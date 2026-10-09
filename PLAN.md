@@ -129,7 +129,7 @@ The style guide and prompts are in `art/` (`STYLE.md`, `prompts/`).
   Highlighted words keep the original's colours, softened. Text appears letter
   by letter, and a click shows it all. A message line shows "Nothing happens." etc.
 - **Moving**: fade through black between scenes.
-- **Mockups**: `docs/mockups/` (grassy bank, dragon cave; laptop and phone
+- **Mockups**: `docs/mockups/` (title, grassy bank, dragon cave; laptop and phone
   screenshots) show the gradient text panel, softened highlight colours,
   5 slots, a compass with missing exits dimmed, and drifting motes.
 - **Phones held upright**: show the whole picture across the top, with the text
