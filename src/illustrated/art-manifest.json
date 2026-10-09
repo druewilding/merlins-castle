@@ -3,22 +3,34 @@
     "title"
   ],
   "rooms": [
+    "charcoal-hut",
     "deep-river",
     "dragon-cave",
     "evergreen-glade",
+    "forest-crossroads",
+    "forest-edge",
     "grassy-bank-sleeping",
     "grassy-bank",
     "merlins-lair",
+    "mossy-steps",
     "mountain-path",
     "old-stone-wall",
-    "old-wall"
+    "old-wall",
+    "rusty-gate",
+    "tower",
+    "yellow-flowers"
   ],
   "items": [
+    "apple",
+    "axe",
+    "emerald",
     "key",
     "ladder",
     "mirror",
     "pearl",
-    "rope"
+    "plank",
+    "rope",
+    "water"
   ],
   "moments": [
     "death-frog"
