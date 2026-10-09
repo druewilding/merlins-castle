@@ -178,7 +178,7 @@ function show(image, images) {
   }
   if (neighbours.length) {
     parts.push(
-      `The last ${neighbours.length > 1 ? `${neighbours.length} images show neighbouring places` : "image shows a neighbouring place"} in the same world (${neighbours.map((n) => n.id).join(", ")}). Anything that appears in both, such as a wall, a path, a river or a mountain, must look the same.`
+      `The last ${neighbours.length > 1 ? `${neighbours.length} images show neighbouring places` : "image shows a neighbouring place"} in the same world (${neighbours.map((n) => n.id).join(", ")}). If this scene's description mentions something that also appears there, such as a wall, a path, a river or a mountain, it must look the same. Don't bring in anything from them that this description doesn't mention.`
     );
   }
   if (prompt.style !== "none") parts.push(styleBlock(prompt.style[0].toUpperCase() + prompt.style.slice(1)));
