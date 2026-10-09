@@ -63,10 +63,24 @@ and the attached anchors are what keep 75 images looking like one world.
 ## Object style block
 
 > A single object painted in the same painterly semi-realistic storybook style
-> as the attached scene. Three-quarter view from slightly above, lit softly from
-> the upper left. The whole object is visible and centred, with a little space
-> around it. **Transparent background**, with no ground, shadow, text or other
-> objects. It should read clearly when shown small.
+> as the attached image. Square image. Three-quarter view from slightly above,
+> lit softly from the upper left. The object is centred and fills most of the
+> frame, with a small even margin, and the whole object is visible.
+>
+> It will be shown very small in the game, so give it a **clear, bold
+> silhouette** and strong, readable shapes and colours, with less fine detail
+> than a scene.
+>
+> **Transparent background.** No ground, cast shadow, glow, sparkles, text or
+> other objects, unless the prompt asks for them. The game adds its own shadow
+> and glow.
+
+Objects use their own anchor: once the ladder is approved it becomes
+`art/anchors/ladder.png`. Attach it (and the grassy bank anchor) for every
+later object, so all 20 look like one set.
+
+The game decides how big each object appears, so don't worry about scale
+between objects. A ring and a ladder both fill their square.
 
 ## Palette and light
 
