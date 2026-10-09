@@ -401,7 +401,8 @@ export class IllustratedApp {
 
     this.seeing.replaceChildren();
     if (itemsHere.length) {
-      const names = itemsHere.flatMap((id, i) => {
+      const byName = [...itemsHere].sort((a, b) => this.world.items[a].name.localeCompare(this.world.items[b].name));
+      const names = byName.flatMap((id, i) => {
         const item = this.world.items[id];
         const name = h("button", { type: "button", class: "name", onclick: () => void this.take(id) }, item.name);
         return [i ? ", " : "", `${item.article} `, name];
