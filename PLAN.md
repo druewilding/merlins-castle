@@ -4,23 +4,23 @@ A faithful remake of Anita Straker's BBC Micro adventure (BBC Model B, April
 1983; published by ESM in 1984), rebuilt as a static TypeScript web game with
 illustrated scenes. Successor to `../merlin-web` (Rails 3 + MongoDB, 2010).
 
-Status: **planning done, content recovered, engine next.**
+Status: **playable teletext version done; art and deploy next.**
 
 ## Decisions
 
-| Topic | Decision |
-|---|---|
-| Fidelity | Map, text and quirks **exactly** as the original. |
-| Input | **Clicking**: direction arrows, objects in the scene, inventory. No typing. |
-| Look | **Full-screen illustrated scene** with the teletext text panel over it. |
-| Art | Pictures for everything: rooms, objects, deaths, clue rooms, title, victory. Leaning towards **pixel art**. |
-| Dead ends | The "You are lost…" clue rooms **end the game**. |
-| Object placement | Random each game (as the original: many objects have two possible rooms). |
-| Saving | **localStorage only**, with named save slots (the original had named position files). |
-| Sound | Silent for now. Maybe later: the original's victory tune is in the code as note data. |
-| Credit | Credit Anita Straker clearly on the title and about screens. |
-| Hosting | GitHub Pages → www.druewilding.com/merlins-castle, later merlinscastle.net. |
-| Someday | Multiplayer. The pure engine keeps this possible, but it is out of scope for now. |
+| Topic            | Decision                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- |
+| Fidelity         | Map, text and quirks **exactly** as the original.                                                           |
+| Input            | **Clicking**: direction arrows, objects in the scene, inventory. No typing.                                 |
+| Look             | **Full-screen illustrated scene** with the teletext text panel over it.                                     |
+| Art              | Pictures for everything: rooms, objects, deaths, clue rooms, title, victory. Leaning towards **pixel art**. |
+| Dead ends        | The "You are lost…" clue rooms **end the game**.                                                            |
+| Object placement | Random each game (as the original: many objects have two possible rooms).                                   |
+| Saving           | **localStorage only**, with named save slots (the original had named position files).                       |
+| Sound            | Silent for now. Maybe later: the original's victory tune is in the code as note data.                       |
+| Credit           | Credit Anita Straker clearly on the title and about screens.                                                |
+| Hosting          | GitHub Pages → www.druewilding.com/merlins-castle, later merlinscastle.net.                                 |
+| Someday          | Multiplayer. The pure engine keeps this possible, but it is out of scope for now.                           |
 
 ## Source material
 
@@ -43,9 +43,9 @@ Status: **planning done, content recovered, engine next.**
   - a plain exit (or none), or
   - a **guarded exit**, which has:
     - the object needed,
-    - a *use message* ("The ladder leans against the wall."),
-    - a *blocked message* ("The wall is too high."), plus whether being blocked kills you,
-    - a *pass message* ("You have climbed over."), plus whether passing kills you.
+    - a _use message_ ("The ladder leans against the wall."),
+    - a _blocked message_ ("The wall is too high."), plus whether being blocked kills you,
+    - a _pass message_ ("You have climbed over."), plus whether passing kills you.
   - Guarded exits that need no object are just messages or traps. For example,
     the mountain's east exit says "Oh dear! Merlin's trap is that way." and kills you.
 - **Use** marks an object as in use in the current room. Several objects can be
@@ -83,7 +83,7 @@ merlins-castle/
   src/main.ts
   public/art/            # pre-generated pixel art (rooms/, items/, deaths/)
   art/prompts/           # the prompt for each image, so art can be regenerated consistently
-  tests/                 # vitest
+  test/                  # vitest
 ```
 
 - **Vite + TypeScript, no framework.** `base: './'` so one build works at
@@ -110,24 +110,30 @@ merlins-castle/
 - Layered images: a room background, plus object sprites placed into the scene
   (they move around randomly, so they can't be baked in), plus death and clue
   vignettes.
-- A nice nod: the notes say the game had no pictures *so that children would
-  paint the scenes*. An optional "crayon mode" in the style of the 2010 sketch
+- A nice nod: the notes say the game had no pictures _so that children would
+  paint the scenes_. An optional "crayon mode" in the style of the 2010 sketch
   could be a fun extra.
 
 ## Milestones
 
-1. ~~Recover the content~~ ✅ (`data/world.json`, all 40 rooms and 20 objects)
-2. **Engine + tests**: rules, quirks, and the golden walkthrough to 100 points.
-3. **Teletext UI**: a faithful black-screen Mode 7 version, playable by
-   clicking. This is also the fallback while art is in progress.
+1. ~~Recover the content~~ ✅ `data/world.json`: all 40 rooms and 20 objects.
+2. ~~Engine + tests~~ ✅ Rules and quirks, plus a golden walkthrough to 100 points
+   (`test/walkthrough.test.ts`).
+3. ~~Teletext UI~~ ✅ Black-screen Mode 7 version, playable by clicking or
+   keyboard, with save slots, notes, about and game over.
 4. **Art**: style exploration on 3–4 rooms first, then the rest.
-5. **Polish + deploy**: save slots, title, notes/about with credit, Pages.
+5. **Polish + deploy**:
+   - port the MERLIN1 title picture (random castle towers on blue);
+   - GitHub Pages workflow;
+   - maybe the victory tune.
 
-## Open questions
+## Decided along the way
 
-- Direction arrows: always show all four (faithful, since you could always
-  *try* any way)? Or only the real exits (as in the 2010 Rails version)?
-- After death or a dead end: show the scene and message first, then the
-  score screen?
-- Should "Best score so far" be kept in localStorage across visits, or only
-  for the session as in the original?
+- **Arrows** show only the real exits. Lost rooms have none, which also
+  removes the original's "two clues" quirk at `clue-silver`. The arrow keys
+  and N/S/E/W keys work as well.
+- **Death or dead end**: show the scene and message first, then "Press
+  RETURN" leads to the score screen.
+- **Best score** is kept in localStorage indefinitely.
+- **Starting score**: objects that start on the bank (sometimes the ladder)
+  count at once, so a game can start at 3. This is faithful to the original.

@@ -98,6 +98,14 @@ for room in world_rooms.values():
         if "obstacle" in ex:
             ex["obstacle"]["needs"] = ids[ex["obstacle"]["needs"]]
 
+# "You are lost" clue rooms: every exit goes to the same room, so the player is
+# stuck. The remake ends the game there instead, so they get no exits.
+for room in world_rooms.values():
+    targets = {ex.get("to") for ex in room["exits"].values()}
+    if len(room["exits"]) == 4 and len(targets) == 1 and not any("obstacle" in ex for ex in room["exits"].values()):
+        room["exits"] = {}
+        room["deadEnd"] = True
+
 bank = world_rooms["grassy-bank"]
 bank["firstVisitDescription"] = bank["description"]
 bank["description"] = "You are standing at a cross-roads. On a{green}grassy{green}bank{white}a figure lies sleeping."

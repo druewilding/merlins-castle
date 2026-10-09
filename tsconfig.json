@@ -1,0 +1,11 @@
+{
+  "extends": "eslint-config-plus-prettier/tsconfig",
+  "include": ["src/**/*", "test/**/*"],
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["vite/client"],
+    "noEmit": true
+  }
+}

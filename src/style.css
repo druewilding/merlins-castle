@@ -1,0 +1,323 @@
+/* A BBC Micro Mode 7 (teletext) screen: 40 columns, double-height text. */
+
+@font-face {
+  font-family: "Bedstead";
+  src: url("/fonts/bedstead.otf") format("opentype");
+  font-display: block;
+}
+
+:root {
+  --black: #000;
+  --red: #f00;
+  --green: #0f0;
+  --yellow: #ff0;
+  --blue: #00f;
+  --magenta: #f0f;
+  --cyan: #0ff;
+  --white: #fff;
+  /* One teletext cell is 0.6em × 1em; fit 40 columns (plus margin) into the viewport. */
+  --cell: min(calc((100vw - 32px) / 24), calc(100vh / 30), 30px);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--black);
+  color: var(--white);
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  font-family: "Bedstead", monospace;
+  font-size: var(--cell);
+  line-height: 1;
+}
+
+.screen {
+  width: 40ch;
+  min-height: 25em;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Teletext rows ---- */
+
+.row {
+  height: 1em;
+  white-space: pre;
+}
+
+.row.double {
+  height: 2em;
+}
+
+.row.double > .inner {
+  display: inline-block;
+  transform: scaleY(2);
+  transform-origin: 0 0;
+  white-space: pre;
+}
+
+.red {
+  color: var(--red);
+}
+.green {
+  color: var(--green);
+}
+.yellow {
+  color: var(--yellow);
+}
+.blue {
+  color: var(--blue);
+}
+.magenta {
+  color: var(--magenta);
+}
+.cyan {
+  color: var(--cyan);
+}
+.white {
+  color: var(--white);
+}
+
+/* ---- Buttons that look like teletext text ---- */
+
+.tt {
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+button.tt.red,
+a.tt.red {
+  color: var(--red);
+}
+button.tt.green {
+  color: var(--green);
+}
+button.tt.yellow {
+  color: var(--yellow);
+}
+button.tt.magenta {
+  color: var(--magenta);
+}
+button.tt.cyan,
+a.tt.cyan {
+  color: var(--cyan);
+}
+button.tt.white {
+  color: var(--white);
+}
+
+/* Inverse video on hover, like a teletext highlight. */
+button.tt:hover,
+a.tt:hover {
+  color: var(--black);
+  background: currentColor;
+}
+
+button.tt.red:hover,
+a.tt.red:hover {
+  background: var(--red);
+}
+button.tt.green:hover {
+  background: var(--green);
+}
+button.tt.yellow:hover {
+  background: var(--yellow);
+}
+button.tt.magenta:hover {
+  background: var(--magenta);
+}
+button.tt.cyan:hover,
+a.tt.cyan:hover {
+  background: var(--cyan);
+}
+button.tt.white:hover,
+button.tt.option:hover {
+  background: var(--white);
+  color: var(--black);
+}
+
+.tt:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+input.tt {
+  width: 21ch;
+  cursor: text;
+  border-bottom: 1px solid var(--yellow);
+  color: var(--yellow);
+}
+
+/* ---- Bottom bar (PROCbar: blue background, white text) ---- */
+
+.bar {
+  margin-top: auto;
+  padding-top: 1em;
+}
+
+.bar > * {
+  display: block;
+  width: 100%;
+  height: 2em;
+  background: var(--blue);
+  color: var(--white);
+  text-align: right;
+  padding-right: 2ch;
+}
+
+.bar > button.tt:hover {
+  background: var(--white);
+  color: var(--blue);
+}
+
+/* ---- Title ---- */
+
+.title-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1em;
+  padding: 2em 0;
+  font: inherit;
+  background: var(--blue);
+  border: 4px solid var(--white);
+  outline: 4px solid var(--blue);
+  outline-offset: 4px;
+  color: var(--black);
+  cursor: pointer;
+}
+
+.title-card .big {
+  font-size: 2em;
+  transform: scaleY(1.6);
+}
+
+/* Placeholder towers until the MERLIN1 title picture is ported. */
+.title-card .castle {
+  width: 24ch;
+  height: 8em;
+  background:
+    linear-gradient(var(--white), var(--white)) 10% 100% / 4ch 70% no-repeat,
+    linear-gradient(var(--white), var(--white)) 38% 100% / 4ch 90% no-repeat,
+    linear-gradient(var(--white), var(--white)) 62% 100% / 4ch 80% no-repeat,
+    linear-gradient(var(--white), var(--white)) 90% 100% / 4ch 60% no-repeat,
+    linear-gradient(var(--white), var(--white)) 50% 100% / 100% 25% no-repeat;
+}
+
+/* ---- Play screen ---- */
+
+.scene,
+.items,
+.messages {
+  margin-bottom: 1em;
+}
+
+.messages:empty {
+  display: none;
+}
+
+.controls {
+  margin-top: auto;
+}
+
+.hands {
+  display: flex;
+  gap: 3ch;
+  align-items: flex-start;
+  min-height: 7em;
+}
+
+.compass {
+  display: grid;
+  grid-template-columns: repeat(3, 3ch);
+  grid-template-rows: repeat(3, 2em);
+  grid-template-areas:
+    ". n ."
+    "w . e"
+    ". s .";
+  flex-shrink: 0;
+}
+
+.arrow {
+  font-size: 2em;
+  line-height: 1;
+  width: 1.5ch;
+  justify-self: center;
+}
+
+.arrow.north {
+  grid-area: n;
+}
+.arrow.south {
+  grid-area: s;
+}
+.arrow.east {
+  grid-area: e;
+}
+.arrow.west {
+  grid-area: w;
+}
+
+.carrying {
+  list-style: none;
+  margin: 0 0 0.5em;
+  padding: 0;
+}
+
+.carrying li {
+  display: flex;
+  gap: 1ch;
+  height: 1.4em;
+  align-items: center;
+}
+
+.carrying li > span {
+  width: 8ch;
+}
+
+.actions {
+  display: flex;
+  gap: 2ch;
+}
+
+.bar.status > div {
+  display: flex;
+  align-items: center;
+  gap: 3ch;
+  padding: 0 2ch;
+}
+
+.bar.status > div > span {
+  margin-right: auto;
+}
+
+.bar.status button.tt:hover {
+  background: var(--white);
+  color: var(--blue);
+}
+
+.prompt {
+  margin-top: auto;
+}
+
+.prompt input {
+  transform: none;
+}

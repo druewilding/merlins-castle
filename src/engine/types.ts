@@ -34,11 +34,11 @@ export interface Room {
   firstVisitDescription?: TeletextString; // grassy bank: "You wake up on a grassy bank…"
   crowdedDescription?: TeletextString; // grassy bank with >12 items on it
   exits: Partial<Record<Direction, Exit>>;
+  // "You are lost…" clue rooms. In the original every exit looped back; in
+  // the remake arriving here ends the game.
+  deadEnd?: true;
   image?: string;
 }
-
-// A room whose every exit leads back to itself (the "You are lost…" clue
-// rooms) is a dead end: the game is over.
 
 export interface Exit {
   to: RoomId | null; // null: "You can't go that way." (after any obstacle)
@@ -74,7 +74,9 @@ export interface GameState {
   // Items "used" in this room. Several can be in use at once, and they stay in
   // use even if dropped (original quirk). Cleared on entering any room.
   using: ItemId[];
-  turnsOnBank: number; // original C%: first visit shows firstVisitDescription
+  // Original C%: how many times the room has been shown (on arrival and after
+  // a successful drop). Only the very first look uses firstVisitDescription.
+  looks: number;
   status: GameStatus;
 }
 

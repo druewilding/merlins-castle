@@ -7,3 +7,6 @@ dist/
 #   cd original && python3 extract.py MerlinsCastle.ssd
 original/*.ssd
 original/files/
+
+# A full solution (spoilers!), kept locally only
+test/walkthrough.test.ts

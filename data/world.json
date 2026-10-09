@@ -8,20 +8,8 @@
   "rooms": {
     "clue-spell": {
       "description": "You are too weak but you get a clue:{red}Use the spell when you meet Merlin.",
-      "exits": {
-        "south": {
-          "to": "clue-spell"
-        },
-        "west": {
-          "to": "clue-spell"
-        },
-        "north": {
-          "to": "clue-spell"
-        },
-        "east": {
-          "to": "clue-spell"
-        }
-      }
+      "exits": {},
+      "deadEnd": true
     },
     "wizards-kitchen": {
       "description": "You are in the{blue}wizard's kitchen. There is a smell of toads and spices brewing. Merlin appears!",
@@ -212,20 +200,8 @@
     },
     "clue-silver": {
       "description": "You are lost but you find a clue:   {red}Give Merlin silver for his buttons.",
-      "exits": {
-        "south": {
-          "to": "clue-mask"
-        },
-        "west": {
-          "to": "clue-mask"
-        },
-        "north": {
-          "to": "clue-mask"
-        },
-        "east": {
-          "to": "clue-mask"
-        }
-      }
+      "exits": {},
+      "deadEnd": true
     },
     "dragon-cave": {
       "description": "You stand in a{cyan}large{cyan}cave.{white}A{red}splendid{red}dragon{white}puffing fire stands in the entrance of the tunnel South. More tunnels lead West and North.",
@@ -634,71 +610,23 @@
     },
     "clue-mask": {
       "description": "You are lost but you find a clue:   {red}A{red}mask{red}hides you{red}from{red}goblins.",
-      "exits": {
-        "south": {
-          "to": "clue-mask"
-        },
-        "west": {
-          "to": "clue-mask"
-        },
-        "north": {
-          "to": "clue-mask"
-        },
-        "east": {
-          "to": "clue-mask"
-        }
-      }
+      "exits": {},
+      "deadEnd": true
     },
     "clue-ring": {
       "description": "You are lost but you find a clue:   {red}A{red}ring helps to{red}move{red}a{red}stone.",
-      "exits": {
-        "south": {
-          "to": "clue-ring"
-        },
-        "west": {
-          "to": "clue-ring"
-        },
-        "north": {
-          "to": "clue-ring"
-        },
-        "east": {
-          "to": "clue-ring"
-        }
-      }
+      "exits": {},
+      "deadEnd": true
     },
     "clue-plank": {
       "description": "You are lost but you find a clue:   {red}A{red}plank{red}makes a{red}bridge{red}for{red}you.",
-      "exits": {
-        "south": {
-          "to": "clue-plank"
-        },
-        "west": {
-          "to": "clue-plank"
-        },
-        "north": {
-          "to": "clue-plank"
-        },
-        "east": {
-          "to": "clue-plank"
-        }
-      }
+      "exits": {},
+      "deadEnd": true
     },
     "clue-rope": {
       "description": "You are lost but you find a clue:   {red}Tie{red}goblins{red}up with rope if you can.",
-      "exits": {
-        "south": {
-          "to": "clue-rope"
-        },
-        "west": {
-          "to": "clue-rope"
-        },
-        "north": {
-          "to": "clue-rope"
-        },
-        "east": {
-          "to": "clue-rope"
-        }
-      }
+      "exits": {},
+      "deadEnd": true
     }
   },
   "items": {

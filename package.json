@@ -1,0 +1,28 @@
+{
+  "name": "merlins-castle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A remake of Anita Straker's BBC Micro adventure Merlin's Castle",
+  "license": "ISC",
+  "author": "Drue Wilding",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "world": "cd original && python3 convert.py",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint --fix",
+    "lint:check": "eslint"
+  },
+  "prettier": "eslint-config-plus-prettier/prettier",
+  "devDependencies": {
+    "eslint-config-plus-prettier": "4.3.3",
+    "typescript": "6.0.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.3"
+  }
+}
