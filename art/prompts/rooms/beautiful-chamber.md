@@ -1,3 +1,11 @@
+---
+style: scene
+reference: style
+attach:
+  - art/anchors/grassy-bank.png
+  - art/originals/rooms/merlins-lair.png
+---
+
 # beautiful-chamber
 
 Original text: "You are in a beautiful chamber. The floor is covered in black and white tiles and the walls are gold. A lonely flute is playing."
@@ -6,7 +14,7 @@ Exits:
 
 - north → dark-tunnels
 
-## Prompt (paste after the scene style block; attach the grassy bank anchor and `merlins-lair`)
+## Prompt
 
 > A **beautiful chamber** deep underground. The floor is covered in **black and white chequered tiles**, the walls are **gold**, softly gleaming in warm light. In the middle, a single silver **flute** floats in the air, playing by itself, with faint drifting musical shimmer around it. Lonely, magical and still.
 >

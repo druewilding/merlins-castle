@@ -1,3 +1,11 @@
+---
+style: scene
+reference: style
+attach:
+  - art/anchors/grassy-bank.png
+  - art/originals/rooms/dragon-cave.png
+---
+
 # oak-door
 
 Original text: "There is a tunnel to the East. An old oak door bars your way South. You can hear singing from behind it."
@@ -9,7 +17,7 @@ Exits:
 
 The old oak door is to the south, directly behind the viewer, so it's suggested by the light and music from the bottom edge.
 
-## Prompt (paste after the scene style block; attach the grassy bank anchor and `dragon-cave`)
+## Prompt
 
 > A short underground passage with a tunnel leading away to the east (right). The rough rock walls are lit by **warm golden light and faint musical shimmer** coming from the bottom edge of the picture, as if a door behind the viewer has someone **singing** on the other side.
 >

@@ -1,3 +1,11 @@
+---
+style: scene
+reference: style
+attach:
+  - art/anchors/grassy-bank.png
+  - art/originals/rooms/mountain.png
+---
+
 # maze
 
 Original text: "You are inside the maze at a crossroads. You can sense danger."
@@ -9,7 +17,7 @@ Exits:
 - south → mountain
 - west → trolls
 
-## Prompt (paste after the scene style block; attach the grassy bank anchor and `mountain` once it exists)
+## Prompt
 
 > Inside a **maze** of high, ancient grey stone walls, open to the sky, at a crossroads. Passages lead away to the north (top), west (left) and east (right). Strange shadows; **you can sense danger**. Just beyond the north passage, the floor drops away into a deep black hole.
 >

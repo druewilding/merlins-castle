@@ -1,5 +1,8 @@
 # Merlin's Castle — art style guide
 
+**Shortcut:** `npm run art` puts all of the below together for you, one
+image at a time. See `prompts/README.md`.
+
 Every image is made in ChatGPT from two parts pasted together:
 
 1. The **style block** below (scenes or objects), unchanged every time.

@@ -1,3 +1,11 @@
+---
+style: scene
+reference: style
+attach:
+  - art/anchors/grassy-bank.png
+  - art/originals/rooms/dragon-cave.png
+---
+
 # dark-tunnels
 
 Original text: "You are at a crossroads in the tunnels. It is very dark."
@@ -11,7 +19,7 @@ Exits:
 
 It's meant to be hard to see. The lamp makes it lighter, but there's only one picture per room.
 
-## Prompt (paste after the scene style block; attach the grassy bank anchor and `dragon-cave`)
+## Prompt
 
 > A crossroads of rough tunnels deep underground. It is **very dark**: the picture is mostly deep blue-black shadow, with just enough faint light to make out the shapes of the tunnels.
 >

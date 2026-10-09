@@ -1,7 +1,15 @@
+---
+style: object
+reference: object
+attach:
+  - art/anchors/grassy-bank.png
+  - art/anchors/ladder.png
+---
+
 # rope
 
 In the game: "a rope", worth 3 points on the grassy bank.
 
-## Prompt (paste after the object style block; attach the grassy bank and ladder anchors)
+## Prompt
 
 > A neat coil of thick, strong hemp rope.

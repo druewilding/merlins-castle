@@ -1,0 +1,67 @@
+// Turns the full-size originals in art/originals into web images in
+// public/art, and records which images exist in
+// src/illustrated/art-manifest.json so the game can fall back gracefully.
+//
+//   npm run art:build     (npm run art also does this first)
+//
+// Scenes, rooms and moments become 1536px-wide WebP. Objects are cropped to
+// their outline, padded evenly onto a transparent square, and saved at 384px.
+// Only new or changed originals are rebuilt.
+
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import sharp from "sharp";
+
+const KINDS = ["scenes", "rooms", "items", "moments"];
+const ITEM_SIZE = 384;
+const ITEM_MARGIN = 0.06;
+
+export async function buildArt({ quiet = false } = {}) {
+  const manifest = {};
+  let built = 0;
+  for (const kind of KINDS) {
+    manifest[kind] = [];
+    const dir = `art/originals/${kind}`;
+    if (!existsSync(dir)) continue;
+    mkdirSync(`public/art/${kind}`, { recursive: true });
+    for (const file of readdirSync(dir)
+      .filter((f) => f.endsWith(".png"))
+      .sort()) {
+      const id = file.replace(/\.png$/, "");
+      const src = `${dir}/${file}`;
+      const out = `public/art/${kind}/${id}.webp`;
+      manifest[kind].push(id);
+      if (existsSync(out) && statSync(out).mtimeMs >= statSync(src).mtimeMs) continue;
+      if (kind === "items") await buildItem(src, out);
+      else await sharp(src).resize({ width: 1536, withoutEnlargement: true }).webp({ quality: 80 }).toFile(out);
+      built++;
+      if (!quiet) console.log(`  built ${out}`);
+    }
+  }
+  writeFileSync("src/illustrated/art-manifest.json", JSON.stringify(manifest, null, 2) + "\n");
+  if (!quiet) console.log(built ? `${built} image(s) built.` : "All web images are up to date.");
+  return built;
+}
+
+// sharp always resizes before extending within one pipeline, so pad first and
+// resize in a second pass.
+async function buildItem(src, out) {
+  const { data, info } = await sharp(src).ensureAlpha().trim().png().toBuffer({ resolveWithObject: true });
+  const side = Math.round(Math.max(info.width, info.height) * (1 + ITEM_MARGIN * 2));
+  const x = side - info.width;
+  const y = side - info.height;
+  const padded = await sharp(data)
+    .extend({
+      top: Math.floor(y / 2),
+      bottom: Math.ceil(y / 2),
+      left: Math.floor(x / 2),
+      right: Math.ceil(x / 2),
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .png()
+    .toBuffer();
+  await sharp(padded).resize(ITEM_SIZE, ITEM_SIZE).webp({ quality: 88, alphaQuality: 100 }).toFile(out);
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) await buildArt();

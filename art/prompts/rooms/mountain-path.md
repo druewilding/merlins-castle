@@ -1,3 +1,10 @@
+---
+style: scene
+reference: style
+attach:
+  - art/anchors/grassy-bank.png
+---
+
 # mountain-path
 
 Original text: "You are on a path running North to South. Thick trees are at the foot of a mountain to the North."
@@ -7,7 +14,7 @@ Exits:
 - north → mountain (needs the axe; blocked: "The trees are too dense.")
 - south → grassy-bank
 
-## Prompt (paste after the scene style block; attach the grassy bank anchor)
+## Prompt
 
 > A path running north to south across open hillside. To the north (top), the path disappears into **thick, dense trees** (an impenetrable wall of trunks and branches) at the foot of a tall blue-grey **mountain** rising behind.
 >

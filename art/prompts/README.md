@@ -1,11 +1,19 @@
 # Image prompts
 
 Each file is one image, named after its id in `data/world.json`. The style
-blocks and workflow are in `../STYLE.md`. To see what's made and what's left:
+blocks and workflow are in `../STYLE.md`.
+
+The easy way to make them:
 
 ```
-npm run art:status
+npm run art              # the next image: what to attach, what to paste
+                         # (copied to your clipboard), where to save it
+npm run art -- moat      # the same for a particular image
+npm run art:status       # everything, made or not
 ```
+
+Each file starts with a small header (`style`, `reference`, `attach`) that
+the script reads. The prompt is the quote under `## Prompt`.
 
 - `scenes/`: the title.
 - `rooms/`: one per room (31, plus the 3 already made). The 6 "lost" clue
@@ -15,7 +23,8 @@ npm run art:status
 
 ## Suggested order
 
-Paint outwards from the start, so the game fills in the way a player
+`npm run art` follows this order, with each object straight after the room
+it's first found in. Paint outwards from the start, so the game fills in the way a player
 explores it:
 
 1. **Around the bank**: mountain-path, evergreen-glade, deep-river,

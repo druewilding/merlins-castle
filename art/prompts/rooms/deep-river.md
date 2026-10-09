@@ -1,3 +1,10 @@
+---
+style: scene
+reference: style
+attach:
+  - art/anchors/grassy-bank.png
+---
+
 # deep-river
 
 Original text: "To the South a deep river is running swiftly. Paths lead North and East. A golden spire can be seen to the South across the water."
@@ -10,7 +17,7 @@ Exits:
 
 The river is to the south, so it runs along the bottom. The golden spire across it is behind the viewer, so the text describes it.
 
-## Prompt (paste after the scene style block; attach the grassy bank anchor)
+## Prompt
 
 > A **deep, swift river** runs across the lower part of the picture from left to right, with foaming rapids. This side of it (the middle and upper picture) is a grassy bank with paths.
 >

@@ -1,3 +1,11 @@
+---
+style: scene
+reference: style
+attach:
+  - art/anchors/grassy-bank.png
+  - art/originals/rooms/merlins-lair.png
+---
+
 # treasure-room
 
 Original text: "You are in a treasure room. There are doors to the South, West and East."
@@ -10,7 +18,7 @@ Exits:
 
 The south door (over the hole) is behind the viewer. No loose treasure is painted in, because the gold is a takeable object.
 
-## Prompt (paste after the scene style block; attach the grassy bank anchor and `merlins-lair`)
+## Prompt
 
 > A **treasure room** carved from rock deep underground: gilded walls, carved pillars, open empty treasure chests and bare stone plinths. Its riches have mostly been taken, and only the glitter in the gilding remains. There are doors to the west (left) and east (right).
 >

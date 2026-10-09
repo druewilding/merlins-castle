@@ -1,3 +1,11 @@
+---
+style: none
+reference: none
+attach:
+  - art/anchors/grassy-bank.png
+  - docs/bbc-title-screen.png
+---
+
 # title
 
 The title screen. The game overlays "Merlin's Castle" and "By Anita Straker"
@@ -6,13 +14,10 @@ in its own font, so the image has no text.
 This prompt is **self-contained**: don't paste the scene style block (its
 camera and composition rules are for rooms).
 
-## Attach two images
+The two attached images: the grassy bank anchor (painting style) and the
+original 1983 title screen (the castle's shape).
 
-1. `art/anchors/grassy-bank.png`: the painting style.
-2. `docs/bbc-title-screen.png`: the original 1983 title screen, for the
-   castle's shape.
-
-## Prompt (paste as it is)
+## Prompt
 
 > The first attached image is a **style reference**: match its painterly,
 > semi-realistic storybook style, brushwork and level of detail, but not its

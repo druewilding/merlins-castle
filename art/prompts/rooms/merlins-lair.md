@@ -1,3 +1,10 @@
+---
+style: scene
+reference: style
+attach:
+  - art/anchors/grassy-bank.png
+---
+
 # merlins-lair
 
 Original text: "This is Merlin the wizard's lair. The walls are purple and green.
@@ -5,7 +12,7 @@ A cauldron boils. The wizard comes towards you!"
 
 Exits: north → grand hall (needs the spell; otherwise "You are turned into a frog.").
 
-## Prompt (paste after the scene style block; attach the anchor)
+## Prompt
 
 > The secret lair of **Merlin the wizard**, inside a castle. The stone walls
 > are painted in deep purple and rich green, with shelves of old books, jars

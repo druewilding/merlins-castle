@@ -1,3 +1,11 @@
+---
+style: scene
+reference: style
+attach:
+  - art/anchors/grassy-bank.png
+  - art/originals/rooms/forest-edge.png
+---
+
 # forest-witches
 
 Original text: "You are in the forest. Some rabbits warn you of some witches dancing in the West."
@@ -9,7 +17,7 @@ Exits:
 - south → clue-silver
 - west → forest-crossroads (needs the broom; blocked: "The witches catch you and tie you up.", fatal)
 
-## Prompt (paste after the scene style block; attach the grassy bank anchor and `forest-edge` once it exists)
+## Prompt
 
 > Deep in a green **forest**. In the lower middle, a few **rabbits** sit up on their hind legs, ears alert, all looking anxiously to the left. On the left (west), between the trees, some **witches** in pointed hats are **dancing** in a ring around a small fire, silhouetted and a little blurred by distance.
 >

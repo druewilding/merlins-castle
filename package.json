@@ -17,11 +17,14 @@
     "format:check": "prettier --check .",
     "lint": "eslint --fix",
     "lint:check": "eslint",
-    "art:status": "node scripts/art-status.js"
+    "art:status": "node scripts/art.js --list",
+    "art": "node scripts/art.js",
+    "art:build": "node scripts/build-art.js"
   },
   "prettier": "eslint-config-plus-prettier/prettier",
   "devDependencies": {
     "eslint-config-plus-prettier": "4.3.3",
+    "sharp": "0.35.5",
     "typescript": "6.0.3",
     "vite": "8.3.4",
     "vitest": "5.0.3"

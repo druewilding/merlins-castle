@@ -1,3 +1,10 @@
+---
+style: scene
+reference: style
+attach:
+  - art/anchors/grassy-bank.png
+---
+
 # courtyard
 
 Original text: "You are in a sunny courtyard with rambling pink roses. To the North is a drawbridge. There is a coach house to the East. Southwards is a hall."
@@ -10,7 +17,7 @@ Exits:
 
 The hall to the south is behind the viewer.
 
-## Prompt (paste after the scene style block; attach the grassy bank anchor)
+## Prompt
 
 > A sunny castle courtyard, warm and peaceful. Old stone walls are covered with **rambling pink roses**, with a stone well and cobbles warm in the sun.
 >

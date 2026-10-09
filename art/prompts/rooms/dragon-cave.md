@@ -1,3 +1,10 @@
+---
+style: scene
+reference: style
+attach:
+  - art/anchors/grassy-bank.png
+---
+
 # dragon-cave
 
 Original text: "You stand in a large cave. A splendid dragon puffing fire stands
@@ -10,7 +17,7 @@ the lower part of the picture with **its back to us**, facing into the cave.
 Its head turns in profile so we can see its face and fire. The text panel
 can cover its tail and feet, but not its head or wings.
 
-## Prompt (paste after the scene style block; attach the anchor)
+## Prompt
 
 > A large, high cavern of warm brown and amber rock, lit by firelight. A
 > **splendid dragon** with crimson-pink scales and great violet wings stands

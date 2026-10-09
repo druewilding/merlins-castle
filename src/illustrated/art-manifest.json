@@ -1,0 +1,19 @@
+{
+  "scenes": [
+    "title"
+  ],
+  "rooms": [
+    "dragon-cave",
+    "grassy-bank",
+    "merlins-lair",
+    "mountain-path"
+  ],
+  "items": [
+    "ladder",
+    "pearl",
+    "rope"
+  ],
+  "moments": [
+    "death-frog"
+  ]
+}
