@@ -6,12 +6,15 @@
     "deep-river",
     "dragon-cave",
     "evergreen-glade",
+    "grassy-bank-sleeping",
     "grassy-bank",
     "merlins-lair",
     "mountain-path",
-    "old-stone-wall"
+    "old-stone-wall",
+    "old-wall"
   ],
   "items": [
+    "key",
     "ladder",
     "mirror",
     "pearl",
