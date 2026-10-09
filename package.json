@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint --fix",
-    "lint:check": "eslint"
+    "lint:check": "eslint",
+    "art:status": "node scripts/art-status.js"
   },
   "prettier": "eslint-config-plus-prettier/prettier",
   "devDependencies": {

@@ -94,6 +94,23 @@ between objects. A ring and a ladder both fill their square.
 - The original's highlighted words (grassy bank in green, golden spire in
   yellow, the dragon in red) should be the eye-catching colours in their scenes.
 
+## Moment style block
+
+For deaths, the lost scenes and victory (`prompts/moments/`). These are not
+map views, so the camera rule doesn't apply.
+
+> Painterly semi-realistic fantasy illustration, like a full-page picture in
+> a storybook, in the same style, brushwork and level of detail as the
+> attached image. Landscape 3:2. A single dramatic moment, composed freely for
+> effect, with soft cinematic light. It is for children, so it's never gory or
+> truly frightening: the mood is whimsical, eerie or bittersweet, like the
+> "and that was the end of the adventure" page of a fairy tale. Keep the
+> bottom quarter calm and simple, because text will cover it. No text or
+> letters.
+
+Where a moment shows the player (as a frog, a statue or a mouse), they are
+small, seen from a distance or from behind, with no recognisable face.
+
 ## The "behind you" rule
 
 The camera always faces north, so the south is behind the viewer:
@@ -104,6 +121,9 @@ The camera always faces north, so the south is behind the viewer:
   to the south) stand in the lower part of the picture **seen from behind**,
   facing into the scene. Their heads can turn in profile.
 - South paths, tunnels and doors simply leave the bottom edge of the picture.
+- A door or wall **directly behind** the viewer (the tower's stone, the oak
+  door) is suggested by light or sound coming from the bottom edge, not
+  painted.
 
 ## Things to keep consistent
 
