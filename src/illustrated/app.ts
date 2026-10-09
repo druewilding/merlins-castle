@@ -292,18 +292,30 @@ export class IllustratedApp {
     this.renderCompass(ended ? [] : view.exits);
     this.compass.hidden = ended;
     this.renderSlots(arriving);
-    const action = ended
-      ? h(
+    const action = !ended && this.slotOrder.length > 1 ? link("Drop all", () => void this.dropAll()) : null;
+    this.handsActions.replaceChildren(...(action ? [action] : []));
+    if (ended && !this.overlay.querySelector(".curtain")) this.dropCurtain();
+    preload(view.exits.map((d) => artUrl("rooms", this.world.rooms[game.room].exits[d]?.to ?? undefined)));
+  }
+
+  // When the game ends, a curtain falls over the scene, with the last words
+  // and a Continue button in the middle. Winning gets no dark curtain.
+  private dropCurtain() {
+    const game = this.game!;
+    const last = game.status === "dead" ? this.events.at(-1) : undefined;
+    this.overlay.replaceChildren(
+      h(
+        "div",
+        { class: game.status === "won" ? "curtain bright" : "curtain" },
+        last && h("p", { class: "last-words" }, plainText(last.text)),
+        h(
           "button",
           { type: "button", class: "pill", autofocus: true, onclick: () => this.continueAfterEnding() },
           "Continue"
         )
-      : this.slotOrder.length > 1
-        ? link("Drop all", () => void this.dropAll())
-        : null;
-    this.handsActions.replaceChildren(...(action ? [action] : []));
-    if (ended) this.focusAutofocus();
-    preload(view.exits.map((d) => artUrl("rooms", this.world.rooms[game.room].exits[d]?.to ?? undefined)));
+      )
+    );
+    this.focusAutofocus();
   }
 
   private sceneFor(game: GameState): string | null {
