@@ -129,6 +129,13 @@ The style guide and prompts are in `art/` (`STYLE.md`, `prompts/`).
   Highlighted words keep the original's colours, softened. Text appears letter
   by letter, and a click shows it all. A message line shows "Nothing happens." etc.
 - **Moving**: fade through black between scenes.
+- **Mockups**: `docs/mockups/` (grassy bank, dragon cave; laptop and phone
+  screenshots) show the gradient text panel, softened highlight colours,
+  5 slots, a compass with missing exits dimmed, and drifting motes.
+- **Phones held upright**: show the whole picture across the top, with the text
+  below and the compass as a thumb pad above the slots, so side exits aren't
+  cropped away. Landscape screens get the full-screen layout with a corner
+  compass.
 - **Extra images**: full-screen death scenes, lost-in-the-mist scenes (shared
   by the clue rooms), the title and victory.
 - **Classic mode**: the existing teletext UI, plus (one day) a typed command

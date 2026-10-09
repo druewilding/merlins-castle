@@ -1,0 +1,187 @@
+<!doctype html>
+<!-- Mockup of the illustrated UI text panel. Open locally: the scene image is in art/originals (not committed). Screenshots: grassy-bank-laptop.jpg, grassy-bank-phone.jpg. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IM+Fell+English&family=Cinzel:wght@600&display=block"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+      .scene {
+        position: fixed;
+        inset: 0;
+        background: url(../../art/originals/rooms/grassy-bank.png) center 45% / cover;
+      }
+      .panel {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 3.5rem 2.5rem 1.2rem;
+        display: flex;
+        gap: 2rem;
+        align-items: flex-end;
+        background: linear-gradient(to bottom, transparent, rgba(8, 4, 2, 0.82) 32%, rgba(8, 4, 2, 0.92));
+        color: #f3e9d2;
+        font-family: "IM Fell English", serif;
+      }
+      .text {
+        flex: 1;
+        font-size: clamp(17px, 1.6vw, 23px);
+        line-height: 1.45;
+        max-width: 46em;
+      }
+      .text p {
+        margin: 0 0 0.4em;
+      }
+      .hl-cyan {
+        color: #9fe3e6;
+      }
+      .hl-red {
+        color: #ff8a7a;
+      }
+      .items {
+        color: #f0b38a;
+      }
+      .msg {
+        color: #ffe08a;
+        font-style: italic;
+      }
+      .slots {
+        display: flex;
+        gap: 0.6rem;
+      }
+      .slot {
+        width: clamp(48px, 5vw, 72px);
+        aspect-ratio: 1;
+        border: 1px solid rgba(243, 233, 210, 0.35);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .slot.full {
+        background: rgba(255, 255, 255, 0.08) radial-gradient(circle, #c9a26a 0 30%, transparent 31%);
+      }
+      .slot.use {
+        box-shadow:
+          0 0 0 2px #ffd84a,
+          0 0 18px 4px rgba(255, 216, 74, 0.6);
+      }
+      .compass {
+        position: fixed;
+        z-index: 2;
+        right: 2rem;
+        top: 2rem;
+        color: #f3e9d2;
+        font: 600 22px Cinzel;
+        text-shadow: 0 0 6px #000;
+        display: grid;
+        grid-template: repeat(3, 1.6em) / repeat(3, 1.6em);
+        text-align: center;
+      }
+      .compass .off {
+        opacity: 0.25;
+      }
+      .compass .n {
+        grid-area: 1/2;
+      }
+      .compass .w {
+        grid-area: 2/1;
+      }
+      .compass .s {
+        grid-area: 3/2;
+      }
+      .compass .e {
+        grid-area: 2/3;
+      }
+      .hl-green {
+        color: #b5e48c;
+      }
+      /* Drifting motes of golden and violet light, animated in the real game. */
+      .motes {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(circle at 38% 34%, rgba(255, 226, 140, 0.9) 0 2px, transparent 6px),
+          radial-gradient(circle at 46% 28%, rgba(214, 170, 255, 0.8) 0 1.5px, transparent 5px),
+          radial-gradient(circle at 55% 40%, rgba(255, 226, 140, 0.8) 0 2px, transparent 6px),
+          radial-gradient(circle at 31% 45%, rgba(255, 226, 140, 0.7) 0 1.5px, transparent 5px),
+          radial-gradient(circle at 63% 31%, rgba(214, 170, 255, 0.7) 0 2px, transparent 6px),
+          radial-gradient(circle at 50% 50%, rgba(255, 226, 140, 0.6) 0 1.5px, transparent 5px);
+      }
+      /* Phones held upright: the whole picture across the top, text below. */
+      @media (max-aspect-ratio: 1/1) {
+        .scene {
+          bottom: auto;
+          height: calc(100vw * 2 / 3);
+          background-position: center;
+          background-size: cover;
+        }
+        .scene::after {
+          content: "";
+          position: absolute;
+          inset: 60% 0 0;
+          background: linear-gradient(to bottom, transparent, #0b0603);
+        }
+        .panel {
+          top: calc(100vw * 2 / 3);
+          flex-direction: column;
+          align-items: stretch;
+          justify-content: space-between;
+          padding: 1rem 1.2rem;
+          background: #0b0603;
+        }
+        .slots {
+          justify-content: space-between;
+        }
+        .compass {
+          top: auto;
+          right: 50%;
+          bottom: 92px;
+          transform: translateX(50%);
+          font-size: 24px;
+          grid-template: repeat(3, 2.1em) / repeat(3, 2.1em);
+          gap: 4px;
+          text-shadow: none;
+        }
+        .compass span {
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          border: 1px solid rgba(243, 233, 210, 0.3);
+          background: rgba(255, 255, 255, 0.06);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="scene"><div class="motes"></div></div>
+    <div class="compass">
+      <span class="n">N</span><span class="w">W</span><span class="e">E</span><span class="s">S</span>
+    </div>
+    <div class="panel">
+      <div class="text">
+        <p>
+          You wake up on a <span class="hl-green">grassy bank</span> at a cross-roads. It is warm and the bees are
+          humming. There is a feeling of magic and mystery all around you.
+        </p>
+        <p class="items">You can see a ladder.</p>
+      </div>
+      <div class="slots">
+        <div class="slot"></div>
+        <div class="slot"></div>
+        <div class="slot"></div>
+        <div class="slot"></div>
+        <div class="slot"></div>
+      </div>
+    </div>
+  </body>
+</html>
