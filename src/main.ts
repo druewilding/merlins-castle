@@ -1,7 +1,13 @@
-import "./style.css";
-
 import worldJson from "../data/world.json";
 import type { World } from "./engine/types";
-import { App } from "./ui/app";
+import { getMode } from "./shared/storage";
 
-new App(document.getElementById("app")!, worldJson as unknown as World);
+const world = worldJson as unknown as World;
+const root = document.getElementById("app")!;
+
+// Only the chosen version (and its styles) is loaded.
+if (getMode() === "classic") {
+  import("./classic/main").then(({ startClassic }) => startClassic(root, world));
+} else {
+  import("./illustrated/main").then(({ startIllustrated }) => startIllustrated(root, world));
+}

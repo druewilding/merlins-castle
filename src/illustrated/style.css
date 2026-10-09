@@ -1,0 +1,786 @@
+/* The illustrated version: a painted scene with a storybook text panel. */
+
+:root {
+  --ink: #f3e9d2;
+  --ink-soft: rgba(243, 233, 210, 0.65);
+  --line: rgba(243, 233, 210, 0.3);
+  --gold: #ffe08a;
+  --glow: #ffd84a;
+  --panel: #0b0603;
+  --red: #ff8a7a;
+  --green: #b5e48c;
+  --yellow: #ffe08a;
+  --blue: #9db4ff;
+  --magenta: #e0a3ff;
+  --cyan: #9fe3e6;
+  --serif: "IM Fell English", Georgia, "Times New Roman", serif;
+  --caps: Cinzel, "Trajan Pro", Georgia, serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  color: var(--ink);
+  font-family: var(--serif);
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- The scene: a 3:2 painting that covers the screen ---- */
+
+.stage {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: max(100vw, 150vh);
+  aspect-ratio: 3 / 2;
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  background: #0b0710;
+}
+
+.scene-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scene-img:not([src]) {
+  display: none;
+}
+
+.placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-bottom: 15%;
+  background: radial-gradient(ellipse at 50% 40%, #2c2440, #0b0710 70%);
+  color: var(--ink-soft);
+  font-style: italic;
+  font-size: clamp(16px, 1.6vw, 22px);
+}
+
+.placeholder[hidden] {
+  display: none;
+}
+
+.fader {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* Drifting motes of golden and violet light. */
+.motes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.mote {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 228, 150, 0.9);
+  box-shadow: 0 0 8px 3px rgba(255, 214, 120, 0.45);
+  opacity: 0;
+  animation: drift 14s ease-in-out infinite;
+}
+
+.mote.violet {
+  background: rgba(220, 180, 255, 0.9);
+  box-shadow: 0 0 8px 3px rgba(190, 150, 255, 0.4);
+}
+
+@keyframes drift {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  20%,
+  70% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(30px, -90px);
+  }
+}
+
+.mc--title .motes,
+.mc--over .motes {
+  display: none;
+}
+
+/* ---- Objects lying in the scene ---- */
+
+.things {
+  position: absolute;
+  inset: 0;
+}
+
+.thing {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  /* A faint glow says "you can take this"; the shadow sits it on the ground. */
+  filter: drop-shadow(0 0 5px rgba(255, 236, 170, 0.55)) drop-shadow(0 7px 5px rgba(0, 0, 0, 0.55));
+  transition:
+    left 0.5s ease,
+    top 0.5s ease,
+    transform 0.2s ease,
+    filter 0.2s ease;
+}
+
+.thing img {
+  display: block;
+  width: 100%;
+  pointer-events: none;
+}
+
+.thing:hover,
+.thing:focus-visible {
+  transform: translate(-50%, -100%) scale(1.08);
+  filter: drop-shadow(0 0 9px rgba(255, 236, 170, 0.8)) drop-shadow(0 7px 5px rgba(0, 0, 0, 0.55));
+}
+
+/* Used, then dropped: still glowing until you leave the room. */
+.thing.in-use {
+  filter: drop-shadow(0 0 3px var(--glow)) drop-shadow(0 0 14px rgba(255, 216, 74, 0.8));
+}
+
+.token {
+  width: auto !important;
+  padding: 0.35em 0.8em;
+  border: 1px solid rgba(255, 224, 138, 0.6);
+  border-radius: 999px;
+  background: rgba(20, 14, 8, 0.75);
+  color: var(--gold);
+  font: 600 clamp(11px, 0.9vw, 14px) var(--caps);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.flyer {
+  position: fixed;
+  z-index: 40;
+  pointer-events: none;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(255, 236, 170, 0.6)) drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5));
+}
+
+/* Darkens the scene around a picked-up object while it's shown off. */
+.spotlight {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle at 50% var(--y),
+    rgba(255, 230, 160, 0.18),
+    rgba(0, 0, 0, 0.55) 30%,
+    rgba(0, 0, 0, 0.65)
+  );
+}
+
+.flyer.dragging {
+  opacity: 0.9;
+  transition: none;
+}
+
+/* ---- Top bar ---- */
+
+.topbar {
+  position: fixed;
+  top: 1.2rem;
+  left: 1.6rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1.3rem;
+  font: 600 13px var(--caps);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  background: rgba(8, 5, 3, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.mc--title .topbar,
+.mc--over .topbar {
+  display: none;
+}
+
+.score {
+  color: var(--gold);
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.link:hover {
+  color: var(--gold);
+  opacity: 1;
+}
+
+/* ---- The text panel ---- */
+
+.panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  gap: 2rem;
+  padding: 4.5rem 2.5rem 1.2rem;
+  background: linear-gradient(to bottom, transparent, rgba(8, 5, 3, 0.82) 3.5rem, rgba(8, 5, 3, 0.94));
+}
+
+.mc--title .panel,
+.mc--over .panel {
+  display: none;
+}
+
+.words {
+  flex: 1;
+  max-width: 46em;
+  min-height: 6.4em;
+  font-size: clamp(17px, 1.55vw, 23px);
+  line-height: 1.45;
+}
+
+.words p {
+  margin: 0 0 0.35em;
+}
+
+.ghost {
+  visibility: hidden;
+}
+
+.hl.red {
+  color: var(--red);
+}
+.hl.green {
+  color: var(--green);
+}
+.hl.yellow {
+  color: var(--yellow);
+}
+.hl.blue {
+  color: var(--blue);
+}
+.hl.magenta {
+  color: var(--magenta);
+}
+.hl.cyan {
+  color: var(--cyan);
+}
+
+.seeing {
+  color: #f0b38a;
+}
+
+.seeing .name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted rgba(240, 179, 138, 0.7);
+  text-underline-offset: 0.2em;
+}
+
+.seeing .name:hover {
+  color: #ffd2b0;
+}
+
+.seeing .link {
+  margin-left: 0.4em;
+  font: 600 0.62em var(--caps);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f0b38a;
+}
+
+.message {
+  font-style: italic;
+}
+
+.message.error {
+  color: #ff9a8a;
+}
+.message.obstacle {
+  color: var(--cyan);
+}
+.message.pass {
+  color: var(--green);
+}
+.message.item {
+  color: #f0b38a;
+}
+.message.fatal {
+  color: #ff7b6b;
+  font-size: 1.1em;
+}
+.message.victory {
+  color: var(--gold);
+  font-size: 1.15em;
+}
+
+/* ---- Compass (top right on wide screens) ---- */
+
+.compass {
+  position: fixed;
+  top: 1.2rem;
+  right: 1.6rem;
+  z-index: 10;
+  display: grid;
+  grid-template: repeat(3, 2.4rem) / repeat(3, 2.4rem);
+  gap: 3px;
+}
+
+.compass button {
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(10, 6, 3, 0.4);
+  color: var(--ink);
+  font: 700 1.15rem var(--caps);
+  text-shadow: 0 0 6px #000;
+  cursor: pointer;
+}
+
+.compass button:hover:enabled {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.compass button:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.compass .north {
+  grid-area: 1 / 2;
+}
+.compass .west {
+  grid-area: 2 / 1;
+}
+.compass .east {
+  grid-area: 2 / 3;
+}
+.compass .south {
+  grid-area: 3 / 2;
+}
+
+/* ---- Hands: 5 slots ---- */
+
+.hands {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.hands-actions {
+  min-height: 1.4rem;
+  font: 600 12px var(--caps);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.slots {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.slot-btn {
+  display: grid;
+  place-items: center;
+  width: clamp(52px, 5.2vw, 76px);
+  aspect-ratio: 1;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  touch-action: none;
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.slot-btn.empty {
+  cursor: default;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.slot-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
+}
+
+.slot-btn:hover:not(.empty) {
+  border-color: rgba(255, 224, 138, 0.7);
+}
+
+.slot-btn.in-use {
+  border-color: var(--glow);
+  box-shadow:
+    0 0 0 2px var(--glow),
+    0 0 18px 4px rgba(255, 216, 74, 0.55);
+}
+
+.slot-btn.arriving > * {
+  opacity: 0;
+}
+
+.slot-name {
+  font: 600 10px var(--caps);
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.drop-btn {
+  min-height: 1.1rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font: 600 10px var(--caps);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.drop-btn:hover {
+  color: var(--ink);
+}
+
+/* ---- Buttons ---- */
+
+.pill {
+  display: inline-block;
+  padding: 0.7em 1.8em;
+  border: 1px solid rgba(201, 184, 255, 0.55);
+  border-radius: 999px;
+  background: rgba(20, 16, 50, 0.45);
+  box-shadow: 0 0 18px rgba(170, 140, 255, 0.25);
+  color: #e9dcff;
+  font: 600 clamp(13px, 1.1vw, 16px) var(--caps);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.pill:hover,
+.pill:focus-visible {
+  border-color: var(--gold);
+  color: #fff6d6;
+  box-shadow: 0 0 22px rgba(255, 216, 120, 0.45);
+  outline: none;
+}
+
+.pill.quiet {
+  border-color: var(--line);
+  background: transparent;
+  box-shadow: none;
+}
+
+.buttons {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 1.6rem;
+}
+
+/* ---- Title screen ---- */
+
+.title-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 1rem 7vh;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 100%, rgba(7, 11, 31, 0.78), transparent 60%);
+}
+
+.title-screen h1 {
+  margin: 0;
+  font: 700 clamp(40px, 7vw, 96px) / 1 var(--caps);
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  text-shadow:
+    0 0 18px rgba(255, 200, 90, 0.55),
+    0 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+.title-screen .by {
+  margin: 0.5em 0 1.6em;
+  font: italic clamp(18px, 2vw, 26px) var(--serif);
+  opacity: 0.9;
+}
+
+.title-screen .links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem 1.6rem;
+  margin-top: 1.6rem;
+  font: 600 12px var(--caps);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* ---- Game over ---- */
+
+.over-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(5, 3, 2, 0.55);
+}
+
+.card {
+  max-width: 34rem;
+  padding: 2.2rem 2.6rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(12, 8, 5, 0.85);
+  color: var(--ink);
+  text-align: center;
+  font-size: clamp(16px, 1.4vw, 20px);
+  line-height: 1.5;
+}
+
+.card h2 {
+  margin: 0 0 0.8em;
+  font: 700 clamp(20px, 2.2vw, 30px) / 1.2 var(--caps);
+  color: var(--gold);
+}
+
+.card p {
+  margin: 0.3em 0;
+}
+
+.card .yours {
+  font-size: 1.2em;
+}
+
+/* ---- Dialogs ---- */
+
+.dialog {
+  text-align: left;
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.dialog h2 {
+  text-align: center;
+}
+
+.dialog a {
+  color: var(--gold);
+}
+
+.dialog input {
+  width: 100%;
+  padding: 0.6em 0.8em;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  font: inherit;
+}
+
+.saves {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.saves li {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.4em 0;
+  border-bottom: 1px solid rgba(243, 233, 210, 0.12);
+}
+
+.save-name {
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  text-align: left;
+  cursor: pointer;
+}
+
+.saves .when {
+  color: var(--ink-soft);
+  font-size: 0.85em;
+}
+
+.saves .link {
+  font: 600 11px var(--caps);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ---- Phones held upright: the picture on top, everything else below ---- */
+
+@media (max-aspect-ratio: 1/1) {
+  body {
+    overflow: auto;
+  }
+
+  .mc--play {
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+    background: var(--panel);
+  }
+
+  .mc--play .stage {
+    position: relative;
+    left: auto;
+    top: auto;
+    width: 100%;
+    transform: none;
+    flex-shrink: 0;
+  }
+
+  .mc--play .stage::after {
+    content: "";
+    position: absolute;
+    inset: 70% 0 0;
+    background: linear-gradient(to bottom, transparent, var(--panel));
+    pointer-events: none;
+  }
+
+  .topbar {
+    position: absolute;
+    top: 0.8rem;
+    left: 1rem;
+    gap: 1rem;
+    font-size: 11px;
+  }
+
+  .panel {
+    position: relative;
+    flex: 1;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 0.6rem 1.2rem 1.2rem;
+    background: var(--panel);
+  }
+
+  .words {
+    min-height: 0;
+    font-size: 17px;
+  }
+
+  .compass {
+    position: static;
+    margin: auto auto 0;
+    grid-template: repeat(3, 3rem) / repeat(3, 3rem);
+    gap: 4px;
+  }
+
+  .compass button {
+    background: rgba(255, 255, 255, 0.06);
+    font-size: 1.3rem;
+    text-shadow: none;
+  }
+
+  .hands {
+    align-items: stretch;
+  }
+
+  .hands-actions {
+    text-align: right;
+  }
+
+  .slots {
+    justify-content: space-between;
+  }
+
+  .slot-btn {
+    width: 56px;
+  }
+}
+
+.compass[hidden] {
+  display: none;
+}

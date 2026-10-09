@@ -1,9 +1,10 @@
 import { act, bestPossibleScore, describe, itemsSentence, newGame, score } from "../engine/engine";
 import type { Colour } from "../engine/teletext";
 import type { Command, Direction, GameEvent, GameState, ItemId, Tone, World } from "../engine/types";
-import { button, h, row, teletext } from "./dom";
+import { h } from "../shared/dom";
+import { bestScore, deleteSave, listSaves, recordScore, saveGame, switchMode } from "../shared/storage";
+import { button, row, teletext } from "./dom";
 import { NOTES } from "./notes";
-import { bestScore, deleteSave, listSaves, recordScore, saveGame } from "./storage";
 
 type Screen =
   | { name: "title" }
@@ -42,10 +43,12 @@ export class App {
 
   constructor(
     private root: HTMLElement,
-    private world: World
+    private world: World,
+    handoff: GameState | null = null
   ) {
     document.addEventListener("keydown", (event) => this.onKey(event));
-    this.render();
+    if (handoff) this.start(handoff);
+    else this.render();
   }
 
   private go(screen: Screen) {
@@ -68,6 +71,7 @@ export class App {
         b: () => this.go({ name: "load" }),
         c: () => this.go({ name: "notes", page: 0 }),
         d: () => this.go({ name: "about" }),
+        e: () => switchMode("illustrated"),
       }[key];
       choice?.();
     } else if (screen.name === "notes" && enter) this.nextNotesPage(screen.page);
@@ -179,6 +183,7 @@ export class App {
       option("B", "load your old position", () => this.go({ name: "load" })),
       option("C", "see the notes", () => this.go({ name: "notes", page: 0 })),
       option("D", "about this version", () => this.go({ name: "about" })),
+      option("E", "the illustrated version", () => switchMode("illustrated")),
       row("white", ""),
       row("white", "Click or type a letter"),
     ];

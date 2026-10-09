@@ -1,20 +1,7 @@
-// Tiny DOM helpers, plus rendering of wrapped teletext rows.
+// Teletext DOM helpers: buttons, rows and wrapped teletext text.
 
 import { type Colour, wrap } from "../engine/teletext";
-
-type Child = Node | string | false | null | undefined;
-type Attrs = Record<string, string | boolean | ((event: Event) => void)>;
-
-export function h(tag: string, attrs: Attrs = {}, ...children: Child[]): HTMLElement {
-  const el = document.createElement(tag);
-  for (const [key, value] of Object.entries(attrs)) {
-    if (typeof value === "function") el.addEventListener(key.replace(/^on/, ""), value);
-    else if (value === true) el.setAttribute(key, "");
-    else if (value !== false) el.setAttribute(key, value);
-  }
-  for (const child of children) if (child) el.append(child);
-  return el;
-}
+import { type Attrs, type Child, h } from "../shared/dom";
 
 export function button(label: string, colour: Colour, onClick: () => void, extra: Attrs = {}): HTMLElement {
   return h("button", { type: "button", class: `tt ${colour}`, onclick: onClick, ...extra }, label);

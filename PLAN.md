@@ -149,7 +149,14 @@ The style guide and prompts are in `art/` (`STYLE.md`, `prompts/`).
 3. ~~Teletext UI~~ ✅ Black-screen Mode 7 version, playable by clicking or
    keyboard, with save slots, notes, about and game over.
 4. **Art**: style exploration on 3–4 rooms first, then the rest.
-5. **Illustrated UI**: scene, text panel, slots, animations, Classic mode toggle.
+5. ~~Illustrated UI~~ ✅ Painted scenes with a fade through black, objects to
+   click (rising into a spotlight, then whooshing into one of 5 slots),
+   typed text, a compass, use glow, drag to drop, death/lost/victory moments,
+   and Classic mode (switchable mid-game). Rooms without art yet show a
+   placeholder. `npm run art` builds new images into `public/art/`.
+   - **To confirm**: one object in use at a time, or several (original)?
+   - **To tune**: per-room floor zones for objects (`src/illustrated/layout.ts`)
+     as each room is painted.
 6. **Polish**: README, release-please, maybe the victory tune, maybe a port of the
    MERLIN1 title picture (random castle towers on blue) for Classic mode.
 

@@ -56,3 +56,36 @@ export function recordScore(score: number): number {
   write(BEST, best);
   return best;
 }
+
+// ---- Which version to show ------------------------------------------------
+
+const MODE = "merlins-castle:mode";
+const HANDOFF = "merlins-castle:handoff";
+
+export type Mode = "illustrated" | "classic";
+
+export function getMode(): Mode {
+  return read<Mode>(MODE, "illustrated") === "classic" ? "classic" : "illustrated";
+}
+
+// Switch version by reloading the page. A game in progress is handed over
+// through sessionStorage, so it carries on in the other version.
+export function switchMode(mode: Mode, game?: GameState | null): void {
+  write(MODE, mode);
+  try {
+    if (game) sessionStorage.setItem(HANDOFF, JSON.stringify(game));
+  } catch {
+    // The game just won't carry over.
+  }
+  location.reload();
+}
+
+export function takeHandoff(): GameState | null {
+  try {
+    const raw = sessionStorage.getItem(HANDOFF);
+    sessionStorage.removeItem(HANDOFF);
+    return raw ? (JSON.parse(raw) as GameState) : null;
+  } catch {
+    return null;
+  }
+}
