@@ -19,9 +19,8 @@ west → old stone wall.
 > - East (right): a path leads into a darker evergreen glade of fir trees.
 > - West (left): a winding track leads towards an old grey stone wall in the
 >   distance.
-> - South (bottom): the fourth path runs out of the bottom edge. Beyond it, far
->   away and only just visible above the horizon line on the right, is the tiny
->   gleam of a golden spire.
+> - South (bottom): the fourth path runs straight out of the bottom edge of
+>   the picture, towards the viewer.
 >
 > Warm late-afternoon sun from the upper left. Peaceful, enchanted, a little
 > mysterious, as if the world is quietly waiting for you. Keep the bottom

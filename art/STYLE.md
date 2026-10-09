@@ -68,11 +68,24 @@ and the attached anchors are what keep 75 images looking like one world.
 - The original's highlighted words (grassy bank in green, golden spire in
   yellow, the dragon in red) should be the eye-catching colours in their scenes.
 
+## The "behind you" rule
+
+The camera always faces north, so the south is behind the viewer:
+
+- Things **far away to the south** (the golden spire seen across the river)
+  are not shown. The text describes them.
+- Things **at the south exit** (a creature guarding the south tunnel, a gate
+  to the south) stand in the lower part of the picture **seen from behind**,
+  facing into the scene. Their heads can turn in profile.
+- South paths, tunnels and doors simply leave the bottom edge of the picture.
+
 ## Things to keep consistent
 
 - Merlin: a tall old wizard, long silver beard, deep blue robe and hat with
   faint silver stars (as in Drue's 2010 map sketch).
 - The dragon: splendid, crimson-pink scales, violet wings, more magnificent
   than scary (as in the sketch).
-- The golden spire: a slender gold spire on Merlin's castle, glimpsed from
-  several outdoor scenes to the south.
+- The golden spire: a slender gold spire on Merlin's castle. The camera always
+  looks north, so only show it where the castle lies to the north or the
+  sides. For anything behind the viewer (to the south), leave it out of the
+  picture and let the text mention it.

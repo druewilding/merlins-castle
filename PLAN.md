@@ -108,6 +108,9 @@ The style guide and prompts are in `art/` (`STYLE.md`, `prompts/`).
   Camera about 30° above the ground looking north, so north is at the top of
   the frame, south at the bottom edge, and east/west at the sides. Mood by area:
   summer outdoors, misty forest, dark underground, candlelit castle.
+- **North is always up, in every room.** You can arrive from any direction,
+  so the view never turns. Anything behind the viewer to the south (the river
+  rooms' golden spire, for example) is left to the text.
 - **Format**: 1536×1024 (ChatGPT's 3:2 landscape), cropped to fill the screen.
   The top and bottom ~8% may be cropped. The bottom quarter sits under the text
   panel, so it should be plain foreground.
