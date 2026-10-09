@@ -19,8 +19,8 @@ Exits:
 
 ## Prompt
 
-> Deep in a green **forest**. In the lower middle, a few **rabbits** sit up on their hind legs, ears alert, all looking anxiously to the left. On the left (west), between the trees, some **witches** in pointed hats are **dancing** in a ring around a small fire, silhouetted and a little blurred by distance.
+> Deep in a green **forest**. In the lower middle, a few **rabbits** sit up on their hind legs, ears alert, all looking anxiously to the left. On the left (west), between the trees at the left-hand edge of the picture and level with the rabbits, some **witches** in pointed hats are **dancing** in a ring around a small fire, half hidden by trunks and a little blurred.
 >
-> - East (right): a path leads back out of the forest.
+> - East (right): a path runs sideways across the middle of the picture and leaves the right-hand edge about halfway up, back out of the forest.
 >
 > Dappled light, a hint of mischief and danger. Keep the bottom quarter as plain forest floor.

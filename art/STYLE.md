@@ -51,7 +51,10 @@ and the attached anchors are what keep 75 images looking like one world.
 > The whole location is visible, like a stage set. North is at the top/back of
 > the picture, south at the bottom/front edge, west on the left and east on
 > the right. Paths, doors or tunnels that lead away must leave the picture on
-> the matching side.
+> the matching side. West and east ways run sideways across the middle ground
+> and leave the left or right edge about halfway up the picture, like a road
+> crossing a stage. They do not curve away into the distance, because the
+> distance is north.
 >
 > Composition: landscape 3:2. The **bottom quarter** is simple, uncluttered
 > foreground (grass, earth, flagstones or water) because text will cover it.
