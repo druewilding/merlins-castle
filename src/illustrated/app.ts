@@ -774,7 +774,9 @@ export class IllustratedApp {
         )
       );
     fill();
-    this.dialog(
+    // On the score screen, the save list takes the score card's place.
+    if (this.mode === "over") this.overlay.hidden = true;
+    const dialog = this.dialog(
       h("h2", {}, "Your old positions"),
       saves.length ? list : h("p", {}, "There are no saved positions yet."),
       this.playing() &&
@@ -790,6 +792,7 @@ export class IllustratedApp {
         h("button", { type: "button", class: "pill quiet", onclick: () => this.closeDialog() }, "Close")
       )
     );
+    dialog.addEventListener("close", () => (this.overlay.hidden = false));
   }
 
   private showNotes() {
