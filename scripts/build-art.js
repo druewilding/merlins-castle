@@ -18,6 +18,9 @@ const ITEM_SIZE = 384;
 const ITEM_MARGIN = 0.06;
 
 export async function buildArt({ quiet = false } = {}) {
+  // The originals aren't in git, so a fresh checkout (like the GitHub build)
+  // has none. Keep the committed images and manifest as they are.
+  if (!existsSync("art/originals")) return 0;
   const manifest = {};
   let built = 0;
   for (const kind of KINDS) {

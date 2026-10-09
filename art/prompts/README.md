@@ -12,6 +12,10 @@ npm run art -- moat      # the same for a particular image
 npm run art:status       # everything, made or not
 ```
 
+Saved originals become web images in `public/art/` automatically while
+`npm run dev` is running, and the game reloads to show them. Otherwise
+`npm run art` (or `npm run art:build`) does it.
+
 Each file starts with a small header (`style`, `reference`, `attach`) that
 the script reads. The prompt is the quote under `## Prompt`.
 
