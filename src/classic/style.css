@@ -301,7 +301,7 @@ input.tt {
 .bar.status > div {
   display: flex;
   align-items: center;
-  gap: 3ch;
+  gap: 2ch;
   padding: 0 2ch;
 }
 
