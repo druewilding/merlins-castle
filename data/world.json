@@ -1,0 +1,879 @@
+{
+  "title": "Merlin's Castle",
+  "author": "Anita Straker",
+  "year": 1983,
+  "startRoom": "grassy-bank",
+  "homeRoom": "grassy-bank",
+  "carryLimit": 5,
+  "rooms": {
+    "clue-spell": {
+      "description": "You are too weak but you get a clue:{red}Use the spell when you meet Merlin.",
+      "exits": {
+        "south": {
+          "to": "clue-spell"
+        },
+        "west": {
+          "to": "clue-spell"
+        },
+        "north": {
+          "to": "clue-spell"
+        },
+        "east": {
+          "to": "clue-spell"
+        }
+      }
+    },
+    "wizards-kitchen": {
+      "description": "You are in the{blue}wizard's kitchen. There is a smell of toads and spices brewing. Merlin appears!",
+      "exits": {
+        "east": {
+          "to": "grand-hall",
+          "obstacle": {
+            "needs": "silver",
+            "useMessage": "Merlin goes to replace his button.",
+            "blocked": "Oh dear! Merlin has caught you.",
+            "fatal": true
+          }
+        }
+      }
+    },
+    "coach-house": {
+      "description": "You are in an{yellow}ancient{yellow}coach{yellow}house. Merlin's cloak, with a missing silver button, hangs on the wall. Something rustles.",
+      "exits": {
+        "west": {
+          "to": "courtyard"
+        }
+      }
+    },
+    "small-room": {
+      "description": "You are in a{red}small{red}room.{white}The walls are covered with red silk. There are archways to the North and West.",
+      "exits": {
+        "west": {
+          "to": "merlins-lair"
+        },
+        "north": {
+          "to": "dungeon"
+        }
+      }
+    },
+    "grand-hall": {
+      "description": "You are in a{cyan}grand{cyan}hall.{white}There are doors in all directions. A{magenta}decorated{magenta}chamber{white}is to the South. Merlin's goblins are very close.",
+      "exits": {
+        "south": {
+          "to": "grand-hall",
+          "message": "You cannot pass."
+        },
+        "west": {
+          "to": "wizards-kitchen",
+          "message": "You tie up the goblins.",
+          "obstacle": {
+            "needs": "rope",
+            "useMessage": "The goblins look worried!",
+            "blocked": "You fall into the goblin's trap.",
+            "fatal": true
+          }
+        },
+        "north": {
+          "to": "courtyard"
+        },
+        "east": {
+          "to": "dungeon",
+          "obstacle": {
+            "needs": "mask",
+            "useMessage": "Perhaps the goblins won't notice you!",
+            "blocked": "Merlin's goblins capture you.",
+            "fatal": true
+          }
+        }
+      }
+    },
+    "dungeon": {
+      "description": "You are in an{yellow}enormous{yellow}dungeon.{white}An old, old woman guards the exit South, waiting to turn you into stone. There is a passage West.",
+      "exits": {
+        "south": {
+          "to": "small-room",
+          "obstacle": {
+            "needs": "mirror",
+            "useMessage": "The old woman is turned into stone.",
+            "blocked": "You become a stone statue.",
+            "fatal": true
+          }
+        },
+        "west": {
+          "to": "grand-hall"
+        }
+      }
+    },
+    "merlins-lair": {
+      "description": "This is{blue}Merlin{blue}the{blue}wizard's{blue}lair.{white}The walls are purple and green. A cauldron boils. The wizard comes towards you!",
+      "exits": {
+        "north": {
+          "to": "grand-hall",
+          "obstacle": {
+            "needs": "spell",
+            "useMessage": "He turns into a frog.",
+            "blocked": "You are turned into a frog.",
+            "fatal": true
+          }
+        }
+      }
+    },
+    "courtyard": {
+      "description": "You are in a{yellow}sunny{yellow}courtyard{white}with rambling pink roses. To the North is a{cyan}drawbridge.{white}There is a{green}coach{green}house{white}to the East. Southwards is a{magenta}hall.",
+      "exits": {
+        "south": {
+          "to": "grand-hall"
+        },
+        "north": {
+          "to": "moat"
+        },
+        "east": {
+          "to": "coach-house"
+        }
+      }
+    },
+    "moat": {
+      "description": "You are on the North bank of a{magenta}moat.{white}Some guards are at the{cyan}toll{cyan}gate.{white}A path leads North through an archway.",
+      "exits": {
+        "south": {
+          "to": "courtyard",
+          "obstacle": {
+            "needs": "penny",
+            "useMessage": "The drawbridge lowers.",
+            "blocked": "The drawbridge is up."
+          }
+        },
+        "north": {
+          "to": "river-south-bank"
+        }
+      }
+    },
+    "forest-edge": {
+      "description": "You are at the edge of a{green}dense{green}forest{white}on a path running East to West. An owl hoots in the trees.",
+      "exits": {
+        "west": {
+          "to": "forest-witches"
+        },
+        "east": {
+          "to": "river-south-bank"
+        }
+      }
+    },
+    "river-south-bank": {
+      "description": "You are on the South bank of a{blue}river.{white}A{green}forest{white}lies to the West. To the South, through a stone archway, a{yellow}golden{yellow}spire{white}is shining in the sun.",
+      "exits": {
+        "south": {
+          "to": "moat"
+        },
+        "west": {
+          "to": "forest-edge"
+        },
+        "north": {
+          "to": "deep-river",
+          "message": "You cross over without any trouble.",
+          "obstacle": {
+            "needs": "plank",
+            "useMessage": "The plank makes a bridge for you.",
+            "blocked": "You fall in but get out safely."
+          }
+        }
+      }
+    },
+    "beautiful-chamber": {
+      "description": "You are in a{magenta}beautiful{magenta}chamber.{white}The floor is covered in black and white tiles and the walls are gold. A lonely flute is playing.",
+      "exits": {
+        "north": {
+          "to": "dark-tunnels"
+        }
+      }
+    },
+    "dark-tunnels": {
+      "description": "You are at a crossroads in the{blue}tunnels.{white}It is very dark.",
+      "exits": {
+        "south": {
+          "to": "beautiful-chamber",
+          "obstacle": {
+            "needs": "lamp",
+            "useMessage": "It is lighter. You can hear music.",
+            "blocked": "You fall over in the dark.",
+            "fatal": true
+          }
+        },
+        "west": {
+          "to": "clue-mask"
+        },
+        "north": {
+          "to": "dragon-cave"
+        },
+        "east": {
+          "to": "clue-spell"
+        }
+      }
+    },
+    "clue-silver": {
+      "description": "You are lost but you find a clue:   {red}Give Merlin silver for his buttons.",
+      "exits": {
+        "south": {
+          "to": "clue-mask"
+        },
+        "west": {
+          "to": "clue-mask"
+        },
+        "north": {
+          "to": "clue-mask"
+        },
+        "east": {
+          "to": "clue-mask"
+        }
+      }
+    },
+    "dragon-cave": {
+      "description": "You stand in a{cyan}large{cyan}cave.{white}A{red}splendid{red}dragon{white}puffing fire stands in the entrance of the tunnel South. More tunnels lead West and North.",
+      "exits": {
+        "south": {
+          "to": "dark-tunnels",
+          "obstacle": {
+            "needs": "water",
+            "useMessage": "The dragon's fire turns to smoke.",
+            "blocked": "You are overcome by fire and smoke."
+          }
+        },
+        "west": {
+          "to": "cave-entrance",
+          "message": "The dragon's fire does not harm you."
+        },
+        "north": {
+          "to": "giant"
+        }
+      }
+    },
+    "cave-entrance": {
+      "description": "You are at the entrance to a{cyan}cave{white}going East.{white}A foot-path leads West. Southwards a{blue}tunnel{white}goes underground.",
+      "exits": {
+        "south": {
+          "to": "old-wall",
+          "message": "It's a long narrow tunnel.",
+          "obstacle": {
+            "needs": "lamp",
+            "useMessage": "You can see where you're going now!",
+            "blocked": "It's too dark down there."
+          }
+        },
+        "west": {
+          "to": "evergreen-glade"
+        },
+        "east": {
+          "to": "dragon-cave",
+          "obstacle": {
+            "needs": "broom",
+            "useMessage": "You sweep away the leaves.",
+            "blocked": "A pile of leaves fills the entrance."
+          }
+        }
+      }
+    },
+    "mountain-path": {
+      "description": "You are on a path running North to South. Thick{green}trees{white}are at the foot of a{cyan}mountain{white}to the North.",
+      "exits": {
+        "south": {
+          "to": "grassy-bank"
+        },
+        "north": {
+          "to": "mountain",
+          "message": "You climb over{green}tree trunks.",
+          "obstacle": {
+            "needs": "axe",
+            "useMessage": "You cut down all the trees.",
+            "blocked": "The trees are too dense."
+          }
+        }
+      }
+    },
+    "evergreen-glade": {
+      "description": "You are in an{green}evergreen{green}glade,{white}with{red}red{red}spotted{red}toadstools{white}growing in a ring. A path runs from East to West.",
+      "exits": {
+        "west": {
+          "to": "grassy-bank"
+        },
+        "east": {
+          "to": "cave-entrance"
+        }
+      }
+    },
+    "deep-river": {
+      "description": "To the South a{blue}deep{blue}river{white}is running swiftly. Paths lead North and East. A{yellow}golden{yellow}spire{white}can be seen to the South across the water.",
+      "exits": {
+        "south": {
+          "to": "river-south-bank",
+          "message": "You run across safely.",
+          "obstacle": {
+            "needs": "plank",
+            "useMessage": "The plank reaches to the other side.",
+            "blocked": "You are swept away by the current.",
+            "fatal": true
+          }
+        },
+        "north": {
+          "to": "grassy-bank"
+        },
+        "east": {
+          "to": "evergreen-glade"
+        }
+      }
+    },
+    "grassy-bank": {
+      "description": "You are standing at a cross-roads. On a{green}grassy{green}bank{white}a figure lies sleeping.",
+      "exits": {
+        "south": {
+          "to": "deep-river"
+        },
+        "west": {
+          "to": "old-stone-wall"
+        },
+        "north": {
+          "to": "mountain-path"
+        },
+        "east": {
+          "to": "evergreen-glade"
+        }
+      },
+      "firstVisitDescription": "You wake up on a{green}grassy{green}bank{white}at a cross-roads. It is warm and the bees are humming. There is a feeling of magic and mystery all around you.",
+      "crowdedDescription": "You are by a{green}grassy{green}bank."
+    },
+    "old-stone-wall": {
+      "description": "To the West is an{yellow}old{yellow}stone{yellow}wall{white}four metres tall. A winding track runs to the East.",
+      "exits": {
+        "west": {
+          "to": "old-wall",
+          "message": "You have climbed over.",
+          "obstacle": {
+            "needs": "ladder",
+            "useMessage": "The ladder leans against the wall.",
+            "blocked": "The wall is too high."
+          }
+        },
+        "east": {
+          "to": "grassy-bank"
+        }
+      }
+    },
+    "old-wall": {
+      "description": "An{yellow}old{yellow}wall{white}is to the East. North is a path which winds into the mist. A small, dark{blue}tunnel{white}goes West. To the South are some{green}trees.",
+      "exits": {
+        "south": {
+          "to": "forest-crossroads"
+        },
+        "west": {
+          "to": "cave-entrance",
+          "obstacle": {
+            "needs": "lamp",
+            "useMessage": "That's better.",
+            "blocked": "You can't see."
+          }
+        },
+        "north": {
+          "to": "rusty-gate"
+        },
+        "east": {
+          "to": "old-stone-wall",
+          "message": "You climb over the wall.",
+          "obstacle": {
+            "needs": "ladder",
+            "useMessage": "The ladder reaches the top.",
+            "blocked": "The wall is much too tall."
+          }
+        }
+      }
+    },
+    "rusty-gate": {
+      "description": "You are by an{red}old{red}rusty{red}gate.{white}Mist swirls around you. A path leads South.",
+      "exits": {
+        "south": {
+          "to": "old-wall"
+        },
+        "north": {
+          "to": "yellow-flowers",
+          "obstacle": {
+            "needs": "key",
+            "useMessage": "The gate swings open with a creak.",
+            "blocked": "It is locked."
+          }
+        }
+      }
+    },
+    "yellow-flowers": {
+      "description": "The ground is covered with{yellow}tiny{yellow}yellow{yellow}flowers.{white}South is a{red}rusty{red}gate.{white}An overgrown path leads North.",
+      "exits": {
+        "south": {
+          "to": "rusty-gate",
+          "message": "The gate closes slowly behind you.",
+          "obstacle": {
+            "needs": "key",
+            "useMessage": "The gate opens.",
+            "blocked": "It won't open."
+          }
+        },
+        "north": {
+          "to": "mossy-steps"
+        }
+      }
+    },
+    "mossy-steps": {
+      "description": "To the North some{green}mossy{green}steps{white}lead upwards. An overgrown path runs South. In the East you can see a{magenta}high{magenta}balcony.",
+      "exits": {
+        "south": {
+          "to": "yellow-flowers"
+        },
+        "north": {
+          "to": "tower",
+          "obstacle": {
+            "needs": "apple",
+            "useMessage": "The snake glides away silently.",
+            "blocked": "A coiled snake hisses at you."
+          }
+        },
+        "east": {
+          "to": "clue-spell",
+          "message": "The ladder slips and you fall.",
+          "fatal": true,
+          "obstacle": {
+            "needs": "ladder",
+            "useMessage": "The ladder is propped up ready.",
+            "blocked": "The balcony is too high to reach."
+          }
+        }
+      }
+    },
+    "tower": {
+      "description": "You enter a tower. It is dark and musty inside. The way out is covered by an{blue}enormous{blue}stone.{white}A shiver runs down your spine.",
+      "exits": {
+        "south": {
+          "to": "mossy-steps",
+          "obstacle": {
+            "needs": "ring",
+            "useMessage": "The stone rolls aside.",
+            "blocked": "You are enclosed."
+          }
+        }
+      }
+    },
+    "forest-witches": {
+      "description": "You are in the{green}forest.{white}Some rabbits warn you of some{magenta}witches{magenta}dancing{white}in the West.",
+      "exits": {
+        "south": {
+          "to": "clue-silver"
+        },
+        "west": {
+          "to": "forest-crossroads",
+          "obstacle": {
+            "needs": "broom",
+            "useMessage": "The witches fly off to the moon.",
+            "blocked": "The witches catch you and tie you up.",
+            "fatal": true
+          }
+        },
+        "north": {
+          "to": "clue-rope"
+        },
+        "east": {
+          "to": "forest-edge"
+        }
+      }
+    },
+    "forest-crossroads": {
+      "description": "You are at a crossroads in the{green}forest.{white}In the distance to the South you can see some smoke.",
+      "exits": {
+        "south": {
+          "to": "charcoal-hut"
+        },
+        "west": {
+          "to": "clue-ring"
+        },
+        "north": {
+          "to": "old-wall"
+        },
+        "east": {
+          "to": "forest-witches"
+        }
+      }
+    },
+    "charcoal-hut": {
+      "description": "You are inside a{red}charcoal{red}burner's{red}hut.{white}His fire smoulders, but he is not there.",
+      "exits": {
+        "north": {
+          "to": "forest-crossroads"
+        }
+      }
+    },
+    "mountain": {
+      "description": "You are on a{cyan}mountain.{white}Some{yellow}treasure{white}lies to the East. A track leads South. A{blue}maze{white}lies to the North.",
+      "exits": {
+        "south": {
+          "to": "mountain-path"
+        },
+        "north": {
+          "to": "maze"
+        },
+        "east": {
+          "to": "clue-spell",
+          "message": "Oh dear! Merlin's trap is that way.",
+          "fatal": true
+        }
+      }
+    },
+    "maze": {
+      "description": "You are inside the{blue}maze{white}at a crossroads. You can sense danger.",
+      "exits": {
+        "south": {
+          "to": "mountain"
+        },
+        "west": {
+          "to": "trolls"
+        },
+        "north": {
+          "to": "treasure-room",
+          "obstacle": {
+            "needs": "rope",
+            "useMessage": "You swing over a deep hole.",
+            "blocked": "You slip down a deep, deep hole.",
+            "fatal": true
+          }
+        },
+        "east": {
+          "to": "damp-tunnels"
+        }
+      }
+    },
+    "damp-tunnels": {
+      "description": "Tunnels lead West and North. The air is damp and stale.",
+      "exits": {
+        "west": {
+          "to": "maze"
+        },
+        "north": {
+          "to": "giant"
+        }
+      }
+    },
+    "trolls": {
+      "description": "There are passages to the East and North. Some{magenta}trolls{white}ask you to play a tune for them.",
+      "exits": {
+        "north": {
+          "to": "oak-door",
+          "obstacle": {
+            "needs": "harp",
+            "useMessage": "The trolls dance and let you pass.",
+            "blocked": "The trolls cast a spell on you."
+          }
+        },
+        "east": {
+          "to": "maze"
+        }
+      }
+    },
+    "treasure-room": {
+      "description": "You are in a{yellow}treasure{yellow}room.{white}There are doors to the South, West and East.",
+      "exits": {
+        "south": {
+          "to": "maze",
+          "obstacle": {
+            "needs": "rope",
+            "useMessage": "You pass safely over the hole.",
+            "blocked": "Oh dear! You fall into darkness.",
+            "fatal": true
+          }
+        },
+        "west": {
+          "to": "oak-door"
+        },
+        "east": {
+          "to": "giant"
+        }
+      }
+    },
+    "giant": {
+      "description": "Tunnels lead South, West and East. A{magenta}hungry{magenta}looking{magenta}giant{white}is waiting in the West.",
+      "exits": {
+        "south": {
+          "to": "damp-tunnels",
+          "obstacle": {
+            "needs": "key",
+            "useMessage": "The way South is open.",
+            "blocked": "The way through is padlocked."
+          }
+        },
+        "west": {
+          "to": "treasure-room",
+          "obstacle": {
+            "needs": "cake",
+            "useMessage": "The giant smiles. You can pass.",
+            "blocked": "The giant turns you into a mouse.",
+            "fatal": true
+          }
+        },
+        "east": {
+          "to": "clue-plank"
+        }
+      }
+    },
+    "oak-door": {
+      "description": "There is a tunnel to the East. An{green}old{green}oak{green}door{white}bars your way South. You can hear singing from behind it.",
+      "exits": {
+        "south": {
+          "to": "trolls",
+          "obstacle": {
+            "needs": "key",
+            "useMessage": "The door opens.",
+            "blocked": "The door is firmly locked."
+          }
+        },
+        "east": {
+          "to": "treasure-room"
+        }
+      }
+    },
+    "clue-mask": {
+      "description": "You are lost but you find a clue:   {red}A{red}mask{red}hides you{red}from{red}goblins.",
+      "exits": {
+        "south": {
+          "to": "clue-mask"
+        },
+        "west": {
+          "to": "clue-mask"
+        },
+        "north": {
+          "to": "clue-mask"
+        },
+        "east": {
+          "to": "clue-mask"
+        }
+      }
+    },
+    "clue-ring": {
+      "description": "You are lost but you find a clue:   {red}A{red}ring helps to{red}move{red}a{red}stone.",
+      "exits": {
+        "south": {
+          "to": "clue-ring"
+        },
+        "west": {
+          "to": "clue-ring"
+        },
+        "north": {
+          "to": "clue-ring"
+        },
+        "east": {
+          "to": "clue-ring"
+        }
+      }
+    },
+    "clue-plank": {
+      "description": "You are lost but you find a clue:   {red}A{red}plank{red}makes a{red}bridge{red}for{red}you.",
+      "exits": {
+        "south": {
+          "to": "clue-plank"
+        },
+        "west": {
+          "to": "clue-plank"
+        },
+        "north": {
+          "to": "clue-plank"
+        },
+        "east": {
+          "to": "clue-plank"
+        }
+      }
+    },
+    "clue-rope": {
+      "description": "You are lost but you find a clue:   {red}Tie{red}goblins{red}up with rope if you can.",
+      "exits": {
+        "south": {
+          "to": "clue-rope"
+        },
+        "west": {
+          "to": "clue-rope"
+        },
+        "north": {
+          "to": "clue-rope"
+        },
+        "east": {
+          "to": "clue-rope"
+        }
+      }
+    }
+  },
+  "items": {
+    "cake": {
+      "name": "cake",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "cave-entrance",
+        "mountain-path"
+      ]
+    },
+    "water": {
+      "name": "water",
+      "article": "some",
+      "score": 3,
+      "startsIn": [
+        "yellow-flowers",
+        "mossy-steps"
+      ]
+    },
+    "mask": {
+      "name": "mask",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "forest-witches",
+        "forest-crossroads"
+      ]
+    },
+    "key": {
+      "name": "key",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "old-stone-wall",
+        "old-wall"
+      ]
+    },
+    "spell": {
+      "name": "spell",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "coach-house",
+        "small-room"
+      ]
+    },
+    "rope": {
+      "name": "rope",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "dragon-cave",
+        "cave-entrance"
+      ]
+    },
+    "plank": {
+      "name": "plank",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "mossy-steps",
+        "tower"
+      ]
+    },
+    "ladder": {
+      "name": "ladder",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "grassy-bank",
+        "old-stone-wall"
+      ]
+    },
+    "pearl": {
+      "name": "pearl",
+      "article": "a",
+      "score": 11,
+      "startsIn": [
+        "merlins-lair"
+      ]
+    },
+    "gold": {
+      "name": "gold",
+      "article": "some",
+      "score": 11,
+      "startsIn": [
+        "treasure-room"
+      ]
+    },
+    "emerald": {
+      "name": "emerald",
+      "article": "an",
+      "score": 11,
+      "startsIn": [
+        "tower"
+      ]
+    },
+    "ring": {
+      "name": "ring",
+      "article": "a",
+      "score": 11,
+      "startsIn": [
+        "beautiful-chamber"
+      ]
+    },
+    "axe": {
+      "name": "axe",
+      "article": "an",
+      "score": 3,
+      "startsIn": [
+        "charcoal-hut"
+      ]
+    },
+    "lamp": {
+      "name": "lamp",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "forest-edge",
+        "river-south-bank"
+      ]
+    },
+    "penny": {
+      "name": "penny",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "mountain",
+        "maze"
+      ]
+    },
+    "apple": {
+      "name": "apple",
+      "article": "an",
+      "score": 3,
+      "startsIn": [
+        "cave-entrance",
+        "mountain-path"
+      ]
+    },
+    "broom": {
+      "name": "broom",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "maze",
+        "damp-tunnels"
+      ]
+    },
+    "harp": {
+      "name": "harp",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "cave-entrance"
+      ]
+    },
+    "mirror": {
+      "name": "mirror",
+      "article": "a",
+      "score": 3,
+      "startsIn": [
+        "evergreen-glade",
+        "deep-river"
+      ]
+    },
+    "silver": {
+      "name": "silver",
+      "article": "some",
+      "score": 11,
+      "startsIn": [
+        "wizards-kitchen"
+      ]
+    }
+  }
+}

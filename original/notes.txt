@@ -1,0 +1,112 @@
+OC27,69
+TS4BS6EPLM6LL68JOPL66PN1
+DFCEPP
+CE1MERLIN'S CASTLE
+
+On a warm and sunny day in the middle of summer you decide to go for a walk. As you wander around you become rather tired and you fall asleep on a low grassy bank. When you wake up you find that you are in a magical world where you can explore and find treasures.
+
+To move around you must give the computer a command. Use:in22
+
+N or North  to go north
+S or South  to go south
+E or East   to go east
+W or West   to go westci
+
+Part of the problem posed by an adventure game is to develop the plan or map of the land in which the adventure is based. You will also need the map in order to keep track of where you are. Some children find map drawing difficult, and so an outline showing the major areas is provided for pupils who cannot manage to produce their own.
+
+As the magic land is explored objects will be found, and also some treasure. The purpose of the game is to bring back and drop at the starting point as many objects and as much treasure as possible.  Three points are scored for any item brought back, with an additional ten points if it is a pearl or an emerald, or gold or silver. The maximum possible score is 100, but there are many different ways of achieving it.
+
+Many of the objects which you discover you will need to help you overcome the hazards of the magic land. Merlin has a cohort of goblins, witches, trolls, giants and dragons working for him, and they all need to be kept happy! He also surrounds himself by hidden holes in the ground, behind high walls and locked doors. If you find an object such as a ladder which you think will be useful then you may take it by typing:in26
+
+Take ladderci
+
+
+If there is more than one object in any one place, and you would like to pick them all up then type:in26
+
+Take allci
+
+
+To make use of the ladder type:in26
+
+
+Use ladderci
+
+
+To drop the ladder type:in26
+
+
+Drop ladderci
+
+
+If you have several items which you are carrying, and you would like to drop all of them at once then type:in26
+
+Drop allci
+
+
+If you forget what you are carrying at any one time then you can find out by typing:in26
+
+Listci
+
+
+Four other commands are available to you. These are:in26
+
+Scoreci
+
+
+to find out what your current score is;in26
+
+Quitci
+
+if you are stuck somewhere and want to stop playing;in26
+
+Saveci
+
+
+to save your current postion in order to start there next time you play; and in26
+
+
+Helpci
+
+to see a summary of the command words.
+OC27,45,1 
+Using the program in the classroomOC27,45,0
+
+If children are using the program, either at school or at home, then they should be allowed to solve the problems for themselves. Average eight year old children can complete the program, but experience at overcoming the hazards builds up only after many attempts. Hints, tips and above all, sympathy and interest, need to be available when required, especially when a group of children are first getting started. However, individual levels of reading ability, of logical deduction and planning, and of motivation, vary so much in young children that levels of achievement are hard to predict.
+
+In a class of thirty children groups of four or five may be the best size. Some teachers prefer mixed ability groups, with one child good at reading, one very curious, one artistic, one a logical thinker. Other teachers may prefer to have groups which are a good social mix.
+
+If required, the program can be used by a whole class at the same time. While one group is working at the keyboard, another can be drawing or painting one of the scenes, another group writing an account of what it is like to live underground, another creating a model of Merlin's castle, another researching giants, witches and wizards in history and literature. 
+
+The program deliberately uses no graphics or pictures, except for the title page, so that children are encouraged to read and talk, to write and paint, and generally let their imaginations run riot. All the text is in double height characters so that a medium sized group of children can sit round the micro with note-books, yet comfortably read the screen. 
+OC27,45,1 
+Additional ideas for childrenOC27,45,0
+
+Start and maintain a log-book describing your adventures in Merlin's magic land.
+
+Keep a record of your group's score and make a bar-chart showing how it changes each time you play.
+
+Develop a map/plan showing how each of the areas in the adventure links to others.
+
+Make a working model of a drawbridge.
+
+Read again the story from the bible about Adam, Eve and the serpent in the garden of Eden; find out about snakes which can be found in our country; read part or all of the poem Snake by D.H.Lawrence.
+
+Write a story about the giant who came to live in the maze; find a good recipe for his cake and work out what it would cost to bake if he is 80 times as big as you.
+
+Find some suitable music and create the dance of the underground trolls.
+
+Make up the tune which the lonely flute was playing and play it on your recorder. Use your music in some drama sessions based on scenes from the adventure.
+
+Discuss and find some possible explanations for some of the unsolved mysteries of the program: what could be rustling in the coach-house, where does the high balcony lead to, who made the very long tunnel, how did the penny get there, why is a silver button missing from Merlin's cloak?
+
+How many different ways of crossing rivers can you think of?
+
+There are many different creatures in Merlin's magic land. Discuss whether or not it would be right to kill them.
+
+What kind of plants could the tiny yellow flowers and the red spotted toadstools have been?
+
+Design and make a costume for Merlin, some slippers for the giant, a collage of the owl in the forest, some yellow paper flowers, a cotton-reel snake, a scaly dragon ......
+
+Read Isaiah, chapter 34, verse 13; the poem In the Dark by A.A. Milne; Jabberwocky by Lewis Carroll; Sam Pig and the Dragon by Alison Utley.
+
+Try a longer book to read: James and the Giant Peach by Roald Dahl (if you are not very old); The Lion, the Witch and the Wardrobe by C.S. Lewis (if you are middle-aged); The Hobbit by J.R.R. Tolkien (if you are quite old).

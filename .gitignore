@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.DS_Store
+
+# Original disk image and its raw extracted files; re-fetch with:
+#   curl -L -o original/MerlinsCastle.ssd https://bbcmicro.co.uk/gameimg/discs/2164/Disc999-MerlinsCastle.ssd
+#   cd original && python3 extract.py MerlinsCastle.ssd
+original/*.ssd
+original/files/
