@@ -14,9 +14,21 @@ and the attached anchors are what keep 75 images looking like one world.
 1. Start with `prompts/rooms/grassy-bank.md` (no anchor yet). Iterate in that
    chat until you love it. That image becomes **the anchor**: save it as
    `art/anchors/grassy-bank.png`.
-2. For every later image, attach the anchor (plus the closest existing scene
-   if there is one, e.g. another cave for a cave) and paste the style block
-   plus the prompt.
+2. For every later image, start a new chat (ideally inside a "Merlin's Castle
+   art" ChatGPT Project). Attach the anchor, plus the closest existing scene
+   if there is one (e.g. another cave for a cave). Then paste, in order:
+   - the reference line below, so ChatGPT doesn't edit the anchor instead;
+   - the style block (scene or object);
+   - the image's prompt.
+
+   > The attached image is a **style reference only**: match its painting
+   > style, brushwork, level of detail and camera angle, but create a
+   > completely new scene with the lighting described below. Don't copy its
+   > content, layout or colours.
+
+   For objects, say "create a single new object" instead of "a completely new
+   scene".
+
 3. Save the full-size original into `art/originals/<kind>/<id>.png`, named
    after the room or object id in `data/world.json`. A script will turn these
    into web-sized files in `public/art/`.
