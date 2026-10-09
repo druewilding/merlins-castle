@@ -149,6 +149,8 @@ button {
 .things {
   position: absolute;
   inset: 0;
+  /* Objects are drawn bigger on small screens, so they can still be seen. */
+  --thing-scale: 1;
 }
 
 .thing {
@@ -338,6 +340,10 @@ button {
   cursor: pointer;
   text-decoration: underline dotted rgba(240, 179, 138, 0.7);
   text-underline-offset: 0.2em;
+}
+
+.nowrap {
+  white-space: nowrap;
 }
 
 .seeing .name:hover {
@@ -791,6 +797,10 @@ button {
     width: 100%;
     transform: none;
     flex-shrink: 0;
+  }
+
+  .things {
+    --thing-scale: 1.7;
   }
 
   .mc--play .stage::after {

@@ -348,7 +348,8 @@ export class IllustratedApp {
 
   private renderThings(ids: ItemId[]) {
     const room = this.game!.room;
-    const spots = spotsFor(room, ids.length);
+    const scale = Number(getComputedStyle(this.things).getPropertyValue("--thing-scale")) || 1;
+    const spots = spotsFor(room, ids.length, scale);
     const existing = new Map(
       [...this.things.children].map((el) => [(el as HTMLElement).dataset.item!, el as HTMLElement])
     );
@@ -363,7 +364,7 @@ export class IllustratedApp {
       }
       el.style.left = `${spot.x}%`;
       el.style.top = `${spot.y}%`;
-      el.style.width = `${itemWidth(id, spot)}%`;
+      el.style.width = `calc(${itemWidth(id, spot)}% * var(--thing-scale))`;
       el.style.zIndex = String(Math.round(spot.y * 10));
       el.classList.toggle("in-use", this.game!.using.includes(id));
       keep.add(el);
@@ -421,12 +422,14 @@ export class IllustratedApp {
     this.seeing.replaceChildren();
     if (itemsHere.length) {
       const byName = [...itemsHere].sort((a, b) => this.world.items[a].name.localeCompare(this.world.items[b].name));
+      // Each name stays on the same line as the comma or full stop after it.
       const names = byName.flatMap((id, i) => {
         const item = this.world.items[id];
         const name = h("button", { type: "button", class: "name", onclick: () => void this.take(id) }, item.name);
-        return [i ? ", " : "", `${item.article} `, name];
+        const after = i === byName.length - 1 ? "." : ",";
+        return [`${item.article} `, h("span", { class: "nowrap" }, name, after), i === byName.length - 1 ? "" : " "];
       });
-      this.seeing.append("You can see ", ...names, ".");
+      this.seeing.append("You can see ", ...names);
       if (itemsHere.length > 1)
         this.seeing.append(
           " ",

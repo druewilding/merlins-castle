@@ -29,10 +29,11 @@ const SPACING_X = 8.5;
 const SPACING_Y = 7;
 
 // Spots fill from the middle of the zone outwards, then are drawn back to front.
-export function spotsFor(room: RoomId, count: number): Spot[] {
+// Bigger objects (on small screens) need spots further apart.
+export function spotsFor(room: RoomId, count: number, scale = 1): Spot[] {
   const zone = ROOM_ZONES[room] ?? DEFAULT_ZONE;
-  const columns = Math.max(4, Math.round((zone.x1 - zone.x0) / SPACING_X));
-  const rows = Math.max(2, Math.round((zone.y1 - zone.y0) / SPACING_Y) + 1);
+  const columns = Math.max(4, Math.round((zone.x1 - zone.x0) / (SPACING_X * scale)));
+  const rows = Math.max(2, Math.round((zone.y1 - zone.y0) / (SPACING_Y * scale)) + 1);
   const grid: Spot[] = [];
   const dx = (zone.x1 - zone.x0) / (columns - 0.5);
   const dy = (zone.y1 - zone.y0) / (rows - 1);
