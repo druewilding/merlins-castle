@@ -21,6 +21,7 @@
     "mountain",
     "old-stone-wall",
     "old-wall",
+    "river-south-bank",
     "rusty-gate",
     "tower",
     "yellow-flowers"
@@ -47,6 +48,8 @@
   "moments": [
     "death-frog",
     "death-ladder",
-    "death-merlins-trap"
+    "death-merlins-trap",
+    "death-river",
+    "lost-forest"
   ]
 }
