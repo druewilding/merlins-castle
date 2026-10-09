@@ -154,9 +154,15 @@ export class IllustratedApp {
             h(
               "button",
               { type: "button", class: "pill", autofocus: true, onclick: () => void this.start() },
-              "Begin again"
+              "Play again"
             ),
-            h("button", { type: "button", class: "pill quiet", onclick: () => this.showTitle() }, "Title")
+            listSaves().length > 0 &&
+              h("button", { type: "button", class: "pill quiet", onclick: () => this.showLoad() }, "Load a game")
+          ),
+          h(
+            "nav",
+            { class: "links" },
+            link("Main menu", () => this.showTitle())
           )
         )
       )
@@ -334,6 +340,7 @@ export class IllustratedApp {
     this.topbar.replaceChildren(
       h("span", { class: "score" }, `Score ${points}`),
       link("Save", () => this.showSave()),
+      link("Load", () => this.showLoad()),
       link("Quit", () => this.showQuit()),
       link("Classic", () => switchMode("classic", this.game))
     );
@@ -770,6 +777,13 @@ export class IllustratedApp {
     this.dialog(
       h("h2", {}, "Your old positions"),
       saves.length ? list : h("p", {}, "There are no saved positions yet."),
+      this.playing() &&
+        saves.length > 0 &&
+        h(
+          "p",
+          { class: "note" },
+          "Loading one ends the game you're playing now, so save it first if you want to keep it."
+        ),
       h(
         "div",
         { class: "buttons" },

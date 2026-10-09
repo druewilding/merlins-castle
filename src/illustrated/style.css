@@ -587,7 +587,8 @@ button {
   opacity: 0.9;
 }
 
-.title-screen .links {
+.title-screen .links,
+.card .links {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -699,6 +700,11 @@ button {
 
 .card .yours {
   font-size: 1.2em;
+}
+
+.dialog .note {
+  color: var(--ink-soft);
+  font-size: 0.9em;
 }
 
 /* ---- Dialogs ---- */
