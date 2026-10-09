@@ -121,9 +121,8 @@ The style guide and prompts are in `art/` (`STYLE.md`, `prompts/`).
   image(s). Don't rely on ChatGPT remembering a long conversation.
 - **Picking up**: the object grows into the centre with its message, then
   whooshes into one of 5 slots at the bottom.
-- **Using**: one object at a time (as Drue remembers it; the original code
-  allowed several) — **to confirm**. The object in use glows yellow, and the
-  glow fades on leaving the room.
+- **Using**: several objects can be in use at once, as in the original code.
+  Objects in use glow yellow, and the glow fades on leaving the room.
 - **Dropping**: a small button under the slot, or drag it back into the scene.
 - **Text panel**: a magical serif (IM Fell English, with Cinzel for titles).
   Highlighted words keep the original's colours, softened. Text appears letter
@@ -154,7 +153,6 @@ The style guide and prompts are in `art/` (`STYLE.md`, `prompts/`).
    typed text, a compass, use glow, drag to drop, death/lost/victory moments,
    and Classic mode (switchable mid-game). Rooms without art yet show a
    placeholder. `npm run art` builds new images into `public/art/`.
-   - **To confirm**: one object in use at a time, or several (original)?
    - **To tune**: per-room floor zones for objects (`src/illustrated/layout.ts`)
      as each room is painted.
 6. **Polish**: README, release-please, maybe the victory tune, maybe a port of the
