@@ -18,6 +18,7 @@
     "merlins-lair",
     "mossy-steps",
     "mountain-path",
+    "mountain",
     "old-stone-wall",
     "old-wall",
     "rusty-gate",
@@ -44,6 +45,7 @@
     "water"
   ],
   "moments": [
-    "death-frog"
+    "death-frog",
+    "death-merlins-trap"
   ]
 }
