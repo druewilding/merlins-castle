@@ -9,6 +9,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { basename } from "node:path";
 import { platform } from "node:process";
 
 import { buildArt } from "./build-art.js";
@@ -69,10 +70,21 @@ function readPrompt(kind, id) {
   const [, header, body] = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/) ?? [];
   if (!header) throw new Error(`${kind}/${id}.md has no header`);
   const field = (name) => header.match(new RegExp(`^${name}: (.*)$`, "m"))?.[1].trim();
-  const attach = [...header.matchAll(/^ {2}- (.*)$/gm)].map((m) => m[1].trim());
+  const list = (name) =>
+    [...(header.match(new RegExp(`^${name}:\\n((?: {2}- .*\\n?)*)`, "m"))?.[1] ?? "").matchAll(/^ {2}- (.*)$/gm)].map(
+      (m) => m[1].trim()
+    );
   const prompt = quoteAfter(body, /^## Prompt$/m);
   if (!prompt) throw new Error(`${kind}/${id}.md has no prompt`);
-  return { kind, id, style: field("style"), reference: field("reference"), attach, prompt };
+  return {
+    kind,
+    id,
+    style: field("style"),
+    reference: field("reference"),
+    attach: list("attach"),
+    match: list("match"),
+    prompt,
+  };
 }
 
 // The first blockquote after a heading, unwrapped into plain paragraphs.
@@ -161,13 +173,15 @@ function paintedNeighbours(id) {
 function show(image, images) {
   const prompt = readPrompt(image.kind, image.id);
   const neighbours = image.kind === "rooms" && prompt.reference === "style" ? paintedNeighbours(image.id) : [];
-  // Neighbours are attached to be matched, not as style references.
+  // Neighbours and `match` images are attached to be matched, not as style references.
   const style = prompt.attach.filter((file) => existsSync(file) && !neighbours.some((n) => n.file === file));
-  const skipped = prompt.attach.filter((file) => !existsSync(file));
-  const attach = [...style, ...neighbours.map((n) => n.file)];
+  const matches = prompt.match.filter((file) => existsSync(file));
+  const skipped = [...prompt.attach, ...prompt.match].filter((file) => !existsSync(file));
+  const attach = [...style, ...neighbours.map((n) => n.file), ...matches];
+  const later = neighbours.length + matches.length;
   const parts = [];
   if (REFERENCE[prompt.reference]) {
-    const which = !neighbours.length
+    const which = !later
       ? style.length > 1
         ? "attached images are"
         : "attached image is"
@@ -175,6 +189,15 @@ function show(image, images) {
         ? `first ${style.length} attached images are`
         : "first attached image is";
     parts.push(REFERENCE[prompt.reference](which));
+  }
+  if (matches.length) {
+    const names = matches
+      .map((file) => `the ${basename(file, ".png")}`)
+      .join(", ")
+      .replace(/, ([^,]*)$/, " and $1");
+    parts.push(
+      `The last ${matches.length > 1 ? `${matches.length} images show` : "image shows"} ${names} from the same world. Everything from ${matches.length > 1 ? "them" : "it"} that appears in this picture must look exactly the same: the same shapes, materials, colours and details.`
+    );
   }
   if (neighbours.length) {
     parts.push(
