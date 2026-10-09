@@ -39,6 +39,7 @@ export class IllustratedApp {
   private game: GameState | null = null;
   private events: GameEvent[] = [];
   private slotOrder: ItemId[] = [];
+  private showcased = new Set<ItemId>(); // objects that have had their slow first pick-up this game
   private busy = false;
   private typewriter: Typewriter | null = null;
   private typedFor = "";
@@ -118,6 +119,7 @@ export class IllustratedApp {
     this.events = [];
     this.ending = null;
     this.slotOrder = carried(this.world, state);
+    this.showcased = new Set(this.slotOrder);
     this.typedFor = "";
     this.overlay.replaceChildren();
     this.setMode("play");
@@ -193,7 +195,8 @@ export class IllustratedApp {
     if (took) this.slotOrder.push(id);
     if (took) this.render(id);
     else this.render();
-    if (took && fromRect) await this.flyToSlot(id, fromRect, true);
+    if (took && fromRect) await this.flyToSlot(id, fromRect, !this.showcased.has(id));
+    if (took) this.showcased.add(id);
     this.revealSlot(id);
     this.busy = false;
   }
@@ -208,11 +211,12 @@ export class IllustratedApp {
     this.command({ type: "take", item: "all" });
     const taken = here.filter((id) => this.game!.itemLocations[id] === "carried");
     this.slotOrder.push(...taken);
+    taken.forEach((id) => this.showcased.add(id));
     this.render(...taken);
     await Promise.all(
       taken.map((id, i) => {
         const rect = rects.get(id);
-        return rect ? delay(i * 120).then(() => this.flyToSlot(id, rect, false)) : Promise.resolve();
+        return rect ? delay(i * 70).then(() => this.flyToSlot(id, rect, false)) : Promise.resolve();
       })
     );
     taken.forEach((id) => this.revealSlot(id));
@@ -501,7 +505,8 @@ export class IllustratedApp {
     await this.fader.animate([{ opacity: 1 }, { opacity: 0 }], { duration: half * 1.2, fill: "forwards" }).finished;
   }
 
-  // A picked-up object rises to the middle of the screen, then whooshes into its slot.
+  // The first time an object is picked up in a game, it rises to the middle of
+  // the screen, then whooshes into its slot. After that it goes straight there.
   private async flyToSlot(id: ItemId, from: DOMRect, pause: boolean) {
     const target = this.slots.querySelector(`[data-item="${id}"]`)?.getBoundingClientRect();
     if (!target || reducedMotion()) return;
@@ -540,7 +545,7 @@ export class IllustratedApp {
       }).finished;
     } else {
       await flyer.animate([{ transform: "none" }, { transform: at(slot, slotScale) }], {
-        duration: 450,
+        duration: 280,
         easing: "cubic-bezier(.4,0,.2,1)",
         fill: "forwards",
       }).finished;
@@ -563,7 +568,7 @@ export class IllustratedApp {
         const dx = end.x + end.width / 2 - (start.x + start.width / 2);
         const dy = end.y + end.height / 2 - (start.y + start.height / 2);
         await flyer.animate([{ transform: "none" }, { transform: `translate(${dx}px, ${dy}px) scale(${scale})` }], {
-          duration: 480,
+          duration: 300,
           easing: "cubic-bezier(.3,0,.2,1)",
           fill: "forwards",
         }).finished;
