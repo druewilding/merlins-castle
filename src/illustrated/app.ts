@@ -6,6 +6,7 @@ import type { Command, Direction, GameEvent, GameState, ItemId, World } from "..
 import { h } from "../shared/dom";
 import { deleteSave, listSaves, recordScore, saveGame, switchMode } from "../shared/storage";
 import { artUrl, preload } from "./art";
+import { loadMask, thingAt } from "./hit";
 import { itemWidth, spotsFor } from "./layout";
 import { deathMoment, lostMoment } from "./moments";
 import { NOTES } from "./notes";
@@ -75,6 +76,9 @@ export class IllustratedApp {
     handoff: GameState | null = null
   ) {
     this.stage.append(this.sceneImg, this.placeholder, motes(), this.things);
+    this.things.addEventListener("pointermove", (event) => this.hover(event));
+    this.things.addEventListener("pointerleave", () => this.hover(null));
+    this.things.addEventListener("click", (event) => this.clickThings(event));
     this.app = h("div", { class: "mc" }, this.stage, this.topbar, this.panel, this.overlay, this.fader);
     root.replaceChildren(this.app);
     document.addEventListener("keydown", (event) => this.onKey(event));
@@ -348,9 +352,30 @@ export class IllustratedApp {
     for (const el of existing.values()) if (!keep.has(el)) el.remove();
   }
 
+  // Pointer clicks on objects are worked out here, from the painted pixels,
+  // so see-through corners don't get in the way. The buttons themselves still
+  // take keyboard clicks.
+  private thingUnder(event: MouseEvent) {
+    return thingAt([...this.things.children] as HTMLElement[], event.clientX, event.clientY);
+  }
+
+  private hover(event: PointerEvent | null) {
+    const hot = event && this.thingUnder(event);
+    for (const el of this.things.children) el.classList.toggle("hot", el === hot);
+    this.things.style.cursor = hot ? "pointer" : "";
+    this.things.title = hot?.title ?? "";
+  }
+
+  private clickThings(event: MouseEvent) {
+    if (event.target !== this.things) return;
+    const el = this.thingUnder(event);
+    if (el) void this.take(el.dataset.item!, el);
+  }
+
   private thingElement(id: ItemId): HTMLElement {
     const item = this.world.items[id];
     const url = artUrl("items", id);
+    if (url) loadMask(url);
     return h(
       "button",
       {
