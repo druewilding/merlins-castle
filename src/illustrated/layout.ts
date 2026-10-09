@@ -19,22 +19,25 @@ interface Zone {
 // whose middle is taken (by a dragon, say) get their own zone.
 const DEFAULT_ZONE: Zone = { x0: 24, x1: 76, y0: 54, y1: 68 };
 const ROOM_ZONES: Partial<Record<RoomId, Zone>> = {
-  "grassy-bank": { x0: 18, x1: 62, y0: 56, y1: 72 },
+  "grassy-bank": { x0: 10, x1: 88, y0: 53, y1: 74 },
   "dragon-cave": { x0: 8, x1: 40, y0: 50, y1: 66 },
   "merlins-lair": { x0: 26, x1: 74, y0: 60, y1: 72 },
 };
 
-const COLUMNS = 7;
-const ROWS = 3;
+// Roughly how far apart neighbouring spots are, so objects don't pile up.
+const SPACING_X = 8.5;
+const SPACING_Y = 7;
 
 // Spots fill from the middle of the zone outwards, then are drawn back to front.
 export function spotsFor(room: RoomId, count: number): Spot[] {
   const zone = ROOM_ZONES[room] ?? DEFAULT_ZONE;
+  const columns = Math.max(4, Math.round((zone.x1 - zone.x0) / SPACING_X));
+  const rows = Math.max(2, Math.round((zone.y1 - zone.y0) / SPACING_Y) + 1);
   const grid: Spot[] = [];
-  const dx = (zone.x1 - zone.x0) / (COLUMNS - 0.5);
-  const dy = (zone.y1 - zone.y0) / (ROWS - 1);
-  for (let row = 0; row < ROWS; row++) {
-    for (let col = 0; col < COLUMNS; col++) {
+  const dx = (zone.x1 - zone.x0) / (columns - 0.5);
+  const dy = (zone.y1 - zone.y0) / (rows - 1);
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < columns; col++) {
       grid.push({ x: zone.x0 + dx * (col + (row % 2 ? 0.5 : 0)), y: zone.y0 + dy * row });
     }
   }
