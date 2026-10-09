@@ -23,8 +23,9 @@ west → old stone wall.
 > - North (top): a path climbs towards a thick wood at the foot of a blue-grey
 >   mountain in the distance.
 > - East (right): a path leads into a darker evergreen glade of fir trees.
-> - West (left): a winding track leads towards an old grey stone wall in the
->   distance.
+> - West (left): a winding track leads towards an ancient, mossy grey stone
+>   wall in the distance, about four metres tall, with square buttresses and
+>   ivy.
 > - South (bottom): the fourth path runs straight out of the bottom edge of
 >   the picture, towards the viewer.
 >

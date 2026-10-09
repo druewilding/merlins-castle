@@ -16,6 +16,6 @@ Exits:
 
 ## Prompt
 
-> On the left (west) side of the picture stands an **old grey stone wall, four metres tall**, mossy and ancient, too high to climb. A **winding track** runs away to the right (east) through meadow towards a distant crossroads.
+> On the left (west) side of the picture stands an **old grey stone wall, four metres tall**, mossy and ancient, too high to climb. A **winding track** runs from the middle of the picture off the right-hand edge (east), back towards the crossroads. It leaves the picture at the side and does not wind away into the distance.
 >
 > Warm summer light from the upper left. Keep the bottom quarter as plain grass.

@@ -3,14 +3,17 @@
     "title"
   ],
   "rooms": [
+    "deep-river",
     "dragon-cave",
     "evergreen-glade",
     "grassy-bank",
     "merlins-lair",
-    "mountain-path"
+    "mountain-path",
+    "old-stone-wall"
   ],
   "items": [
     "ladder",
+    "mirror",
     "pearl",
     "rope"
   ],

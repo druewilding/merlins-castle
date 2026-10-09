@@ -56,9 +56,9 @@ const ROOM_ORDER = [
 
 const REFERENCE = {
   style: (images) =>
-    `The attached ${images} a **style reference only**: match the painting style, brushwork, level of detail and camera angle, but create a completely new scene with the lighting described below. Don't copy the content, layout or colours.`,
+    `The ${images} a **style reference only**: match the painting style, brushwork, level of detail and camera angle, but create a completely new scene with the lighting described below. Don't copy the content, layout or colours.`,
   object: (images) =>
-    `The attached ${images} a **style reference only**: match the painting style, brushwork and level of detail, but create a single new object as described below. Don't copy the content.`,
+    `The ${images} a **style reference only**: match the painting style, brushwork and level of detail, but create a single new object as described below. Don't copy the content.`,
 };
 
 const world = JSON.parse(readFileSync("data/world.json", "utf8"));
@@ -146,13 +146,41 @@ function copy(text) {
   return spawnSync(command, args, { input: text }).status === 0;
 }
 
+// Up to two rooms next to this one that are already painted, so things seen
+// from both (the old stone wall from the grassy bank) match.
+function paintedNeighbours(id) {
+  const room = world.rooms[id];
+  if (!room) return [];
+  const ids = [...new Set(Object.values(room.exits).map((exit) => exit.to))].filter((to) => to && to !== id);
+  return ids
+    .map((to) => ({ id: to, file: `art/originals/rooms/${to}.png` }))
+    .filter((n) => existsSync(n.file) && !n.file.endsWith("/grassy-bank.png"))
+    .slice(0, 2);
+}
+
 function show(image, images) {
   const prompt = readPrompt(image.kind, image.id);
-  const attach = prompt.attach.filter((file) => existsSync(file));
+  const neighbours = image.kind === "rooms" && prompt.reference === "style" ? paintedNeighbours(image.id) : [];
+  // Neighbours are attached to be matched, not as style references.
+  const style = prompt.attach.filter((file) => existsSync(file) && !neighbours.some((n) => n.file === file));
   const skipped = prompt.attach.filter((file) => !existsSync(file));
+  const attach = [...style, ...neighbours.map((n) => n.file)];
   const parts = [];
-  if (REFERENCE[prompt.reference])
-    parts.push(REFERENCE[prompt.reference](attach.length > 1 ? "images are" : "image is"));
+  if (REFERENCE[prompt.reference]) {
+    const which = !neighbours.length
+      ? style.length > 1
+        ? "attached images are"
+        : "attached image is"
+      : style.length > 1
+        ? `first ${style.length} attached images are`
+        : "first attached image is";
+    parts.push(REFERENCE[prompt.reference](which));
+  }
+  if (neighbours.length) {
+    parts.push(
+      `The last ${neighbours.length > 1 ? `${neighbours.length} images show neighbouring places` : "image shows a neighbouring place"} in the same world (${neighbours.map((n) => n.id).join(", ")}). Anything that appears in both, such as a wall, a path, a river or a mountain, must look the same.`
+    );
+  }
   if (prompt.style !== "none") parts.push(styleBlock(prompt.style[0].toUpperCase() + prompt.style.slice(1)));
   parts.push(prompt.prompt);
   const text = parts.join("\n\n");

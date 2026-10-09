@@ -128,6 +128,16 @@ The camera always faces north, so the south is behind the viewer:
   door) is suggested by light or sound coming from the bottom edge, not
   painted.
 
+## Continuity between neighbouring rooms
+
+Things seen from one room are often visited in another: the old stone wall
+from the grassy bank, the mountain from the mountain path. When painting a
+room, attach the neighbouring rooms that are already made, and say what must
+match (for example "the wall must match the one in the second image").
+
+- A path that leads to an exit leaves the picture at that side, and doesn't
+  also wind off into the distance in another direction.
+
 ## Things to keep consistent
 
 - Merlin: a tall old wizard, long silver beard, deep blue robe and hat with
