@@ -92,6 +92,7 @@ export class IllustratedApp {
   private showTitle() {
     this.setMode("title");
     this.ending = null;
+    this.things.replaceChildren();
     void this.setScene(artUrl("scenes", "title"), false);
     const saves = listSaves().length > 0;
     this.overlay.replaceChildren(
