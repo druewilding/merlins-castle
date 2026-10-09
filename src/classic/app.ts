@@ -298,7 +298,8 @@ export class App {
         {},
         h("span", { class: "yellow" }, `Score ${view.score}`),
         button("Save", "white", () => this.go({ name: "play", events: [], prompt: "save" })),
-        button("Quit", "white", () => this.go({ name: "play", events: [], prompt: "quit" }))
+        button("Quit", "white", () => this.go({ name: "play", events: [], prompt: "quit" })),
+        button("Pictures", "white", () => switchMode("illustrated", this.game))
       )
     );
 
