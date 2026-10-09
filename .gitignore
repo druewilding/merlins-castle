@@ -10,3 +10,6 @@ original/files/
 
 # A full solution (spoilers!), kept locally only
 test/walkthrough.test.ts
+
+# Full-size image originals (web versions go in public/art)
+art/originals/

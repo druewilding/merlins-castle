@@ -8,19 +8,19 @@ Status: **playable teletext version done; art and deploy next.**
 
 ## Decisions
 
-| Topic            | Decision                                                                                                    |
-| ---------------- | ----------------------------------------------------------------------------------------------------------- |
-| Fidelity         | Map, text and quirks **exactly** as the original.                                                           |
-| Input            | **Clicking**: direction arrows, objects in the scene, inventory. No typing.                                 |
-| Look             | **Full-screen illustrated scene** with the teletext text panel over it.                                     |
-| Art              | Pictures for everything: rooms, objects, deaths, clue rooms, title, victory. Leaning towards **pixel art**. |
-| Dead ends        | The "You are lost…" clue rooms **end the game**.                                                            |
-| Object placement | Random each game (as the original: many objects have two possible rooms).                                   |
-| Saving           | **localStorage only**, with named save slots (the original had named position files).                       |
-| Sound            | Silent for now. Maybe later: the original's victory tune is in the code as note data.                       |
-| Credit           | Credit Anita Straker clearly on the title and about screens.                                                |
-| Hosting          | GitHub Pages → www.druewilding.com/merlins-castle, later merlinscastle.net.                                 |
-| Someday          | Multiplayer. The pure engine keeps this possible, but it is out of scope for now.                           |
+| Topic            | Decision                                                                                                                     |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Fidelity         | Map, text and quirks **exactly** as the original.                                                                            |
+| Input            | **Clicking** plus keyboard (arrows / N S E W, 1–5 for slots). A typed command line only in Classic mode.                     |
+| Look             | **Full-screen painted scene**, a text panel along the bottom, 5 inventory slots. Teletext **Classic mode** kept as a toggle. |
+| Art              | **Painterly semi-realism**, made with ChatGPT. See `art/STYLE.md`. No player shown.                                          |
+| Dead ends        | The "You are lost…" clue rooms **end the game**.                                                                             |
+| Object placement | Random each game (as the original: many objects have two possible rooms).                                                    |
+| Saving           | **localStorage only**, with named save slots (the original had named position files).                                        |
+| Sound            | Silent for now. Maybe later: the original's victory tune is in the code as note data.                                        |
+| Credit           | Credit Anita Straker clearly on the title and about screens.                                                                 |
+| Hosting          | GitHub Pages → www.druewilding.com/merlins-castle, later merlinscastle.net.                                                  |
+| Someday          | Multiplayer. The pure engine keeps this possible, but it is out of scope for now.                                            |
 
 ## Source material
 
@@ -81,7 +81,7 @@ merlins-castle/
   src/engine/            # pure TS, no DOM: types, newGame, act, score, describe
   src/ui/                # scene, teletext panel, arrows, inventory, save slots
   src/main.ts
-  public/art/            # pre-generated pixel art (rooms/, items/, deaths/)
+  public/art/            # finished images (rooms/, items/, deaths/), web-optimised
   art/prompts/           # the prompt for each image, so art can be regenerated consistently
   test/                  # vitest
 ```
@@ -100,19 +100,36 @@ merlins-castle/
   every read and write in try/catch.
 - **Deploy**: GitHub Actions → Pages on `druewilding/merlins-castle`.
 
-## Art direction (to explore)
+## Art direction and illustrated UI
 
-- Pixel art at a fixed low resolution (e.g. 320×256, a BBC Mode 1-ish
-  canvas). Upscale with `image-rendering: pixelated`. Use a limited shared
-  palette so 40+ images look like one world.
-- Generate offline and commit the results. Keep one prompt file per image,
-  with a shared style preamble and a reference image for consistency.
-- Layered images: a room background, plus object sprites placed into the scene
-  (they move around randomly, so they can't be baked in), plus death and clue
-  vignettes.
-- A nice nod: the notes say the game had no pictures _so that children would
-  paint the scenes_. An optional "crayon mode" in the style of the 2010 sketch
-  could be a fun extra.
+The style guide and prompts are in `art/` (`STYLE.md`, `prompts/`).
+
+- **Scenes**: painterly semi-realism, storybook matte-painting light, dreamlike.
+  Camera about 30° above the ground looking north, so north is at the top of
+  the frame, south at the bottom edge, and east/west at the sides. Mood by area:
+  summer outdoors, misty forest, dark underground, candlelit castle.
+- **Format**: 1536×1024 (ChatGPT's 3:2 landscape), cropped to fill the screen.
+  The top and bottom ~8% may be cropped. The bottom quarter sits under the text
+  panel, so it should be plain foreground.
+- **No objects painted into rooms**: objects are separate transparent cut-outs,
+  placed at per-room "drop spots" (to add to `world.json`). The grassy bank needs
+  20 spots, so its pile of treasures grows into a visible score.
+- **Consistency**: paste the same style guide every time and attach the anchor
+  image(s). Don't rely on ChatGPT remembering a long conversation.
+- **Picking up**: the object grows into the centre with its message, then
+  whooshes into one of 5 slots at the bottom.
+- **Using**: one object at a time (as Drue remembers it; the original code
+  allowed several) — **to confirm**. The object in use glows yellow, and the
+  glow fades on leaving the room.
+- **Dropping**: a small button under the slot, or drag it back into the scene.
+- **Text panel**: a magical serif (IM Fell English, with Cinzel for titles).
+  Highlighted words keep the original's colours, softened. Text appears letter
+  by letter, and a click shows it all. A message line shows "Nothing happens." etc.
+- **Moving**: fade through black between scenes.
+- **Extra images**: full-screen death scenes, lost-in-the-mist scenes (shared
+  by the clue rooms), the title and victory.
+- **Classic mode**: the existing teletext UI, plus (one day) a typed command
+  line ported from `PROCin`. It matches on the first 3 letters: `use lad`, `n`.
 
 ## Milestones
 
@@ -122,10 +139,11 @@ merlins-castle/
 3. ~~Teletext UI~~ ✅ Black-screen Mode 7 version, playable by clicking or
    keyboard, with save slots, notes, about and game over.
 4. **Art**: style exploration on 3–4 rooms first, then the rest.
-5. **Polish + deploy**:
-   - port the MERLIN1 title picture (random castle towers on blue);
-   - GitHub Pages workflow;
-   - maybe the victory tune.
+5. **Illustrated UI**: scene, text panel, slots, animations, Classic mode toggle.
+6. **Polish**: README, release-please, maybe the victory tune, maybe a port of the
+   MERLIN1 title picture (random castle towers on blue) for Classic mode.
+
+Deployed: https://www.druewilding.com/merlins-castle/ (every push to `main`).
 
 ## Decided along the way
 
