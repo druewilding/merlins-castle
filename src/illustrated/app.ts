@@ -57,6 +57,7 @@ export class IllustratedApp {
   private typedFor = "";
   private sceneUrl: string | null | undefined = undefined;
   private ending: string | null = null; // the moment picture after the game ends
+  private opened: Direction[] = []; // ways out just opened by using an object
   private dragged = false;
   private readonly music = new Music();
   private readonly sounds = new Sounds();
@@ -309,6 +310,9 @@ export class IllustratedApp {
   private async use(id: ItemId) {
     if (!this.playing() || this.busy) return;
     this.command({ type: "use", item: id });
+    // Any way out here that needed this object glows, so you know where to go.
+    const exits = this.world.rooms[this.game!.room].exits;
+    this.opened = COMPASS.map((c) => c.direction).filter((d) => exits[d]?.obstacle?.needs === id);
     // The engine says "Nothing happens." when no way here needs this object.
     this.sounds.play(this.events.at(-1)?.text === "Nothing happens." ? "nothing" : "effect");
     this.render();
@@ -496,13 +500,16 @@ export class IllustratedApp {
   }
 
   private renderCompass(exits: Direction[]) {
+    // The glow plays once, so it's not restarted by the next render.
+    const opened = this.opened;
+    this.opened = [];
     this.compass.replaceChildren(
       ...COMPASS.map(({ direction, label }) =>
         h(
           "button",
           {
             type: "button",
-            class: direction,
+            class: opened.includes(direction) ? `${direction} opened` : direction,
             disabled: !exits.includes(direction),
             "aria-label": `Go ${direction}`,
             title: `Go ${direction}`,

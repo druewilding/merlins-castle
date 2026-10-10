@@ -433,6 +433,29 @@ button {
   cursor: default;
 }
 
+/* A way out you've just opened by using an object glows gold a few times. */
+.compass button.opened {
+  animation: opened 1.2s ease-in-out 3;
+}
+
+@keyframes opened {
+  50% {
+    border-color: var(--gold);
+    color: var(--gold);
+    box-shadow:
+      0 0 18px rgba(255, 216, 120, 0.7),
+      inset 0 0 12px rgba(255, 216, 120, 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compass button.opened {
+    animation: none;
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+}
+
 .compass .north {
   grid-area: 1 / 2;
 }
