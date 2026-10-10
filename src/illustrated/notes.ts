@@ -11,7 +11,7 @@ const EN = [
 ];
 
 const DA = [
-  "Du går en tur en varm, solrig dag. Du bliver træt og falder i søvn på en græsklædt skrænt. Da du vågner, er du i et magisk land, hvor der er skatte at finde.",
+  "Du går en tur en varm, solrig dag. Du bliver træt og falder i søvn på en græsklædt skrænt. Når du vågner, er du i et magisk land, hvor der er skatte at finde.",
   "Du kommer rundt med retningsknapperne eller piletasterne (eller N, S, Ø og V). Men det er ikke let at gå på opdagelse. Der er mange farer på vejen!",
   "Mens du udforsker, finder du genstande, som du får brug for. Hvis du bærer genstandene tilbage til den græsklædte skrænt og lægger dem der, stiger dine point.",
   "Klik på en genstand for at tage den. Klik på den i dine hænder (eller tryk 1 til 5) for at bruge den, hvis du er i fare. Læg den fra dig med knappen nedenunder, eller træk den tilbage ind i billedet.",

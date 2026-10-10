@@ -26,7 +26,7 @@ const DA: string[][] = [
   [
     "{blue}Merlin's Castle",
     "",
-    "Du går en tur en varm, solrig dag. Du bliver træt og falder i søvn på en græsklædt skrænt. Da du vågner, er du i et magisk land, hvor der er skatte at finde.",
+    "Du går en tur en varm, solrig dag. Du bliver træt og falder i søvn på en græsklædt skrænt. Når du vågner, er du i et magisk land, hvor der er skatte at finde.",
     "",
     "Du kommer rundt ved at klikke på{yellow}pilene{white}eller trykke på{yellow}N, S, Ø, V{white}eller{yellow}piletasterne.",
     "",
