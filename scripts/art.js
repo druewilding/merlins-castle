@@ -64,7 +64,7 @@ const REFERENCE = {
   object: (images) =>
     `The ${images} a **style reference only**: match the painting style, brushwork and level of detail, but create a single new object as described below. Don't copy the content.`,
   edit: (images) =>
-    `The ${images} the picture to **edit**. Keep everything in it exactly as it is: the composition, camera, light, colours, and every stone, leaf and shadow. Change only what is described below, and keep the same size and shape (1536×1024, landscape).`,
+    `The ${images} the picture to **edit**. Keep everything in it exactly as it is: the composition, camera, light, colours, and every stone, leaf and shadow. Change only what is described below: don't add, remove, move or reshape anything else, even a little. Keep the same size and shape (1536×1024, landscape).`,
 };
 
 const world = JSON.parse(readFileSync("data/world.json", "utf8"));

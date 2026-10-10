@@ -15,4 +15,4 @@ Made from the two single effects: edit the first, matching the second.
 
 ## Prompt
 
-> Keep the steps clear of the snake exactly as they are in the first image, and add the **ladder up to the balcony** exactly as it is in the last image. Nothing else changes.
+> Keep the steps exactly as they are in the first image: clear of the snake, with only the **tip of its tail** slipping away into the long grass beside them and the **apple core** on the bottom step. Then add the **ladder up to the balcony** exactly as it is in the last image. Nothing else changes.

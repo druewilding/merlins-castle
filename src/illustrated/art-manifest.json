@@ -78,7 +78,14 @@
     "victory"
   ],
   "effects": [
+    "cave-entrance--broom+lamp",
+    "cave-entrance--broom",
+    "cave-entrance--lamp",
     "deep-river--plank",
+    "dragon-cave--water",
+    "mossy-steps--apple+ladder",
+    "mossy-steps--apple",
+    "mossy-steps--ladder",
     "mountain-path--axe",
     "old-stone-wall--ladder",
     "old-wall--ladder+lamp",
@@ -86,6 +93,7 @@
     "old-wall--lamp",
     "river-south-bank--plank",
     "rusty-gate--key",
+    "tower--ring",
     "yellow-flowers--key"
   ]
 }

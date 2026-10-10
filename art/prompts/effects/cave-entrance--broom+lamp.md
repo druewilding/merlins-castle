@@ -15,4 +15,4 @@ Made from the two single effects: edit the first, matching the second.
 
 ## Prompt
 
-> Keep the leaves swept aside from the cave mouth exactly as they are in the first image, and add the **warm lamp glow** on the steps exactly as it is in the last image. Nothing else changes.
+> Keep the leaves swept aside from the cave mouth exactly as they are in the first image, and add the **warm lamp glow** on the three steps behind the mound exactly as it is in the last image, without changing the mound or the steps. Nothing else changes.
