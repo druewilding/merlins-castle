@@ -875,12 +875,12 @@ export class IllustratedApp {
             "aria-pressed": String(isOn() === on),
             onclick: () => {
               set(on);
-              buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(isOn() === (i === 0))));
+              buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(isOn() === (i === 1))));
             },
           },
           on ? T.on : T.off
         );
-      const buttons = [choice(true), choice(false)];
+      const buttons = [choice(false), choice(true)]; // Off, then On
       return h(
         "li",
         {},
@@ -932,7 +932,7 @@ export class IllustratedApp {
       );
     this.dialog(
       h("h2", {}, "Language \u00b7 Sprog"),
-      h("div", { class: "languages" }, h("span", { class: "choices" }, choice("en", "English"), choice("da", "Dansk"))),
+      h("div", { class: "languages" }, h("span", { class: "choices" }, choice("da", "Dansk"), choice("en", "English"))),
       h(
         "div",
         { class: "buttons" },
