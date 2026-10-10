@@ -179,15 +179,16 @@ mkdirSync(OUT, { recursive: true });
   save("discover", track, 0.3);
 }
 
-// An object works: a harp glissando sweeping up, crowned with a bell.
+// An object works: a quick harp sweep up, crowned with a bell. Short,
+// because you hear it a lot.
 {
-  const track = new Track(2);
-  ["G4", "A4", "C5", "D5", "E5", "G5", "A5", "C6", "D6"].forEach((n, i) =>
-    track.add(i * 0.038, pluck(note(n), 1.4, 0.8), -0.4 + i * 0.1)
+  const track = new Track(0.95);
+  ["C5", "E5", "G5", "A5", "C6", "E6"].forEach((n, i) =>
+    track.add(i * 0.03, pluck(note(n), 0.75, 0.8), -0.3 + i * 0.12)
   );
-  track.add(0.36, bell(note("G6"), 1.2, 0.5), 0.3);
-  sparkle(track, 0.4, 0.4, 5, 0.18);
-  save("effect", track, 0.3);
+  track.add(0.18, bell(note("G6"), 0.7, 0.45), 0.3);
+  sparkle(track, 0.2, 0.2, 3, 0.15);
+  save("effect", track, 0.22);
 }
 
 // You can't go that way: a gentle wooden "uh-uh", two notes falling.
