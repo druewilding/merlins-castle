@@ -118,7 +118,7 @@ const en = {
 export type Strings = typeof en;
 
 const da: Strings = {
-  title: "Merlins borg",
+  title: "Merlin's Castle", // the original's name, in every language
   by: (author) => `Af ${author}`,
 
   compass: { north: "N", west: "V", east: "Ø", south: "S" },
@@ -179,7 +179,7 @@ const da: Strings = {
   on: "Til",
   off: "Fra",
   aboutText: (author, year) => [
-    `Merlins borg (Merlin's Castle) blev skrevet af ${author} til BBC Micro i ${year} og udgivet af ESM. Hvert rum, hver genstand og hver besked her stammer fra hendes originale program, nu oversat til dansk.`,
+    `Merlin's Castle blev skrevet af ${author} til BBC Micro i ${year} og udgivet af ESM. Hvert rum, hver genstand og hver besked her stammer fra hendes originale program, nu oversat til dansk.`,
     "Genskabt med kærlighed af Drue Wilding, som spillede det i skolen og aldrig glemte det.",
   ],
   playOriginal: "Du kan stadig spille originalen (på engelsk) på ",
@@ -187,7 +187,7 @@ const da: Strings = {
 
   pressReturn: "Tryk på RETURN",
   backToMenu: "Tilbage til menuen",
-  titleLabel: "Merlins borg, af Anita Straker. Begynd",
+  titleLabel: "Merlin's Castle, af Anita Straker. Begynd",
   titlePicture: "En borg med mange tårne",
   titleByline: "Af Anita Straker",
   choicePage: "Valgside",

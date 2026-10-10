@@ -35,7 +35,7 @@ const CASTLE: Record<number, number[]> = {
 };
 
 // The few letters of the BBC Micro's own font that the title needs, in
-// English and Danish ("Merlins borg", "Af Anita Straker").
+// English and Danish ("Af Anita Straker").
 const FONT: Record<string, number[]> = {
   " ": [0, 0, 0, 0, 0, 0, 0, 0],
   "'": [24, 24, 48, 0, 0, 0, 0, 0],
@@ -45,10 +45,8 @@ const FONT: Record<string, number[]> = {
   M: [99, 119, 127, 107, 107, 99, 99, 0],
   S: [60, 102, 96, 60, 6, 102, 60, 0],
   a: [0, 0, 60, 6, 62, 102, 62, 0],
-  b: [96, 96, 124, 102, 102, 102, 124, 0],
   e: [0, 0, 60, 102, 126, 96, 60, 0],
   f: [28, 48, 48, 124, 48, 48, 48, 0],
-  g: [0, 0, 62, 102, 102, 62, 6, 60],
   i: [24, 0, 56, 24, 24, 24, 60, 0],
   k: [96, 96, 102, 108, 120, 108, 102, 0],
   l: [56, 24, 24, 24, 24, 24, 60, 0],

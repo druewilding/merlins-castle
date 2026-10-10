@@ -32,7 +32,7 @@ There are two ways to play:
 
 ![The Classic version, on its teletext screen](docs/screenshots/classic.png)
 
-It can be played in English or Danish (_Merlins borg_): the game follows
+It can be played in English or Danish: the game follows
 your browser's language, and Language/Sprog switches at any time.
 
 Games can be saved in your browser, and your best score is remembered.

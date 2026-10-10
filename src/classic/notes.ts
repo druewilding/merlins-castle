@@ -24,7 +24,7 @@ const EN: string[][] = [
 
 const DA: string[][] = [
   [
-    "{blue}Merlins borg",
+    "{blue}Merlin's Castle",
     "",
     "Du går en tur en varm, solrig dag. Du bliver træt og falder i søvn på en græsklædt skrænt. Da du vågner, er du i et magisk land, hvor der er skatte at finde.",
     "",
