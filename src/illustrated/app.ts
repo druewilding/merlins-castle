@@ -7,8 +7,10 @@ import { h } from "../shared/dom";
 import {
   deleteSave,
   effectsOn,
+  type Handoff,
   listSaves,
   musicOn,
+  nextSaveName,
   recordScore,
   saveGame,
   setEffectsOn,
@@ -60,6 +62,7 @@ export class IllustratedApp {
   private ending: string | null = null; // the moment picture after the game ends
   private opened: Direction[] = []; // ways out just opened by using an object
   private refused: Direction | null = null; // a way you just couldn't go
+  private saveName = ""; // the position last saved or loaded in this game
   private dragged = false;
   private readonly music = new Music();
   private readonly sounds = new Sounds();
@@ -89,7 +92,7 @@ export class IllustratedApp {
   constructor(
     root: HTMLElement,
     private world: World,
-    handoff: GameState | null = null
+    handoff: Handoff | null = null
   ) {
     this.stage.append(this.sceneImg, this.placeholder, motes(), this.things);
     // The ways out on wide screens sit just above the text panel.
@@ -102,7 +105,7 @@ export class IllustratedApp {
     this.app = h("div", { class: "mc" }, this.stage, this.topbar, this.panel, this.overlay, this.fader);
     root.replaceChildren(this.app);
     document.addEventListener("keydown", (event) => this.onKey(event));
-    if (handoff) void this.start(handoff);
+    if (handoff) void this.start(handoff.state, handoff.saveName);
     else this.showTitle();
   }
 
@@ -146,8 +149,9 @@ export class IllustratedApp {
     this.focusAutofocus();
   }
 
-  private async start(state: GameState = newGame(this.world)) {
+  private async start(state: GameState = newGame(this.world), saveName = "") {
     this.game = state;
+    this.saveName = saveName;
     this.events = [];
     this.ending = null;
     this.slotOrder = carried(this.world, state);
@@ -404,7 +408,7 @@ export class IllustratedApp {
       link(T.quit, () => this.showQuit()),
       link(T.sound, () => this.showSound()),
       link(T.language, () => this.showLanguage()),
-      link(T.classic, () => switchMode("classic", this.game))
+      link(T.classic, () => switchMode("classic", this.game, this.saveName))
     );
   }
 
@@ -780,11 +784,20 @@ export class IllustratedApp {
       "aria-label": T.nameLabel,
       autofocus: true,
     }) as HTMLInputElement;
+    // After a save (or a load), suggest the next in the series, ready to type over.
+    if (this.saveName) {
+      input.value = nextSaveName(
+        this.saveName,
+        listSaves().map((slot) => slot.name)
+      );
+      requestAnimationFrame(() => input.select());
+    }
     const save = (event: Event) => {
       event.preventDefault();
       const name = input.value.trim();
       if (!name) return;
       const ok = saveGame(name, this.game!);
+      if (ok) this.saveName = name;
       this.events = [ok ? { tone: "pass", text: T.savedAs(name) } : { tone: "error", text: T.cantSave }];
       this.closeDialog();
       this.render();
@@ -821,7 +834,7 @@ export class IllustratedApp {
                 class: "save-name",
                 onclick: () => {
                   this.closeDialog();
-                  void this.start(slot.state);
+                  void this.start(slot.state, slot.name);
                 },
               },
               slot.name
@@ -937,7 +950,9 @@ export class IllustratedApp {
           lang: language,
           "aria-pressed": String(LANGUAGE === language),
           onclick: () => {
-            if (language !== LANGUAGE) switchLanguage(language, this.playing() ? this.game : null);
+            if (language !== LANGUAGE) {
+              switchLanguage(language, this.playing() ? this.game : null, this.playing() ? this.saveName : "");
+            }
           },
         },
         label

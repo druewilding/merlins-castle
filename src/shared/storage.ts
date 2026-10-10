@@ -40,6 +40,18 @@ export function saveGame(name: string, state: GameState): boolean {
   return write(SAVES, [{ name, savedAt: new Date().toISOString(), state }, ...others]);
 }
 
+// A name for the next save after `last`: "Tower" -> "Tower 2" -> "Tower 3",
+// skipping any already taken, and kept within `max` characters.
+export function nextSaveName(last: string, taken: string[], max = 24): string {
+  const match = /^(.*?)\s*(\d+)$/.exec(last.trim());
+  const base = (match ? match[1] : last.trim()) || "";
+  // Counted exactly (BigInt), so even a huge number goes up by one.
+  let n = match ? BigInt(match[2]) + 1n : 2n;
+  const named = (k: bigint) => `${base.slice(0, max - String(k).length - 1).trimEnd()} ${k}`.trim();
+  while (taken.includes(named(n))) n++;
+  return named(n);
+}
+
 export function deleteSave(name: string): void {
   write(
     SAVES,
@@ -85,6 +97,13 @@ export function setEffectsOn(on: boolean): void {
 
 const MODE = "merlins-castle:mode";
 const HANDOFF = "merlins-castle:handoff";
+const HANDOFF_NAME = "merlins-castle:handoff-save-name";
+
+// A game carried over a reload, with the name it was last saved or loaded as.
+export interface Handoff {
+  state: GameState;
+  saveName: string;
+}
 
 export type Mode = "illustrated" | "classic";
 
@@ -94,9 +113,9 @@ export function getMode(): Mode {
 
 // Switch version by reloading the page. A game in progress is handed over
 // through sessionStorage, so it carries on in the other version.
-export function switchMode(mode: Mode, game?: GameState | null): void {
+export function switchMode(mode: Mode, game?: GameState | null, saveName = ""): void {
   write(MODE, mode);
-  reloadWith(game);
+  reloadWith(game, saveName);
 }
 
 // ---- Language -----------------------------------------------------------------
@@ -123,25 +142,30 @@ export function preferredLanguage(tags: readonly string[]): Language {
 }
 
 // Like switching version, the game carries on in the other language.
-export function switchLanguage(language: Language, game?: GameState | null): void {
+export function switchLanguage(language: Language, game?: GameState | null, saveName = ""): void {
   write(LANGUAGE, language);
-  reloadWith(game);
+  reloadWith(game, saveName);
 }
 
-function reloadWith(game?: GameState | null) {
+function reloadWith(game?: GameState | null, saveName = "") {
   try {
-    if (game) sessionStorage.setItem(HANDOFF, JSON.stringify(game));
+    if (game) {
+      sessionStorage.setItem(HANDOFF, JSON.stringify(game));
+      sessionStorage.setItem(HANDOFF_NAME, saveName);
+    }
   } catch {
     // The game just won't carry over.
   }
   location.reload();
 }
 
-export function takeHandoff(): GameState | null {
+export function takeHandoff(): Handoff | null {
   try {
     const raw = sessionStorage.getItem(HANDOFF);
+    const saveName = sessionStorage.getItem(HANDOFF_NAME) ?? "";
     sessionStorage.removeItem(HANDOFF);
-    return raw ? (JSON.parse(raw) as GameState) : null;
+    sessionStorage.removeItem(HANDOFF_NAME);
+    return raw ? { state: JSON.parse(raw) as GameState, saveName } : null;
   } catch {
     return null;
   }

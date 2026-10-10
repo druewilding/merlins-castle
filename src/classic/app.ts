@@ -2,7 +2,17 @@ import { act, bestPossibleScore, describe, itemsSentence, newGame, score } from 
 import type { Colour } from "../engine/teletext";
 import type { Command, Direction, GameEvent, GameState, ItemId, Tone, World } from "../engine/types";
 import { h } from "../shared/dom";
-import { bestScore, deleteSave, listSaves, recordScore, saveGame, switchLanguage, switchMode } from "../shared/storage";
+import {
+  bestScore,
+  deleteSave,
+  type Handoff,
+  listSaves,
+  nextSaveName,
+  recordScore,
+  saveGame,
+  switchLanguage,
+  switchMode,
+} from "../shared/storage";
 import { LANGUAGE, LOCALE, T } from "../shared/strings";
 import { button, row, teletext } from "./dom";
 import { NOTES } from "./notes";
@@ -50,14 +60,15 @@ export class App {
   private stopTitle: (() => void) | null = null;
   private game: GameState | null = null;
   private deleting: string | null = null; // the save waiting for "delete? yes"
+  private saveName = ""; // the position last saved or loaded in this game
 
   constructor(
     private root: HTMLElement,
     private world: World,
-    handoff: GameState | null = null
+    handoff: Handoff | null = null
   ) {
     document.addEventListener("keydown", (event) => this.onKey(event));
-    if (handoff) this.start(handoff);
+    if (handoff) this.start(handoff.state, handoff.saveName);
     else this.render();
   }
 
@@ -115,9 +126,10 @@ export class App {
     this.go({ name: "play", events: result.events });
   }
 
-  private start(state = newGame(this.world)) {
+  private start(state = newGame(this.world), saveName = "") {
     stopTune();
     this.game = state;
+    this.saveName = saveName;
     this.go({ name: "play", events: [] });
   }
 
@@ -130,7 +142,8 @@ export class App {
 
   // English and Danish swap places; a game in progress carries on.
   private otherLanguage() {
-    switchLanguage(LANGUAGE === "da" ? "en" : "da", this.game?.status === "playing" ? this.game : null);
+    const playing = this.game?.status === "playing";
+    switchLanguage(LANGUAGE === "da" ? "en" : "da", playing ? this.game : null, playing ? this.saveName : "");
   }
 
   private nextNotesPage(page: number) {
@@ -342,7 +355,7 @@ export class App {
         h("span", { class: "yellow" }, T.score(view.score)),
         button(T.save, "white", () => this.go({ name: "play", events: [], prompt: "save" })),
         button(T.quit, "white", () => this.go({ name: "play", events: [], prompt: "quit" })),
-        button(T.illustrated, "white", () => switchMode("illustrated", this.game))
+        button(T.illustrated, "white", () => switchMode("illustrated", this.game, this.saveName))
       )
     );
 
@@ -377,11 +390,21 @@ export class App {
       "aria-label": T.fileLabel,
       autofocus: true,
     }) as HTMLInputElement;
+    // After a save (or a load), suggest the next in the series, ready to type over.
+    if (this.saveName) {
+      input.value = nextSaveName(
+        this.saveName,
+        listSaves().map((slot) => slot.name),
+        20
+      );
+      requestAnimationFrame(() => input.select());
+    }
     const save = (event: Event) => {
       event.preventDefault();
       const name = input.value.trim();
       if (!name || !this.game) return;
       const saved = saveGame(name, this.game);
+      if (saved) this.saveName = name;
       const text = saved ? T.savedAsTt(name) : T.cantSave;
       this.go({ name: "play", events: [{ tone: saved ? "pass" : "error", text }] });
     };
@@ -412,7 +435,7 @@ export class App {
       rows.push(
         row(
           "white",
-          button(slot.name, "yellow", () => this.start(slot.state)),
+          button(slot.name, "yellow", () => this.start(slot.state, slot.name)),
           h("span", { class: "cyan" }, `  ${when}  `),
           this.deleting !== slot.name &&
             button(T.deleteTt, "red", () => {
