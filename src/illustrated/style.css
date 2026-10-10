@@ -891,6 +891,48 @@ button {
   text-transform: uppercase;
 }
 
+.settings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings li {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6em 0;
+  border-bottom: 1px solid rgba(243, 233, 210, 0.12);
+}
+
+.settings .setting {
+  flex: 1;
+}
+
+.choices {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.choice {
+  min-width: 4.5em;
+  padding: 0.5em 1em;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font: 600 12px var(--caps);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.choice[aria-pressed="true"] {
+  background: rgba(255, 216, 120, 0.18);
+  color: var(--gold);
+}
+
 /* ---- Phones held upright: the picture on top, everything else below ---- */
 
 @media (max-aspect-ratio: 1/1) {

@@ -3,7 +3,7 @@
 // and how loud, is set in sounds.json; npm run art:build turns those files
 // into MP3s in public/fx.
 
-import { soundOn } from "../shared/storage";
+import { effectsOn } from "../shared/storage";
 import { audioContext } from "./audio";
 import SOUNDS from "./sounds.json";
 
@@ -30,7 +30,7 @@ export class Sounds {
   }
 
   play(name: Sound, delay = 0) {
-    if (!soundOn()) return;
+    if (!effectsOn()) return;
     this.load();
     const context = this.context!;
     void this.buffers.get(name)?.then((buffer) => {

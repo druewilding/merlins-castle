@@ -59,14 +59,28 @@ export function recordScore(score: number): number {
 
 // ---- Which version to show ------------------------------------------------
 
-const SOUND = "merlins-castle:sound";
+// ---- Sound -----------------------------------------------------------------
 
-export function soundOn(): boolean {
-  return read<boolean>(SOUND, true);
+// Music and sound effects are switched on and off separately. Both start from
+// the single sound setting earlier versions had, so "off" stays off.
+const SOUND = "merlins-castle:sound";
+const MUSIC = "merlins-castle:music";
+const EFFECTS = "merlins-castle:effects";
+
+export function musicOn(): boolean {
+  return read<boolean>(MUSIC, read<boolean>(SOUND, true));
 }
 
-export function setSoundOn(on: boolean): void {
-  write(SOUND, on);
+export function setMusicOn(on: boolean): void {
+  write(MUSIC, on);
+}
+
+export function effectsOn(): boolean {
+  return read<boolean>(EFFECTS, read<boolean>(SOUND, true));
+}
+
+export function setEffectsOn(on: boolean): void {
+  write(EFFECTS, on);
 }
 
 const MODE = "merlins-castle:mode";
