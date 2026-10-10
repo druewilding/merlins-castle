@@ -9,6 +9,8 @@ becomes a frog.
 Only the Illustrated version changes. Classic stays as the original was.
 Pictures have no words, so Danish needs nothing new.
 
+Status: **done.** All 33 pictures are painted and in the game.
+
 ## How it behaves
 
 - **What counts as an effect**: an object that is in use (`state.using`) and
@@ -162,10 +164,10 @@ gain pictures batch by batch, like v1 did.
    the `effects` art kind with `reference: edit`, and all 33 prompts.
 2. ~~Picture choice, crossfade and preload, tested with one effect:
    `old-stone-wall--ladder`, the one that started all this.~~ ✅
-3. Repaint yellow-flowers.
-4. Paint the rest in exploring order, releasing as we go.
-5. Add a Decisions row to PLAN.md. v1 said "no objects painted into rooms",
-   and v2 makes a deliberate exception for objects in use.
+3. ~~Repaint yellow-flowers.~~ ✅ An edit of the v1 picture (kept as
+   `art/anchors/yellow-flowers-v1.png`), adding just the tops of the gate.
+4. ~~Paint the rest in exploring order.~~ ✅ All 33.
+5. ~~Add a Decisions row to PLAN.md.~~ ✅
 
 ## Decided
 
@@ -177,3 +179,22 @@ gain pictures batch by batch, like v1 did.
   is enough.
 - **Behind you**: light tells the story wherever it can (tower, oak door,
   giant). Only yellow-flowers gets a repainted base.
+
+## Learned while painting
+
+- **Describe the picture as it is painted**, not as its old prompt asked for
+  it. The cave entrance's steps hide behind a mound, and asking for "steps
+  under an arch" made ChatGPT cut through the mound to paint one.
+- **Light from behind the viewer is brightest at the bottom edge**, lighting
+  the nearest stones first, and a small patch reads better than a flood.
+  Reach about a third of the way up, so it shows above the text panel.
+- **Say which way things move**, and the same way in both rooms (the gate
+  opens into the meadow).
+- **Pin what must stay put** (the grand hall's west door), and say what
+  stays in the picture as well as what goes (the east goblin).
+- **One action per hand**: a guard waving and biting a penny grew a split arm.
+- **Use ChatGPT's select tool** for small changes. It can't touch anything
+  outside the selection.
+- **"Similarity to third-party content"** refusals come from wording that
+  sounds like someone else's characters (dancing, grinning trolls). Tie the
+  change to the look already in the picture instead.

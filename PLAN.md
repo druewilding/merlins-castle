@@ -4,7 +4,7 @@ A faithful remake of Anita Straker's BBC Micro adventure (BBC Model B, April
 1983; published by ESM in 1984), rebuilt as a static TypeScript web game with
 illustrated scenes. Successor to `../merlin-web` (Rails 3 + MongoDB, 2010).
 
-Status: **complete and deployed: both versions, all 70 pictures and music. Sound effects and polish next.**
+Status: **complete and deployed: both versions, all 70 pictures, music and sound effects.** v2 adds 33 pictures that change when an object is used (see `PLAN-V2.md`).
 
 ## Decisions
 
@@ -21,6 +21,7 @@ Status: **complete and deployed: both versions, all 70 pictures and music. Sound
 | Language         | English and Danish (the title stays "Merlin's Castle"). The world's words are in `data/da.json`, laid over `world.json` by `src/engine/localise.ts`; everything else is in `src/shared/strings.ts`. Follows the browser at first, then the Language/Sprog choice. |
 | Credit           | Credit Anita Straker clearly on the title and about screens.                                                                                                                                                                                                      |
 | Hosting          | GitHub Pages → www.druewilding.com/merlins-castle, later merlinscastle.net.                                                                                                                                                                                       |
+| Changing scenes  | **v2**: using an object that opens a way out changes the picture (the ladder appears against the wall), crossfading in. Rooms with two such objects have a picture with both. See `PLAN-V2.md`.                                                                   |
 | Multiplayer      | Decided against: it stays a single-player game, as the original was.                                                                                                                                                                                              |
 
 ## Source material
@@ -117,13 +118,17 @@ The style guide and prompts are in `art/` (`STYLE.md`, `prompts/`).
   panel, so it should be plain foreground.
 - **No objects painted into rooms**: objects are separate transparent cut-outs,
   placed at per-room "drop spots" (to add to `world.json`). The grassy bank needs
-  20 spots, so its pile of treasures grows into a visible score.
+  20 spots, so its pile of treasures grows into a visible score. **The one
+  exception (v2)**: an object in use that opens a way out is painted into the
+  room's changed picture, like the ladder against the wall.
 - **Consistency**: paste the same style guide every time and attach the anchor
   image(s). Don't rely on ChatGPT remembering a long conversation.
 - **Picking up**: the object grows into the centre with its message, then
   whooshes into one of 5 slots at the bottom.
 - **Using**: several objects can be in use at once, as in the original code.
-  Objects in use glow yellow, and the glow fades on leaving the room.
+  Objects in use glow yellow, and the glow fades on leaving the room. Since
+  v2, an object that opens a way out also changes the picture, which
+  crossfades in place (about 0.6 s).
 - **Dropping**: a small button under the slot, or drag it back into the scene.
 - **Text panel**: a magical serif (IM Fell English, with Cinzel for titles).
   Highlighted words keep the original's colours, softened. Text appears letter
