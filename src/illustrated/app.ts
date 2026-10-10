@@ -18,7 +18,7 @@ import {
   switchLanguage,
   switchMode,
 } from "../shared/storage";
-import { LANGUAGE, LOCALE, T } from "../shared/strings";
+import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { artUrl, preload } from "./art";
 import { loadMask, thingAt } from "./hit";
 import { itemWidth, placeThings } from "./layout";
@@ -839,11 +839,7 @@ export class IllustratedApp {
               },
               slot.name
             ),
-            h(
-              "span",
-              { class: "when" },
-              new Date(slot.savedAt).toLocaleDateString(LOCALE, { day: "numeric", month: "short" })
-            ),
+            h("span", { class: "when" }, `${savedDate(slot.savedAt)}, ${savedTime(slot.savedAt)}`),
             h(
               "span",
               { class: "actions" },
