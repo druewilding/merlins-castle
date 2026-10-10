@@ -3,7 +3,7 @@
 
 import manifest from "./art-manifest.json";
 
-export type ArtKind = "scenes" | "rooms" | "items" | "moments";
+export type ArtKind = "scenes" | "rooms" | "items" | "moments" | "effects";
 
 const available = manifest as Record<ArtKind, string[]>;
 

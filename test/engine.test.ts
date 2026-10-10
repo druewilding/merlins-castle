@@ -1,6 +1,6 @@
 import { describe as context, expect, it } from "vitest";
 
-import { act, bestPossibleScore, describe, itemsSentence, newGame, score } from "../src/engine/engine";
+import { act, bestPossibleScore, describe, effects, itemsSentence, newGame, score } from "../src/engine/engine";
 import { EXIT_ORDER, type GameState } from "../src/engine/types";
 import { firstChoice, play, texts, world } from "./helpers";
 
@@ -146,6 +146,46 @@ context("obstacles", () => {
   it("does nothing once the game is over", () => {
     const dead = play(carrying([], "deep-river"), ["S"]).state;
     expect(act(world, dead, { type: "go", direction: "north" })).toEqual({ state: dead, events: [] });
+  });
+});
+
+context("effects (objects in use that open a way out)", () => {
+  it("has none until an object is used", () => {
+    expect(effects(world, carrying(["ladder"], "old-stone-wall"))).toEqual([]);
+  });
+
+  it("has the object that opens a way out here", () => {
+    const { state } = play(carrying(["ladder"], "old-stone-wall"), ["use ladder"]);
+    expect(effects(world, state)).toEqual(["ladder"]);
+  });
+
+  it("leaves out objects that do nothing here", () => {
+    const { state } = play(carrying(["ladder", "harp"], "old-stone-wall"), ["use harp", "use ladder"]);
+    expect(state.using).toEqual(["harp", "ladder"]);
+    expect(effects(world, state)).toEqual(["ladder"]);
+  });
+
+  it("lists two in the order they were used, the latest last", () => {
+    const { state } = play(carrying(["apple", "ladder"], "mossy-steps"), ["use ladder", "use apple"]);
+    expect(effects(world, state)).toEqual(["ladder", "apple"]);
+    expect(effects(world, play(state, ["use ladder"]).state)).toEqual(["apple", "ladder"]);
+  });
+
+  it("keeps an object that was used and then dropped (original quirk)", () => {
+    const { state } = play(carrying(["ladder"], "old-stone-wall"), ["use ladder", "drop ladder"]);
+    expect(effects(world, state)).toEqual(["ladder"]);
+  });
+
+  it("forgets them on leaving the room", () => {
+    const { state } = play(carrying(["ladder"], "old-stone-wall"), ["use ladder", "E"]);
+    expect(effects(world, state)).toEqual([]);
+  });
+
+  it("never needs one object for two ways out of the same room", () => {
+    for (const [id, room] of Object.entries(world.rooms)) {
+      const needs = Object.values(room.exits).flatMap((exit) => (exit?.obstacle ? [exit.obstacle.needs] : []));
+      expect(new Set(needs).size, id).toBe(needs.length);
+    }
   });
 });
 

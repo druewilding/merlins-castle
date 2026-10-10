@@ -27,6 +27,12 @@ the script reads. The prompt is the quote under `## Prompt`.
   rooms share two pictures in `moments/` instead.
 - `items/`: the 20 objects (transparent backgrounds).
 - `moments/`: deaths, the two lost scenes, and victory.
+- `effects/`: a room changed by an object in use (v2, see `PLAN-V2.md`),
+  named `<room>--<object>`, or `<room>--<object>+<object>` when two are in
+  use. These are **edits** of the room's picture (`reference: edit`), not
+  new paintings, so everything except the change stays put. Pictures with two
+  objects are edits of a picture with one, so make those first. `npm run art`
+  lists each room's effects straight after the room.
 
 ## Suggested order
 
