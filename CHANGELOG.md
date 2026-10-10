@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0](https://github.com/druewilding/merlins-castle/compare/v1.6.0...v2.0.0) (2026-10-10)
+
+
+### Features
+
+* Add item effects that change the images ([#38](https://github.com/druewilding/merlins-castle/issues/38)) ([bf00edc](https://github.com/druewilding/merlins-castle/commit/bf00edcc0e63cb3e4d1107ad2311afdd9e6279bd))
+
 ## [1.6.0](https://github.com/druewilding/merlins-castle/compare/v1.5.0...v1.6.0) (2026-10-10)
 
 
