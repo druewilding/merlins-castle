@@ -1,7 +1,7 @@
 // The illustrated version: a painted scene, objects you can see and click,
 // a storybook text panel, 5 slots for what you carry, and a compass.
 
-import { act, bestPossibleScore, carried, describe, itemsIn, newGame, score } from "../engine/engine";
+import { act, bestPossibleScore, byName, carried, describe, itemsIn, newGame, score } from "../engine/engine";
 import type { Command, Direction, GameEvent, GameState, ItemId, World } from "../engine/types";
 import { h } from "../shared/dom";
 import { deleteSave, listSaves, recordScore, saveGame, switchMode } from "../shared/storage";
@@ -421,13 +421,13 @@ export class IllustratedApp {
 
     this.seeing.replaceChildren();
     if (itemsHere.length) {
-      const byName = [...itemsHere].sort((a, b) => this.world.items[a].name.localeCompare(this.world.items[b].name));
+      const sorted = byName(this.world, itemsHere);
       // Each name stays on the same line as the comma or full stop after it.
-      const names = byName.flatMap((id, i) => {
+      const names = sorted.flatMap((id, i) => {
         const item = this.world.items[id];
         const name = h("button", { type: "button", class: "name", onclick: () => void this.take(id) }, item.name);
-        const after = i === byName.length - 1 ? "." : ",";
-        return [`${item.article} `, h("span", { class: "nowrap" }, name, after), i === byName.length - 1 ? "" : " "];
+        const after = i === sorted.length - 1 ? "." : ",";
+        return [`${item.article} `, h("span", { class: "nowrap" }, name, after), i === sorted.length - 1 ? "" : " "];
       });
       this.seeing.append("You can see ", ...names);
       if (itemsHere.length > 1)

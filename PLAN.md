@@ -168,5 +168,7 @@ Deployed: https://www.druewilding.com/merlins-castle/ (every push to `main`).
 - **Death or dead end**: show the scene and message first, then "Press
   RETURN" leads to the score screen.
 - **Best score** is kept in localStorage indefinitely.
+- **"You can see"** lists objects alphabetically in both modes. This is a
+  deliberate change: the original listed them in the order of its DATA.
 - **Starting score**: objects that start on the bank (sometimes the ladder)
   count at once, so a game can start at 3. This is faithful to the original.

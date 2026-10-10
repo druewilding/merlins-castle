@@ -68,10 +68,16 @@ export function describe(world: World, state: GameState): View {
   };
 }
 
+// Objects in alphabetical order, for listing. (The original listed them in
+// the order of its DATA statements.)
+export function byName(world: World, ids: ItemId[]): ItemId[] {
+  return [...ids].sort((a, b) => world.items[a].name.localeCompare(world.items[b].name));
+}
+
 // "You can see a{red}cake,{red}a{red}ladder." — the original builds the list
 // with red control codes in place of spaces, and prints it all in red.
 export function itemsSentence(world: World, ids: ItemId[], prefix = "You can see "): TeletextString {
-  const parts = ids.map((id) => `${world.items[id].article}{red}${world.items[id].name}`);
+  const parts = byName(world, ids).map((id) => `${world.items[id].article}{red}${world.items[id].name}`);
   return `${prefix}${parts.join(",{red}")}.`;
 }
 

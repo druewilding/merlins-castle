@@ -62,6 +62,9 @@ context("starting a new adventure", () => {
   it("lists the objects you can see", () => {
     expect(itemsSentence(world, describe(world, start()).itemsHere)).toBe("You can see a{red}ladder.");
     expect(itemsSentence(world, ["cake", "water"])).toBe("You can see a{red}cake,{red}some{red}water.");
+    expect(itemsSentence(world, ["water", "apple", "key"])).toBe(
+      "You can see an{red}apple,{red}a{red}key,{red}some{red}water."
+    );
   });
 });
 
