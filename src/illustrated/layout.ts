@@ -16,13 +16,14 @@ interface Zone {
 }
 
 // The open floor where objects can rest. Most rooms use the middle; rooms
-// whose middle is taken (by a dragon, say) get their own zone.
+// whose middle is taken (by a dragon, say) get their own zone. Objects stand
+// up from their spot, so a spot must be well below anything it shouldn't cover.
 const DEFAULT_ZONE: Zone = { x0: 24, x1: 76, y0: 54, y1: 68 };
 const ROOM_ZONES: Partial<Record<RoomId, Zone>> = {
   "grassy-bank": { x0: 10, x1: 88, y0: 53, y1: 74 },
   "dragon-cave": { x0: 8, x1: 40, y0: 50, y1: 66 },
   "merlins-lair": { x0: 20, x1: 80, y0: 64, y1: 74 },
-  courtyard: { x0: 14, x1: 86, y0: 66, y1: 74 },
+  courtyard: { x0: 10, x1: 90, y0: 64, y1: 76 },
   "coach-house": { x0: 8, x1: 56, y0: 64, y1: 74 },
   "deep-river": { x0: 24, x1: 76, y0: 40, y1: 52 },
   dungeon: { x0: 6, x1: 42, y0: 60, y1: 72 },
@@ -31,33 +32,51 @@ const ROOM_ZONES: Partial<Record<RoomId, Zone>> = {
   "wizards-kitchen": { x0: 36, x1: 82, y0: 64, y1: 74 },
 };
 
+// Parts of a zone to keep clear, like the courtyard's well.
+const ROOM_AVOID: Partial<Record<RoomId, Zone[]>> = {
+  courtyard: [{ x0: 36, x1: 66, y0: 0, y1: 70 }],
+};
+
 // Roughly how far apart neighbouring spots are, so objects don't pile up.
 const SPACING_X = 8.5;
 const SPACING_Y = 7;
 
-// Spots fill from the middle of the zone outwards, then are drawn back to front.
-// Bigger objects (on small screens) need spots further apart.
-export function spotsFor(room: RoomId, count: number, scale = 1): Spot[] {
-  const zone = ROOM_ZONES[room] ?? DEFAULT_ZONE;
-  const columns = Math.max(4, Math.round((zone.x1 - zone.x0) / (SPACING_X * scale)));
-  const rows = Math.max(2, Math.round((zone.y1 - zone.y0) / (SPACING_Y * scale)) + 1);
-  const grid: Spot[] = [];
+function grid(zone: Zone, avoid: Zone[], spacing: number): Spot[] {
+  const columns = Math.max(4, Math.round((zone.x1 - zone.x0) / (SPACING_X * spacing)));
+  const rows = Math.max(2, Math.round((zone.y1 - zone.y0) / (SPACING_Y * spacing)) + 1);
   const dx = (zone.x1 - zone.x0) / (columns - 0.5);
   const dy = (zone.y1 - zone.y0) / (rows - 1);
+  const spots: Spot[] = [];
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < columns; col++) {
-      grid.push({ x: zone.x0 + dx * (col + (row % 2 ? 0.5 : 0)), y: zone.y0 + dy * row });
+      const spot = { x: zone.x0 + dx * (col + (row % 2 ? 0.5 : 0)), y: zone.y0 + dy * row };
+      if (!avoid.some((a) => spot.x >= a.x0 && spot.x <= a.x1 && spot.y >= a.y0 && spot.y <= a.y1)) spots.push(spot);
     }
+  }
+  return spots;
+}
+
+// Spots fill from the middle of the zone outwards, then are drawn back to front.
+// Bigger objects (on small screens) need spots further apart, but when there
+// are lots of objects the spots close up rather than piling objects on top
+// of each other.
+export function spotsFor(room: RoomId, count: number, scale = 1): Spot[] {
+  const zone = ROOM_ZONES[room] ?? DEFAULT_ZONE;
+  const avoid = ROOM_AVOID[room] ?? [];
+  let spacing = scale;
+  let spots = grid(zone, avoid, spacing);
+  while (spots.length < count && spacing > 0.6) {
+    spacing *= 0.9;
+    spots = grid(zone, avoid, spacing);
   }
   const cx = (zone.x0 + zone.x1) / 2;
   const cy = (zone.y0 + zone.y1) / 2;
-  grid.sort((a, b) => Math.hypot((a.x - cx) / 2, a.y - cy) - Math.hypot((b.x - cx) / 2, b.y - cy));
-  const spots = Array.from({ length: count }, (_, i) => {
-    const spot = grid[i % grid.length];
-    const layer = Math.floor(i / grid.length);
+  spots.sort((a, b) => Math.hypot((a.x - cx) / 2, a.y - cy) - Math.hypot((b.x - cx) / 2, b.y - cy));
+  return Array.from({ length: count }, (_, i) => {
+    const spot = spots[i % spots.length];
+    const layer = Math.floor(i / spots.length);
     return { x: spot.x + layer * 1.5, y: spot.y - layer * 1.5 };
   });
-  return spots;
 }
 
 // How big each object looks, relative to an ordinary one.

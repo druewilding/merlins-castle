@@ -6,9 +6,11 @@
 //
 // Scenes, rooms and moments become 1536px-wide WebP. Objects are cropped to
 // their outline, padded evenly onto a transparent square, and saved at 384px.
-// Only new or changed originals are rebuilt, and web images whose original
-// has gone (moved or deleted) are removed.
+// Music in art/originals/music becomes a 128 kbps MP3 in public/music (this
+// needs ffmpeg). Only new or changed originals are rebuilt, and web files
+// whose original has gone (moved or deleted) are removed.
 
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -48,8 +50,46 @@ export async function buildArt({ quiet = false } = {}) {
       if (!quiet) console.log(`  removed public/art/${kind}/${file}`);
     }
   }
+  built += buildMusic(quiet);
   writeFileSync("src/illustrated/art-manifest.json", JSON.stringify(manifest, null, 2) + "\n");
-  if (!quiet) console.log(built ? `${built} image(s) built.` : "All web images are up to date.");
+  if (!quiet) console.log(built ? `${built} file(s) built.` : "All web files are up to date.");
+  return built;
+}
+
+function buildMusic(quiet) {
+  const dir = "art/originals/music";
+  if (!existsSync(dir)) return 0;
+  mkdirSync("public/music", { recursive: true });
+  const ids = readdirSync(dir).filter((f) => f.endsWith(".mp3"));
+  let built = 0;
+  for (const file of ids) {
+    const src = `${dir}/${file}`;
+    const out = `public/music/${file}`;
+    if (existsSync(out) && statSync(out).mtimeMs >= statSync(src).mtimeMs) continue;
+    const ffmpeg = spawnSync("ffmpeg", [
+      "-loglevel",
+      "error",
+      "-y",
+      "-i",
+      src,
+      "-codec:a",
+      "libmp3lame",
+      "-b:a",
+      "128k",
+      out,
+    ]);
+    if (ffmpeg.error || ffmpeg.status !== 0) {
+      console.warn(`  couldn't convert ${src}: is ffmpeg installed? (brew install ffmpeg)`);
+      continue;
+    }
+    built++;
+    if (!quiet) console.log(`  built ${out}`);
+  }
+  for (const file of readdirSync("public/music").filter((f) => f.endsWith(".mp3"))) {
+    if (ids.includes(file)) continue;
+    rmSync(`public/music/${file}`);
+    if (!quiet) console.log(`  removed public/music/${file}`);
+  }
   return built;
 }
 

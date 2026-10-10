@@ -28,6 +28,19 @@ describe("object spots", () => {
     }
   });
 
+  it("keeps objects off the courtyard well", () => {
+    for (const scale of [1, 1.7]) {
+      for (const spot of spotsFor("courtyard", 20, scale)) {
+        expect(spot.x > 36 && spot.x < 66 && spot.y < 70, `${spot.x},${spot.y}`).toBe(false);
+      }
+    }
+  });
+
+  it("finds a spot for every object, even on a phone", () => {
+    const spots = spotsFor("courtyard", 20, 1.7);
+    expect(new Set(spots.map((s) => `${s.x.toFixed(1)},${s.y.toFixed(1)}`)).size).toBe(20);
+  });
+
   it("puts big objects behind small ones", () => {
     const [apple, ladder, ring] = placeThings("dragon-cave", ["apple", "ladder", "ring"], 1.7);
     expect(ladder.y).toBeLessThanOrEqual(apple.y);

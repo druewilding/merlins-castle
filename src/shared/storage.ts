@@ -59,6 +59,16 @@ export function recordScore(score: number): number {
 
 // ---- Which version to show ------------------------------------------------
 
+const SOUND = "merlins-castle:sound";
+
+export function soundOn(): boolean {
+  return read<boolean>(SOUND, true);
+}
+
+export function setSoundOn(on: boolean): void {
+  write(SOUND, on);
+}
+
 const MODE = "merlins-castle:mode";
 const HANDOFF = "merlins-castle:handoff";
 

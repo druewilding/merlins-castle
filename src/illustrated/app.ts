@@ -4,11 +4,12 @@
 import { act, bestPossibleScore, byName, carried, describe, itemsIn, newGame, score } from "../engine/engine";
 import type { Command, Direction, GameEvent, GameState, ItemId, World } from "../engine/types";
 import { h } from "../shared/dom";
-import { deleteSave, listSaves, recordScore, saveGame, switchMode } from "../shared/storage";
+import { deleteSave, listSaves, recordScore, saveGame, setSoundOn, soundOn, switchMode } from "../shared/storage";
 import { artUrl, preload } from "./art";
 import { loadMask, thingAt } from "./hit";
 import { itemWidth, placeThings } from "./layout";
 import { deathMoment, lostMoment } from "./moments";
+import { Music } from "./music";
 import { NOTES } from "./notes";
 import { plainText, segments } from "./text";
 import { Typewriter } from "./typewriter";
@@ -47,6 +48,7 @@ export class IllustratedApp {
   private sceneUrl: string | null | undefined = undefined;
   private ending: string | null = null; // the moment picture after the game ends
   private dragged = false;
+  private readonly music = new Music();
 
   private readonly stage = h("div", { class: "stage" });
   private readonly sceneImg = h("img", { class: "scene-img", alt: "" }) as HTMLImageElement;
@@ -96,6 +98,7 @@ export class IllustratedApp {
   private showTitle() {
     this.setMode("title");
     this.ending = null;
+    this.music.end(1200);
     this.things.replaceChildren();
     void this.setScene(artUrl("scenes", "title"), false);
     const saves = listSaves().length > 0;
@@ -128,11 +131,13 @@ export class IllustratedApp {
     this.typedFor = "";
     this.overlay.replaceChildren();
     this.setMode("play");
+    this.music.begin();
     await this.transition(() => this.render());
   }
 
   private showOver() {
     const game = this.game!;
+    if (game.status !== "won") this.music.end(1500);
     const yours = score(this.world, game);
     const best = recordScore(yours);
     this.setMode("over");
@@ -308,6 +313,8 @@ export class IllustratedApp {
   // and a Continue button in the middle. Winning gets no dark curtain.
   private dropCurtain() {
     const game = this.game!;
+    // The music fades with the falling curtain; a win keeps it playing.
+    if (game.status !== "won") this.music.end(3000);
     const last = game.status === "dead" ? this.events.at(-1) : undefined;
     this.overlay.replaceChildren(
       h(
@@ -342,7 +349,14 @@ export class IllustratedApp {
       link("Save", () => this.showSave()),
       link("Load", () => this.showLoad()),
       link("Quit", () => this.showQuit()),
-      link("Classic", () => switchMode("classic", this.game))
+      link("Classic", () => switchMode("classic", this.game)),
+      // The link says what clicking it will do.
+      link(soundOn() ? "Sound off" : "Sound on", (event) => {
+        const on = !soundOn();
+        setSoundOn(on);
+        this.music.setOn(on);
+        (event.currentTarget as HTMLElement).textContent = on ? "Sound off" : "Sound on";
+      })
     );
   }
 
@@ -833,6 +847,19 @@ export class IllustratedApp {
         "."
       ),
       h(
+        "p",
+        { class: "note" },
+        "Music: \u201cThe Path of the Goblin King\u201d by Kevin MacLeod (",
+        h("a", { href: "https://incompetech.com", target: "_blank", rel: "noopener" }, "incompetech.com"),
+        "), licensed under ",
+        h(
+          "a",
+          { href: "https://creativecommons.org/licenses/by/4.0/", target: "_blank", rel: "noopener" },
+          "Creative Commons: By Attribution 4.0"
+        ),
+        "."
+      ),
+      h(
         "div",
         { class: "buttons" },
         h("button", { type: "button", class: "pill", autofocus: true, onclick: () => this.closeDialog() }, "Close")
@@ -865,7 +892,7 @@ export class IllustratedApp {
   }
 }
 
-function link(label: string, onClick: () => void): HTMLElement {
+function link(label: string, onClick: (event: Event) => void): HTMLElement {
   return h("button", { type: "button", class: "link", onclick: onClick }, label);
 }
 

@@ -8,19 +8,19 @@ Status: **playable teletext version done; art and deploy next.**
 
 ## Decisions
 
-| Topic            | Decision                                                                                                                     |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Fidelity         | Map, text and quirks **exactly** as the original.                                                                            |
-| Input            | **Clicking** plus keyboard (arrows / N S E W, 1–5 for slots). A typed command line only in Classic mode.                     |
-| Look             | **Full-screen painted scene**, a text panel along the bottom, 5 inventory slots. Teletext **Classic mode** kept as a toggle. |
-| Art              | **Painterly semi-realism**, made with ChatGPT. See `art/STYLE.md`. No player shown.                                          |
-| Dead ends        | The "You are lost…" clue rooms **end the game**.                                                                             |
-| Object placement | Random each game (as the original: many objects have two possible rooms).                                                    |
-| Saving           | **localStorage only**, with named save slots (the original had named position files).                                        |
-| Sound            | Silent for now. Maybe later: the original's victory tune is in the code as note data.                                        |
-| Credit           | Credit Anita Straker clearly on the title and about screens.                                                                 |
-| Hosting          | GitHub Pages → www.druewilding.com/merlins-castle, later merlinscastle.net.                                                  |
-| Someday          | Multiplayer. The pure engine keeps this possible, but it is out of scope for now.                                            |
+| Topic            | Decision                                                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fidelity         | Map, text and quirks **exactly** as the original.                                                                                                             |
+| Input            | **Clicking** plus keyboard (arrows / N S E W, 1–5 for slots). A typed command line only in Classic mode.                                                      |
+| Look             | **Full-screen painted scene**, a text panel along the bottom, 5 inventory slots. Teletext **Classic mode** kept as a toggle.                                  |
+| Art              | **Painterly semi-realism**, made with ChatGPT. See `art/STYLE.md`. No player shown.                                                                           |
+| Dead ends        | The "You are lost…" clue rooms **end the game**.                                                                                                              |
+| Object placement | Random each game (as the original: many objects have two possible rooms).                                                                                     |
+| Saving           | **localStorage only**, with named save slots (the original had named position files).                                                                         |
+| Sound            | Illustrated: looping music (Kevin MacLeod, CC BY 4.0) with a Sound on/off link; it fades out when the game ends. Classic stays silent. Sound effects to come. |
+| Credit           | Credit Anita Straker clearly on the title and about screens.                                                                                                  |
+| Hosting          | GitHub Pages → www.druewilding.com/merlins-castle, later merlinscastle.net.                                                                                   |
+| Someday          | Multiplayer. The pure engine keeps this possible, but it is out of scope for now.                                                                             |
 
 ## Source material
 

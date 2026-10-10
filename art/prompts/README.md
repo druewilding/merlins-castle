@@ -16,6 +16,9 @@ Saved originals become web images in `public/art/` automatically while
 `npm run dev` is running, and the game reloads to show them. Otherwise
 `npm run art` (or `npm run art:build`) does it.
 
+Music works the same way: put the full-quality MP3 in `art/originals/music/`
+and a smaller 128 kbps copy goes into `public/music/` (this needs ffmpeg).
+
 Each file starts with a small header (`style`, `reference`, `attach`) that
 the script reads. The prompt is the quote under `## Prompt`.
 
