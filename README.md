@@ -51,8 +51,12 @@ npm test           # run the tests
 npm run build      # build the static site into dist/
 ```
 
-Every push to `main` is built and deployed to GitHub Pages by
-`.github/workflows/deploy.yml`.
+Changes reach `main` through pull requests, checked by
+`.github/workflows/code-quality.yml`. release-please keeps a release pull
+request up to date from the commit messages; merging it publishes a release,
+which `.github/workflows/deploy-please.yml` builds and deploys to GitHub
+Pages. Dependencies are updated monthly by
+`.github/workflows/update-please.yml`.
 
 ## How it's made
 
