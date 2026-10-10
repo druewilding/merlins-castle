@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/druewilding/merlins-castle/compare/v1.3.0...v1.4.0) (2026-10-10)
+
+
+### Features
+
+* Translate the whole game into Danish ([#25](https://github.com/druewilding/merlins-castle/issues/25)) ([ced7b06](https://github.com/druewilding/merlins-castle/commit/ced7b066bdf0f4df40ebea2e440c2958538637b5))
+
+
+### Bug Fixes
+
+* Put Off before On, and Dansk before English ([#26](https://github.com/druewilding/merlins-castle/issues/26)) ([dc095a8](https://github.com/druewilding/merlins-castle/commit/dc095a8f7c2074fac148176276b3e6f122a0c7da))
+
 ## [1.3.0](https://github.com/druewilding/merlins-castle/compare/v1.2.0...v1.3.0) (2026-10-10)
 
 
