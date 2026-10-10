@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.3](https://github.com/druewilding/merlins-castle/compare/v1.0.2...v1.0.3) (2026-10-10)
+
+
+### Continuous Integration
+
+* Attach test result report to PRs as a comment ([#8](https://github.com/druewilding/merlins-castle/issues/8)) ([d4924b9](https://github.com/druewilding/merlins-castle/commit/d4924b9a73aad3befd20adf099b088f236c7196a))
+* Only deploy when chosen, by running deploy-please by hand ([#6](https://github.com/druewilding/merlins-castle/issues/6)) ([fe2b5e9](https://github.com/druewilding/merlins-castle/commit/fe2b5e9403e9121dad286f5ccc604b5a2169f72b))
+
 ## [1.0.2](https://github.com/druewilding/merlins-castle/compare/v1.0.1...v1.0.2) (2026-10-10)
 
 
