@@ -879,12 +879,14 @@ button {
     text-align: right;
   }
 
+  /* Together in the middle: filling a phone, but not spread across a tablet. */
   .slots {
-    justify-content: space-between;
+    justify-content: center;
+    gap: clamp(10px, 4vw, 20px);
   }
 
   .slot-btn {
-    width: 56px;
+    width: clamp(56px, 12vw, 76px);
   }
 }
 
