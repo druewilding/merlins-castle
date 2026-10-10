@@ -134,7 +134,7 @@ const da: Strings = {
   dropUnder: "læg",
   carrying: "Det, du bærer på",
 
-  score: (points) => `Point ${points}`,
+  score: (points) => `${points} point`,
   save: "Gem",
   load: "Hent",
   quit: "Afslut",
