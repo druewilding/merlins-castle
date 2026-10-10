@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/druewilding/merlins-castle/compare/v1.1.0...v1.1.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* Keep the music volume in range while fading ([#13](https://github.com/druewilding/merlins-castle/issues/13)) ([75604e3](https://github.com/druewilding/merlins-castle/commit/75604e33111f79065e6f59190aa7a921470b20af))
+
 ## [1.1.0](https://github.com/druewilding/merlins-castle/compare/v1.0.3...v1.1.0) (2026-10-10)
 
 
