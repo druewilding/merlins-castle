@@ -26,11 +26,14 @@ Games can be saved in your browser, and your best score is remembered.
 - **Original game**: Anita Straker, 1983, published by ESM. You can still
   play the original at
   [bbcmicro.co.uk](https://bbcmicro.co.uk/game.php?id=2164).
-- **Remake**: Drue Wilding, who played it at school and never forgot it.
+- **Remake**: Drue Wilding, who played it at school and never forgot it,
+  built together with Claude (Anthropic).
 - **Music**: "The Path of the Goblin King" by Kevin MacLeod
   ([incompetech.com](https://incompetech.com)), licensed under
   [Creative Commons: By Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
-- **Sound effects**: [Kenney](https://kenney.nl) (CC0).
+- **Sound effects**: the magical ones (twinkles, harp and bells) were
+  composed in code by Claude, in `scripts/make-sounds.js`; the rest are from
+  [Kenney](https://kenney.nl) (CC0).
 - **Pictures**: painted with ChatGPT from the prompts in `art/prompts`.
 - **Fonts**: IM Fell English and Cinzel, from Google Fonts.
 
