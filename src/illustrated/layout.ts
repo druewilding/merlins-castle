@@ -21,8 +21,14 @@ const DEFAULT_ZONE: Zone = { x0: 24, x1: 76, y0: 54, y1: 68 };
 const ROOM_ZONES: Partial<Record<RoomId, Zone>> = {
   "grassy-bank": { x0: 10, x1: 88, y0: 53, y1: 74 },
   "dragon-cave": { x0: 8, x1: 40, y0: 50, y1: 66 },
-  "merlins-lair": { x0: 26, x1: 74, y0: 60, y1: 72 },
+  "merlins-lair": { x0: 20, x1: 80, y0: 64, y1: 74 },
   courtyard: { x0: 14, x1: 86, y0: 66, y1: 74 },
+  "coach-house": { x0: 8, x1: 56, y0: 64, y1: 74 },
+  "deep-river": { x0: 24, x1: 76, y0: 40, y1: 52 },
+  dungeon: { x0: 6, x1: 42, y0: 60, y1: 72 },
+  "forest-witches": { x0: 52, x1: 90, y0: 52, y1: 66 },
+  moat: { x0: 6, x1: 40, y0: 50, y1: 62 },
+  "wizards-kitchen": { x0: 36, x1: 82, y0: 64, y1: 74 },
 };
 
 // Roughly how far apart neighbouring spots are, so objects don't pile up.

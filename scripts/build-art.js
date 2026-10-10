@@ -6,9 +6,10 @@
 //
 // Scenes, rooms and moments become 1536px-wide WebP. Objects are cropped to
 // their outline, padded evenly onto a transparent square, and saved at 384px.
-// Only new or changed originals are rebuilt.
+// Only new or changed originals are rebuilt, and web images whose original
+// has gone (moved or deleted) are removed.
 
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
@@ -40,6 +41,11 @@ export async function buildArt({ quiet = false } = {}) {
       else await sharp(src).resize({ width: 1536, withoutEnlargement: true }).webp({ quality: 80 }).toFile(out);
       built++;
       if (!quiet) console.log(`  built ${out}`);
+    }
+    for (const file of readdirSync(`public/art/${kind}`).filter((f) => f.endsWith(".webp"))) {
+      if (manifest[kind].includes(file.replace(/\.webp$/, ""))) continue;
+      rmSync(`public/art/${kind}/${file}`);
+      if (!quiet) console.log(`  removed public/art/${kind}/${file}`);
     }
   }
   writeFileSync("src/illustrated/art-manifest.json", JSON.stringify(manifest, null, 2) + "\n");
