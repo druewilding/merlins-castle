@@ -408,13 +408,10 @@ button {
   font-size: 1.15em;
 }
 
-/* ---- Compass (top right on wide screens) ---- */
+/* ---- Ways out: at the edges of the picture on wide screens, a thumb pad
+   (see the portrait layout) on phones ---- */
 
 .compass {
-  position: fixed;
-  top: 1.2rem;
-  right: 1.6rem;
-  z-index: 10;
   display: grid;
   grid-template: repeat(3, 2.4rem) / repeat(3, 2.4rem);
   gap: 3px;
@@ -453,6 +450,76 @@ button {
 }
 .compass .south {
   grid-area: 3 / 2;
+}
+
+/* On wide screens there's no compass: each real way out is a soft button at
+   that edge of the picture, where you'd reach to go that way. --panel-h (the
+   text panel's height) is kept up to date by the app. */
+@media (aspect-ratio > 1/1) {
+  .compass {
+    position: fixed;
+    inset: 0;
+    display: block;
+    pointer-events: none;
+  }
+
+  .compass button {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(10, 6, 3, 0.35);
+    backdrop-filter: blur(3px);
+    pointer-events: auto;
+    transition:
+      background 0.2s,
+      box-shadow 0.2s;
+  }
+
+  .compass button:disabled {
+    display: none;
+  }
+
+  .compass .north,
+  .compass .south {
+    left: 50%;
+    width: 7.5rem;
+    height: 3.2rem;
+    translate: -50% 0;
+  }
+
+  .compass .north {
+    top: 4.8rem;
+  }
+
+  .compass .south {
+    bottom: calc(var(--panel-h, 12rem) - 2.2rem);
+  }
+
+  .compass .west,
+  .compass .east {
+    top: calc((100vh - var(--panel-h, 12rem)) / 2 + 2.4rem);
+    width: 3.2rem;
+    height: 7.5rem;
+    translate: 0 -50%;
+  }
+
+  .compass .west {
+    left: 1.2rem;
+  }
+
+  .compass .east {
+    right: 1.2rem;
+  }
+}
+
+@media (aspect-ratio > 1/1) and (hover: hover) {
+  .compass button:hover {
+    background: rgba(10, 6, 3, 0.55);
+    box-shadow: 0 0 18px rgba(255, 216, 120, 0.35);
+  }
 }
 
 /* ---- Hands: 5 slots ---- */
