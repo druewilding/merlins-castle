@@ -5,7 +5,7 @@ the BBC Micro in 1983, now with a painted picture for every place, music, and
 sound effects. It plays in your browser, and on phones and iPads you can
 install it and play offline.
 
-**Play it at [www.druewilding.com/merlins-castle](https://www.druewilding.com/merlins-castle/)**
+**Play it at [merlinscastle.net](https://merlinscastle.net/)**
 
 ![The grassy bank at the crossroads, where the adventure begins](docs/screenshots/illustrated.jpg)
 
