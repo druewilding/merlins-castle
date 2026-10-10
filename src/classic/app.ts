@@ -5,7 +5,7 @@ import { h } from "../shared/dom";
 import { bestScore, deleteSave, listSaves, recordScore, saveGame, switchMode } from "../shared/storage";
 import { button, row, teletext } from "./dom";
 import { NOTES } from "./notes";
-import { playTune, stopTune } from "./tune";
+import { beep, playTune, stopTune } from "./tune";
 
 type Screen =
   | { name: "title" }
@@ -99,6 +99,7 @@ export class App {
     const result = act(this.world, this.game, command);
     // As in the original, the tune plays when you solve the mystery.
     if (result.state.status === "won" && this.game.status !== "won") playTune();
+    else if (result.events.some((event) => event.tone === "error")) beep();
     this.game = result.state;
     this.go({ name: "play", events: result.events });
   }
