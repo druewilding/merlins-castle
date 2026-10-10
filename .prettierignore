@@ -1,4 +1,6 @@
+.github/.release-please-manifest.json
+CHANGELOG.md
 data/world.json
-original/
 dist/
+original/
 src/illustrated/art-manifest.json
