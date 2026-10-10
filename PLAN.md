@@ -4,7 +4,7 @@ A faithful remake of Anita Straker's BBC Micro adventure (BBC Model B, April
 1983; published by ESM in 1984), rebuilt as a static TypeScript web game with
 illustrated scenes. Successor to `../merlin-web` (Rails 3 + MongoDB, 2010).
 
-Status: **playable teletext version done; art and deploy next.**
+Status: **complete and deployed: both versions, all 70 pictures and music. Sound effects and polish next.**
 
 ## Decisions
 
