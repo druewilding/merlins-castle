@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/druewilding/merlins-castle/compare/v2.0.0...v2.0.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* Play sound effects in silent mode, like the music ([#40](https://github.com/druewilding/merlins-castle/issues/40)) ([4397431](https://github.com/druewilding/merlins-castle/commit/43974311c42708d75ab97de274909abb5af3cf5b))
+
 ## [2.0.0](https://github.com/druewilding/merlins-castle/compare/v1.6.0...v2.0.0) (2026-10-10)
 
 
