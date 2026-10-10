@@ -24,7 +24,7 @@ import { deathMoment, lostMoment } from "./moments";
 import { Music } from "./music";
 import { NOTES } from "./notes";
 import { Sounds } from "./sounds";
-import { plainText, segments } from "./text";
+import { plainText, segments, splitClue } from "./text";
 import { Typewriter } from "./typewriter";
 
 const COMPASS: { direction: Direction; label: string }[] = (["north", "west", "east", "south"] as Direction[]).map(
@@ -59,6 +59,7 @@ export class IllustratedApp {
   private sceneUrl: string | null | undefined = undefined;
   private ending: string | null = null; // the moment picture after the game ends
   private opened: Direction[] = []; // ways out just opened by using an object
+  private refused: Direction | null = null; // a way you just couldn't go
   private dragged = false;
   private readonly music = new Music();
   private readonly sounds = new Sounds();
@@ -223,7 +224,10 @@ export class IllustratedApp {
     this.command({ type: "go", direction });
     const moved = this.game!.room !== room;
     if (moved) this.sounds.play("step");
-    else if (this.game!.status === "playing") this.sounds.play("blocked");
+    else if (this.game!.status === "playing") {
+      this.sounds.play("blocked");
+      this.refused = direction; // its button flashes red
+    }
     if (moved || this.game!.status !== "playing") await this.transition(() => this.render(), moved ? 600 : 1200);
     else this.render();
     this.busy = false;
@@ -361,11 +365,15 @@ export class IllustratedApp {
     // The music fades with the falling curtain (after a win it has already gone).
     if (game.status !== "won") this.music.end(3000);
     const last = game.status === "dead" ? this.events.at(-1) : undefined;
+    // Lost: the clue you found, so it isn't hidden behind the curtain.
+    const lost = game.status === "lost" ? splitClue(describe(this.world, game).description) : undefined;
     this.overlay.replaceChildren(
       h(
         "div",
         { class: game.status === "won" ? "curtain bright" : "curtain" },
         last && h("p", { class: "last-words" }, plainText(last.text)),
+        lost?.intro && h("p", { class: "clue-intro" }, lost.intro),
+        lost && h("p", { class: "last-words clue" }, lost.clue),
         h(
           "button",
           { type: "button", class: "pill", autofocus: true, onclick: () => this.continueAfterEnding() },
@@ -503,16 +511,20 @@ export class IllustratedApp {
   }
 
   private renderCompass(exits: Direction[]) {
-    // The glow plays once, so it's not restarted by the next render.
+    // The glow and the red flash play once, so the next render doesn't restart them.
     const opened = this.opened;
+    const refused = this.refused;
     this.opened = [];
+    this.refused = null;
     this.compass.replaceChildren(
       ...COMPASS.map(({ direction, label }) =>
         h(
           "button",
           {
             type: "button",
-            class: opened.includes(direction) ? `${direction} opened` : direction,
+            class: [direction, opened.includes(direction) && "opened", refused === direction && "refused"]
+              .filter(Boolean)
+              .join(" "),
             disabled: !exits.includes(direction),
             "aria-label": T.go[direction],
             title: T.go[direction],

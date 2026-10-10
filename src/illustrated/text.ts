@@ -80,3 +80,17 @@ export const plainText = (text: string) =>
   segments(text)
     .map((seg) => seg.text)
     .join("");
+
+// A clue room's description, split into the plain words before the clue
+// ("You are lost but you find a clue:") and the highlighted clue itself.
+export function splitClue(text: string): { intro: string; clue: string } {
+  const segs = segments(text);
+  const at = segs.findIndex((seg) => seg.colour);
+  if (at < 0) return { intro: "", clue: plainText(text) };
+  const join = (list: Segment[]) =>
+    list
+      .map((seg) => seg.text)
+      .join("")
+      .trim();
+  return { intro: join(segs.slice(0, at)), clue: join(segs.slice(at)) };
+}

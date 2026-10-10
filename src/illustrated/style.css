@@ -448,6 +448,20 @@ button {
   }
 }
 
+/* A way you can't go (yet) flashes red once. */
+.compass button.refused {
+  animation: refused 0.7s ease-out;
+}
+
+@keyframes refused {
+  25% {
+    border-color: #ff6b5b;
+    color: #ff8b7b;
+    background: rgba(170, 30, 20, 0.45);
+    box-shadow: 0 0 18px rgba(255, 90, 70, 0.7);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .compass button.opened {
     animation: none;
@@ -775,6 +789,18 @@ button {
   color: #ff7b6b;
   font: italic clamp(20px, 2.4vw, 32px) / 1.3 var(--serif);
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+/* Lost: the clue you found, told the same way as last words. */
+.clue-intro {
+  margin: 0 0 -0.6rem;
+  color: var(--ink-soft);
+  font: italic clamp(15px, 1.5vw, 20px) / 1.3 var(--serif);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.last-words.clue {
+  color: var(--gold);
 }
 
 @keyframes curtain-fall {
