@@ -64,7 +64,8 @@ export class Music {
     const startedAt = performance.now();
     const step = (now: number) => {
       const t = Math.min(1, (now - startedAt) / ms);
-      this.audio.volume = from + (target - from) * t;
+      // Rounding can land a hair outside 0-1, which the browser refuses.
+      this.audio.volume = Math.min(1, Math.max(0, from + (target - from) * t));
       if (t < 1) this.fade = requestAnimationFrame(step);
       else if (target === 0) this.audio.pause();
     };
