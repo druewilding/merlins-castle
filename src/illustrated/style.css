@@ -448,6 +448,20 @@ button {
   }
 }
 
+/* A way you can't go (yet) flashes red once. */
+.compass button.refused {
+  animation: refused 0.7s ease-out;
+}
+
+@keyframes refused {
+  25% {
+    border-color: #ff6b5b;
+    color: #ff8b7b;
+    background: rgba(170, 30, 20, 0.45);
+    box-shadow: 0 0 18px rgba(255, 90, 70, 0.7);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .compass button.opened {
     animation: none;
