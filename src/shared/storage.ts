@@ -109,8 +109,17 @@ export type Language = "en" | "da";
 export function getLanguage(): Language {
   const chosen = read<Language | null>(LANGUAGE, null);
   if (chosen === "en" || chosen === "da") return chosen;
-  const preferred = typeof navigator === "undefined" ? [] : navigator.languages;
-  return preferred.some((tag) => tag.toLowerCase().startsWith("da")) ? "da" : "en";
+  return preferredLanguage(typeof navigator === "undefined" ? [] : navigator.languages);
+}
+
+// The first of the browser's languages (in its order of preference) that the
+// game speaks, matched on the language part of the tag: "da-DK" is Danish.
+export function preferredLanguage(tags: readonly string[]): Language {
+  for (const tag of tags) {
+    const language = tag.toLowerCase().split("-")[0];
+    if (language === "en" || language === "da") return language;
+  }
+  return "en";
 }
 
 // Like switching version, the game carries on in the other language.

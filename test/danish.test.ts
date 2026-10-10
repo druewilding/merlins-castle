@@ -5,6 +5,7 @@ import { act, describe, itemsSentence, messages, newGame } from "../src/engine/e
 import { localise, type WorldText } from "../src/engine/localise";
 import { parse, wrap } from "../src/engine/teletext";
 import type { GameState } from "../src/engine/types";
+import { preferredLanguage } from "../src/shared/storage";
 import { world } from "./helpers";
 
 const da = daJson as WorldText;
@@ -85,5 +86,13 @@ group("the Danish translation", () => {
   it("leaves the English world as it was", () => {
     expect(world.items.ladder.name).toBe("ladder");
     expect(messages(world).cantGo).toBe("You can't go that way.");
+  });
+
+  it("follows the browser's first language that the game speaks", () => {
+    expect(preferredLanguage(["da-DK", "en-GB"])).toBe("da");
+    expect(preferredLanguage(["en-GB", "da-DK"])).toBe("en");
+    expect(preferredLanguage(["sv-SE", "da", "en"])).toBe("da");
+    expect(preferredLanguage(["dav-KE"])).toBe("en");
+    expect(preferredLanguage([])).toBe("en");
   });
 });

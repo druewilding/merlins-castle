@@ -224,3 +224,6 @@ const da: Strings = {
 export const LANGUAGE = getLanguage();
 
 export const T: Strings = LANGUAGE === "da" ? da : en;
+
+// For dates (the save lists): the page is in British English or Danish.
+export const LOCALE = LANGUAGE === "da" ? "da" : "en-GB";

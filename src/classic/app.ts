@@ -3,7 +3,7 @@ import type { Colour } from "../engine/teletext";
 import type { Command, Direction, GameEvent, GameState, ItemId, Tone, World } from "../engine/types";
 import { h } from "../shared/dom";
 import { bestScore, deleteSave, listSaves, recordScore, saveGame, switchLanguage, switchMode } from "../shared/storage";
-import { LANGUAGE, T } from "../shared/strings";
+import { LANGUAGE, LOCALE, T } from "../shared/strings";
 import { button, row, teletext } from "./dom";
 import { NOTES } from "./notes";
 import { drawTitle } from "./title-picture";
@@ -406,7 +406,7 @@ export class App {
     ];
     if (!saves.length) rows.push(row("white", T.noSaves));
     for (const slot of saves) {
-      const when = new Date(slot.savedAt).toLocaleDateString(LANGUAGE, { day: "numeric", month: "short" });
+      const when = new Date(slot.savedAt).toLocaleDateString(LOCALE, { day: "numeric", month: "short" });
       rows.push(
         row(
           "white",

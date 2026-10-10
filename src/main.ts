@@ -3,12 +3,12 @@ import worldJson from "../data/world.json";
 import { localise, type WorldText } from "./engine/localise";
 import type { World } from "./engine/types";
 import { getMode } from "./shared/storage";
-import { LANGUAGE, T } from "./shared/strings";
+import { LANGUAGE, LOCALE, T } from "./shared/strings";
 
 const english = worldJson as unknown as World;
 const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
 const root = document.getElementById("app")!;
-document.documentElement.lang = LANGUAGE === "da" ? "da" : "en-GB";
+document.documentElement.lang = LOCALE;
 document.title = T.title;
 
 // Only the chosen version (and its styles) is loaded.

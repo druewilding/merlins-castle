@@ -16,7 +16,7 @@ import {
   switchLanguage,
   switchMode,
 } from "../shared/storage";
-import { LANGUAGE, T } from "../shared/strings";
+import { LANGUAGE, LOCALE, T } from "../shared/strings";
 import { artUrl, preload } from "./art";
 import { loadMask, thingAt } from "./hit";
 import { itemWidth, placeThings } from "./layout";
@@ -817,7 +817,7 @@ export class IllustratedApp {
             h(
               "span",
               { class: "when" },
-              new Date(slot.savedAt).toLocaleDateString(LANGUAGE, { day: "numeric", month: "short" })
+              new Date(slot.savedAt).toLocaleDateString(LOCALE, { day: "numeric", month: "short" })
             ),
             h(
               "span",
