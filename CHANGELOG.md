@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/druewilding/merlins-castle/compare/v1.4.0...v1.4.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* Stop the victory tune when leaving the victory screen ([#28](https://github.com/druewilding/merlins-castle/issues/28)) ([cc41b8a](https://github.com/druewilding/merlins-castle/commit/cc41b8acd33f4e2872a292e8117184ba7f36055d))
+
 ## [1.4.0](https://github.com/druewilding/merlins-castle/compare/v1.3.0...v1.4.0) (2026-10-10)
 
 
