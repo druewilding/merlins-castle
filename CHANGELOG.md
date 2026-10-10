@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/druewilding/merlins-castle/compare/v1.5.0...v1.6.0) (2026-10-10)
+
+
+### Features
+
+* Suggest the next save name, numbered, after saving or loading ([#34](https://github.com/druewilding/merlins-castle/issues/34)) ([7f4d805](https://github.com/druewilding/merlins-castle/commit/7f4d8059e3bb1c0a6328a5a50f41afb57a3d6c73))
+
 ## [1.5.0](https://github.com/druewilding/merlins-castle/compare/v1.4.1...v1.5.0) (2026-10-10)
 
 
