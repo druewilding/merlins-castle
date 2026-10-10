@@ -188,38 +188,28 @@ input.tt {
 
 /* ---- Title ---- */
 
+/* The original's MODE 1 title picture (320 × 256), shown pixel for pixel. */
 .title-card {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
-  gap: 1em;
-  padding: 2em 0;
-  font: inherit;
-  background: var(--blue);
-  border: 4px solid var(--white);
-  outline: 4px solid var(--blue);
-  outline-offset: 4px;
-  color: var(--black);
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: var(--black);
   cursor: pointer;
 }
 
-.title-card .big {
-  font-size: 2em;
-  transform: scaleY(1.6);
+/* Any key begins, so there's no need to show the button has focus. */
+.title-card:focus {
+  outline: none;
 }
 
-/* Placeholder towers until the MERLIN1 title picture is ported. */
-.title-card .castle {
-  width: 24ch;
-  height: 8em;
-  background:
-    linear-gradient(var(--white), var(--white)) 10% 100% / 4ch 70% no-repeat,
-    linear-gradient(var(--white), var(--white)) 38% 100% / 4ch 90% no-repeat,
-    linear-gradient(var(--white), var(--white)) 62% 100% / 4ch 80% no-repeat,
-    linear-gradient(var(--white), var(--white)) 90% 100% / 4ch 60% no-repeat,
-    linear-gradient(var(--white), var(--white)) 50% 100% / 100% 25% no-repeat;
+.title-picture {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 4;
+  image-rendering: pixelated;
 }
 
 /* ---- Play screen ---- */

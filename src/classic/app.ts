@@ -5,6 +5,7 @@ import { h } from "../shared/dom";
 import { bestScore, deleteSave, listSaves, recordScore, saveGame, switchMode } from "../shared/storage";
 import { button, row, teletext } from "./dom";
 import { NOTES } from "./notes";
+import { drawTitle } from "./title-picture";
 import { beep, playTune, stopTune } from "./tune";
 
 type Screen =
@@ -40,6 +41,7 @@ const KEY_DIRECTIONS: Record<string, Direction> = {
 
 export class App {
   private screen: Screen = { name: "title" };
+  private stopTitle: (() => void) | null = null;
   private game: GameState | null = null;
 
   constructor(
@@ -124,6 +126,8 @@ export class App {
 
   private render() {
     const screen = this.screen;
+    this.stopTitle?.();
+    this.stopTitle = null;
     const content = (() => {
       switch (screen.name) {
         case "title":
@@ -156,14 +160,25 @@ export class App {
 
   private renderTitle(): Node[] {
     const next = () => this.go({ name: "menu" });
+    // The original's title picture, drawn tower by tower (see title-picture.ts).
+    const picture = h("canvas", { class: "title-picture", role: "img", "aria-label": "A castle of many towers" });
+    // The original just waited for a key; this says so, once the castle is up.
+    const prompt = this.bar("Press RETURN", next);
+    prompt.style.visibility = "hidden";
+    this.stopTitle = drawTitle(picture as HTMLCanvasElement, () => (prompt.style.visibility = ""));
     return [
       h(
         "button",
-        { type: "button", class: "title-card", onclick: next, autofocus: true, "aria-label": "Begin" },
-        h("span", { class: "castle", "aria-hidden": "true" }),
-        h("span", { class: "big yellow" }, "Merlin's Castle"),
-        h("span", { class: "byline" }, "By Anita Straker")
+        {
+          type: "button",
+          class: "title-card",
+          onclick: next,
+          autofocus: true,
+          "aria-label": "Merlin's Castle, by Anita Straker. Begin",
+        },
+        picture
       ),
+      prompt,
     ];
   }
 
