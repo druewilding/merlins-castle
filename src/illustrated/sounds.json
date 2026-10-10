@@ -1,5 +1,5 @@
 {
-  "discover": { "file": "merlin/discover.wav", "volume": 0.55 },
+  "discover": { "file": "merlin/discover.wav", "volume": 0.3 },
   "take": { "file": "kenney_rpg-audio/Audio/handleSmallLeather.ogg", "volume": 0.7 },
   "drop": { "file": "kenney_rpg-audio/Audio/dropLeather.ogg", "volume": 0.45 },
   "step": { "file": "kenney_impact-sounds/Audio/footstep_grass_000.ogg", "volume": 0.35 },

@@ -1,6 +1,7 @@
 // Makes the game's magical sound effects (bell twinkles, harp glissandos and
 // soft wooden knocks) from scratch, as WAV files in art/originals/fx/merlin.
-// They're all in C major pentatonic, so they sit happily together.
+// They're written in C major pentatonic and played a fourth lower, in G, the
+// key of the background music, so everything sits happily together.
 //
 //   node scripts/make-sounds.js
 //
@@ -14,7 +15,8 @@ const OUT = "art/originals/fx/merlin";
 
 // Notes by name, e.g. note("C6").
 const SEMITONES = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-const note = (name) => 440 * 2 ** ((SEMITONES[name[0]] + 12 * (Number(name.slice(1)) + 1) - 69) / 12);
+const TRANSPOSE = -5; // C → G
+const note = (name) => 440 * 2 ** ((SEMITONES[name[0]] + 12 * (Number(name.slice(1)) + 1) - 69 + TRANSPOSE) / 12);
 const PENTATONIC = ["C", "D", "E", "G", "A"];
 
 // A seeded random, so the sounds come out the same every time.
@@ -68,19 +70,18 @@ function bell(freq, seconds, amp = 1) {
   return release(out);
 }
 
-// A harp string (Karplus-Strong): a burst of noise in a tuned, softening loop.
-function pluck(freq, seconds, amp = 1) {
+// A harp string: exactly tuned harmonics, the higher ones fading first, which
+// gives a soft, round pluck.
+function harp(freq, seconds, amp = 1) {
   const out = new Float32Array(Math.ceil(seconds * RATE));
-  const period = Math.round(RATE / freq);
-  // Smoothing the starting noise makes a softer, rounder pluck.
-  let loop = Float32Array.from({ length: period }, () => random() * 2 - 1);
-  for (let pass = 0; pass < 4; pass++) loop = loop.map((v, i) => (v + loop[(i + 1) % period]) / 2);
-  for (let i = 0, p = 0; i < out.length; i++) {
-    const next = (p + 1) % period;
-    const v = loop[p];
-    loop[p] = 0.996 * 0.5 * (loop[p] + loop[next]);
-    out[i] = v * amp * 0.6 * Math.min(1, i / (0.003 * RATE));
-    p = next;
+  for (let i = 0; i < out.length; i++) {
+    const t = i / RATE;
+    const attack = Math.min(1, t / 0.003);
+    let v = 0;
+    for (let k = 1; k <= 6; k++) {
+      v += (Math.sin(2 * Math.PI * freq * k * t) / k ** 1.6) * Math.exp(-t / ((seconds * 0.35) / k ** 0.8));
+    }
+    out[i] = v * attack * amp * 0.5;
   }
   return release(out);
 }
@@ -184,7 +185,7 @@ mkdirSync(OUT, { recursive: true });
 {
   const track = new Track(0.95);
   ["C5", "E5", "G5", "A5", "C6", "E6"].forEach((n, i) =>
-    track.add(i * 0.03, pluck(note(n), 0.75, 0.8), -0.3 + i * 0.12)
+    track.add(i * 0.03, harp(note(n), 0.75, 0.8), -0.3 + i * 0.12)
   );
   track.add(0.18, bell(note("G6"), 0.7, 0.45), 0.3);
   sparkle(track, 0.2, 0.2, 3, 0.15);
@@ -221,7 +222,7 @@ mkdirSync(OUT, { recursive: true });
     track.add(1.2, bell(note(n), 3, 0.9), pan);
   }
   ["C4", "E4", "G4", "C5", "E5", "G5", "C6", "E6", "G6", "C7"].forEach((n, i) =>
-    track.add(1.1 + i * 0.03, pluck(note(n), 2.2, 0.55), -0.6 + i * 0.13)
+    track.add(1.1 + i * 0.03, harp(note(n), 2.2, 0.55), -0.6 + i * 0.13)
   );
   sparkle(track, 1.3, 2, 28, 0.32);
   save("victory", track, 0.35);
