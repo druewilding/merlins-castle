@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/druewilding/merlins-castle/compare/v1.0.1...v1.0.2) (2026-10-10)
+
+
+### Continuous Integration
+
+* Only release when chosen, by running release-please by hand ([#4](https://github.com/druewilding/merlins-castle/issues/4)) ([008e4cb](https://github.com/druewilding/merlins-castle/commit/008e4cbc0c5b3bd71ea86df25483759858bf589e))
+
 ## [1.0.1](https://github.com/druewilding/merlins-castle/compare/v1.0.0...v1.0.1) (2026-10-10)
 
 
