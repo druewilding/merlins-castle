@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/druewilding/merlins-castle/compare/v1.4.1...v1.5.0) (2026-10-10)
+
+
+### Features
+
+* Show clue on the curtain when lost, and flash the way you can't go ([#30](https://github.com/druewilding/merlins-castle/issues/30)) ([9e07240](https://github.com/druewilding/merlins-castle/commit/9e07240a407f9f80be76f3d8d9cba0260771221e))
+
 ## [1.4.1](https://github.com/druewilding/merlins-castle/compare/v1.4.0...v1.4.1) (2026-10-10)
 
 
