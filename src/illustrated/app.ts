@@ -24,7 +24,7 @@ import { deathMoment, lostMoment } from "./moments";
 import { Music } from "./music";
 import { NOTES } from "./notes";
 import { Sounds } from "./sounds";
-import { plainText, segments } from "./text";
+import { plainText, segments, splitClue } from "./text";
 import { Typewriter } from "./typewriter";
 
 const COMPASS: { direction: Direction; label: string }[] = (["north", "west", "east", "south"] as Direction[]).map(
@@ -361,11 +361,15 @@ export class IllustratedApp {
     // The music fades with the falling curtain (after a win it has already gone).
     if (game.status !== "won") this.music.end(3000);
     const last = game.status === "dead" ? this.events.at(-1) : undefined;
+    // Lost: the clue you found, so it isn't hidden behind the curtain.
+    const lost = game.status === "lost" ? splitClue(describe(this.world, game).description) : undefined;
     this.overlay.replaceChildren(
       h(
         "div",
         { class: game.status === "won" ? "curtain bright" : "curtain" },
         last && h("p", { class: "last-words" }, plainText(last.text)),
+        lost?.intro && h("p", { class: "clue-intro" }, lost.intro),
+        lost && h("p", { class: "last-words clue" }, lost.clue),
         h(
           "button",
           { type: "button", class: "pill", autofocus: true, onclick: () => this.continueAfterEnding() },

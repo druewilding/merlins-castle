@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { plainText, segments } from "../src/illustrated/text";
+import daJson from "../data/da.json";
+import { localise, type WorldText } from "../src/engine/localise";
+import { plainText, segments, splitClue } from "../src/illustrated/text";
 import { world } from "./helpers";
 
 describe("illustrated text", () => {
@@ -40,6 +42,23 @@ describe("illustrated text", () => {
     for (const room of Object.values(world.rooms)) {
       const text = plainText(room.description);
       expect(text).not.toMatch(/\s{2}|^\s|\s$|\{/);
+    }
+  });
+
+  it("splits a clue from the words before it, in both languages", () => {
+    expect(splitClue(world.rooms["clue-silver"].description)).toEqual({
+      intro: "You are lost but you find a clue:",
+      clue: "Give Merlin silver for his buttons.",
+    });
+    expect(splitClue(world.rooms["clue-mask"].description).clue).toBe("A mask hides you from goblins.");
+    const dansk = localise(world, daJson as WorldText);
+    expect(splitClue(dansk.rooms["clue-spell"].description)).toEqual({
+      intro: "Du er for svag, men du får et spor:",
+      clue: "Brug trylleformularen, når du møder Merlin.",
+    });
+    for (const id of Object.keys(world.rooms).filter((id) => id.startsWith("clue-"))) {
+      expect(splitClue(world.rooms[id].description).intro, id).toMatch(/clue:$/);
+      expect(splitClue(dansk.rooms[id].description).intro, id).toMatch(/spor:$/);
     }
   });
 });

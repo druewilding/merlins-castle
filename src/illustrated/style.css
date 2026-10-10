@@ -777,6 +777,18 @@ button {
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
 }
 
+/* Lost: the clue you found, told the same way as last words. */
+.clue-intro {
+  margin: 0 0 -0.6rem;
+  color: var(--ink-soft);
+  font: italic clamp(15px, 1.5vw, 20px) / 1.3 var(--serif);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.last-words.clue {
+  color: var(--gold);
+}
+
 @keyframes curtain-fall {
   from {
     transform: translateY(-100%);
