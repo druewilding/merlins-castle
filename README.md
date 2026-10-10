@@ -54,8 +54,9 @@ npm run build      # build the static site into dist/
 Changes reach `main` through pull requests, checked by
 `.github/workflows/code-quality.yml`. Releases are made on purpose: running
 **Release please** from the Actions tab opens a release pull request with the
-changelog, and merging it publishes the release, which
-`.github/workflows/deploy-please.yml` builds and deploys to GitHub Pages.
+changelog, and merging it publishes the release. Running **Deploy please**
+(`.github/workflows/deploy-please.yml`) then builds the latest release and
+deploys it to GitHub Pages; give it an older version to roll back.
 Dependencies are updated monthly by `.github/workflows/update-please.yml`.
 
 ## How it's made
