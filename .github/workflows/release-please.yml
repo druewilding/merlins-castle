@@ -4,7 +4,7 @@ name: Release please
 # 1. Run this by hand (Actions → Release please → Run workflow) to open or
 #    update the release pull request, with the changelog.
 # 2. Merging that pull request runs this again, which tags and publishes the
-#    release; deploy-please then deploys it.
+#    release. Deploying it is a separate step: run Deploy please.
 # Ordinary merges to main don't trigger it.
 on:
   workflow_dispatch:
