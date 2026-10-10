@@ -2,7 +2,8 @@ import { act, bestPossibleScore, describe, itemsSentence, newGame, score } from 
 import type { Colour } from "../engine/teletext";
 import type { Command, Direction, GameEvent, GameState, ItemId, Tone, World } from "../engine/types";
 import { h } from "../shared/dom";
-import { bestScore, deleteSave, listSaves, recordScore, saveGame, switchMode } from "../shared/storage";
+import { bestScore, deleteSave, listSaves, recordScore, saveGame, switchLanguage, switchMode } from "../shared/storage";
+import { LANGUAGE, T } from "../shared/strings";
 import { button, row, teletext } from "./dom";
 import { NOTES } from "./notes";
 import { drawTitle } from "./title-picture";
@@ -37,7 +38,12 @@ const KEY_DIRECTIONS: Record<string, Direction> = {
   s: "south",
   e: "east",
   w: "west",
+  ø: "east", // Danish: øst and vest
+  v: "west",
 };
+
+// Centred on the 38-column teletext row.
+const centred = (text: string) => " ".repeat(Math.max(0, Math.floor((38 - text.length) / 2)));
 
 export class App {
   private screen: Screen = { name: "title" };
@@ -77,6 +83,7 @@ export class App {
         c: () => this.go({ name: "notes", page: 0 }),
         d: () => this.go({ name: "about" }),
         e: () => switchMode("illustrated"),
+        f: () => this.otherLanguage(),
       }[key];
       choice?.();
     } else if (screen.name === "notes" && enter) this.nextNotesPage(screen.page);
@@ -119,6 +126,11 @@ export class App {
     this.go({ name: "over", best });
   }
 
+  // English and Danish swap places; a game in progress carries on.
+  private otherLanguage() {
+    switchLanguage(LANGUAGE === "da" ? "en" : "da", this.game?.status === "playing" ? this.game : null);
+  }
+
   private nextNotesPage(page: number) {
     if (page + 1 < NOTES.length) this.go({ name: "notes", page: page + 1 });
     else this.go({ name: "menu" });
@@ -152,7 +164,7 @@ export class App {
     this.root.querySelector<HTMLElement>("[autofocus]")?.focus();
   }
 
-  private bar(label = "Press RETURN", onClick?: () => void): HTMLElement {
+  private bar(label = T.pressReturn, onClick?: () => void): HTMLElement {
     return h(
       "div",
       { class: "bar" },
@@ -163,11 +175,17 @@ export class App {
   private renderTitle(): Node[] {
     const next = () => this.go({ name: "menu" });
     // The original's title picture, drawn tower by tower (see title-picture.ts).
-    const picture = h("canvas", { class: "title-picture", role: "img", "aria-label": "A castle of many towers" });
+    const picture = h("canvas", { class: "title-picture", role: "img", "aria-label": T.titlePicture });
     // The original just waited for a key; this says so, once the castle is up.
-    const prompt = this.bar("Press RETURN", next);
+    const prompt = this.bar(T.pressReturn, next);
     prompt.style.visibility = "hidden";
-    this.stopTitle = drawTitle(picture as HTMLCanvasElement, () => (prompt.style.visibility = ""));
+    this.stopTitle = drawTitle(
+      picture as HTMLCanvasElement,
+      () => (prompt.style.visibility = ""),
+      undefined,
+      T.title,
+      T.titleByline
+    );
     return [
       h(
         "button",
@@ -176,7 +194,7 @@ export class App {
           class: "title-card",
           onclick: next,
           autofocus: true,
-          "aria-label": "Merlin's Castle, by Anita Straker. Begin",
+          "aria-label": T.titleLabel,
         },
         picture
       ),
@@ -198,16 +216,17 @@ export class App {
         )
       );
     return [
-      row("blue", "            ", h("span", { class: "blue" }, "Choice Page")),
+      row("blue", centred(T.choicePage), h("span", { class: "blue" }, T.choicePage)),
       row("white", ""),
-      row("white", "You can:"),
-      option("A", "start a new adventure", () => this.start()),
-      option("B", "load your old position", () => this.go({ name: "load" })),
-      option("C", "see the notes", () => this.go({ name: "notes", page: 0 })),
-      option("D", "about this version", () => this.go({ name: "about" })),
-      option("E", "the illustrated version", () => switchMode("illustrated")),
+      row("white", T.youCan),
+      option("A", T.menu[0], () => this.start()),
+      option("B", T.menu[1], () => this.go({ name: "load" })),
+      option("C", T.menu[2], () => this.go({ name: "notes", page: 0 })),
+      option("D", T.menu[3], () => this.go({ name: "about" })),
+      option("E", T.menu[4], () => switchMode("illustrated")),
+      option("F", T.menu[5], () => this.otherLanguage()),
       row("white", ""),
-      row("white", "Click or type a letter"),
+      row("white", T.clickOrType),
     ];
   }
 
@@ -215,7 +234,7 @@ export class App {
     const last = page + 1 === NOTES.length;
     return [
       ...NOTES[page].flatMap((line) => (line === "" ? [row("white", "")] : teletext(line))),
-      this.bar(last ? "Back to the menu" : "Press RETURN", () => this.nextNotesPage(page)),
+      this.bar(last ? T.backToMenu : T.pressReturn, () => this.nextNotesPage(page)),
     ];
   }
 
@@ -227,14 +246,9 @@ export class App {
     );
     return [
       ...teletext(`{yellow}${this.world.title}`),
-      ...teletext(
-        `Written by Anita Straker for the BBC Micro in ${this.world.year}, published by ESM. Every room, object and message here comes from her original program.`
-      ),
-      row("white", ""),
-      ...teletext("Remade with love for the web by Drue Wilding, who played it at school and never forgot it."),
-      row("white", ""),
-      row("white", "Play the original at ", link),
-      this.bar("Back to the menu", () => this.go({ name: "menu" })),
+      ...T.classicAbout(this.world.year).flatMap((paragraph) => [...teletext(paragraph), row("white", "")]),
+      row("white", T.playOriginalAt, link),
+      this.bar(T.backToMenu, () => this.go({ name: "menu" })),
     ];
   }
 
@@ -242,7 +256,12 @@ export class App {
     const game = this.game!;
     const view = describe(this.world, game);
     const take = (item: ItemId) => () => this.command({ type: "take", item });
-    const clickable = Object.fromEntries(view.itemsHere.map((id) => [this.world.items[id].name, take(id)]));
+    const clickable = Object.fromEntries(
+      view.itemsHere.map((id) => {
+        const item = this.world.items[id];
+        return [item.name, { onClick: take(id), title: T.take(T.theItem(item.name, item.definite)) }];
+      })
+    );
     const playing = game.status === "playing";
 
     const parts: Node[] = [h("section", { class: "scene", "aria-live": "polite" }, ...teletext(view.description))];
@@ -264,7 +283,7 @@ export class App {
     );
 
     if (!playing) {
-      parts.push(this.bar("Press RETURN", () => this.gameOver()));
+      parts.push(this.bar(T.pressReturn, () => this.gameOver()));
     } else if (screen.prompt === "quit") {
       parts.push(this.renderQuitPrompt());
     } else if (screen.prompt === "save") {
@@ -278,13 +297,13 @@ export class App {
   private renderControls(view: ReturnType<typeof describe>): HTMLElement {
     const compass = h(
       "nav",
-      { class: "compass", "aria-label": "Directions" },
+      { class: "compass", "aria-label": T.directions },
       ...(["north", "west", "east", "south"] as Direction[]).map((direction) =>
         view.exits.includes(direction)
           ? button(ARROWS[direction], "yellow", () => this.command({ type: "go", direction }), {
               class: `tt yellow arrow ${direction}`,
-              "aria-label": `Go ${direction}`,
-              title: `Go ${direction}`,
+              "aria-label": T.go[direction],
+              title: T.go[direction],
             })
           : h("span", { class: `arrow ${direction}` })
       )
@@ -292,14 +311,14 @@ export class App {
 
     const carrying = h(
       "ul",
-      { class: "carrying", "aria-label": "Carrying" },
+      { class: "carrying", "aria-label": T.carrying },
       ...view.carried.map((id) =>
         h(
           "li",
           {},
           h("span", { class: "red" }, this.world.items[id].name),
-          button("use", "cyan", () => this.command({ type: "use", item: id })),
-          button("drop", "white", () => this.command({ type: "drop", item: id }))
+          button(T.use_, "cyan", () => this.command({ type: "use", item: id })),
+          button(T.drop_, "white", () => this.command({ type: "drop", item: id }))
         )
       )
     );
@@ -307,8 +326,8 @@ export class App {
     const actions = h(
       "div",
       { class: "actions" },
-      view.itemsHere.length > 0 && button("Take all", "red", () => this.command({ type: "take", item: "all" })),
-      view.carried.length > 0 && button("Drop all", "white", () => this.command({ type: "drop", item: "all" }))
+      view.itemsHere.length > 0 && button(T.takeAll, "red", () => this.command({ type: "take", item: "all" })),
+      view.carried.length > 0 && button(T.dropAll, "white", () => this.command({ type: "drop", item: "all" }))
     );
 
     // The status bar, in the style of the original's blue PROCbar.
@@ -318,10 +337,10 @@ export class App {
       h(
         "div",
         {},
-        h("span", { class: "yellow" }, `Score ${view.score}`),
-        button("Save", "white", () => this.go({ name: "play", events: [], prompt: "save" })),
-        button("Quit", "white", () => this.go({ name: "play", events: [], prompt: "quit" })),
-        button("Illustrated", "white", () => switchMode("illustrated", this.game))
+        h("span", { class: "yellow" }, T.score(view.score)),
+        button(T.save, "white", () => this.go({ name: "play", events: [], prompt: "save" })),
+        button(T.quit, "white", () => this.go({ name: "play", events: [], prompt: "quit" })),
+        button(T.illustrated, "white", () => switchMode("illustrated", this.game))
       )
     );
 
@@ -337,12 +356,12 @@ export class App {
     return h(
       "section",
       { class: "prompt" },
-      row("white", "Are you sure you want to quit?"),
+      row("white", T.sureQuit),
       row(
         "white",
-        button("Yes - quit", "red", () => this.command({ type: "quit" })),
+        button(T.yesQuitTt, "red", () => this.command({ type: "quit" })),
         "   ",
-        button("No - carry on", "green", () => this.go({ name: "play", events: [] }), { autofocus: true })
+        button(T.noCarryOnTt, "green", () => this.go({ name: "play", events: [] }), { autofocus: true })
       )
     );
   }
@@ -353,7 +372,7 @@ export class App {
       name: "save-name",
       maxlength: "20",
       autocomplete: "off",
-      "aria-label": "Name of your position file",
+      "aria-label": T.fileLabel,
       autofocus: true,
     }) as HTMLInputElement;
     const save = (event: Event) => {
@@ -361,20 +380,20 @@ export class App {
       const name = input.value.trim();
       if (!name || !this.game) return;
       const saved = saveGame(name, this.game);
-      const text = saved ? `Your position is saved as{yellow}${name}.` : "Sorry, this browser won't let me save.";
+      const text = saved ? T.savedAsTt(name) : T.cantSave;
       this.go({ name: "play", events: [{ tone: saved ? "pass" : "error", text }] });
     };
     return h(
       "form",
       { class: "prompt", onsubmit: save },
-      row("white", "Name of your position file?"),
+      row("white", T.fileName),
       row(
         "white",
         input,
         "  ",
-        h("button", { type: "submit", class: "tt green" }, "Save"),
+        h("button", { type: "submit", class: "tt green" }, T.save),
         "  ",
-        button("Cancel", "white", () => this.go({ name: "play", events: [] }))
+        button(T.cancel, "white", () => this.go({ name: "play", events: [] }))
       )
     );
   }
@@ -382,19 +401,19 @@ export class App {
   private renderLoad(): Node[] {
     const saves = listSaves();
     const rows: Node[] = [
-      row("blue", "         ", h("span", { class: "blue" }, "Your old positions")),
+      row("blue", centred(T.oldPositions), h("span", { class: "blue" }, T.oldPositions)),
       row("white", ""),
     ];
-    if (!saves.length) rows.push(row("white", "There are no saved positions yet."));
+    if (!saves.length) rows.push(row("white", T.noSaves));
     for (const slot of saves) {
-      const when = new Date(slot.savedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+      const when = new Date(slot.savedAt).toLocaleDateString(LANGUAGE, { day: "numeric", month: "short" });
       rows.push(
         row(
           "white",
           button(slot.name, "yellow", () => this.start(slot.state)),
           h("span", { class: "cyan" }, `  ${when}  `),
           this.deleting !== slot.name &&
-            button("delete", "red", () => {
+            button(T.deleteTt, "red", () => {
               this.deleting = slot.name;
               this.render();
             })
@@ -405,37 +424,36 @@ export class App {
         rows.push(
           row(
             "red",
-            "  Delete it?  ",
-            button("yes", "red", () => {
+            `  ${T.deleteItTt}  `,
+            button(T.yesTt, "red", () => {
               deleteSave(slot.name);
               this.deleting = null;
               this.render();
             }),
             "  ",
-            button("keep", "green", () => {
+            button(T.keepTt, "green", () => {
               this.deleting = null;
               this.render();
             })
           )
         );
     }
-    rows.push(this.bar("Back to the menu", () => this.go({ name: "menu" })));
+    rows.push(this.bar(T.backToMenu, () => this.go({ name: "menu" })));
     return rows;
   }
 
   private renderOver(best: number): Node[] {
     const yours = this.game ? score(this.world, this.game) : 0;
-    const centre = (text: string, colour: Colour) =>
-      row(colour, " ".repeat(Math.max(0, Math.floor((38 - text.length) / 2))), text);
+    const centre = (text: string, colour: Colour) => row(colour, centred(text), text);
     return [
-      centre("Today's scores", "blue"),
+      centre(T.todaysScores, "blue"),
       row("white", ""),
-      centre(`Best possible score: ${bestPossibleScore(this.world)}`, "cyan"),
+      centre(T.bestPossible(bestPossibleScore(this.world)), "cyan"),
       row("white", ""),
-      centre(`Best score so far: ${best}`, "red"),
+      centre(T.bestSoFar(best), "red"),
       row("white", ""),
-      centre(`Your score this time: ${yours}`, "blue"),
-      this.bar("Press RETURN", () => this.go({ name: "menu" })),
+      centre(T.yourScore(yours), "blue"),
+      this.bar(T.pressReturn, () => this.go({ name: "menu" })),
     ];
   }
 }

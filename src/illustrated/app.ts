@@ -1,7 +1,7 @@
 // The illustrated version: a painted scene, objects you can see and click,
 // a storybook text panel, 5 slots for what you carry, and a compass.
 
-import { act, bestPossibleScore, byName, carried, describe, itemsIn, newGame, score } from "../engine/engine";
+import { act, bestPossibleScore, byName, carried, describe, itemsIn, messages, newGame, score } from "../engine/engine";
 import type { Command, Direction, GameEvent, GameState, ItemId, World } from "../engine/types";
 import { h } from "../shared/dom";
 import {
@@ -13,8 +13,10 @@ import {
   saveGame,
   setEffectsOn,
   setMusicOn,
+  switchLanguage,
   switchMode,
 } from "../shared/storage";
+import { LANGUAGE, T } from "../shared/strings";
 import { artUrl, preload } from "./art";
 import { loadMask, thingAt } from "./hit";
 import { itemWidth, placeThings } from "./layout";
@@ -25,12 +27,9 @@ import { Sounds } from "./sounds";
 import { plainText, segments } from "./text";
 import { Typewriter } from "./typewriter";
 
-const COMPASS: { direction: Direction; label: string }[] = [
-  { direction: "north", label: "N" },
-  { direction: "west", label: "W" },
-  { direction: "east", label: "E" },
-  { direction: "south", label: "S" },
-];
+const COMPASS: { direction: Direction; label: string }[] = (["north", "west", "east", "south"] as Direction[]).map(
+  (direction) => ({ direction, label: T.compass[direction] })
+);
 
 const KEY_DIRECTIONS: Record<string, Direction> = {
   ArrowUp: "north",
@@ -41,6 +40,8 @@ const KEY_DIRECTIONS: Record<string, Direction> = {
   s: "south",
   e: "east",
   w: "west",
+  ø: "east", // Danish: øst and vest
+  v: "west",
 };
 
 const SLOTS = 5;
@@ -68,11 +69,11 @@ export class IllustratedApp {
   private readonly things = h("div", { class: "things" });
   private readonly fader = h("div", { class: "fader" });
   private readonly topbar = h("header", { class: "topbar" });
-  private readonly compass = h("nav", { class: "compass", "aria-label": "Directions" });
+  private readonly compass = h("nav", { class: "compass", "aria-label": T.directions });
   private readonly description = h("p", { class: "description" });
   private readonly seeing = h("p", { class: "seeing" });
   private readonly messages = h("div", { class: "messages", "aria-live": "polite" });
-  private readonly slots = h("div", { class: "slots", "aria-label": "What you are carrying" });
+  private readonly slots = h("div", { class: "slots", "aria-label": T.carrying });
   private readonly handsActions = h("div", { class: "hands-actions" });
   private readonly panel = h(
     "section",
@@ -123,20 +124,21 @@ export class IllustratedApp {
       h(
         "div",
         { class: "title-screen" },
-        h("h1", {}, "Merlin's Castle"),
-        h("p", { class: "by" }, `By ${this.world.author}`),
+        h("h1", {}, T.title),
+        h("p", { class: "by" }, T.by(this.world.author)),
         h(
           "div",
           { class: "buttons" },
-          h("button", { type: "button", class: "pill", autofocus: true, onclick: () => void this.start() }, "Play"),
-          saves && h("button", { type: "button", class: "pill quiet", onclick: () => this.showLoad() }, "Load a game")
+          h("button", { type: "button", class: "pill", autofocus: true, onclick: () => void this.start() }, T.play),
+          saves && h("button", { type: "button", class: "pill quiet", onclick: () => this.showLoad() }, T.loadAGame)
         ),
         h(
           "nav",
           { class: "links" },
-          link("Notes", () => this.showNotes()),
-          link("About", () => this.showAbout()),
-          link("Classic version", () => switchMode("classic"))
+          link(T.notes, () => this.showNotes()),
+          link(T.about, () => this.showAbout()),
+          link(T.language, () => this.showLanguage()),
+          link(T.classicVersion, () => switchMode("classic"))
         )
       )
     );
@@ -164,7 +166,7 @@ export class IllustratedApp {
     const yours = score(this.world, game);
     const best = recordScore(yours);
     this.setMode("over");
-    const heading = game.status === "won" ? "You have solved the mystery of Merlin!" : "The adventure is over";
+    const heading = game.status === "won" ? T.solved : T.adventureOver;
     this.overlay.replaceChildren(
       h(
         "div",
@@ -173,24 +175,24 @@ export class IllustratedApp {
           "div",
           { class: "card" },
           h("h2", {}, heading),
-          h("p", { class: "yours" }, `Your score this time: ${yours}`),
-          h("p", {}, `Best score so far: ${best}`),
-          h("p", {}, `Best possible score: ${bestPossibleScore(this.world)}`),
+          h("p", { class: "yours" }, T.yourScore(yours)),
+          h("p", {}, T.bestSoFar(best)),
+          h("p", {}, T.bestPossible(bestPossibleScore(this.world))),
           h(
             "div",
             { class: "buttons" },
             h(
               "button",
               { type: "button", class: "pill", autofocus: true, onclick: () => void this.start() },
-              "Play again"
+              T.playAgain
             ),
             listSaves().length > 0 &&
-              h("button", { type: "button", class: "pill quiet", onclick: () => this.showLoad() }, "Load a game")
+              h("button", { type: "button", class: "pill quiet", onclick: () => this.showLoad() }, T.loadAGame)
           ),
           h(
             "nav",
             { class: "links" },
-            link("Main menu", () => this.showTitle())
+            link(T.mainMenu, () => this.showTitle())
           )
         )
       )
@@ -314,7 +316,7 @@ export class IllustratedApp {
     const exits = this.world.rooms[this.game!.room].exits;
     this.opened = COMPASS.map((c) => c.direction).filter((d) => exits[d]?.obstacle?.needs === id);
     // The engine says "Nothing happens." when no way here needs this object.
-    this.sounds.play(this.events.at(-1)?.text === "Nothing happens." ? "nothing" : "effect");
+    this.sounds.play(this.events.at(-1)?.text === messages(this.world).nothingHappens ? "nothing" : "effect");
     this.render();
   }
 
@@ -346,7 +348,7 @@ export class IllustratedApp {
     this.renderCompass(ended ? [] : view.exits);
     this.compass.hidden = ended;
     this.renderSlots(arriving);
-    const action = !ended && this.slotOrder.length > 1 ? link("Drop all", () => void this.dropAll()) : null;
+    const action = !ended && this.slotOrder.length > 1 ? link(T.dropAll, () => void this.dropAll()) : null;
     this.handsActions.replaceChildren(...(action ? [action] : []));
     if (ended && !this.overlay.querySelector(".curtain")) this.dropCurtain();
     preload(view.exits.map((d) => artUrl("rooms", this.world.rooms[game.room].exits[d]?.to ?? undefined)));
@@ -367,7 +369,7 @@ export class IllustratedApp {
         h(
           "button",
           { type: "button", class: "pill", autofocus: true, onclick: () => this.continueAfterEnding() },
-          "Continue"
+          T.continue
         )
       )
     );
@@ -388,12 +390,13 @@ export class IllustratedApp {
 
   private renderTopbar(points: number) {
     this.topbar.replaceChildren(
-      h("span", { class: "score" }, `Score ${points}`),
-      link("Save", () => this.showSave()),
-      link("Load", () => this.showLoad()),
-      link("Quit", () => this.showQuit()),
-      link("Sound", () => this.showSound()),
-      link("Classic", () => switchMode("classic", this.game))
+      h("span", { class: "score" }, T.score(points)),
+      link(T.save, () => this.showSave()),
+      link(T.load, () => this.showLoad()),
+      link(T.quit, () => this.showQuit()),
+      link(T.sound, () => this.showSound()),
+      link(T.language, () => this.showLanguage()),
+      link(T.classic, () => switchMode("classic", this.game))
     );
   }
 
@@ -455,8 +458,8 @@ export class IllustratedApp {
         type: "button",
         class: url ? "thing" : "thing token",
         "data-item": id,
-        title: `Take the ${item.name}`,
-        "aria-label": `Take ${item.article} ${item.name}`,
+        title: T.take(this.the(id)),
+        "aria-label": T.take(`${item.article} ${item.name}`),
         onclick: (event) => void this.take(id, event.currentTarget as Element),
       },
       url ? h("img", { src: url, alt: "", draggable: "false" }) : item.name
@@ -482,11 +485,11 @@ export class IllustratedApp {
         const after = i === sorted.length - 1 ? "." : ",";
         return [`${item.article} `, h("span", { class: "nowrap" }, name, after), i === sorted.length - 1 ? "" : " "];
       });
-      this.seeing.append("You can see ", ...names);
+      this.seeing.append(messages(this.world).youCanSee, ...names);
       if (itemsHere.length > 1)
         this.seeing.append(
           " ",
-          link("Take all", () => void this.takeAll())
+          link(T.takeAll, () => void this.takeAll())
         );
     }
 
@@ -511,8 +514,8 @@ export class IllustratedApp {
             type: "button",
             class: opened.includes(direction) ? `${direction} opened` : direction,
             disabled: !exits.includes(direction),
-            "aria-label": `Go ${direction}`,
-            title: `Go ${direction}`,
+            "aria-label": T.go[direction],
+            title: T.go[direction],
             onclick: () => void this.go(direction),
           },
           label
@@ -535,15 +538,14 @@ export class IllustratedApp {
             h("span", { class: "drop-btn", "aria-hidden": "true" })
           );
         }
-        const item = this.world.items[id];
         const slot = h(
           "button",
           {
             type: "button",
             class: `slot-btn${using.includes(id) ? " in-use" : ""}${arriving.includes(id) ? " arriving" : ""}`,
             "data-item": id,
-            title: `Use the ${item.name} (${i + 1})`,
-            "aria-label": `Use the ${item.name}`,
+            title: `${T.use(this.the(id))} (${i + 1})`,
+            "aria-label": T.use(this.the(id)),
             "aria-pressed": using.includes(id) ? "true" : "false",
             onclick: () => {
               if (this.dragged) this.dragged = false;
@@ -563,9 +565,9 @@ export class IllustratedApp {
               type: "button",
               class: "drop-btn",
               onclick: () => void this.drop(id),
-              "aria-label": `Drop the ${item.name}`,
+              "aria-label": T.drop(this.the(id)),
             },
-            "drop"
+            T.dropUnder
           )
         );
       })
@@ -746,16 +748,12 @@ export class IllustratedApp {
   private showQuit() {
     if (!this.playing()) return;
     this.dialog(
-      h("h2", {}, "Give up the adventure?"),
+      h("h2", {}, T.giveUp),
       h(
         "div",
         { class: "buttons" },
-        h("button", { type: "button", class: "pill quiet", onclick: () => this.quit() }, "Yes, quit"),
-        h(
-          "button",
-          { type: "button", class: "pill", autofocus: true, onclick: () => this.closeDialog() },
-          "No, carry on"
-        )
+        h("button", { type: "button", class: "pill quiet", onclick: () => this.quit() }, T.yesQuit),
+        h("button", { type: "button", class: "pill", autofocus: true, onclick: () => this.closeDialog() }, T.noCarryOn)
       )
     );
   }
@@ -766,8 +764,8 @@ export class IllustratedApp {
       name: "save-name",
       maxlength: "24",
       autocomplete: "off",
-      placeholder: "Name your position",
-      "aria-label": "Name of your position",
+      placeholder: T.namePlaceholder,
+      "aria-label": T.nameLabel,
       autofocus: true,
     }) as HTMLInputElement;
     const save = (event: Event) => {
@@ -775,16 +773,12 @@ export class IllustratedApp {
       const name = input.value.trim();
       if (!name) return;
       const ok = saveGame(name, this.game!);
-      this.events = [
-        ok
-          ? { tone: "pass", text: `Your position is saved as "${name}".` }
-          : { tone: "error", text: "Sorry, this browser won't let me save." },
-      ];
+      this.events = [ok ? { tone: "pass", text: T.savedAs(name) } : { tone: "error", text: T.cantSave }];
       this.closeDialog();
       this.render();
     };
     this.dialog(
-      h("h2", {}, "Save your position"),
+      h("h2", {}, T.saveTitle),
       h(
         "form",
         { onsubmit: save },
@@ -792,8 +786,8 @@ export class IllustratedApp {
         h(
           "div",
           { class: "buttons" },
-          h("button", { type: "submit", class: "pill" }, "Save"),
-          h("button", { type: "button", class: "pill quiet", onclick: () => this.closeDialog() }, "Cancel")
+          h("button", { type: "submit", class: "pill" }, T.save),
+          h("button", { type: "button", class: "pill quiet", onclick: () => this.closeDialog() }, T.cancel)
         )
       )
     );
@@ -823,12 +817,12 @@ export class IllustratedApp {
             h(
               "span",
               { class: "when" },
-              new Date(slot.savedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })
+              new Date(slot.savedAt).toLocaleDateString(LANGUAGE, { day: "numeric", month: "short" })
             ),
             h(
               "span",
               { class: "actions" },
-              link("Delete", (event) => confirmDelete(event, slot.name))
+              link(T.delete, (event) => confirmDelete(event, slot.name))
             )
           )
         )
@@ -836,10 +830,10 @@ export class IllustratedApp {
     // Deleting can't be undone, so it asks first, in place of the Delete link.
     const confirmDelete = (event: Event, name: string) => {
       const actions = (event.currentTarget as HTMLElement).parentElement!;
-      const no = link("Keep", () => fill());
+      const no = link(T.keep, () => fill());
       actions.replaceChildren(
-        h("span", { class: "ask" }, "Delete?"),
-        link("Yes", () => {
+        h("span", { class: "ask" }, T.deleteAsk),
+        link(T.yes, () => {
           deleteSave(name);
           fill();
         }),
@@ -851,15 +845,9 @@ export class IllustratedApp {
     // On the score screen, the save list takes the score card's place.
     if (this.mode === "over") this.overlay.hidden = true;
     const dialog = this.dialog(
-      h("h2", {}, "Your old positions"),
-      saves.length ? list : h("p", {}, "There are no saved positions yet."),
-      this.playing() &&
-        saves.length > 0 &&
-        h(
-          "p",
-          { class: "note" },
-          "Loading one ends the game you're playing now, so save it first if you want to keep it."
-        ),
+      h("h2", {}, T.oldPositions),
+      saves.length ? list : h("p", {}, T.noSaves),
+      this.playing() && saves.length > 0 && h("p", { class: "note" }, T.loadingEnds),
       h(
         "div",
         { class: "buttons" },
@@ -868,7 +856,7 @@ export class IllustratedApp {
         h(
           "button",
           { type: "button", class: "pill quiet", autofocus: true, onclick: () => this.closeDialog() },
-          "Close"
+          T.close
         )
       )
     );
@@ -890,7 +878,7 @@ export class IllustratedApp {
               buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(isOn() === (i === 0))));
             },
           },
-          on ? "On" : "Off"
+          on ? T.on : T.off
         );
       const buttons = [choice(true), choice(false)];
       return h(
@@ -901,15 +889,15 @@ export class IllustratedApp {
       );
     };
     this.dialog(
-      h("h2", {}, "Sound"),
+      h("h2", {}, T.sound),
       h(
         "ul",
         { class: "settings" },
-        toggle("Music", musicOn, (on) => {
+        toggle(T.music, musicOn, (on) => {
           setMusicOn(on);
           this.music.setOn(on);
         }),
-        toggle("Sound effects", effectsOn, (on) => {
+        toggle(T.soundEffects, effectsOn, (on) => {
           setEffectsOn(on);
           if (on) this.sounds.play("take");
         })
@@ -920,7 +908,38 @@ export class IllustratedApp {
         h(
           "button",
           { type: "button", class: "pill quiet", autofocus: true, onclick: () => this.closeDialog() },
-          "Close"
+          T.close
+        )
+      )
+    );
+  }
+
+  // English or Danish. Choosing reloads the page, and a game carries on.
+  private showLanguage() {
+    const choice = (language: "en" | "da", label: string) =>
+      h(
+        "button",
+        {
+          type: "button",
+          class: "choice",
+          lang: language,
+          "aria-pressed": String(LANGUAGE === language),
+          onclick: () => {
+            if (language !== LANGUAGE) switchLanguage(language, this.playing() ? this.game : null);
+          },
+        },
+        label
+      );
+    this.dialog(
+      h("h2", {}, "Language \u00b7 Sprog"),
+      h("div", { class: "languages" }, h("span", { class: "choices" }, choice("en", "English"), choice("da", "Dansk"))),
+      h(
+        "div",
+        { class: "buttons" },
+        h(
+          "button",
+          { type: "button", class: "pill quiet", autofocus: true, onclick: () => this.closeDialog() },
+          T.close
         )
       )
     );
@@ -928,29 +947,24 @@ export class IllustratedApp {
 
   private showNotes() {
     this.dialog(
-      h("h2", {}, "Notes"),
+      h("h2", {}, T.notes),
       ...NOTES.map((paragraph) => h("p", {}, paragraph)),
       h(
         "div",
         { class: "buttons" },
-        h("button", { type: "button", class: "pill", autofocus: true, onclick: () => this.closeDialog() }, "Close")
+        h("button", { type: "button", class: "pill", autofocus: true, onclick: () => this.closeDialog() }, T.close)
       )
     );
   }
 
   private showAbout() {
     this.dialog(
-      h("h2", {}, "About"),
+      h("h2", {}, T.about),
+      ...T.aboutText(this.world.author, this.world.year).map((paragraph) => h("p", {}, paragraph)),
       h(
         "p",
         {},
-        `Merlin's Castle was written by ${this.world.author} for the BBC Micro in ${this.world.year} and published by ESM. Every room, object and message here comes from her original program.`
-      ),
-      h("p", {}, "Remade with love by Drue Wilding, who played it at school and never forgot it."),
-      h(
-        "p",
-        {},
-        "You can still play the original at ",
+        T.playOriginal,
         h(
           "a",
           { href: "https://bbcmicro.co.uk/game.php?id=2164", target: "_blank", rel: "noopener" },
@@ -961,9 +975,9 @@ export class IllustratedApp {
       h(
         "p",
         { class: "note" },
-        "Music: \u201cThe Path of the Goblin King\u201d by Kevin MacLeod (",
+        T.musicCredit[0],
         h("a", { href: "https://incompetech.com", target: "_blank", rel: "noopener" }, "incompetech.com"),
-        "), licensed under ",
+        T.musicCredit[1],
         h(
           "a",
           { href: "https://creativecommons.org/licenses/by/4.0/", target: "_blank", rel: "noopener" },
@@ -974,7 +988,7 @@ export class IllustratedApp {
       h(
         "div",
         { class: "buttons" },
-        h("button", { type: "button", class: "pill", autofocus: true, onclick: () => this.closeDialog() }, "Close")
+        h("button", { type: "button", class: "pill", autofocus: true, onclick: () => this.closeDialog() }, T.close)
       )
     );
   }
@@ -997,6 +1011,12 @@ export class IllustratedApp {
       const id = this.slotOrder[Number(key) - 1];
       if (id) void this.use(id);
     }
+  }
+
+  // "the ladder" in English, "stigen" in Danish.
+  private the(id: ItemId): string {
+    const item = this.world.items[id];
+    return T.theItem(item.name, item.definite);
   }
 
   private focusAutofocus() {

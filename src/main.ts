@@ -1,9 +1,15 @@
+import daJson from "../data/da.json";
 import worldJson from "../data/world.json";
+import { localise, type WorldText } from "./engine/localise";
 import type { World } from "./engine/types";
 import { getMode } from "./shared/storage";
+import { LANGUAGE, T } from "./shared/strings";
 
-const world = worldJson as unknown as World;
+const english = worldJson as unknown as World;
+const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
 const root = document.getElementById("app")!;
+document.documentElement.lang = LANGUAGE === "da" ? "da" : "en-GB";
+document.title = T.title;
 
 // Only the chosen version (and its styles) is loaded.
 if (getMode() === "classic") {

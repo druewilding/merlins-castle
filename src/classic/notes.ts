@@ -1,7 +1,9 @@
 // The in-game notes, from PROCinfo in MERLIN2. The typed commands are
 // adapted for clicking. "" is a blank row.
 
-export const NOTES: string[][] = [
+import { LANGUAGE } from "../shared/strings";
+
+const EN: string[][] = [
   [
     "{blue}Merlin's Castle",
     "",
@@ -19,3 +21,24 @@ export const NOTES: string[][] = [
     "However, you can only carry with you a maximum of 5 objects at any one time.",
   ],
 ];
+
+const DA: string[][] = [
+  [
+    "{blue}Merlins borg",
+    "",
+    "Du går en tur en varm, solrig dag. Du bliver træt og falder i søvn på en græsklædt skrænt. Da du vågner, er du i et magisk land, hvor der er skatte at finde.",
+    "",
+    "Du kommer rundt ved at klikke på{yellow}pilene{white}eller trykke på{yellow}N, S, Ø, V{white}eller{yellow}piletasterne.",
+    "",
+    "Men det er ikke let at gå på opdagelse. Der er mange farer på vejen!",
+  ],
+  [
+    "Mens du udforsker, finder du genstande, som du får brug for. Hvis du bærer genstandene tilbage til den græsklædte skrænt og lægger dem der, stiger dine point.",
+    "",
+    "Klik på en genstand for at{yellow}tage{white}den.{yellow}Brug{white}den, hvis du er i fare, og{yellow}læg{white}den så på den græsklædte skrænt.",
+    "",
+    "Du kan dog højst bære 5 genstande ad gangen.",
+  ],
+];
+
+export const NOTES = LANGUAGE === "da" ? DA : EN;
