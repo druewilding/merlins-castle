@@ -158,7 +158,7 @@ The style guide and prompts are in `art/` (`STYLE.md`, `prompts/`).
 6. **Polish**: README, release-please, maybe the victory tune, maybe a port of the
    MERLIN1 title picture (random castle towers on blue) for Classic mode.
 
-Deployed: https://www.druewilding.com/merlins-castle/ (every push to `main`).
+Deployed: https://www.druewilding.com/merlins-castle/ (each release, by deploy-please).
 
 ## Decided along the way
 
