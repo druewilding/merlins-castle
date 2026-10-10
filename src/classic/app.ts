@@ -122,6 +122,8 @@ export class App {
   }
 
   private gameOver() {
+    // Leaving the victory screen stops the tune.
+    stopTune();
     const best = this.game ? recordScore(score(this.world, this.game)) : bestScore();
     this.go({ name: "over", best });
   }
