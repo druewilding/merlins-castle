@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
+
 import { defineConfig, type Plugin } from "vite";
 
 import { buildArt } from "./scripts/build-art.js";
@@ -26,9 +30,49 @@ function artWatcher(): Plugin {
   };
 }
 
+// After a build, writes dist/sw.js: the service worker from
+// scripts/service-worker.js, told which files make up the game. The game's
+// own files are stored on the first visit; pictures and music as they're met
+// (or all at once in the installed app), each with a fingerprint so an update
+// only replaces what changed.
+function offline(): Plugin {
+  let outDir = "dist";
+  return {
+    name: "merlins-castle-offline",
+    apply: "build",
+    configResolved(config) {
+      outDir = config.build.outDir;
+    },
+    closeBundle() {
+      const files = (dir: string): string[] =>
+        readdirSync(dir).flatMap((name) => {
+          const path = join(dir, name);
+          return statSync(path).isDirectory() ? files(path) : [path];
+        });
+      const hash = (data: Buffer | string) => createHash("sha256").update(data).digest("hex").slice(0, 12);
+      const core: string[] = ["./"];
+      const media: Record<string, string> = {};
+      let all = "";
+      for (const path of files(outDir).sort()) {
+        const url = "./" + relative(outDir, path).split("\\").join("/");
+        if (url === "./sw.js" || url === "./social.jpg") continue;
+        const fingerprint = hash(readFileSync(path));
+        all += url + fingerprint;
+        if (/^\.\/(art|music)\//.test(url)) media[url] = fingerprint;
+        else core.push(url);
+      }
+      const worker = readFileSync("scripts/service-worker.js", "utf8")
+        .replace("__VERSION__", hash(all))
+        .replace("__CORE__", JSON.stringify(core))
+        .replace("__MEDIA__", JSON.stringify(media));
+      writeFileSync(join(outDir, "sw.js"), worker);
+    },
+  };
+}
+
 // Relative base: the same build works at druewilding.com/merlins-castle/ and
 // at the root of a custom domain.
 export default defineConfig({
   base: "./",
-  plugins: [artWatcher()],
+  plugins: [artWatcher(), offline()],
 });

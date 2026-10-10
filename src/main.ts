@@ -11,3 +11,12 @@ if (getMode() === "classic") {
 } else {
   import("./illustrated/main").then(({ startIllustrated }) => startIllustrated(root, world));
 }
+
+// Works offline once visited (see scripts/service-worker.js). The installed
+// app also fetches every picture and the music, ready for a journey.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+  if (matchMedia("(display-mode: standalone)").matches) {
+    navigator.serviceWorker.ready.then((registration) => registration.active?.postMessage("cache-everything"));
+  }
+}

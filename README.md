@@ -20,6 +20,9 @@ There are two ways to play:
   `use lad`. Switch between them at any time, even mid-game.
 
 Games can be saved in your browser, and your best score is remembered.
+You can also install it on your phone or computer (Add to Home Screen, or
+Install in the browser's menu): it then opens like an app and downloads the
+whole world, so it works without a connection.
 
 ## Credits
 
@@ -71,6 +74,8 @@ Every push to `main` is built and deployed to GitHub Pages by
   `art/originals/` (not committed) and are converted into `public/` for the
   game automatically, while `npm run dev` is running or with
   `npm run art:build`. See `art/prompts/README.md`.
+- `scripts/service-worker.js`: what makes it work offline. The build fills
+  in the list of files and writes `dist/sw.js`.
 - `PLAN.md`: the decisions behind the remake.
 
 The game's map, text and puzzles are Anita Straker's. The code in this
