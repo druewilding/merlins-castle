@@ -30,6 +30,7 @@ Games can be saved in your browser, and your best score is remembered.
 - **Music**: "The Path of the Goblin King" by Kevin MacLeod
   ([incompetech.com](https://incompetech.com)), licensed under
   [Creative Commons: By Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
+- **Sound effects**: [Kenney](https://kenney.nl) (CC0).
 - **Pictures**: painted with ChatGPT from the prompts in `art/prompts`.
 - **Fonts**: IM Fell English and Cinzel, from Google Fonts.
 

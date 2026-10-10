@@ -1,0 +1,11 @@
+{
+  "discover": { "file": "kenney_interface-sounds/Audio/glass_002.ogg", "volume": 0.6 },
+  "take": { "file": "kenney_rpg-audio/Audio/handleSmallLeather.ogg", "volume": 0.7 },
+  "drop": { "file": "kenney_rpg-audio/Audio/dropLeather.ogg", "volume": 0.7 },
+  "step": { "file": "kenney_impact-sounds/Audio/footstep_grass_000.ogg", "volume": 0.35 },
+  "blocked": { "file": "kenney_impact-sounds/Audio/impactSoft_medium_001.ogg", "volume": 0.8 },
+  "effect": { "file": "kenney_interface-sounds/Audio/confirmation_002.ogg", "volume": 0.6 },
+  "nothing": { "file": "kenney_interface-sounds/Audio/back_002.ogg", "volume": 0.5 },
+  "refuse": { "file": "kenney_interface-sounds/Audio/error_004.ogg", "volume": 0.4 },
+  "victory": { "file": "kenney_interface-sounds/Audio/glass_006.ogg", "volume": 0.7 }
+}

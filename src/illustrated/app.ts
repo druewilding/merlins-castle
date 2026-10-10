@@ -11,6 +11,7 @@ import { itemWidth, placeThings } from "./layout";
 import { deathMoment, lostMoment } from "./moments";
 import { Music } from "./music";
 import { NOTES } from "./notes";
+import { Sounds } from "./sounds";
 import { plainText, segments } from "./text";
 import { Typewriter } from "./typewriter";
 
@@ -49,6 +50,7 @@ export class IllustratedApp {
   private ending: string | null = null; // the moment picture after the game ends
   private dragged = false;
   private readonly music = new Music();
+  private readonly sounds = new Sounds();
 
   private readonly stage = h("div", { class: "stage" });
   private readonly sceneImg = h("img", { class: "scene-img", alt: "" }) as HTMLImageElement;
@@ -132,6 +134,7 @@ export class IllustratedApp {
     this.overlay.replaceChildren();
     this.setMode("play");
     this.music.begin();
+    this.sounds.load();
     await this.transition(() => this.render());
   }
 
@@ -197,6 +200,8 @@ export class IllustratedApp {
     const room = this.game!.room;
     this.command({ type: "go", direction });
     const moved = this.game!.room !== room;
+    if (moved) this.sounds.play("step");
+    else if (this.game!.status === "playing") this.sounds.play("blocked");
     if (moved || this.game!.status !== "playing") await this.transition(() => this.render(), moved ? 600 : 1200);
     else this.render();
     this.busy = false;
@@ -208,10 +213,14 @@ export class IllustratedApp {
     const fromRect = (from ?? this.things.querySelector(`[data-item="${id}"]`))?.getBoundingClientRect();
     this.command({ type: "take", item: id });
     const took = this.game!.itemLocations[id] === "carried";
+    const firstTime = took && !this.showcased.has(id);
+    if (!took) this.sounds.play("refuse");
+    if (firstTime) this.sounds.play("discover");
     if (took) this.slotOrder.push(id);
     if (took) this.render(id);
     else this.render();
-    if (took && fromRect) await this.flyToSlot(id, fromRect, !this.showcased.has(id));
+    if (took && fromRect) await this.flyToSlot(id, fromRect, firstTime);
+    if (took) this.sounds.play("take");
     if (took) this.showcased.add(id);
     this.revealSlot(id);
     this.busy = false;
@@ -226,6 +235,8 @@ export class IllustratedApp {
     );
     this.command({ type: "take", item: "all" });
     const taken = here.filter((id) => this.game!.itemLocations[id] === "carried");
+    if (!taken.length) this.sounds.play("refuse");
+    if (taken.some((id) => !this.showcased.has(id))) this.sounds.play("discover");
     this.slotOrder.push(...taken);
     taken.forEach((id) => this.showcased.add(id));
     this.render(...taken);
@@ -235,6 +246,7 @@ export class IllustratedApp {
         return rect ? delay(i * 70).then(() => this.flyToSlot(id, rect, false)) : Promise.resolve();
       })
     );
+    if (taken.length) this.sounds.play("take");
     taken.forEach((id) => this.revealSlot(id));
     this.busy = false;
   }
@@ -247,6 +259,7 @@ export class IllustratedApp {
     this.slotOrder = this.slotOrder.filter((other) => other !== id);
     this.render();
     await this.flyToScene([id], fromRect ? new Map([[id, fromRect]]) : new Map());
+    this.sounds.play("drop");
     await this.afterDrop();
     this.busy = false;
   }
@@ -260,18 +273,23 @@ export class IllustratedApp {
     this.slotOrder = [];
     this.render();
     await this.flyToScene(ids, rects);
+    this.sounds.play("drop");
     await this.afterDrop();
     this.busy = false;
   }
 
   // Dropping the last object on the grassy bank wins the game.
   private async afterDrop() {
-    if (this.game!.status === "won") await this.transition(() => this.render(), 1600);
+    if (this.game!.status !== "won") return;
+    this.sounds.play("victory", 300);
+    await this.transition(() => this.render(), 1600);
   }
 
   private async use(id: ItemId) {
     if (!this.playing() || this.busy) return;
     this.command({ type: "use", item: id });
+    // The engine says "Nothing happens." when no way here needs this object.
+    this.sounds.play(this.events.at(-1)?.text === "Nothing happens." ? "nothing" : "effect");
     this.render();
   }
 

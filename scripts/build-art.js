@@ -6,12 +6,13 @@
 //
 // Scenes, rooms and moments become 1536px-wide WebP. Objects are cropped to
 // their outline, padded evenly onto a transparent square, and saved at 384px.
-// Music in art/originals/music becomes a 128 kbps MP3 in public/music (this
-// needs ffmpeg). Only new or changed originals are rebuilt, and web files
+// Music in art/originals/music becomes a 128 kbps MP3 in public/music, and the
+// sound effects chosen in src/illustrated/sounds.json (from art/originals/fx)
+// become MP3s in public/fx (both need ffmpeg). Only new or changed originals are rebuilt, and web files
 // whose original has gone (moved or deleted) are removed.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
@@ -51,8 +52,57 @@ export async function buildArt({ quiet = false } = {}) {
     }
   }
   built += buildMusic(quiet);
+  built += buildSounds(quiet);
   writeFileSync("src/illustrated/art-manifest.json", JSON.stringify(manifest, null, 2) + "\n");
   if (!quiet) console.log(built ? `${built} file(s) built.` : "All web files are up to date.");
+  return built;
+}
+
+function mp3(src, out, bitrate) {
+  const ffmpeg = spawnSync("ffmpeg", [
+    "-loglevel",
+    "error",
+    "-y",
+    "-i",
+    src,
+    "-codec:a",
+    "libmp3lame",
+    "-b:a",
+    bitrate,
+    out,
+  ]);
+  if (ffmpeg.error || ffmpeg.status !== 0) {
+    console.warn(`  couldn't convert ${src}: is ffmpeg installed? (brew install ffmpeg)`);
+    return false;
+  }
+  return true;
+}
+
+const newer = (out, ...srcs) => existsSync(out) && srcs.every((src) => statSync(out).mtimeMs >= statSync(src).mtimeMs);
+
+function buildSounds(quiet) {
+  const list = "src/illustrated/sounds.json";
+  if (!existsSync("art/originals/fx")) return 0;
+  const sounds = JSON.parse(readFileSync(list, "utf8"));
+  mkdirSync("public/fx", { recursive: true });
+  let built = 0;
+  for (const [name, { file }] of Object.entries(sounds)) {
+    const src = `art/originals/fx/${file}`;
+    const out = `public/fx/${name}.mp3`;
+    if (!existsSync(src)) {
+      console.warn(`  sound "${name}": ${src} doesn't exist`);
+      continue;
+    }
+    if (newer(out, src, list)) continue;
+    if (!mp3(src, out, "96k")) continue;
+    built++;
+    if (!quiet) console.log(`  built ${out} (${file})`);
+  }
+  for (const file of readdirSync("public/fx").filter((f) => f.endsWith(".mp3"))) {
+    if (file.replace(/\.mp3$/, "") in sounds) continue;
+    rmSync(`public/fx/${file}`);
+    if (!quiet) console.log(`  removed public/fx/${file}`);
+  }
   return built;
 }
 
@@ -65,23 +115,8 @@ function buildMusic(quiet) {
   for (const file of ids) {
     const src = `${dir}/${file}`;
     const out = `public/music/${file}`;
-    if (existsSync(out) && statSync(out).mtimeMs >= statSync(src).mtimeMs) continue;
-    const ffmpeg = spawnSync("ffmpeg", [
-      "-loglevel",
-      "error",
-      "-y",
-      "-i",
-      src,
-      "-codec:a",
-      "libmp3lame",
-      "-b:a",
-      "128k",
-      out,
-    ]);
-    if (ffmpeg.error || ffmpeg.status !== 0) {
-      console.warn(`  couldn't convert ${src}: is ffmpeg installed? (brew install ffmpeg)`);
-      continue;
-    }
+    if (newer(out, src)) continue;
+    if (!mp3(src, out, "128k")) continue;
     built++;
     if (!quiet) console.log(`  built ${out}`);
   }
