@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { EXIT_ORDER } from "../src/engine/types";
+import { grow } from "../src/illustrated/hit";
 import { itemWidth, placeThings, spotsFor } from "../src/illustrated/layout";
 import { deathMoment, lostMoment } from "../src/illustrated/moments";
 import { world } from "./helpers";
@@ -72,5 +73,27 @@ describe("moments", () => {
     for (const [key, room] of Object.entries(world.rooms)) {
       if (room.deadEnd) expect(lostMoment(key), key).toBeTruthy();
     }
+  });
+});
+
+describe("clicking objects", () => {
+  // A tiny ladder: two rails with rungs, and gaps between them.
+  const ladder = Uint8Array.from(
+    ["X...X", "XXXXX", "X...X", "X...X", "XXXXX", "X...X", "....."].join("").split(""),
+    (c) => (c === "X" ? 1 : 0)
+  );
+
+  it("fills the gaps in a gappy object", () => {
+    const hit = grow(ladder.slice(0, 25), 5, 1);
+    expect(hit[2 * 5 + 2]).toBe(1); // between the rungs
+  });
+
+  it("doesn't spread far beyond it", () => {
+    const big = new Uint8Array(20 * 20);
+    big[10 * 20 + 10] = 1;
+    const hit = grow(big, 20, 2);
+    expect(hit[10 * 20 + 12]).toBe(1);
+    expect(hit[10 * 20 + 13]).toBe(0);
+    expect(hit[0]).toBe(0);
   });
 });
