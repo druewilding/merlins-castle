@@ -289,9 +289,12 @@ button {
   opacity: 0.85;
 }
 
-.link:hover {
-  color: var(--gold);
-  opacity: 1;
+/* Only with a mouse: touchscreens keep the last tapped link "hovered". */
+@media (hover: hover) {
+  .link:hover {
+    color: var(--gold);
+    opacity: 1;
+  }
 }
 
 /* ---- The text panel ---- */
@@ -366,8 +369,10 @@ button {
   white-space: nowrap;
 }
 
-.seeing .name:hover {
-  color: #ffd2b0;
+@media (hover: hover) {
+  .seeing .name:hover {
+    color: #ffd2b0;
+  }
 }
 
 .seeing .link {
@@ -425,9 +430,11 @@ button {
   cursor: pointer;
 }
 
-.compass button:hover:enabled {
-  border-color: var(--gold);
-  color: var(--gold);
+@media (hover: hover) {
+  .compass button:hover:enabled {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
 }
 
 .compass button:disabled {
@@ -507,8 +514,10 @@ button {
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
 }
 
-.slot-btn:hover:not(.empty) {
-  border-color: rgba(255, 224, 138, 0.7);
+@media (hover: hover) {
+  .slot-btn:hover:not(.empty) {
+    border-color: rgba(255, 224, 138, 0.7);
+  }
 }
 
 .slot-btn.in-use {
@@ -542,8 +551,10 @@ button {
   cursor: pointer;
 }
 
-.drop-btn:hover {
-  color: var(--ink);
+@media (hover: hover) {
+  .drop-btn:hover {
+    color: var(--ink);
+  }
 }
 
 /* ---- Buttons ---- */
@@ -562,12 +573,19 @@ button {
   cursor: pointer;
 }
 
-.pill:hover,
 .pill:focus-visible {
   border-color: var(--gold);
   color: #fff6d6;
   box-shadow: 0 0 22px rgba(255, 216, 120, 0.45);
   outline: none;
+}
+
+@media (hover: hover) {
+  .pill:hover {
+    border-color: var(--gold);
+    color: #fff6d6;
+    box-shadow: 0 0 22px rgba(255, 216, 120, 0.45);
+  }
 }
 
 .pill.quiet {
