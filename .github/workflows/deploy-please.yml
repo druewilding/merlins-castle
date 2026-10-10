@@ -1,9 +1,7 @@
 name: Deploy please
 
-# Deploys each release to GitHub Pages. Merging to main adds to the next
-# release (release-please keeps the pull request for it up to date); merging
-# that release pull request publishes the release, which deploys it. It can
-# also be run by hand from the Actions tab.
+# Deploys each release to GitHub Pages, once release-please has published it
+# (see release-please.yml). It can also be run by hand from the Actions tab.
 on:
   release:
     types:

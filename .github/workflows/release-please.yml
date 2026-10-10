@@ -1,10 +1,16 @@
 name: Release please
 
+# Releases are deliberate, in two steps:
+# 1. Run this by hand (Actions → Release please → Run workflow) to open or
+#    update the release pull request, with the changelog.
+# 2. Merging that pull request runs this again, which tags and publishes the
+#    release; deploy-please then deploys it.
+# Ordinary merges to main don't trigger it.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+  pull_request:
+    types: [closed]
+    branches: [main]
 
 permissions:
   contents: write
@@ -12,6 +18,9 @@ permissions:
 
 jobs:
   release-please:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v5
