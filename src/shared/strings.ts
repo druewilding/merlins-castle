@@ -112,6 +112,9 @@ const en = {
   deleteItTt: "Delete it?",
   yesTt: "yes",
   keepTt: "keep",
+  moreTt: "more",
+  backTt: "back",
+  pageOfTt: (page: number, pages: number) => `page ${page} of ${pages}`,
   todaysScores: "Today's scores",
 };
 
@@ -218,6 +221,9 @@ const da: Strings = {
   deleteItTt: "Slet den?",
   yesTt: "ja",
   keepTt: "behold",
+  moreTt: "flere",
+  backTt: "tilbage",
+  pageOfTt: (page, pages) => `side ${page} af ${pages}`,
   todaysScores: "Dagens point",
 };
 
@@ -227,3 +233,10 @@ export const T: Strings = LANGUAGE === "da" ? da : en;
 
 // For dates (the save lists): the page is in British English or Danish.
 export const LOCALE = LANGUAGE === "da" ? "da" : "en-GB";
+
+// When a position was saved, in the page's language: "10 Oct" and "14:35"
+// ("10. okt." and "14.35" in Danish).
+export const savedDate = (iso: string) => new Date(iso).toLocaleDateString(LOCALE, { day: "numeric", month: "short" });
+export const savedTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" });
+export const savedToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();

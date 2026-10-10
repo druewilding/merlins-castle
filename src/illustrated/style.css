@@ -892,9 +892,14 @@ button {
   font: inherit;
 }
 
+/* A long list scrolls on its own, between the title and Close. The padding
+   keeps focus rings inside the scrolling area. */
 .saves {
-  margin: 0;
-  padding: 0;
+  max-height: min(50vh, 24rem);
+  margin: 0 -0.4rem;
+  padding: 0 0.4rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
 }
 

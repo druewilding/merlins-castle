@@ -13,7 +13,7 @@ import {
   switchLanguage,
   switchMode,
 } from "../shared/storage";
-import { LANGUAGE, LOCALE, T } from "../shared/strings";
+import { LANGUAGE, savedDate, savedTime, savedToday, T } from "../shared/strings";
 import { button, row, teletext } from "./dom";
 import { NOTES } from "./notes";
 import { drawTitle } from "./title-picture";
@@ -25,7 +25,7 @@ type Screen =
   | { name: "notes"; page: number }
   | { name: "about" }
   | { name: "play"; events: GameEvent[]; prompt?: "quit" | "save" }
-  | { name: "load" }
+  | { name: "load"; page?: number }
   | { name: "over"; best: number };
 
 const TONE_COLOURS: Record<Tone, Colour> = {
@@ -51,6 +51,9 @@ const KEY_DIRECTIONS: Record<string, Direction> = {
   ø: "east", // Danish: øst and vest
   v: "west",
 };
+
+// Saved positions per page of the load screen: as many as fit above the bar.
+const SAVES_PER_PAGE = 7;
 
 // Centred on the 38-column teletext row.
 const centred = (text: string) => " ".repeat(Math.max(0, Math.floor((38 - text.length) / 2)));
@@ -98,7 +101,9 @@ export class App {
       }[key];
       choice?.();
     } else if (screen.name === "notes" && enter) this.nextNotesPage(screen.page);
-    else if (
+    else if (screen.name === "load" && (key === "ArrowRight" || key === "ArrowLeft")) {
+      this.go({ name: "load", page: (screen.page ?? 0) + (key === "ArrowRight" ? 1 : -1) });
+    } else if (
       (screen.name === "about" || screen.name === "over" || screen.name === "load") &&
       (enter || key === "Escape")
     ) {
@@ -170,7 +175,7 @@ export class App {
         case "play":
           return this.renderPlay(screen);
         case "load":
-          return this.renderLoad();
+          return this.renderLoad(screen.page ?? 0);
         case "over":
           return this.renderOver(screen.best);
       }
@@ -423,15 +428,22 @@ export class App {
     );
   }
 
-  private renderLoad(): Node[] {
+  // The saves, newest first, a page at a time like teletext.
+  private renderLoad(wanted: number): Node[] {
     const saves = listSaves();
+    const pages = Math.max(1, Math.ceil(saves.length / SAVES_PER_PAGE));
+    const page = Math.min(Math.max(wanted, 0), pages - 1);
     const rows: Node[] = [
       row("blue", centred(T.oldPositions), h("span", { class: "blue" }, T.oldPositions)),
       row("white", ""),
     ];
     if (!saves.length) rows.push(row("white", T.noSaves));
-    for (const slot of saves) {
-      const when = new Date(slot.savedAt).toLocaleDateString(LOCALE, { day: "numeric", month: "short" });
+    for (const slot of saves.slice(page * SAVES_PER_PAGE, (page + 1) * SAVES_PER_PAGE)) {
+      // Date and time if they fit on the 38-column row; with a long name, just
+      // the time for today's saves, or the date for older ones.
+      const full = `${savedDate(slot.savedAt)} ${savedTime(slot.savedAt)}`;
+      const short = savedToday(slot.savedAt) ? savedTime(slot.savedAt) : savedDate(slot.savedAt);
+      const when = slot.name.length + full.length + T.deleteTt.length + 4 <= 38 ? full : short;
       rows.push(
         row(
           "white",
@@ -462,6 +474,17 @@ export class App {
             })
           )
         );
+    }
+    if (pages > 1) {
+      const turn = (to: number) => () => this.go({ name: "load", page: to });
+      rows.push(
+        row(
+          "cyan",
+          page > 0 ? button(`\u2190 ${T.backTt}`, "yellow", turn(page - 1)) : "      ",
+          `  ${T.pageOfTt(page + 1, pages)}  `,
+          page < pages - 1 && button(`${T.moreTt} \u2192`, "yellow", turn(page + 1))
+        )
+      );
     }
     rows.push(this.bar(T.backToMenu, () => this.go({ name: "menu" })));
     return rows;
