@@ -78,6 +78,11 @@
     "victory"
   ],
   "effects": [
-    "old-stone-wall--ladder"
+    "old-stone-wall--ladder",
+    "old-wall--ladder+lamp",
+    "old-wall--ladder",
+    "old-wall--lamp",
+    "rusty-gate--key",
+    "yellow-flowers--key"
   ]
 }

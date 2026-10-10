@@ -671,7 +671,7 @@ export class IllustratedApp {
     await this.sceneNext.decode().catch(() => undefined);
     if (this.sceneUrl !== url) return; // the scene changed again while it loaded
     const fade = this.sceneNext.animate([{ opacity: 0 }, { opacity: 1 }], {
-      duration: 900,
+      duration: 600,
       easing: "ease-in-out",
       fill: "forwards",
     });

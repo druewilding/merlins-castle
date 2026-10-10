@@ -1,8 +1,10 @@
 ---
-style: scene
-reference: style
+style: none
+reference: edit
 attach:
-  - art/anchors/grassy-bank.png
+  - art/anchors/yellow-flowers-v1.png
+match:
+  - art/originals/rooms/rusty-gate.png
 ---
 
 # yellow-flowers
@@ -14,14 +16,15 @@ Exits:
 - north → mossy-steps
 - south → rusty-gate (needs the key; blocked: "It won't open.")
 
-The rusty gate is to the south, behind the viewer. Since v2 the top of it
-shows along the bottom of the picture, so that `effects/yellow-flowers--key`
-can show it opening.
+The rusty gate is to the south, behind the viewer. Since v2 the very top of
+it peeks up from the bottom edge, so that `effects/yellow-flowers--key` can
+show it opening. It's an edit of the v1 picture (kept as
+`art/anchors/yellow-flowers-v1.png`), so the meadow stays as it was.
+
+The text panel covers the picture from about 72% of the way down on wide
+screens, so the gate's tips must rise to about 65%, and no higher: only the
+tips should show, or it looks as if you're on the other side of the gate.
 
 ## Prompt
 
-> A secret meadow where the ground is completely covered with **tiny yellow flowers**, glowing in the sun. To the north (top), an **overgrown path** leads away between wild bushes towards some old stone steps. A few wisps of mist linger.
->
-> - South (bottom): we are just inside the **old rusty iron gate**, seen from behind, the same gate and crumbling ivy-covered wall as in the rusty-gate picture. The top of the crumbling wall runs along the bottom edge, and the gate's arch and rusty spikes rise up from the bottom edge into the lower third of the picture, closed and locked, with silver mist beyond its bars.
->
-> Bright and joyful after the misty gate. Apart from the gate and wall at the bottom edge, the lower part of the picture is plain flowers.
+> Add only the **very top of the old rusty iron gate** from the last image, right in the foreground at the bottom edge of the picture, seen from behind, as if it's just behind us and we have only just stepped through it. Only the tips of its rusty spear-point spikes and the top curve of its scrolled arch rise up from the bottom edge, reaching about a third of the way up the picture and no higher. The rest of the gate, its lock and the wall it stands in are all below the bottom edge, out of sight. A few wisps of silver mist curl up around the spikes. Everything else in the picture, the meadow of yellow flowers, the bushes, the steps and the sky, stays exactly as it is.

@@ -15,7 +15,7 @@ Pictures have no words, so Danish needs nothing new.
   opens an exit in the current room. Using something that does nothing here
   ("Nothing happens.") leaves the picture alone.
 - **When it shows**: the moment the object is used, the scene **crossfades**
-  (about 0.8 s, not the fade through black we use for moving) to the changed
+  (about 0.6 s, not the fade through black we use for moving) to the changed
   picture. The exit glows gold as it does now. With reduced motion, the
   picture swaps instantly.
 - **How long it lasts**: as long as the rules say the way is open, which is
