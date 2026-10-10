@@ -1,0 +1,76 @@
+name: Update please
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        type: choice
+        description: Target versions to upgrade to
+        required: true
+        options:
+          - latest
+          - minor
+          - patch
+      package_filter:
+        type: string
+        description: Which packages to upgrade
+        default: "*"
+  schedule:
+    - cron: "0 0 10 * *"
+
+jobs:
+  update-please:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install npm-check-updates
+        run: npm install -g npm-check-updates
+
+      - name: Update ${{ github.event.inputs.target || 'minor' }} dependencies
+        run: ncu -t ${{ github.event.inputs.target || 'minor' }} -u --install always --filter "${{ github.event.inputs.package_filter }}" --jsonUpgraded > npm-updates.json
+
+      - id: format-summary
+        name: Format Update Summary
+        run: |
+          updates=$(cat npm-updates.json)
+          PR_BODY=$(echo "$updates" | jq -r 'to_entries | map("\(.key) → \(.value)") | join("\n")')
+          count=$(echo "$updates" | jq length)
+          if [ "$count" -eq 1 ]; then
+            dep=$(echo "$updates" | jq -r 'keys[0]')
+            to=$(echo "$updates" | jq -r ".[\"$dep\"]")
+            PR_TITLE="chore: Update $dep to $to"
+          else
+            PR_TITLE="chore: Update dependencies"
+          fi
+
+          # Delete the npm-updates.json file so it doesn't get committed
+          rm npm-updates.json
+
+          # Write to $GITHUB_OUTPUT using file-based syntax
+          echo "pr_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$PR_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "pr_title<<EOF" >> $GITHUB_OUTPUT
+          echo "$PR_TITLE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Audit dependencies
+        run: npm audit fix --omit=dev
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.UPDATE_PLEASE_TOKEN }}
+          commit-message: ${{ steps.format-summary.outputs.pr_title }}
+          title: ${{ steps.format-summary.outputs.pr_title }}
+          body: ${{ steps.format-summary.outputs.pr_body || 'No package updates were detected, but there may be audit changes.' }}
+          branch: update-please-${{ github.sha }}
+          labels: chore
