@@ -12,7 +12,7 @@ export class Sounds {
   private context: AudioContext | null = null;
   private readonly buffers = new Map<Sound, Promise<AudioBuffer | null>>();
 
-  // Called from a click (Begin), when the browser allows audio to start.
+  // Called from a click (Play), when the browser allows audio to start.
   load() {
     if (!this.context) this.context = new AudioContext();
     void this.context.resume();

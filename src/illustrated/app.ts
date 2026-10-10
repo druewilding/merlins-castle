@@ -109,11 +109,15 @@ export class IllustratedApp {
         { class: "title-screen" },
         h("h1", {}, "Merlin's Castle"),
         h("p", { class: "by" }, `By ${this.world.author}`),
-        h("button", { type: "button", class: "pill", autofocus: true, onclick: () => void this.start() }, "Begin"),
+        h(
+          "div",
+          { class: "buttons" },
+          h("button", { type: "button", class: "pill", autofocus: true, onclick: () => void this.start() }, "Play"),
+          saves && h("button", { type: "button", class: "pill quiet", onclick: () => this.showLoad() }, "Load a game")
+        ),
         h(
           "nav",
           { class: "links" },
-          saves && link("Load", () => this.showLoad()),
           link("Notes", () => this.showNotes()),
           link("About", () => this.showAbout()),
           link("Classic version", () => switchMode("classic"))
