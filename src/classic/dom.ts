@@ -13,11 +13,11 @@ export function row(colour: Colour, ...children: Child[]): HTMLElement {
 }
 
 // Render teletext text as wrapped double-height rows, exactly as PROCprint
-// lays it out. `clickable` turns matching words into buttons.
+// lays it out. `clickable` turns matching words into buttons, with a title.
 export function teletext(
   text: string,
   colour: Colour = "white",
-  clickable: Record<string, () => void> = {}
+  clickable: Record<string, { onClick: () => void; title: string }> = {}
 ): HTMLElement[] {
   return wrap(text, colour).map((r) => {
     const inner = h("span", { class: "inner" });
@@ -28,7 +28,7 @@ export function teletext(
       const action = clickable[word.text.replace(/[.,]$/, "")];
       if (action) {
         const name = word.text.replace(/[.,]$/, "");
-        inner.append(button(name, word.colour, action, { title: `Take the ${name}` }));
+        inner.append(button(name, word.colour, action.onClick, { title: action.title }));
         if (name !== word.text) inner.append(h("span", { class: word.colour }, word.text.slice(name.length)));
       } else {
         inner.append(h("span", { class: word.colour }, word.text));

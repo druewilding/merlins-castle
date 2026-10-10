@@ -956,6 +956,17 @@ button {
   color: var(--gold);
 }
 
+.languages {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.languages .choice {
+  min-width: 7em;
+  padding: 0.7em 1.4em;
+}
+
 /* ---- Phones held upright: the picture on top, everything else below ---- */
 
 @media (max-aspect-ratio: 1/1) {
@@ -995,9 +1006,11 @@ button {
   .topbar {
     position: static;
     order: -1;
-    justify-content: space-between;
-    gap: 0.4rem;
-    /* Spread across a phone, but kept together in the middle of a tablet. */
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+    gap: 0.3rem 0.6rem;
+    /* Spread across a phone, but kept together in the middle of a tablet. On
+       the narrowest phones (or in a wordier language) it wraps onto two rows. */
     padding: 0.7rem max(1rem, (100% - 36rem) / 2);
     border-radius: 0;
     background: var(--panel);

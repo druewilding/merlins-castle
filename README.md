@@ -32,6 +32,9 @@ There are two ways to play:
 
 ![The Classic version, on its teletext screen](docs/screenshots/classic.png)
 
+It can be played in English or Danish: the game follows
+your browser's language, and Language/Sprog switches at any time.
+
 Games can be saved in your browser, and your best score is remembered.
 You can also install it on your phone, tablet or computer (Add to Home
 Screen, or Install in the browser's menu): it then opens like an app and
@@ -81,6 +84,9 @@ Dependencies are updated monthly by `.github/workflows/update-please.yml`.
   `.gitignore` says how to fetch it.
 - `data/world.json`: the whole game world: 40 rooms, 20 objects and every
   message.
+- `data/da.json`: the whole world in Danish, laid over `world.json` by
+  `src/engine/localise.ts`. The rest of the Danish is in
+  `src/shared/strings.ts`.
 - `src/engine/`: the game rules as a pure function,
   `act(world, state, command) → { state, events }`, faithful to the
   original down to its quirks.

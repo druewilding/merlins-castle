@@ -1,0 +1,346 @@
+{
+  "title": "Merlin's Castle",
+  "locale": "da",
+  "messages": {
+    "cantGo": "Du kan ikke gå den vej.",
+    "impossible": "Det er umuligt.",
+    "carryingTooMuch": "Du bærer på for meget.",
+    "alreadyGot": "Du har den allerede.",
+    "notHere": "Den er her ikke.",
+    "nothingHere": "Der er ingenting her.",
+    "allTaken": "Alt er taget.",
+    "youHave": "Du har{red}%a.",
+    "notTaken": "Det har du ikke taget.",
+    "youDrop": "Du lægger{red}%d{white}fra dig.",
+    "allDropped": "Alt er lagt fra dig.",
+    "notPossible": "Det er ikke muligt",
+    "haventGot": "Det har du ikke.",
+    "nothingHappens": "Der sker ingenting.",
+    "victory": "Du har løst Merlins mysterium!",
+    "youCanSee": "Du kan se "
+  },
+  "rooms": {
+    "clue-spell": {
+      "description": "Du er for svag, men du får et spor:  {red}Brug{red}trylleformularen,{red}når{red}du{red}møder{red}Merlin."
+    },
+    "wizards-kitchen": {
+      "description": "Du er i{blue}troldmandens køkken. Det lugter af tudser og krydderier, der simrer. Merlin dukker op!",
+      "exits": {
+        "east": {
+          "useMessage": "Merlin går for at sætte sin knap på igen.",
+          "blocked": "Åh nej! Merlin har fanget dig."
+        }
+      }
+    },
+    "coach-house": {
+      "description": "Du er i et{yellow}ældgammelt{yellow}vognhus. Merlins kappe, som mangler en sølvknap, hænger på væggen. Noget rasler."
+    },
+    "small-room": {
+      "description": "Du er i et{red}lille{red}rum.{white}Væggene er beklædt med rød silke. Der er buegange mod nord og vest."
+    },
+    "grand-hall": {
+      "description": "Du er i en{cyan}stor{cyan}hal.{white}Der er døre i alle retninger. Et{magenta}udsmykket{magenta}kammer{white}ligger mod syd. Merlins gobliner er meget tæt på.",
+      "exits": {
+        "south": {
+          "message": "Du kan ikke komme forbi."
+        },
+        "west": {
+          "message": "Du binder goblinerne.",
+          "useMessage": "Goblinerne ser bekymrede ud!",
+          "blocked": "Du falder i goblinernes fælde."
+        },
+        "east": {
+          "useMessage": "Måske lægger goblinerne ikke mærke til dig!",
+          "blocked": "Merlins gobliner tager dig til fange."
+        }
+      }
+    },
+    "dungeon": {
+      "description": "Du er i et{yellow}enormt{yellow}fangehul.{white}En gammel, gammel kone vogter udgangen mod syd og venter på at forvandle dig til sten. Der er en gang mod vest.",
+      "exits": {
+        "south": {
+          "useMessage": "Den gamle kone bliver forvandlet til sten.",
+          "blocked": "Du bliver til en stenstatue."
+        }
+      }
+    },
+    "merlins-lair": {
+      "description": "Dette er{blue}troldmanden{blue}Merlins{blue}hule.{white}Væggene er lilla og grønne. En kedel bobler. Troldmanden kommer hen imod dig!",
+      "exits": {
+        "north": {
+          "useMessage": "Han bliver forvandlet til en frø.",
+          "blocked": "Du bliver forvandlet til en frø."
+        }
+      }
+    },
+    "courtyard": {
+      "description": "Du er i en{yellow}solrig{yellow}borggård{white}med vildtvoksende lyserøde roser. Mod nord er en{cyan}vindebro.{white}Der er et{green}vognhus{white}mod øst. Mod syd er en{magenta}hal."
+    },
+    "moat": {
+      "description": "Du er på nordbredden af en{magenta}voldgrav.{white}Nogle vagter står ved{cyan}toldbommen.{white}En sti fører mod nord gennem en buegang.",
+      "exits": {
+        "south": {
+          "useMessage": "Vindebroen sænkes.",
+          "blocked": "Vindebroen er hejst op."
+        }
+      }
+    },
+    "forest-edge": {
+      "description": "Du er ved kanten af en{green}tæt{green}skov{white}på en sti, der løber fra øst til vest. En ugle tuder i træerne."
+    },
+    "river-south-bank": {
+      "description": "Du er på sydbredden af en{blue}flod.{white}En{green}skov{white}ligger mod vest. Mod syd, gennem en stenbue, skinner et{yellow}gyldent{yellow}spir{white}i solen.",
+      "exits": {
+        "north": {
+          "message": "Du kommer over uden problemer.",
+          "useMessage": "Planken bliver til en bro for dig.",
+          "blocked": "Du falder i, men kommer sikkert op igen."
+        }
+      }
+    },
+    "beautiful-chamber": {
+      "description": "Du er i et{magenta}smukt{magenta}kammer.{white}Gulvet er dækket af sorte og hvide fliser, og væggene er af guld. En ensom fløjte spiller."
+    },
+    "dark-tunnels": {
+      "description": "Du er ved en korsvej i{blue}tunnelerne.{white}Der er meget mørkt.",
+      "exits": {
+        "south": {
+          "useMessage": "Det bliver lysere. Du kan høre musik.",
+          "blocked": "Du falder i mørket."
+        }
+      }
+    },
+    "clue-silver": {
+      "description": "Du er faret vild, men finder et spor:{red}Giv{red}Merlin{red}sølv{red}til{red}hans{red}knapper."
+    },
+    "dragon-cave": {
+      "description": "Du står i en{cyan}stor{cyan}hule.{white}En{red}prægtig{red}drage,{white}der puster ild, står ved indgangen til tunnelen mod syd. Flere tunneler fører mod vest og nord.",
+      "exits": {
+        "south": {
+          "useMessage": "Dragens ild bliver til røg.",
+          "blocked": "Du bliver overmandet af ild og røg."
+        },
+        "west": {
+          "message": "Dragens ild skader dig ikke."
+        }
+      }
+    },
+    "cave-entrance": {
+      "description": "Du er ved indgangen til en{cyan}hule,{white}der går mod øst. En gangsti fører mod vest. Mod syd går en{blue}tunnel{white}under jorden.",
+      "exits": {
+        "south": {
+          "message": "Det er en lang, smal tunnel.",
+          "useMessage": "Nu kan du se, hvor du går!",
+          "blocked": "Der er for mørkt dernede."
+        },
+        "east": {
+          "useMessage": "Du fejer bladene væk.",
+          "blocked": "En bunke blade fylder indgangen."
+        }
+      }
+    },
+    "mountain-path": {
+      "description": "Du er på en sti, der løber fra nord til syd. Tætte{green}træer{white}står ved foden af et{cyan}bjerg{white}mod nord.",
+      "exits": {
+        "north": {
+          "message": "Du klatrer over{green}træstammer.",
+          "useMessage": "Du fælder alle træerne.",
+          "blocked": "Træerne står for tæt."
+        }
+      }
+    },
+    "evergreen-glade": {
+      "description": "Du er i en{green}stedsegrøn{green}lysning,{white}hvor{red}rødprikkede{red}paddehatte{white}vokser i en ring. En sti løber fra øst til vest."
+    },
+    "deep-river": {
+      "description": "Mod syd strømmer en{blue}dyb{blue}flod{white}hurtigt forbi. Stier fører mod nord og øst. Et{yellow}gyldent{yellow}spir{white}kan ses mod syd på den anden side af vandet.",
+      "exits": {
+        "south": {
+          "message": "Du løber sikkert over.",
+          "useMessage": "Planken når over til den anden side.",
+          "blocked": "Du bliver revet med af strømmen."
+        }
+      }
+    },
+    "grassy-bank": {
+      "description": "Du står ved en korsvej. På en{green}græsklædt{green}skrænt{white}ligger en skikkelse og sover.",
+      "firstVisitDescription": "Du vågner på en{green}græsklædt{green}skrænt{white}ved en korsvej. Det er varmt, og bierne summer. Der er en følelse af magi og mystik overalt omkring dig.",
+      "crowdedDescription": "Du er ved en{green}græsklædt{green}skrænt."
+    },
+    "old-stone-wall": {
+      "description": "Mod vest er en{yellow}gammel{yellow}stenmur,{white}der er fire meter høj. Et snoet spor løber mod øst.",
+      "exits": {
+        "west": {
+          "message": "Du er kravlet over.",
+          "useMessage": "Stigen læner sig op ad muren.",
+          "blocked": "Muren er for høj."
+        }
+      }
+    },
+    "old-wall": {
+      "description": "En{yellow}gammel{yellow}mur{white}ligger mod øst. Mod nord er en sti, der snor sig ind i tågen. En lille, mørk{blue}tunnel{white}går mod vest. Mod syd står nogle{green}træer.",
+      "exits": {
+        "west": {
+          "useMessage": "Sådan, det er bedre.",
+          "blocked": "Du kan ikke se noget."
+        },
+        "east": {
+          "message": "Du klatrer over muren.",
+          "useMessage": "Stigen når helt op.",
+          "blocked": "Muren er alt for høj."
+        }
+      }
+    },
+    "rusty-gate": {
+      "description": "Du er ved en{red}gammel{red}rusten{red}port.{white}Tågen hvirvler omkring dig. En sti fører mod syd.",
+      "exits": {
+        "north": {
+          "useMessage": "Porten svinger knirkende op.",
+          "blocked": "Den er låst."
+        }
+      }
+    },
+    "yellow-flowers": {
+      "description": "Jorden er dækket af{yellow}bittesmå{yellow}gule{yellow}blomster.{white}Mod syd er en{red}rusten{red}port.{white}En tilgroet sti fører mod nord.",
+      "exits": {
+        "south": {
+          "message": "Porten lukker langsomt bag dig.",
+          "useMessage": "Porten går op.",
+          "blocked": "Den vil ikke gå op."
+        }
+      }
+    },
+    "mossy-steps": {
+      "description": "Mod nord fører nogle{green}mosgroede{green}trin{white}opad. En tilgroet sti løber mod syd. Mod øst kan du se en{magenta}høj{magenta}balkon.",
+      "exits": {
+        "north": {
+          "useMessage": "Slangen glider lydløst væk.",
+          "blocked": "En sammenrullet slange hvæser ad dig."
+        },
+        "east": {
+          "message": "Stigen glider, og du falder.",
+          "useMessage": "Stigen står klar.",
+          "blocked": "Balkonen er for højt oppe."
+        }
+      }
+    },
+    "tower": {
+      "description": "Du går ind i et tårn. Der er mørkt og muggent indenfor. Udgangen er spærret af en{blue}enorm{blue}sten.{white}Det løber dig koldt ned ad ryggen.",
+      "exits": {
+        "south": {
+          "useMessage": "Stenen ruller til side.",
+          "blocked": "Du er spærret inde."
+        }
+      }
+    },
+    "forest-witches": {
+      "description": "Du er i{green}skoven.{white}Nogle kaniner advarer dig mod nogle{magenta}dansende{magenta}hekse{white}mod vest.",
+      "exits": {
+        "west": {
+          "useMessage": "Heksene flyver af sted til månen.",
+          "blocked": "Heksene fanger dig og binder dig."
+        }
+      }
+    },
+    "forest-crossroads": {
+      "description": "Du er ved en korsvej i{green}skoven.{white}Langt borte mod syd kan du se noget røg."
+    },
+    "charcoal-hut": {
+      "description": "Du er inde i en{red}kulsviers{red}hytte.{white}Hans ild ulmer, men han er her ikke."
+    },
+    "mountain": {
+      "description": "Du er på et{cyan}bjerg.{white}En{yellow}skat{white}ligger mod øst. Et spor fører mod syd. En{blue}labyrint{white}ligger mod nord.",
+      "exits": {
+        "east": {
+          "message": "Åh nej! Merlins fælde er den vej."
+        }
+      }
+    },
+    "maze": {
+      "description": "Du er inde i{blue}labyrinten{white}ved en korsvej. Du kan mærke fare.",
+      "exits": {
+        "north": {
+          "useMessage": "Du svinger dig over et dybt hul.",
+          "blocked": "Du glider ned i et dybt, dybt hul."
+        }
+      }
+    },
+    "damp-tunnels": {
+      "description": "Tunneler fører mod vest og nord. Luften er fugtig og indelukket."
+    },
+    "trolls": {
+      "description": "Der er gange mod øst og nord. Nogle{magenta}trolde{white}beder dig spille en melodi for dem.",
+      "exits": {
+        "north": {
+          "useMessage": "Troldene danser og lader dig passere.",
+          "blocked": "Troldene kaster en forbandelse over dig."
+        }
+      }
+    },
+    "treasure-room": {
+      "description": "Du er i et{yellow}skatkammer.{white}Der er døre mod syd, vest og øst.",
+      "exits": {
+        "south": {
+          "useMessage": "Du kommer sikkert over hullet.",
+          "blocked": "Åh nej! Du falder ned i mørket."
+        }
+      }
+    },
+    "giant": {
+      "description": "Tunneler fører mod syd, vest og øst. En{magenta}sulten{magenta}kæmpe{white}venter mod vest.",
+      "exits": {
+        "south": {
+          "useMessage": "Vejen mod syd er åben.",
+          "blocked": "Vejen er spærret med en hængelås."
+        },
+        "west": {
+          "useMessage": "Kæmpen smiler. Du kan passere.",
+          "blocked": "Kæmpen forvandler dig til en mus."
+        }
+      }
+    },
+    "oak-door": {
+      "description": "Der er en tunnel mod øst. En{green}gammel{green}egetræsdør{white}spærrer vejen mod syd. Du kan høre sang bag den.",
+      "exits": {
+        "south": {
+          "useMessage": "Døren går op.",
+          "blocked": "Døren er solidt låst."
+        }
+      }
+    },
+    "clue-mask": {
+      "description": "Du er faret vild, men finder et spor:{red}En{red}maske{red}skjuler{red}dig{red}for{red}gobliner."
+    },
+    "clue-ring": {
+      "description": "Du er faret vild, men finder et spor:{red}En{red}ring{red}hjælper{red}med{red}at{red}flytte{red}en{red}sten."
+    },
+    "clue-plank": {
+      "description": "Du er faret vild, men finder et spor:{red}En{red}planke{red}bliver{red}til{red}en{red}bro{red}for{red}dig."
+    },
+    "clue-rope": {
+      "description": "Du er faret vild, men finder et spor:{red}Bind{red}goblinerne{red}med{red}reb,{red}hvis{red}du{red}kan."
+    }
+  },
+  "items": {
+    "cake": { "name": "kage", "article": "en", "definite": "kagen" },
+    "water": { "name": "vand", "article": "noget", "definite": "vandet" },
+    "mask": { "name": "maske", "article": "en", "definite": "masken" },
+    "key": { "name": "nøgle", "article": "en", "definite": "nøglen" },
+    "spell": { "name": "trylleformular", "article": "en", "definite": "trylleformularen" },
+    "rope": { "name": "reb", "article": "et", "definite": "rebet" },
+    "plank": { "name": "planke", "article": "en", "definite": "planken" },
+    "ladder": { "name": "stige", "article": "en", "definite": "stigen" },
+    "pearl": { "name": "perle", "article": "en", "definite": "perlen" },
+    "gold": { "name": "guld", "article": "noget", "definite": "guldet" },
+    "emerald": { "name": "smaragd", "article": "en", "definite": "smaragden" },
+    "ring": { "name": "ring", "article": "en", "definite": "ringen" },
+    "axe": { "name": "økse", "article": "en", "definite": "øksen" },
+    "lamp": { "name": "lampe", "article": "en", "definite": "lampen" },
+    "penny": { "name": "skilling", "article": "en", "definite": "skillingen" },
+    "apple": { "name": "æble", "article": "et", "definite": "æblet" },
+    "broom": { "name": "kost", "article": "en", "definite": "kosten" },
+    "harp": { "name": "harpe", "article": "en", "definite": "harpen" },
+    "mirror": { "name": "spejl", "article": "et", "definite": "spejlet" },
+    "silver": { "name": "sølv", "article": "noget", "definite": "sølvet" }
+  }
+}

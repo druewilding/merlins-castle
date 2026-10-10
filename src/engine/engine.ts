@@ -8,12 +8,37 @@ import {
   type GameEvent,
   type GameState,
   type ItemId,
+  type Messages,
   type TeletextString,
   type TurnResult,
   type World,
 } from "./types";
 
 export type Random = () => number;
+
+const MESSAGES: Messages = {
+  cantGo: "You can't go that way.",
+  impossible: "That's impossible.",
+  carryingTooMuch: "You're carrying too much.",
+  alreadyGot: "You've already got it.",
+  notHere: "It's not here.",
+  nothingHere: "There's nothing here.",
+  allTaken: "All taken.",
+  youHave: "You have{red}%a.",
+  notTaken: "You haven't taken that.",
+  youDrop: "You drop the{red}%d.",
+  allDropped: "All dropped.",
+  notPossible: "That's not possible",
+  haventGot: "You haven't got that.",
+  nothingHappens: "Nothing happens.",
+  victory: "You have solved the mystery of Merlin!",
+  youCanSee: "You can see ",
+};
+
+// The engine's messages in the world's language.
+export function messages(world: World): Messages {
+  return world.messages ?? MESSAGES;
+}
 
 export function newGame(world: World, random: Random = Math.random): GameState {
   const itemLocations: GameState["itemLocations"] = {};
@@ -71,12 +96,12 @@ export function describe(world: World, state: GameState): View {
 // Objects in alphabetical order, for listing. (The original listed them in
 // the order of its DATA statements.)
 export function byName(world: World, ids: ItemId[]): ItemId[] {
-  return [...ids].sort((a, b) => world.items[a].name.localeCompare(world.items[b].name));
+  return [...ids].sort((a, b) => world.items[a].name.localeCompare(world.items[b].name, world.locale ?? "en"));
 }
 
 // "You can see a{red}cake,{red}a{red}ladder." — the original builds the list
 // with red control codes in place of spaces, and prints it all in red.
-export function itemsSentence(world: World, ids: ItemId[], prefix = "You can see "): TeletextString {
+export function itemsSentence(world: World, ids: ItemId[], prefix = messages(world).youCanSee): TeletextString {
   const parts = byName(world, ids).map((id) => `${world.items[id].article}{red}${world.items[id].name}`);
   return `${prefix}${parts.join(",{red}")}.`;
 }
@@ -109,11 +134,20 @@ export function act(world: World, state: GameState, command: Command): TurnResul
 
 class Turn {
   events: GameEvent[] = [];
+  private text: Messages;
 
   constructor(
     private world: World,
     public state: GameState
-  ) {}
+  ) {
+    this.text = messages(world);
+  }
+
+  // A message about an object: "%a" with its article, "%d" its definite form.
+  private withItem(message: TeletextString, id: ItemId): TeletextString {
+    const item = this.world.items[id];
+    return message.replace("%a", itemLabel(this.world, id)).replace("%d", item.definite ?? item.name);
+  }
 
   private say(tone: GameEvent["tone"], text: TeletextString) {
     this.events.push({ tone, text });
@@ -133,7 +167,7 @@ class Turn {
       return;
     }
     if (!exit?.to) {
-      this.say("error", "You can't go that way.");
+      this.say("error", this.text.cantGo);
       return;
     }
     this.state.room = exit.to;
@@ -144,27 +178,26 @@ class Turn {
 
   take(id: ItemId) {
     const location = this.state.itemLocations[id];
-    if (location === undefined) return this.say("error", "That's impossible.");
+    if (location === undefined) return this.say("error", this.text.impossible);
     if (location === this.state.room) {
-      if (this.carriedCount() >= this.world.carryLimit) return this.say("error", "You're carrying too much.");
+      if (this.carriedCount() >= this.world.carryLimit) return this.say("error", this.text.carryingTooMuch);
       this.state.itemLocations[id] = "carried";
       this.markFound(id);
-      return this.say("item", `You have{red}${itemLabel(this.world, id)}.`);
+      return this.say("item", this.withItem(this.text.youHave, id));
     }
-    if (location === "carried") return this.say("error", "You've already got it.");
-    this.say("error", "It's not here.");
+    if (location === "carried") return this.say("error", this.text.alreadyGot);
+    this.say("error", this.text.notHere);
   }
 
   takeAll() {
     const here = itemsIn(this.world, this.state, this.state.room);
-    if (this.carriedCount() + here.length > this.world.carryLimit)
-      return this.say("error", "You're carrying too much.");
-    if (here.length === 0) return this.say("error", "There's nothing here.");
+    if (this.carriedCount() + here.length > this.world.carryLimit) return this.say("error", this.text.carryingTooMuch);
+    if (here.length === 0) return this.say("error", this.text.nothingHere);
     for (const id of here) {
       this.state.itemLocations[id] = "carried";
       this.markFound(id);
     }
-    this.say("item", "All taken.");
+    this.say("item", this.text.allTaken);
   }
 
   private markFound(id: ItemId) {
@@ -173,26 +206,26 @@ class Turn {
   }
 
   drop(id: ItemId) {
-    if (this.state.itemLocations[id] !== "carried") return this.say("error", "You haven't taken that.");
+    if (this.state.itemLocations[id] !== "carried") return this.say("error", this.text.notTaken);
     // Quirk: dropping does not stop the item being "in use".
     this.state.itemLocations[id] = this.state.room;
     this.state.looks++;
-    this.say("plain", `You drop the{red}${this.world.items[id].name}.`);
+    this.say("plain", this.withItem(this.text.youDrop, id));
   }
 
   // Quirk: always says "All dropped.", even when carrying nothing.
   dropAll() {
     for (const id of carried(this.world, this.state)) this.state.itemLocations[id] = this.state.room;
     this.state.looks++;
-    this.say("plain", "All dropped.");
+    this.say("plain", this.text.allDropped);
   }
 
   use(id: ItemId) {
     const location = this.state.itemLocations[id];
-    if (location === undefined) return this.say("error", "That's not possible");
-    if (location !== "carried") return this.say("error", "You haven't got that.");
+    if (location === undefined) return this.say("error", this.text.notPossible);
+    if (location !== "carried") return this.say("error", this.text.haventGot);
     if (!this.state.using.includes(id)) this.state.using.push(id);
-    let message = "Nothing happens.";
+    let message = this.text.nothingHappens;
     for (const direction of EXIT_ORDER) {
       const obstacle = this.world.rooms[this.state.room].exits[direction]?.obstacle;
       if (obstacle?.needs === id) message = obstacle.useMessage;
@@ -205,7 +238,7 @@ class Turn {
     if (state.status !== "playing" || state.room !== world.homeRoom) return;
     if (itemsIn(world, state, world.homeRoom).length !== Object.keys(world.items).length) return;
     state.status = "won";
-    this.say("victory", "You have solved the mystery of Merlin!");
+    this.say("victory", this.text.victory);
   }
 
   private carriedCount() {

@@ -96,6 +96,39 @@ export function getMode(): Mode {
 // through sessionStorage, so it carries on in the other version.
 export function switchMode(mode: Mode, game?: GameState | null): void {
   write(MODE, mode);
+  reloadWith(game);
+}
+
+// ---- Language -----------------------------------------------------------------
+
+const LANGUAGE = "merlins-castle:language";
+
+export type Language = "en" | "da";
+
+// Chosen in the game, or else the browser's own language.
+export function getLanguage(): Language {
+  const chosen = read<Language | null>(LANGUAGE, null);
+  if (chosen === "en" || chosen === "da") return chosen;
+  return preferredLanguage(typeof navigator === "undefined" ? [] : navigator.languages);
+}
+
+// The first of the browser's languages (in its order of preference) that the
+// game speaks, matched on the language part of the tag: "da-DK" is Danish.
+export function preferredLanguage(tags: readonly string[]): Language {
+  for (const tag of tags) {
+    const language = tag.toLowerCase().split("-")[0];
+    if (language === "en" || language === "da") return language;
+  }
+  return "en";
+}
+
+// Like switching version, the game carries on in the other language.
+export function switchLanguage(language: Language, game?: GameState | null): void {
+  write(LANGUAGE, language);
+  reloadWith(game);
+}
+
+function reloadWith(game?: GameState | null) {
   try {
     if (game) sessionStorage.setItem(HANDOFF, JSON.stringify(game));
   } catch {

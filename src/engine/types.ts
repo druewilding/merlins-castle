@@ -22,6 +22,31 @@ export interface World {
   carryLimit: number; // 5
   rooms: Record<RoomId, Room>;
   items: Record<ItemId, Item>;
+  // In a translation (see localise.ts): the language for sorting names, and
+  // the engine's own messages.
+  locale?: string;
+  messages?: Messages;
+}
+
+// The engine's own messages. "%a" is an object with its article ("a ladder"),
+// "%d" its definite form (in English just the name, after "the").
+export interface Messages {
+  cantGo: TeletextString;
+  impossible: TeletextString;
+  carryingTooMuch: TeletextString;
+  alreadyGot: TeletextString;
+  notHere: TeletextString;
+  nothingHere: TeletextString;
+  allTaken: TeletextString;
+  youHave: TeletextString;
+  notTaken: TeletextString;
+  youDrop: TeletextString;
+  allDropped: TeletextString;
+  notPossible: TeletextString;
+  haventGot: TeletextString;
+  nothingHappens: TeletextString;
+  victory: TeletextString;
+  youCanSee: TeletextString;
 }
 
 // Text uses inline teletext colour codes, e.g. "a{green}grassy{green}bank{white}at".
@@ -56,7 +81,8 @@ export interface Obstacle {
 
 export interface Item {
   name: string;
-  article: "a" | "an" | "some";
+  article: string; // "a", "an" or "some"; in Danish "en", "et" or "noget"
+  definite?: string; // Danish "stigen"; English uses "the" and the name
   score: number; // 3, or 11 for treasures (pearl, gold, emerald, ring, silver)
   startsIn: RoomId[]; // one chosen at random per game
   image?: string;

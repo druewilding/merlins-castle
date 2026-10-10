@@ -34,7 +34,8 @@ const CASTLE: Record<number, number[]> = {
   239: [128, 128, 128, 128, 128, 128, 128, 128], // window, left
 };
 
-// The few letters of the BBC Micro's own font that the title needs.
+// The few letters of the BBC Micro's own font that the title needs, in
+// English and Danish ("Af Anita Straker").
 const FONT: Record<string, number[]> = {
   " ": [0, 0, 0, 0, 0, 0, 0, 0],
   "'": [24, 24, 48, 0, 0, 0, 0, 0],
@@ -45,6 +46,7 @@ const FONT: Record<string, number[]> = {
   S: [60, 102, 96, 60, 6, 102, 60, 0],
   a: [0, 0, 60, 6, 62, 102, 62, 0],
   e: [0, 0, 60, 102, 126, 96, 60, 0],
+  f: [28, 48, 48, 124, 48, 48, 48, 0],
   i: [24, 0, 56, 24, 24, 24, 60, 0],
   k: [96, 96, 102, 108, 120, 108, 102, 0],
   l: [56, 24, 24, 24, 24, 24, 60, 0],
@@ -126,7 +128,11 @@ function tower(k: number, n: number, l: number, colour: string): Draw[] {
 
 // The whole picture, as a list of steps: one per tower, then the gate and the
 // title. `random` gives 0 to 1, like Math.random.
-export function titleSteps(random: () => number = Math.random): Draw[][] {
+export function titleSteps(
+  random: () => number = Math.random,
+  name = "Merlin's Castle",
+  byline = "By Anita Straker"
+): Draw[][] {
   const steps: Draw[][] = [];
   // The border (PROCbox(0) and PROCbox(12)) and the white wall behind the towers.
   steps.push([
@@ -163,23 +169,29 @@ export function titleSteps(random: () => number = Math.random): Draw[][] {
   steps.push(gate);
   // PROCBIGST: each letter made twice as tall, row by row, in yellow.
   const title: Draw[] = [];
-  [..."Merlin's Castle"].forEach((c, i) => {
+  [...name].forEach((c, i) => {
     const g = FONT[c] ?? FONT[" "];
     title.push(char([0, g[0], g[0], g[1], g[1], g[2], g[2], g[3]], i + 2, 28, YELLOW, BLUE));
     title.push(char([g[3], g[4], g[4], g[5], g[5], g[6], g[6], g[7]], i + 2, 29, YELLOW, BLUE));
   });
-  title.push(...text("By Anita Straker", 22, 29, BLACK));
+  title.push(...text(byline, COLS - 2 - byline.length, 29, BLACK));
   steps.push(title);
   return steps;
 }
 
 // Draws the picture onto a canvas, one tower at a time as the BBC did, then
 // calls onDone. Returns a function that stops it (for leaving the screen early).
-export function drawTitle(canvas: HTMLCanvasElement, onDone?: () => void, delay = 100): () => void {
+export function drawTitle(
+  canvas: HTMLCanvasElement,
+  onDone?: () => void,
+  delay = 100,
+  name?: string,
+  byline?: string
+): () => void {
   canvas.width = COLS * 8;
   canvas.height = ROWS * 8;
   const ctx = canvas.getContext("2d")!;
-  const steps = titleSteps();
+  const steps = titleSteps(Math.random, name, byline);
   const instant = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let i = 0;
   let timer = 0;

@@ -1,0 +1,229 @@
+// Everything the two versions say that isn't part of the game world, in
+// English and Danish. The game's own words are in data/world.json and
+// data/da.json. Changing language reloads the page, so the choice is made once.
+
+import type { Direction } from "../engine/types";
+import { getLanguage } from "./storage";
+
+const en = {
+  title: "Merlin's Castle",
+  by: (author: string) => `By ${author}`,
+
+  // Ways out: the letters on the buttons, the keys, and what they're called.
+  compass: { north: "N", west: "W", east: "E", south: "S" } as Record<Direction, string>,
+  go: { north: "Go north", west: "Go west", east: "Go east", south: "Go south" } as Record<Direction, string>,
+  directions: "Directions",
+
+  // Objects. `definite` is "the ladder" in English, "stigen" in Danish.
+  take: (definite: string) => `Take ${definite}`,
+  use: (definite: string) => `Use ${definite}`,
+  drop: (definite: string) => `Drop ${definite}`,
+  theItem: (name: string, definite?: string) => definite ?? `the ${name}`,
+  takeAll: "Take all",
+  dropAll: "Drop all",
+  dropUnder: "drop",
+  carrying: "What you are carrying",
+
+  // The top bar and the title screen.
+  score: (points: number) => `Score ${points}`,
+  save: "Save",
+  load: "Load",
+  quit: "Quit",
+  sound: "Sound",
+  language: "Language",
+  classic: "Classic",
+  illustrated: "Illustrated",
+  play: "Play",
+  loadAGame: "Load a game",
+  notes: "Notes",
+  about: "About",
+  classicVersion: "Classic version",
+
+  // Endings.
+  solved: "You have solved the mystery of Merlin!",
+  adventureOver: "The adventure is over",
+  yourScore: (n: number) => `Your score this time: ${n}`,
+  bestSoFar: (n: number) => `Best score so far: ${n}`,
+  bestPossible: (n: number) => `Best possible score: ${n}`,
+  playAgain: "Play again",
+  mainMenu: "Main menu",
+  continue: "Continue",
+
+  // Dialogs.
+  close: "Close",
+  cancel: "Cancel",
+  giveUp: "Give up the adventure?",
+  yesQuit: "Yes, quit",
+  noCarryOn: "No, carry on",
+  saveTitle: "Save your position",
+  namePlaceholder: "Name your position",
+  nameLabel: "Name of your position",
+  savedAs: (name: string) => `Your position is saved as "${name}".`,
+  cantSave: "Sorry, this browser won't let me save.",
+  oldPositions: "Your old positions",
+  noSaves: "There are no saved positions yet.",
+  loadingEnds: "Loading one ends the game you're playing now, so save it first if you want to keep it.",
+  delete: "Delete",
+  deleteAsk: "Delete?",
+  yes: "Yes",
+  keep: "Keep",
+  music: "Music",
+  soundEffects: "Sound effects",
+  on: "On",
+  off: "Off",
+  aboutText: (author: string, year: number) => [
+    `Merlin's Castle was written by ${author} for the BBC Micro in ${year} and published by ESM. Every room, object and message here comes from her original program.`,
+    "Remade with love by Drue Wilding, who played it at school and never forgot it.",
+  ],
+  playOriginal: "You can still play the original at ",
+  musicCredit: ["Music: “The Path of the Goblin King” by Kevin MacLeod (", "), licensed under "],
+
+  // The Classic version's teletext screens.
+  pressReturn: "Press RETURN",
+  backToMenu: "Back to the menu",
+  titleLabel: "Merlin's Castle, by Anita Straker. Begin",
+  titlePicture: "A castle of many towers",
+  titleByline: "By Anita Straker",
+  choicePage: "Choice Page",
+  youCan: "You can:",
+  menu: [
+    "start a new adventure",
+    "load your old position",
+    "see the notes",
+    "about this version",
+    "the illustrated version",
+    "på dansk",
+  ],
+  clickOrType: "Click or type a letter",
+  classicAbout: (year: number) => [
+    `Written by Anita Straker for the BBC Micro in ${year}, published by ESM. Every room, object and message here comes from her original program.`,
+    "Remade with love for the web by Drue Wilding, who played it at school and never forgot it.",
+  ],
+  playOriginalAt: "Play the original at ",
+  use_: "use",
+  drop_: "drop",
+  sureQuit: "Are you sure you want to quit?",
+  yesQuitTt: "Yes - quit",
+  noCarryOnTt: "No - carry on",
+  fileName: "Name of your position file?",
+  fileLabel: "Name of your position file",
+  savedAsTt: (name: string) => `Your position is saved as{yellow}${name}.`,
+  deleteTt: "delete",
+  deleteItTt: "Delete it?",
+  yesTt: "yes",
+  keepTt: "keep",
+  todaysScores: "Today's scores",
+};
+
+export type Strings = typeof en;
+
+const da: Strings = {
+  title: "Merlin's Castle", // the original's name, in every language
+  by: (author) => `Af ${author}`,
+
+  compass: { north: "N", west: "V", east: "Ø", south: "S" },
+  go: { north: "Gå mod nord", west: "Gå mod vest", east: "Gå mod øst", south: "Gå mod syd" },
+  directions: "Retninger",
+
+  take: (definite) => `Tag ${definite}`,
+  use: (definite) => `Brug ${definite}`,
+  drop: (definite) => `Læg ${definite}`,
+  theItem: (name, definite) => definite ?? name,
+  takeAll: "Tag alt",
+  dropAll: "Læg alt",
+  dropUnder: "læg",
+  carrying: "Det, du bærer på",
+
+  score: (points) => `${points} point`,
+  save: "Gem",
+  load: "Hent",
+  quit: "Afslut",
+  sound: "Lyd",
+  language: "Sprog",
+  classic: "Klassisk",
+  illustrated: "Illustreret",
+  play: "Spil",
+  loadAGame: "Hent et spil",
+  notes: "Vejledning",
+  about: "Om spillet",
+  classicVersion: "Klassisk udgave",
+
+  solved: "Du har løst Merlins mysterium!",
+  adventureOver: "Eventyret er slut",
+  yourScore: (n) => `Dine point denne gang: ${n}`,
+  bestSoFar: (n) => `Bedste resultat indtil nu: ${n}`,
+  bestPossible: (n) => `Højst mulige antal point: ${n}`,
+  playAgain: "Spil igen",
+  mainMenu: "Hovedmenu",
+  continue: "Fortsæt",
+
+  close: "Luk",
+  cancel: "Annuller",
+  giveUp: "Vil du opgive eventyret?",
+  yesQuit: "Ja, afslut",
+  noCarryOn: "Nej, fortsæt",
+  saveTitle: "Gem din position",
+  namePlaceholder: "Giv din position et navn",
+  nameLabel: "Navn på din position",
+  savedAs: (name) => `Din position er gemt som "${name}".`,
+  cantSave: "Beklager, denne browser vil ikke lade mig gemme.",
+  oldPositions: "Dine gamle positioner",
+  noSaves: "Der er ingen gemte positioner endnu.",
+  loadingEnds: "Når du henter en, slutter det spil, du er i gang med, så gem det først, hvis du vil beholde det.",
+  delete: "Slet",
+  deleteAsk: "Slet?",
+  yes: "Ja",
+  keep: "Behold",
+  music: "Musik",
+  soundEffects: "Lydeffekter",
+  on: "Til",
+  off: "Fra",
+  aboutText: (author, year) => [
+    `Merlin's Castle blev skrevet af ${author} til BBC Micro i ${year} og udgivet af ESM. Hvert rum, hver genstand og hver besked her stammer fra hendes originale program, nu oversat til dansk.`,
+    "Genskabt med kærlighed af Drue Wilding, som spillede det i skolen og aldrig glemte det.",
+  ],
+  playOriginal: "Du kan stadig spille originalen (på engelsk) på ",
+  musicCredit: ["Musik: “The Path of the Goblin King” af Kevin MacLeod (", "), med licensen "],
+
+  pressReturn: "Tryk på RETURN",
+  backToMenu: "Tilbage til menuen",
+  titleLabel: "Merlin's Castle, af Anita Straker. Begynd",
+  titlePicture: "En borg med mange tårne",
+  titleByline: "Af Anita Straker",
+  choicePage: "Valgside",
+  youCan: "Du kan:",
+  menu: [
+    "starte et nyt eventyr",
+    "hente din gamle position",
+    "læse vejledningen",
+    "om denne udgave",
+    "den illustrerede udgave",
+    "in English",
+  ],
+  clickOrType: "Klik eller tast et bogstav",
+  classicAbout: (year) => [
+    `Skrevet af Anita Straker til BBC Micro i ${year} og udgivet af ESM. Hvert rum, hver genstand og hver besked her stammer fra hendes originale program, nu oversat til dansk.`,
+    "Genskabt med kærlighed til nettet af Drue Wilding, som spillede det i skolen og aldrig glemte det.",
+  ],
+  playOriginalAt: "Spil originalen på ",
+  use_: "brug",
+  drop_: "læg",
+  sureQuit: "Vil du virkelig afslutte?",
+  yesQuitTt: "Ja - afslut",
+  noCarryOnTt: "Nej - fortsæt",
+  fileName: "Navn på din positionsfil?",
+  fileLabel: "Navn på din positionsfil",
+  savedAsTt: (name) => `Din position er gemt som{yellow}${name}.`,
+  deleteTt: "slet",
+  deleteItTt: "Slet den?",
+  yesTt: "ja",
+  keepTt: "behold",
+  todaysScores: "Dagens point",
+};
+
+export const LANGUAGE = getLanguage();
+
+export const T: Strings = LANGUAGE === "da" ? da : en;
+
+// For dates (the save lists): the page is in British English or Danish.
+export const LOCALE = LANGUAGE === "da" ? "da" : "en-GB";
