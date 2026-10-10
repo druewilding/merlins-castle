@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { EXIT_ORDER } from "../src/engine/types";
-import { itemWidth, spotsFor } from "../src/illustrated/layout";
+import { itemWidth, placeThings, spotsFor } from "../src/illustrated/layout";
 import { deathMoment, lostMoment } from "../src/illustrated/moments";
 import { world } from "./helpers";
 
@@ -26,6 +26,16 @@ describe("object spots", () => {
       expect(spot.y).toBeGreaterThan(40);
       expect(spot.y).toBeLessThan(75);
     }
+  });
+
+  it("puts big objects behind small ones", () => {
+    const [apple, ladder, ring] = placeThings("dragon-cave", ["apple", "ladder", "ring"], 1.7);
+    expect(ladder.y).toBeLessThanOrEqual(apple.y);
+    expect(ladder.y).toBeLessThanOrEqual(ring.y);
+    const ids = ["water", "key", "rope", "ladder", "lamp", "apple"];
+    const spots = placeThings("dragon-cave", ids, 1.7);
+    const ladderY = spots[ids.indexOf("ladder")].y;
+    expect(Math.min(...spots.map((s) => s.y))).toBe(ladderY);
   });
 
   it("draws a ladder bigger than a ring", () => {

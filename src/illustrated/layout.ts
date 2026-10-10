@@ -82,3 +82,13 @@ export function itemWidth(id: ItemId, spot: Spot): number {
   const depth = 0.85 + ((spot.y - 50) / 20) * 0.3;
   return 6.5 * (SCALE[id] ?? 1) * depth;
 }
+
+// Where each of these objects goes. Big objects take the spots at the back, so
+// they never hide small ones behind them.
+export function placeThings(room: RoomId, ids: ItemId[], scale = 1): Spot[] {
+  const spots = spotsFor(room, ids.length, scale).sort((a, b) => a.y - b.y || a.x - b.x);
+  const bigFirst = ids.map((id, i) => ({ id, i })).sort((a, b) => (SCALE[b.id] ?? 1) - (SCALE[a.id] ?? 1));
+  const placed: Spot[] = [];
+  bigFirst.forEach(({ i }, rank) => (placed[i] = spots[rank]));
+  return placed;
+}

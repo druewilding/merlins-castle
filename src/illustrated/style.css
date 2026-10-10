@@ -162,13 +162,31 @@ button {
   border: 0;
   background: none;
   cursor: pointer;
-  /* A faint glow says "you can take this"; the shadow sits it on the ground. */
-  filter: drop-shadow(0 0 5px rgba(255, 236, 170, 0.55)) drop-shadow(0 7px 5px rgba(0, 0, 0, 0.55));
+  /* A bright rim and a softly breathing halo say "you can take this", and
+     make objects easy to spot. The shadow sits each one on the ground. */
+  filter: drop-shadow(0 0 2px rgba(255, 248, 225, 1)) drop-shadow(0 0 var(--halo) rgba(255, 226, 130, 0.95))
+    drop-shadow(0 7px 5px rgba(0, 0, 0, 0.55));
+  animation: shimmer 2.6s ease-in-out infinite alternate;
+  /* No transition on filter: the breathing halo changes it every frame. */
   transition:
     left 0.5s ease,
     top 0.5s ease,
-    transform 0.2s ease,
-    filter 0.2s ease;
+    transform 0.2s ease;
+}
+
+@property --halo {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 9px;
+}
+
+@keyframes shimmer {
+  from {
+    --halo: 6px;
+  }
+  to {
+    --halo: 18px;
+  }
 }
 
 .thing img {
@@ -180,7 +198,10 @@ button {
 .thing.hot,
 .thing:focus-visible {
   transform: translate(-50%, -100%) scale(1.08);
-  filter: drop-shadow(0 0 9px rgba(255, 236, 170, 0.8)) drop-shadow(0 7px 5px rgba(0, 0, 0, 0.55));
+  /* The same breathing glow, doubled up so it's clearly brighter and wider. */
+  filter: brightness(1.1) drop-shadow(0 0 3px rgb(255, 250, 232))
+    drop-shadow(0 0 calc(var(--halo) + 4px) rgb(255, 226, 130))
+    drop-shadow(0 0 calc(var(--halo) + 4px) rgb(255, 226, 130)) drop-shadow(0 7px 5px rgba(0, 0, 0, 0.55));
 }
 
 /* Used, then dropped: still glowing until you leave the room. */
@@ -667,7 +688,8 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   .curtain::before,
-  .curtain > * {
+  .curtain > *,
+  .thing {
     animation: none;
   }
 }

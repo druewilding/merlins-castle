@@ -7,7 +7,7 @@ import { h } from "../shared/dom";
 import { deleteSave, listSaves, recordScore, saveGame, switchMode } from "../shared/storage";
 import { artUrl, preload } from "./art";
 import { loadMask, thingAt } from "./hit";
-import { itemWidth, spotsFor } from "./layout";
+import { itemWidth, placeThings } from "./layout";
 import { deathMoment, lostMoment } from "./moments";
 import { NOTES } from "./notes";
 import { plainText, segments } from "./text";
@@ -349,7 +349,7 @@ export class IllustratedApp {
   private renderThings(ids: ItemId[]) {
     const room = this.game!.room;
     const scale = Number(getComputedStyle(this.things).getPropertyValue("--thing-scale")) || 1;
-    const spots = spotsFor(room, ids.length, scale);
+    const spots = placeThings(room, ids, scale);
     const existing = new Map(
       [...this.things.children].map((el) => [(el as HTMLElement).dataset.item!, el as HTMLElement])
     );
@@ -360,6 +360,8 @@ export class IllustratedApp {
       if (!el || el.dataset.room !== room) {
         el = this.thingElement(id);
         el.dataset.room = room;
+        // Each object breathes at its own pace, so they don't pulse in step.
+        el.style.animationDelay = `${-Math.random() * 2.6}s`;
         this.things.append(el);
       }
       el.style.left = `${spot.x}%`;
