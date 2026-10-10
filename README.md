@@ -1,28 +1,41 @@
 # Merlin's Castle
 
 A remake of **Merlin's Castle**, the adventure game Anita Straker wrote for
-the BBC Micro in 1983. Every room, object, message and quirk comes from her
-original program; this version adds a painted picture for every place and
-plays in the browser.
+the BBC Micro in 1983, now with a painted picture for every place, music, and
+sound effects. It plays in your browser, and on phones and iPads you can
+install it and play offline.
 
 **Play it at [www.druewilding.com/merlins-castle](https://www.druewilding.com/merlins-castle/)**
 
+![The grassy bank at the crossroads, where the adventure begins](docs/screenshots/illustrated.jpg)
+
+I first remade Merlin's Castle for the web in 2010, and always wanted to give
+it pictures. This time it's built straight from the original program: a parser
+read the game's DATA statements from the 1983 disk, so every room, object,
+message and quirk is exactly as Anita wrote it. Objects are scattered
+differently each game, with over 8,000 possible starting layouts, and every one
+of them can be won.
+
 You wake up on a grassy bank at a crossroads. Somewhere in this magic land
 are objects and treasures; bring as many as you can back to the bank. Click
-the compass (or use the arrow keys or N, S, E and W) to move, click objects to
+a way out (or use the arrow keys or N, S, E and W) to move, click objects to
 pick them up, and click an object you're carrying (or press 1 to 5) to use
 it. You can carry five things at a time.
 
 There are two ways to play:
 
-- **Illustrated**: painted scenes, objects you can see and drag, and music.
-- **Classic**: the original 1983 teletext screen, with its colours, its
-  beep and its victory tune. Switch between them at any time, even mid-game.
+- **Illustrated**: painted scenes, objects you can see and drag, music and
+  sound effects.
+- **Classic**: the original 1983 teletext screen, with its font, its colours,
+  its beep and its victory tune. Switch between them at any time, even
+  mid-game.
+
+![The Classic version, on its teletext screen](docs/screenshots/classic.png)
 
 Games can be saved in your browser, and your best score is remembered.
-You can also install it on your phone or computer (Add to Home Screen, or
-Install in the browser's menu): it then opens like an app and downloads the
-whole world, so it works without a connection.
+You can also install it on your phone, tablet or computer (Add to Home
+Screen, or Install in the browser's menu): it then opens like an app and
+downloads the whole world, so it works without a connection.
 
 ## Credits
 
