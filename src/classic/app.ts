@@ -5,6 +5,7 @@ import { h } from "../shared/dom";
 import {
   bestScore,
   deleteSave,
+  type Handoff,
   listSaves,
   nextSaveName,
   recordScore,
@@ -64,10 +65,10 @@ export class App {
   constructor(
     private root: HTMLElement,
     private world: World,
-    handoff: GameState | null = null
+    handoff: Handoff | null = null
   ) {
     document.addEventListener("keydown", (event) => this.onKey(event));
-    if (handoff) this.start(handoff);
+    if (handoff) this.start(handoff.state, handoff.saveName);
     else this.render();
   }
 
@@ -141,7 +142,8 @@ export class App {
 
   // English and Danish swap places; a game in progress carries on.
   private otherLanguage() {
-    switchLanguage(LANGUAGE === "da" ? "en" : "da", this.game?.status === "playing" ? this.game : null);
+    const playing = this.game?.status === "playing";
+    switchLanguage(LANGUAGE === "da" ? "en" : "da", playing ? this.game : null, playing ? this.saveName : "");
   }
 
   private nextNotesPage(page: number) {
@@ -353,7 +355,7 @@ export class App {
         h("span", { class: "yellow" }, T.score(view.score)),
         button(T.save, "white", () => this.go({ name: "play", events: [], prompt: "save" })),
         button(T.quit, "white", () => this.go({ name: "play", events: [], prompt: "quit" })),
-        button(T.illustrated, "white", () => switchMode("illustrated", this.game))
+        button(T.illustrated, "white", () => switchMode("illustrated", this.game, this.saveName))
       )
     );
 

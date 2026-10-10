@@ -7,6 +7,7 @@ import { h } from "../shared/dom";
 import {
   deleteSave,
   effectsOn,
+  type Handoff,
   listSaves,
   musicOn,
   nextSaveName,
@@ -91,7 +92,7 @@ export class IllustratedApp {
   constructor(
     root: HTMLElement,
     private world: World,
-    handoff: GameState | null = null
+    handoff: Handoff | null = null
   ) {
     this.stage.append(this.sceneImg, this.placeholder, motes(), this.things);
     // The ways out on wide screens sit just above the text panel.
@@ -104,7 +105,7 @@ export class IllustratedApp {
     this.app = h("div", { class: "mc" }, this.stage, this.topbar, this.panel, this.overlay, this.fader);
     root.replaceChildren(this.app);
     document.addEventListener("keydown", (event) => this.onKey(event));
-    if (handoff) void this.start(handoff);
+    if (handoff) void this.start(handoff.state, handoff.saveName);
     else this.showTitle();
   }
 
@@ -407,7 +408,7 @@ export class IllustratedApp {
       link(T.quit, () => this.showQuit()),
       link(T.sound, () => this.showSound()),
       link(T.language, () => this.showLanguage()),
-      link(T.classic, () => switchMode("classic", this.game))
+      link(T.classic, () => switchMode("classic", this.game, this.saveName))
     );
   }
 
@@ -949,7 +950,9 @@ export class IllustratedApp {
           lang: language,
           "aria-pressed": String(LANGUAGE === language),
           onclick: () => {
-            if (language !== LANGUAGE) switchLanguage(language, this.playing() ? this.game : null);
+            if (language !== LANGUAGE) {
+              switchLanguage(language, this.playing() ? this.game : null, this.playing() ? this.saveName : "");
+            }
           },
         },
         label

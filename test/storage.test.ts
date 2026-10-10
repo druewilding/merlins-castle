@@ -22,4 +22,9 @@ describe("suggesting the next save name", () => {
     expect(nextSaveName(long.slice(0, 24), []).length).toBeLessThanOrEqual(24);
     expect(nextSaveName("x".repeat(24), [])).toBe(`${"x".repeat(22)} 2`);
   });
+
+  it("counts exactly, even past the largest safe number", () => {
+    expect(nextSaveName("10000000000000000", ["10000000000000000"])).toBe("10000000000000001");
+    expect(nextSaveName("9007199254740993", ["9007199254740994"])).toBe("9007199254740995");
+  });
 });
