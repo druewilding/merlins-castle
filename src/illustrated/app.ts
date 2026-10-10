@@ -4,7 +4,17 @@
 import { act, bestPossibleScore, byName, carried, describe, itemsIn, newGame, score } from "../engine/engine";
 import type { Command, Direction, GameEvent, GameState, ItemId, World } from "../engine/types";
 import { h } from "../shared/dom";
-import { deleteSave, listSaves, recordScore, saveGame, setSoundOn, soundOn, switchMode } from "../shared/storage";
+import {
+  deleteSave,
+  effectsOn,
+  listSaves,
+  musicOn,
+  recordScore,
+  saveGame,
+  setEffectsOn,
+  setMusicOn,
+  switchMode,
+} from "../shared/storage";
 import { artUrl, preload } from "./art";
 import { loadMask, thingAt } from "./hit";
 import { itemWidth, placeThings } from "./layout";
@@ -378,13 +388,7 @@ export class IllustratedApp {
       link("Save", () => this.showSave()),
       link("Load", () => this.showLoad()),
       link("Quit", () => this.showQuit()),
-      // The link says what clicking it will do.
-      link(soundOn() ? "Sound off" : "Sound on", (event) => {
-        const on = !soundOn();
-        setSoundOn(on);
-        this.music.setOn(on);
-        (event.currentTarget as HTMLElement).textContent = on ? "Sound off" : "Sound on";
-      }),
+      link("Sound", () => this.showSound()),
       link("Classic", () => switchMode("classic", this.game))
     );
   }
@@ -862,6 +866,57 @@ export class IllustratedApp {
       )
     );
     dialog.addEventListener("close", () => (this.overlay.hidden = false));
+  }
+
+  // Music and sound effects, each switched on or off on its own.
+  private showSound() {
+    const toggle = (label: string, isOn: () => boolean, set: (on: boolean) => void) => {
+      const choice = (on: boolean) =>
+        h(
+          "button",
+          {
+            type: "button",
+            class: "choice",
+            "aria-pressed": String(isOn() === on),
+            onclick: () => {
+              set(on);
+              buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(isOn() === (i === 0))));
+            },
+          },
+          on ? "On" : "Off"
+        );
+      const buttons = [choice(true), choice(false)];
+      return h(
+        "li",
+        {},
+        h("span", { class: "setting" }, label),
+        h("span", { class: "choices", role: "group", "aria-label": label }, ...buttons)
+      );
+    };
+    this.dialog(
+      h("h2", {}, "Sound"),
+      h(
+        "ul",
+        { class: "settings" },
+        toggle("Music", musicOn, (on) => {
+          setMusicOn(on);
+          this.music.setOn(on);
+        }),
+        toggle("Sound effects", effectsOn, (on) => {
+          setEffectsOn(on);
+          if (on) this.sounds.play("take");
+        })
+      ),
+      h(
+        "div",
+        { class: "buttons" },
+        h(
+          "button",
+          { type: "button", class: "pill quiet", autofocus: true, onclick: () => this.closeDialog() },
+          "Close"
+        )
+      )
+    );
   }
 
   private showNotes() {

@@ -5,7 +5,7 @@
 // The volume is set through Web Audio rather than on the <audio> element,
 // because iPhones and iPads ignore an element's volume, so fades wouldn't work.
 
-import { soundOn } from "../shared/storage";
+import { musicOn } from "../shared/storage";
 import { audioContext } from "./audio";
 
 const URL = "music/the-path-of-the-goblin-king.mp3";
@@ -24,7 +24,7 @@ export class Music {
 
   // On the title screen: start downloading, so the music is ready by Play.
   prepare() {
-    if (!soundOn() || this.audio.src) return;
+    if (!musicOn() || this.audio.src) return;
     this.audio.preload = "auto";
     this.audio.src = URL;
     // iPhones and iPads don't preload media, so fetch it too: this fills the
@@ -35,7 +35,7 @@ export class Music {
   // A new game: play from the beginning.
   begin() {
     this.wanted = true;
-    if (!soundOn()) return;
+    if (!musicOn()) return;
     this.audio.currentTime = 0;
     this.play();
   }
@@ -46,7 +46,7 @@ export class Music {
     this.fadeTo(0, ms);
   }
 
-  // The sound setting changed.
+  // The music setting changed.
   setOn(on: boolean) {
     if (!on) this.fadeTo(0, 400);
     else if (this.wanted) this.play();
@@ -76,7 +76,7 @@ export class Music {
     const retry = () => {
       window.removeEventListener("pointerdown", retry, true);
       window.removeEventListener("keydown", retry, true);
-      if (this.wanted && soundOn()) this.play();
+      if (this.wanted && musicOn()) this.play();
     };
     window.addEventListener("pointerdown", retry, true);
     window.addEventListener("keydown", retry, true);
