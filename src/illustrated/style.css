@@ -872,7 +872,20 @@ button {
   font-size: 0.85em;
 }
 
+.saves .actions {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-left: 1rem;
+}
+
+.saves .ask {
+  color: var(--ink-soft);
+  font-size: 0.85em;
+}
+
 .saves .link {
+  padding: 0.4em 0.2em;
   font: 600 11px var(--caps);
   letter-spacing: 0.12em;
   text-transform: uppercase;
