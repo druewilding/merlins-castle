@@ -70,8 +70,8 @@ function offline(): Plugin {
   };
 }
 
-// Relative base: the same build works at druewilding.com/merlins-castle/ and
-// at the root of a custom domain.
+// Relative base: the same build works at merlinscastle.net and under a path
+// (as it once did at druewilding.com/merlins-castle/).
 export default defineConfig({
   base: "./",
   plugins: [artWatcher(), offline()],
