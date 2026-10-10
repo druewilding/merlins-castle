@@ -9,8 +9,8 @@ match:
 
 # death-darkness
 
-Shown for: "You slip down a deep, deep hole." (maze) / "Oh dear! You fall into darkness." (treasure-room) / "You fall over in the dark." (dark-tunnels)
+Shown for: "You slip down a deep, deep hole." (maze) / "Oh dear! You fall into darkness." (treasure-room)
 
 ## Prompt
 
-> Looking down into a deep, deep black hole in an ancient stone floor, its edges crumbling, a few pebbles falling into endless darkness, a faint swirl of violet magic far below. Dizzying, eerie.
+> Falling, seen from deep inside a narrow stone shaft beneath the maze, looking straight up. Far above, the opening is a small, bright circle of golden evening sky, with the old wooden beam across it, already terribly far away. The ancient mossy stone walls of the shaft rush upwards all around, streaked with motion. A few pebbles and loose leaves tumble down alongside, and a faint swirl of violet magic glows in the darkness that fills the edges and the bottom of the picture. Dizzying and eerie, but dreamlike rather than frightening.

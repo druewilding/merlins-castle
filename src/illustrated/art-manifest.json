@@ -6,6 +6,7 @@
     "beautiful-chamber",
     "cave-entrance",
     "charcoal-hut",
+    "damp-tunnels",
     "dark-tunnels",
     "deep-river",
     "dragon-cave",
@@ -13,17 +14,22 @@
     "forest-crossroads",
     "forest-edge",
     "forest-witches",
+    "giant",
     "grassy-bank-sleeping",
     "grassy-bank",
+    "maze",
     "merlins-lair",
     "mossy-steps",
     "mountain-path",
     "mountain",
+    "oak-door",
     "old-stone-wall",
     "old-wall",
     "river-south-bank",
     "rusty-gate",
     "tower",
+    "treasure-room",
+    "trolls",
     "yellow-flowers"
   ],
   "items": [
@@ -32,6 +38,7 @@
     "broom",
     "cake",
     "emerald",
+    "gold",
     "harp",
     "key",
     "ladder",
@@ -46,10 +53,14 @@
     "water"
   ],
   "moments": [
+    "death-darkness",
     "death-frog",
     "death-ladder",
     "death-merlins-trap",
+    "death-mouse",
     "death-river",
-    "lost-forest"
+    "death-stumble",
+    "lost-forest",
+    "lost-tunnels"
   ]
 }

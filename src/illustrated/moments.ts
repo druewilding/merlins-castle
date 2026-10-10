@@ -14,7 +14,7 @@ const DEATHS: Record<string, string> = {
   "mountain:east": "death-merlins-trap",
   "maze:north": "death-darkness",
   "treasure-room:south": "death-darkness",
-  "dark-tunnels:south": "death-darkness",
+  "dark-tunnels:south": "death-stumble",
   "giant:west": "death-mouse",
 };
 

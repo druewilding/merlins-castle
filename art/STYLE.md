@@ -50,7 +50,9 @@ and the attached anchors are what keep 75 images looking like one world.
 > looking **north**, as if hovering just above the southern edge of the place.
 > The whole location is visible, like a stage set. North is at the top/back of
 > the picture, south at the bottom/front edge, west on the left and east on
-> the right. Paths, doors or tunnels that lead away must leave the picture on
+> the right. Only paint the ways out that are listed: where there is no exit,
+> there is solid wall, rock, water or dense trees, never an opening, path or
+> tunnel. Paths, doors or tunnels that lead away must leave the picture on
 > the matching side. West and east ways run sideways across the middle ground
 > and leave the left or right edge about halfway up the picture, like a road
 > crossing a stage. They do not curve away into the distance, because the
@@ -123,13 +125,14 @@ The camera always faces north, so the south is behind the viewer:
 
 - Things **far away to the south** (the golden spire seen across the river)
   are not shown. The text describes them.
-- Things **at the south exit** (a creature guarding the south tunnel, a gate
-  to the south) stand in the lower part of the picture **seen from behind**,
-  facing into the scene. Their heads can turn in profile.
-- South paths, tunnels and doors simply leave the bottom edge of the picture.
-- A door or wall **directly behind** the viewer (the tower's stone, the oak
-  door) is suggested by light or sound coming from the bottom edge, not
-  painted.
+- A **creature** at the south exit (one guarding the south tunnel) stands in
+  the lower part of the picture **seen from behind**, facing into the scene.
+  Its head can turn in profile.
+- South paths and tunnels simply leave the bottom edge of the picture.
+- **Gates, doors, locks and walls** at the south, or directly behind the
+  viewer (the padlocked way past the giant, the tower's stone, the oak door),
+  are not painted. Painted low in the picture, they read as being in front of
+  you. The text describes them.
 
 ## Continuity between neighbouring rooms
 

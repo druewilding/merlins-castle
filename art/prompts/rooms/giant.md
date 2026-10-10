@@ -16,8 +16,14 @@ Exits:
 - south → damp-tunnels (needs the key; blocked: "The way through is padlocked.")
 - west → treasure-room (needs the cake; blocked: "The giant turns you into a mouse.", fatal)
 
+The padlocked way south is behind the viewer, so it isn't painted (see the "behind you" rule); the text describes it.
+
 ## Prompt
 
-> A wide meeting of underground tunnels: passages lead west (left) and east (right), and one leaves the bottom of the picture. On the left (west), a huge **hungry-looking giant** sits blocking the west passage, rubbing his belly and licking his lips, peering down at the viewer. He's enormous (he barely fits) but more grumpy-hungry than evil.
+> A wide, torchlit meeting of underground tunnels.
+>
+> - West (left): a huge **hungry-looking giant** stands in the mouth of the west tunnel at the left-hand edge of the picture, about halfway up, filling it completely. He is so tall that he has to stoop under the rock ceiling, one hand braced against the tunnel wall. He rubs his belly and licks his lips, looking towards the viewer. Enormous, more grumpy-hungry than evil.
+> - East (right): a tunnel runs sideways and leaves the right-hand edge of the picture about halfway up.
+> - North (top): solid rock wall with stalactites and a torch. There is no tunnel or opening to the north.
 >
 > Torchlight. Keep the bottom quarter as plain tunnel floor.
