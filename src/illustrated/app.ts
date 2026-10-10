@@ -281,6 +281,8 @@ export class IllustratedApp {
   // Dropping the last object on the grassy bank wins the game.
   private async afterDrop() {
     if (this.game!.status !== "won") return;
+    // The music steps aside so the victory fanfare rings out on its own.
+    this.music.end(600);
     this.sounds.play("victory", 300);
     await this.transition(() => this.render(), 1600);
   }
@@ -331,7 +333,7 @@ export class IllustratedApp {
   // and a Continue button in the middle. Winning gets no dark curtain.
   private dropCurtain() {
     const game = this.game!;
-    // The music fades with the falling curtain; a win keeps it playing.
+    // The music fades with the falling curtain (after a win it has already gone).
     if (game.status !== "won") this.music.end(3000);
     const last = game.status === "dead" ? this.events.at(-1) : undefined;
     this.overlay.replaceChildren(
