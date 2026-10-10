@@ -367,14 +367,14 @@ export class IllustratedApp {
       link("Save", () => this.showSave()),
       link("Load", () => this.showLoad()),
       link("Quit", () => this.showQuit()),
-      link("Classic", () => switchMode("classic", this.game)),
       // The link says what clicking it will do.
       link(soundOn() ? "Sound off" : "Sound on", (event) => {
         const on = !soundOn();
         setSoundOn(on);
         this.music.setOn(on);
         (event.currentTarget as HTMLElement).textContent = on ? "Sound off" : "Sound on";
-      })
+      }),
+      link("Classic", () => switchMode("classic", this.game))
     );
   }
 
