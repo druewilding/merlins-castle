@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.3.0](https://github.com/druewilding/merlins-castle/compare/v1.2.0...v1.3.0) (2026-10-10)
+
+
+### Features
+
+* Make a way out glow when an object opens it ([#23](https://github.com/druewilding/merlins-castle/issues/23)) ([3a88f00](https://github.com/druewilding/merlins-castle/commit/3a88f00310c418d2c400d1ba16a76c8d59a38ba5))
+* Recreate the original loading screen ([#19](https://github.com/druewilding/merlins-castle/issues/19)) ([e9257a2](https://github.com/druewilding/merlins-castle/commit/e9257a2762f0313511745021297e14790dc77172))
+* Switch music and sound effects on and off separately ([#22](https://github.com/druewilding/merlins-castle/issues/22)) ([c99e35f](https://github.com/druewilding/merlins-castle/commit/c99e35f55ccc04a6ea97cd4a80fad7c3bb8fe575))
+
+
+### Bug Fixes
+
+* Avoid accidentally deleting save positions ([#21](https://github.com/druewilding/merlins-castle/issues/21)) ([39ae6a5](https://github.com/druewilding/merlins-castle/commit/39ae6a523b24e767ae14ffa74ed980e6f8daa0fe))
+* Show only the fireflies while a scene loads ([#20](https://github.com/druewilding/merlins-castle/issues/20)) ([46e53a6](https://github.com/druewilding/merlins-castle/commit/46e53a6226fe389bad7258ce451bb4deb5101fa5))
+
+
+### Documentation
+
+* Add some screenshots to the README ([#18](https://github.com/druewilding/merlins-castle/issues/18)) ([c985df8](https://github.com/druewilding/merlins-castle/commit/c985df85c5f2728ebeab057220fe7a9ce25e89fb))
+
 ## [1.2.0](https://github.com/druewilding/merlins-castle/compare/v1.1.1...v1.2.0) (2026-10-10)
 
 
