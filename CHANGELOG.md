@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/druewilding/merlins-castle/compare/v1.0.3...v1.1.0) (2026-10-10)
+
+
+### Features
+
+* Beep at error messages in Classic, like the BBC Micro ([#11](https://github.com/druewilding/merlins-castle/issues/11)) ([ca83797](https://github.com/druewilding/merlins-castle/commit/ca837976cf133a709ad2ab87bfefa9070ed48634))
+* Play the original victory tune in Classic ([#10](https://github.com/druewilding/merlins-castle/issues/10)) ([54db353](https://github.com/druewilding/merlins-castle/commit/54db3537ff335c9b2dba6cf302cd6308f24625ca))
+
 ## [1.0.3](https://github.com/druewilding/merlins-castle/compare/v1.0.2...v1.0.3) (2026-10-10)
 
 
