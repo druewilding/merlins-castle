@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write # to post the test report
 
 jobs:
   code-quality:
@@ -28,8 +29,21 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+      # Vitest writes a test report into the step's summary on GitHub. Keep a
+      # copy (even if tests fail) so it can be posted on the pull request.
       - name: Run tests
-        run: npm test
+        run: |
+          npm test || status=$?
+          cp "$GITHUB_STEP_SUMMARY" test-report.md
+          exit ${status:-0}
+
+      # One comment per pull request, updated on every push.
+      - name: Post the test report
+        if: always() && hashFiles('test-report.md') != ''
+        uses: marocchino/sticky-pull-request-comment@v3
+        with:
+          header: test-report
+          path: test-report.md
 
       - name: Build
         run: npm run build
