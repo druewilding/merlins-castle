@@ -16,8 +16,8 @@ it. You can carry five things at a time.
 There are two ways to play:
 
 - **Illustrated**: painted scenes, objects you can see and drag, and music.
-- **Classic**: the original 1983 teletext screen, with typed commands like
-  `use lad`. Switch between them at any time, even mid-game.
+- **Classic**: the original 1983 teletext screen, with its colours, its
+  beep and its victory tune. Switch between them at any time, even mid-game.
 
 Games can be saved in your browser, and your best score is remembered.
 You can also install it on your phone or computer (Add to Home Screen, or
