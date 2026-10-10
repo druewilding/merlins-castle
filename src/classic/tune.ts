@@ -138,3 +138,19 @@ export function stopTune() {
   void playing?.close();
   playing = null;
 }
+
+// VDU7, the BBC Micro's bell: the original beeps with every red error message
+// ("You can't go that way."). The default bell is a square wave at pitch 101
+// (the C above middle C), on channel 3, for 6 twentieths of a second.
+export function beep(volume = 0.08) {
+  const context = new AudioContext();
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = "square";
+  oscillator.frequency.value = frequencyOf(101);
+  gain.gain.value = volume;
+  oscillator.connect(gain).connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + 0.3);
+  oscillator.onended = () => void context.close();
+}
