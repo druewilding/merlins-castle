@@ -834,12 +834,20 @@ button {
     pointer-events: none;
   }
 
+  /* Above the picture, so it never covers the scene. */
   .topbar {
-    position: absolute;
-    top: 0.8rem;
-    left: 1rem;
-    gap: 1rem;
-    font-size: 11px;
+    position: static;
+    order: -1;
+    justify-content: space-between;
+    gap: 0.4rem;
+    /* Spread across a phone, but kept together in the middle of a tablet. */
+    padding: 0.7rem max(1rem, (100% - 36rem) / 2);
+    border-radius: 0;
+    background: var(--panel);
+    backdrop-filter: none;
+    font-size: clamp(9px, 2.75vw, 13px);
+    letter-spacing: 0.08em;
+    white-space: nowrap;
   }
 
   .panel {

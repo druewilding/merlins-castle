@@ -20,7 +20,7 @@ Status: **complete and deployed: both versions, all 70 pictures and music. Sound
 | Sound            | Illustrated: looping music (Kevin MacLeod, CC BY 4.0) with a Sound on/off link; it fades out when the game ends. Classic stays silent. Sound effects to come. |
 | Credit           | Credit Anita Straker clearly on the title and about screens.                                                                                                  |
 | Hosting          | GitHub Pages → www.druewilding.com/merlins-castle, later merlinscastle.net.                                                                                   |
-| Someday          | Multiplayer. The pure engine keeps this possible, but it is out of scope for now.                                                                             |
+| Multiplayer      | Decided against: it stays a single-player game, as the original was.                                                                                          |
 
 ## Source material
 
