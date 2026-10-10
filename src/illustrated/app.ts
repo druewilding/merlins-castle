@@ -42,7 +42,6 @@ export class IllustratedApp {
   private game: GameState | null = null;
   private events: GameEvent[] = [];
   private slotOrder: ItemId[] = [];
-  private showcased = new Set<ItemId>(); // objects that have had their slow first pick-up this game
   private busy = false;
   private typewriter: Typewriter | null = null;
   private typedFor = "";
@@ -129,7 +128,8 @@ export class IllustratedApp {
     this.events = [];
     this.ending = null;
     this.slotOrder = carried(this.world, state);
-    this.showcased = new Set(this.slotOrder);
+    // Saves from before objects were remembered as found: count what you carry.
+    state.found ??= [...this.slotOrder];
     this.typedFor = "";
     this.overlay.replaceChildren();
     this.setMode("play");
@@ -211,9 +211,10 @@ export class IllustratedApp {
     if (!this.playing() || this.busy) return;
     this.busy = true;
     const fromRect = (from ?? this.things.querySelector(`[data-item="${id}"]`))?.getBoundingClientRect();
+    const foundBefore = this.game!.found ?? [];
     this.command({ type: "take", item: id });
     const took = this.game!.itemLocations[id] === "carried";
-    const firstTime = took && !this.showcased.has(id);
+    const firstTime = took && !foundBefore.includes(id);
     if (!took) this.sounds.play("refuse");
     if (firstTime) this.sounds.play("discover");
     if (took) this.slotOrder.push(id);
@@ -221,7 +222,6 @@ export class IllustratedApp {
     else this.render();
     if (took && fromRect) await this.flyToSlot(id, fromRect, firstTime);
     if (took) this.sounds.play("take");
-    if (took) this.showcased.add(id);
     this.revealSlot(id);
     this.busy = false;
   }
@@ -233,12 +233,12 @@ export class IllustratedApp {
     const rects = new Map(
       here.map((id) => [id, this.things.querySelector(`[data-item="${id}"]`)?.getBoundingClientRect()])
     );
+    const foundBefore = this.game!.found ?? [];
     this.command({ type: "take", item: "all" });
     const taken = here.filter((id) => this.game!.itemLocations[id] === "carried");
     if (!taken.length) this.sounds.play("refuse");
-    if (taken.some((id) => !this.showcased.has(id))) this.sounds.play("discover");
+    if (taken.some((id) => !foundBefore.includes(id))) this.sounds.play("discover");
     this.slotOrder.push(...taken);
-    taken.forEach((id) => this.showcased.add(id));
     this.render(...taken);
     await Promise.all(
       taken.map((id, i) => {

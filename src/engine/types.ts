@@ -78,6 +78,9 @@ export interface GameState {
   // a successful drop). Only the very first look uses firstVisitDescription.
   looks: number;
   status: GameStatus;
+  // Items picked up at least once this game (not in the original; the
+  // illustrated version celebrates each first find). Missing in older saves.
+  found?: ItemId[];
 }
 
 // ---- Commands and results -------------------------------------------------

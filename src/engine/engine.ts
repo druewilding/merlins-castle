@@ -20,7 +20,7 @@ export function newGame(world: World, random: Random = Math.random): GameState {
   for (const [id, item] of Object.entries(world.items)) {
     itemLocations[id] = item.startsIn[Math.floor(random() * item.startsIn.length)];
   }
-  return { room: world.startRoom, itemLocations, using: [], looks: 1, status: "playing" };
+  return { room: world.startRoom, itemLocations, using: [], looks: 1, status: "playing", found: [] };
 }
 
 export function score(world: World, state: GameState): number {
@@ -148,6 +148,7 @@ class Turn {
     if (location === this.state.room) {
       if (this.carriedCount() >= this.world.carryLimit) return this.say("error", "You're carrying too much.");
       this.state.itemLocations[id] = "carried";
+      this.markFound(id);
       return this.say("item", `You have{red}${itemLabel(this.world, id)}.`);
     }
     if (location === "carried") return this.say("error", "You've already got it.");
@@ -159,8 +160,16 @@ class Turn {
     if (this.carriedCount() + here.length > this.world.carryLimit)
       return this.say("error", "You're carrying too much.");
     if (here.length === 0) return this.say("error", "There's nothing here.");
-    for (const id of here) this.state.itemLocations[id] = "carried";
+    for (const id of here) {
+      this.state.itemLocations[id] = "carried";
+      this.markFound(id);
+    }
     this.say("item", "All taken.");
+  }
+
+  private markFound(id: ItemId) {
+    this.state.found ??= [];
+    if (!this.state.found.includes(id)) this.state.found.push(id);
   }
 
   drop(id: ItemId) {

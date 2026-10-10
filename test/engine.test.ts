@@ -182,6 +182,12 @@ context("taking and dropping", () => {
     expect(describe(world, after).carried).toEqual(["cake", "apple", "harp"]);
   });
 
+  it("remembers which objects you've found, even after dropping them", () => {
+    const state = carrying([], "cave-entrance");
+    ["cake", "apple", "harp"].forEach((id) => (state.itemLocations[id] = "cave-entrance"));
+    expect(play(state, ["take cake", "drop cake", "take all"]).state.found).toEqual(["cake", "apple", "harp"]);
+  });
+
   it("says all dropped even when carrying nothing (original quirk)", () => {
     expect(texts(play(carrying([]), ["drop all"]).events)).toEqual(["All dropped."]);
   });
