@@ -79,13 +79,7 @@ button {
 .placeholder {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  padding-bottom: 15%;
   background: radial-gradient(ellipse at 50% 40%, #2c2440, #0b0710 70%);
-  color: var(--ink-soft);
-  font-style: italic;
-  font-size: clamp(16px, 1.6vw, 22px);
 }
 
 .placeholder[hidden] {
