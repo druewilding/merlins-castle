@@ -100,6 +100,7 @@ export class IllustratedApp {
     this.setMode("title");
     this.ending = null;
     this.music.end(1200);
+    this.music.prepare();
     this.things.replaceChildren();
     void this.setScene(artUrl("scenes", "title"), false);
     const saves = listSaves().length > 0;

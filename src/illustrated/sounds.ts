@@ -4,6 +4,7 @@
 // into MP3s in public/fx.
 
 import { soundOn } from "../shared/storage";
+import { audioContext } from "./audio";
 import SOUNDS from "./sounds.json";
 
 export type Sound = keyof typeof SOUNDS;
@@ -14,8 +15,7 @@ export class Sounds {
 
   // Called from a click (Play), when the browser allows audio to start.
   load() {
-    if (!this.context) this.context = new AudioContext();
-    void this.context.resume();
+    this.context = audioContext();
     for (const name of Object.keys(SOUNDS) as Sound[]) {
       if (this.buffers.has(name)) continue;
       const context = this.context;

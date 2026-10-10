@@ -1,21 +1,35 @@
 // Background music for the illustrated version: "The Path of the Goblin King"
 // by Kevin MacLeod (incompetech.com), CC BY 4.0. It loops while you play,
 // fades out when the game ends, and starts again from the top with each game.
+//
+// The volume is set through Web Audio rather than on the <audio> element,
+// because iPhones and iPads ignore an element's volume, so fades wouldn't work.
 
 import { soundOn } from "../shared/storage";
+import { audioContext } from "./audio";
 
 const URL = "music/the-path-of-the-goblin-king.mp3";
 const VOLUME = 0.45;
 
 export class Music {
   private readonly audio = new Audio();
-  private fade = 0;
+  private gain: GainNode | null = null;
+  private stopping = 0;
   private wanted = false; // a game is running that would like music
 
   constructor() {
     this.audio.loop = true;
     this.audio.preload = "none";
-    this.audio.volume = 0;
+  }
+
+  // On the title screen: start downloading, so the music is ready by Play.
+  prepare() {
+    if (!soundOn() || this.audio.src) return;
+    this.audio.preload = "auto";
+    this.audio.src = URL;
+    // iPhones and iPads don't preload media, so fetch it too: this fills the
+    // offline store (or the browser's cache), which the player then reads.
+    fetch(URL).catch(() => {});
   }
 
   // A new game: play from the beginning.
@@ -40,12 +54,22 @@ export class Music {
 
   private play() {
     if (!this.audio.src) this.audio.src = URL;
+    this.connect();
     this.audio.play().then(
       () => this.fadeTo(VOLUME, 2000),
       // Browsers only play sound after a click or key press (for example when
       // a game is carried over from Classic), so try again on the next one.
       () => this.retryOnInput()
     );
+  }
+
+  // Route the music through a gain node, the first time it plays.
+  private connect() {
+    if (this.gain) return;
+    const context = audioContext();
+    this.gain = context.createGain();
+    this.gain.gain.value = 0;
+    context.createMediaElementSource(this.audio).connect(this.gain).connect(context.destination);
   }
 
   private retryOnInput() {
@@ -59,16 +83,16 @@ export class Music {
   }
 
   private fadeTo(target: number, ms: number) {
-    cancelAnimationFrame(this.fade);
-    const from = this.audio.volume;
-    const startedAt = performance.now();
-    const step = (now: number) => {
-      const t = Math.min(1, (now - startedAt) / ms);
-      // Rounding can land a hair outside 0-1, which the browser refuses.
-      this.audio.volume = Math.min(1, Math.max(0, from + (target - from) * t));
-      if (t < 1) this.fade = requestAnimationFrame(step);
-      else if (target === 0) this.audio.pause();
-    };
-    this.fade = requestAnimationFrame(step);
+    clearTimeout(this.stopping);
+    if (!this.gain) {
+      if (target === 0) this.audio.pause();
+      return;
+    }
+    const { gain } = this.gain;
+    const now = this.gain.context.currentTime;
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(gain.value, now);
+    gain.linearRampToValueAtTime(target, now + ms / 1000);
+    if (target === 0) this.stopping = window.setTimeout(() => this.audio.pause(), ms);
   }
 }
