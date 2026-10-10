@@ -2,7 +2,16 @@ import { act, bestPossibleScore, describe, itemsSentence, newGame, score } from 
 import type { Colour } from "../engine/teletext";
 import type { Command, Direction, GameEvent, GameState, ItemId, Tone, World } from "../engine/types";
 import { h } from "../shared/dom";
-import { bestScore, deleteSave, listSaves, recordScore, saveGame, switchLanguage, switchMode } from "../shared/storage";
+import {
+  bestScore,
+  deleteSave,
+  listSaves,
+  nextSaveName,
+  recordScore,
+  saveGame,
+  switchLanguage,
+  switchMode,
+} from "../shared/storage";
 import { LANGUAGE, LOCALE, T } from "../shared/strings";
 import { button, row, teletext } from "./dom";
 import { NOTES } from "./notes";
@@ -50,6 +59,7 @@ export class App {
   private stopTitle: (() => void) | null = null;
   private game: GameState | null = null;
   private deleting: string | null = null; // the save waiting for "delete? yes"
+  private saveName = ""; // the position last saved or loaded in this game
 
   constructor(
     private root: HTMLElement,
@@ -115,9 +125,10 @@ export class App {
     this.go({ name: "play", events: result.events });
   }
 
-  private start(state = newGame(this.world)) {
+  private start(state = newGame(this.world), saveName = "") {
     stopTune();
     this.game = state;
+    this.saveName = saveName;
     this.go({ name: "play", events: [] });
   }
 
@@ -377,11 +388,21 @@ export class App {
       "aria-label": T.fileLabel,
       autofocus: true,
     }) as HTMLInputElement;
+    // After a save (or a load), suggest the next in the series, ready to type over.
+    if (this.saveName) {
+      input.value = nextSaveName(
+        this.saveName,
+        listSaves().map((slot) => slot.name),
+        20
+      );
+      requestAnimationFrame(() => input.select());
+    }
     const save = (event: Event) => {
       event.preventDefault();
       const name = input.value.trim();
       if (!name || !this.game) return;
       const saved = saveGame(name, this.game);
+      if (saved) this.saveName = name;
       const text = saved ? T.savedAsTt(name) : T.cantSave;
       this.go({ name: "play", events: [{ tone: saved ? "pass" : "error", text }] });
     };
@@ -412,7 +433,7 @@ export class App {
       rows.push(
         row(
           "white",
-          button(slot.name, "yellow", () => this.start(slot.state)),
+          button(slot.name, "yellow", () => this.start(slot.state, slot.name)),
           h("span", { class: "cyan" }, `  ${when}  `),
           this.deleting !== slot.name &&
             button(T.deleteTt, "red", () => {

@@ -40,6 +40,17 @@ export function saveGame(name: string, state: GameState): boolean {
   return write(SAVES, [{ name, savedAt: new Date().toISOString(), state }, ...others]);
 }
 
+// A name for the next save after `last`: "Tower" -> "Tower 2" -> "Tower 3",
+// skipping any already taken, and kept within `max` characters.
+export function nextSaveName(last: string, taken: string[], max = 24): string {
+  const match = /^(.*?)\s*(\d+)$/.exec(last.trim());
+  const base = (match ? match[1] : last.trim()) || "";
+  let n = match ? Number(match[2]) + 1 : 2;
+  const named = (k: number) => `${base.slice(0, max - String(k).length - 1).trimEnd()} ${k}`.trim();
+  while (taken.includes(named(n))) n++;
+  return named(n);
+}
+
 export function deleteSave(name: string): void {
   write(
     SAVES,
