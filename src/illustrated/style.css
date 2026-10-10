@@ -76,6 +76,10 @@ button {
   display: none;
 }
 
+.scene-next {
+  opacity: 0;
+}
+
 .placeholder {
   position: absolute;
   inset: 0;

@@ -25,7 +25,8 @@ it. You can carry five things at a time.
 There are two ways to play:
 
 - **Illustrated**: painted scenes, objects you can see and drag, music and
-  sound effects.
+  sound effects. Use the right object and the picture changes: the ladder
+  leans against the wall, the snake leaves the steps, Merlin becomes a frog.
 - **Classic**: the original 1983 teletext screen, with its font, its colours,
   its beep and its victory tune. Switch between them at any time, even
   mid-game.
@@ -97,10 +98,13 @@ Dependencies are updated monthly by `.github/workflows/update-please.yml`.
   shows which reference images to attach. Full-size originals go in
   `art/originals/` (not committed) and are converted into `public/` for the
   game automatically, while `npm run dev` is running or with
-  `npm run art:build`. See `art/prompts/README.md`.
+  `npm run art:build`. See `art/prompts/README.md`. The pictures that
+  change when an object is used (`art/prompts/effects/`) are edits of the
+  room's own picture, so only the change moves when they crossfade in.
 - `scripts/service-worker.js`: what makes it work offline. The build fills
   in the list of files and writes `dist/sw.js`.
-- `PLAN.md`: the decisions behind the remake.
+- `PLAN.md`: the decisions behind the remake, and `PLAN-V2.md` for the
+  pictures that change.
 
 The game's map, text and puzzles are Anita Straker's. The code in this
 repository is ISC licensed.

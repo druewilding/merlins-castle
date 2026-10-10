@@ -64,6 +64,13 @@ export function carried(world: World, state: GameState): ItemId[] {
   return itemsIn(world, state, "carried");
 }
 
+// Objects in use that open a way out of this room, in the order they were
+// used. Not in the original: the illustrated version paints them in.
+export function effects(world: World, state: GameState): ItemId[] {
+  const needed = Object.values(world.rooms[state.room].exits).map((exit) => exit?.obstacle?.needs);
+  return state.using.filter((id) => needed.includes(id));
+}
+
 export function itemLabel(world: World, id: ItemId): string {
   const item = world.items[id];
   return `${item.article} ${item.name}`;
@@ -224,7 +231,8 @@ class Turn {
     const location = this.state.itemLocations[id];
     if (location === undefined) return this.say("error", this.text.notPossible);
     if (location !== "carried") return this.say("error", this.text.haventGot);
-    if (!this.state.using.includes(id)) this.state.using.push(id);
+    // Using an object again makes it the most recent (for effects()).
+    this.state.using = [...this.state.using.filter((other) => other !== id), id];
     let message = this.text.nothingHappens;
     for (const direction of EXIT_ORDER) {
       const obstacle = this.world.rooms[this.state.room].exits[direction]?.obstacle;

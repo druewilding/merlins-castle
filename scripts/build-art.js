@@ -4,7 +4,7 @@
 //
 //   npm run art:build     (npm run art also does this first)
 //
-// Scenes, rooms and moments become 1536px-wide WebP. Objects are cropped to
+// Scenes, rooms, moments and effects become 1536px-wide WebP. Objects are cropped to
 // their outline, padded evenly onto a transparent square, and saved at 384px.
 // Music in art/originals/music becomes a 128 kbps MP3 in public/music, and the
 // sound effects chosen in src/illustrated/sounds.json (from art/originals/fx)
@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
-const KINDS = ["scenes", "rooms", "items", "moments"];
+const KINDS = ["scenes", "rooms", "items", "moments", "effects"];
 const ITEM_SIZE = 384;
 const ITEM_MARGIN = 0.06;
 

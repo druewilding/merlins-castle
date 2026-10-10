@@ -30,6 +30,7 @@ const ROOM_ZONES: Partial<Record<RoomId, Zone>> = {
   "forest-witches": { x0: 52, x1: 90, y0: 52, y1: 66 },
   moat: { x0: 6, x1: 40, y0: 50, y1: 62 },
   "wizards-kitchen": { x0: 36, x1: 82, y0: 64, y1: 74 },
+  "yellow-flowers": { x0: 22, x1: 78, y0: 40, y1: 52 }, // above the gate's spikes
 };
 
 // Parts of a zone to keep clear, like the courtyard's well.

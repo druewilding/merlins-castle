@@ -1,7 +1,18 @@
 // The illustrated version: a painted scene, objects you can see and click,
 // a storybook text panel, 5 slots for what you carry, and a compass.
 
-import { act, bestPossibleScore, byName, carried, describe, itemsIn, messages, newGame, score } from "../engine/engine";
+import {
+  act,
+  bestPossibleScore,
+  byName,
+  carried,
+  describe,
+  effects,
+  itemsIn,
+  messages,
+  newGame,
+  score,
+} from "../engine/engine";
 import type { Command, Direction, GameEvent, GameState, ItemId, World } from "../engine/types";
 import { h } from "../shared/dom";
 import {
@@ -19,7 +30,7 @@ import {
   switchMode,
 } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
-import { artUrl, preload } from "./art";
+import { artUrl, effectUrl, preload } from "./art";
 import { loadMask, thingAt } from "./hit";
 import { itemWidth, placeThings } from "./layout";
 import { deathMoment, lostMoment } from "./moments";
@@ -69,6 +80,9 @@ export class IllustratedApp {
 
   private readonly stage = h("div", { class: "stage" });
   private readonly sceneImg = h("img", { class: "scene-img", alt: "" }) as HTMLImageElement;
+  // The next picture, fading in over the scene when an object changes it.
+  private readonly sceneNext = h("img", { class: "scene-img scene-next", alt: "" }) as HTMLImageElement;
+  private crossfade: Animation | undefined;
   private readonly placeholder = h("div", { class: "placeholder" });
   private readonly things = h("div", { class: "things" });
   private readonly fader = h("div", { class: "fader" });
@@ -94,7 +108,7 @@ export class IllustratedApp {
     private world: World,
     handoff: Handoff | null = null
   ) {
-    this.stage.append(this.sceneImg, this.placeholder, motes(), this.things);
+    this.stage.append(this.sceneImg, this.sceneNext, this.placeholder, motes(), this.things);
     // The ways out on wide screens sit just above the text panel.
     new ResizeObserver(() =>
       document.documentElement.style.setProperty("--panel-h", `${this.panel.offsetHeight}px`)
@@ -325,6 +339,7 @@ export class IllustratedApp {
     this.opened = COMPASS.map((c) => c.direction).filter((d) => exits[d]?.obstacle?.needs === id);
     // The engine says "Nothing happens." when no way here needs this object.
     this.sounds.play(this.events.at(-1)?.text === messages(this.world).nothingHappens ? "nothing" : "effect");
+    void this.crossfadeTo(this.sceneFor(this.game!));
     this.render();
   }
 
@@ -360,6 +375,18 @@ export class IllustratedApp {
     this.handsActions.replaceChildren(...(action ? [action] : []));
     if (ended && !this.overlay.querySelector(".curtain")) this.dropCurtain();
     preload(view.exits.map((d) => artUrl("rooms", this.world.rooms[game.room].exits[d]?.to ?? undefined)));
+    preload(this.effectsToCome(game));
+  }
+
+  // The pictures that objects you have could change this room into: one for
+  // each, and one with all of them.
+  private effectsToCome(game: GameState): (string | null)[] {
+    const room = game.room;
+    const needs = Object.values(this.world.rooms[room].exits).flatMap((exit) =>
+      exit?.obstacle ? [exit.obstacle.needs] : []
+    );
+    const ready = needs.filter((id) => game.itemLocations[id] === "carried" || game.using.includes(id));
+    return [...ready.map((id) => effectUrl(room, [id])), ready.length > 1 ? effectUrl(room, ready) : null];
   }
 
   // When the game ends, a curtain falls over the scene, with the last words
@@ -397,7 +424,21 @@ export class IllustratedApp {
     if (game.room === "grassy-bank" && game.looks > 1) {
       return artUrl("rooms", "grassy-bank-sleeping") ?? artUrl("rooms", "grassy-bank");
     }
-    return artUrl("rooms", game.room);
+    return this.effectArt(game) ?? artUrl("rooms", game.room);
+  }
+
+  // The room changed by the objects in use: the picture with all of them, or
+  // else the most recent one that's painted.
+  private effectArt(game: GameState): string | null {
+    const used = effects(this.world, game);
+    if (!used.length) return null;
+    const all = effectUrl(game.room, used);
+    if (all) return all;
+    for (const id of [...used].reverse()) {
+      const one = effectUrl(game.room, [id]);
+      if (one) return one;
+    }
+    return null;
   }
 
   private renderTopbar(points: number) {
@@ -609,6 +650,7 @@ export class IllustratedApp {
 
   private async setScene(url: string | null, wait: boolean) {
     if (url === this.sceneUrl) return;
+    this.stopCrossfade();
     this.sceneUrl = url;
     this.placeholder.hidden = Boolean(url);
     if (url) {
@@ -617,6 +659,37 @@ export class IllustratedApp {
     } else {
       this.sceneImg.removeAttribute("src");
     }
+  }
+
+  // Using an object changes the picture in place: the new one fades in over
+  // the old, so only what changed seems to appear.
+  private async crossfadeTo(url: string | null) {
+    if (!url || !this.sceneUrl || url === this.sceneUrl || reducedMotion()) return this.setScene(url, false);
+    this.stopCrossfade();
+    this.sceneUrl = url;
+    this.sceneNext.src = url;
+    await this.sceneNext.decode().catch(() => undefined);
+    if (this.sceneUrl !== url) return; // the scene changed again while it loaded
+    const fade = this.sceneNext.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: 600,
+      easing: "ease-in-out",
+      fill: "forwards",
+    });
+    this.crossfade = fade;
+    try {
+      await fade.finished;
+    } catch {
+      return; // stopped
+    }
+    this.sceneImg.src = url;
+    await this.sceneImg.decode().catch(() => undefined);
+    if (this.crossfade === fade) this.stopCrossfade();
+  }
+
+  private stopCrossfade() {
+    this.crossfade?.cancel();
+    this.crossfade = undefined;
+    this.sceneNext.removeAttribute("src");
   }
 
   // Fade through black, change the scene while it's dark, fade back in.

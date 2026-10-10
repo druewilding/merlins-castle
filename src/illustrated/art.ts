@@ -3,13 +3,19 @@
 
 import manifest from "./art-manifest.json";
 
-export type ArtKind = "scenes" | "rooms" | "items" | "moments";
+export type ArtKind = "scenes" | "rooms" | "items" | "moments" | "effects";
 
 const available = manifest as Record<ArtKind, string[]>;
 
 export function artUrl(kind: ArtKind, id: string | undefined): string | null {
   if (!id || !available[kind]?.includes(id)) return null;
   return `${import.meta.env.BASE_URL}art/${kind}/${id}.webp`;
+}
+
+// A room changed by objects in use (see PLAN-V2.md): "old-stone-wall--ladder",
+// or "mossy-steps--apple+ladder" for two.
+export function effectUrl(room: string, items: string[]): string | null {
+  return artUrl("effects", `${room}--${[...items].sort().join("+")}`);
 }
 
 // Start loading images the player is likely to need next.

@@ -5,6 +5,9 @@
 //   npm run art -- <id>      the same for a particular image, e.g. moat
 //   npm run art:status       everything, made (✓) or not (·)
 //
+// Effects (a room changed by an object in use, e.g. old-stone-wall--ladder)
+// are edits of the room's picture rather than new paintings.
+//
 // It also builds web versions of any new originals (see build-art.js).
 
 import { spawnSync } from "node:child_process";
@@ -14,7 +17,7 @@ import { platform } from "node:process";
 
 import { buildArt } from "./build-art.js";
 
-const KINDS = ["scenes", "rooms", "items", "moments"];
+const KINDS = ["scenes", "rooms", "items", "moments", "effects"];
 
 // Rooms in the order a player explores them, from the grassy bank outwards.
 const ROOM_ORDER = [
@@ -60,6 +63,8 @@ const REFERENCE = {
     `The ${images} a **style reference only**: match the painting style, brushwork, level of detail and camera angle, but create a completely new scene with the lighting described below. Don't copy the content, layout or colours.`,
   object: (images) =>
     `The ${images} a **style reference only**: match the painting style, brushwork and level of detail, but create a single new object as described below. Don't copy the content.`,
+  edit: (images) =>
+    `The ${images} the picture to **edit**. Keep everything in it exactly as it is: the composition, camera, light, colours, and every stone, leaf and shadow. Change only what is described below: don't add, remove, move or reshape anything else, even a little. Keep the same size and shape (1536×1024, landscape).`,
 };
 
 const world = JSON.parse(readFileSync("data/world.json", "utf8"));
@@ -128,6 +133,10 @@ function allImages() {
   const itemsPlaced = new Set();
   for (const room of ROOM_ORDER) {
     if (prompts.rooms.includes(room)) ordered.push(["rooms", room]);
+    // Then the room's effects, each single one before the pictures with two.
+    const effects = prompts.effects.filter((id) => id.startsWith(`${room}--`));
+    for (const id of effects.sort((a, b) => a.includes("+") - b.includes("+") || a.localeCompare(b)))
+      ordered.push(["effects", id]);
     // Each object comes just after the room it can first be found in.
     for (const id of prompts.items) {
       if (!itemsPlaced.has(id) && world.items[id]?.startsIn[0] === room) {
@@ -137,7 +146,7 @@ function allImages() {
     }
   }
   const listed = new Set(ordered.map(([kind, id]) => `${kind}/${id}`));
-  for (const kind of ["rooms", "items", "moments"]) {
+  for (const kind of ["rooms", "items", "moments", "effects"]) {
     for (const id of prompts[kind].sort()) if (!listed.has(`${kind}/${id}`)) ordered.push([kind, id]);
   }
   return ordered.map(([kind, id]) => ({ kind, id, made: existsSync(`art/originals/${kind}/${id}.png`) }));
@@ -170,8 +179,25 @@ function paintedNeighbours(id) {
     .slice(0, 2);
 }
 
+// "the ladder", or for an effect, "the mossy-steps picture with the ladder".
+function matchName(file) {
+  const [room, items] = basename(file, ".png").split("--");
+  if (!items) return `the ${room}`;
+  return `the ${room} picture with ${items
+    .split("+")
+    .map((item) => `the ${item}`)
+    .join(" and ")}`;
+}
+
 function show(image, images) {
   const prompt = readPrompt(image.kind, image.id);
+  // An edit needs its pictures to exist first.
+  const missing = prompt.reference === "edit" ? [...prompt.attach, ...prompt.match].filter((f) => !existsSync(f)) : [];
+  if (missing.length) {
+    console.log(`\n✋ ${image.kind}/${image.id} is an edit of pictures that aren't made yet. Make these first:`);
+    for (const file of missing) console.log(`     ${file}`);
+    return;
+  }
   const neighbours = image.kind === "rooms" && prompt.reference === "style" ? paintedNeighbours(image.id) : [];
   // Neighbours and `match` images are attached to be matched, not as style references.
   const style = prompt.attach.filter((file) => existsSync(file) && !neighbours.some((n) => n.file === file));
@@ -192,7 +218,7 @@ function show(image, images) {
   }
   if (matches.length) {
     const names = matches
-      .map((file) => `the ${basename(file, ".png")}`)
+      .map(matchName)
       .join(", ")
       .replace(/, ([^,]*)$/, " and $1");
     parts.push(
