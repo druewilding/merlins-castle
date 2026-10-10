@@ -13,7 +13,7 @@ function artWatcher(): Plugin {
       server.watcher.add("art/originals");
       server.watcher.add("src/illustrated/sounds.json");
       const rebuild = async (file: string) => {
-        if (!/[\\/]art[\\/]originals[\\/].*\.(png|mp3|ogg)$|sounds\.json$/.test(file)) return;
+        if (!/[\\/]art[\\/]originals[\\/].*\.(png|mp3|ogg|wav)$|sounds\.json$/.test(file)) return;
         const built = await buildArt({ quiet: true });
         if (built) {
           server.config.logger.info(`  🖼  ${built} new file(s) added to the game`, { timestamp: true });

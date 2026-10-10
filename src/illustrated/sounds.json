@@ -1,11 +1,11 @@
 {
-  "discover": { "file": "kenney_interface-sounds/Audio/glass_002.ogg", "volume": 0.6 },
+  "discover": { "file": "merlin/discover.wav", "volume": 0.55 },
   "take": { "file": "kenney_rpg-audio/Audio/handleSmallLeather.ogg", "volume": 0.7 },
-  "drop": { "file": "kenney_rpg-audio/Audio/dropLeather.ogg", "volume": 0.7 },
+  "drop": { "file": "kenney_rpg-audio/Audio/dropLeather.ogg", "volume": 0.45 },
   "step": { "file": "kenney_impact-sounds/Audio/footstep_grass_000.ogg", "volume": 0.35 },
-  "blocked": { "file": "kenney_impact-sounds/Audio/impactSoft_medium_001.ogg", "volume": 0.8 },
-  "effect": { "file": "kenney_interface-sounds/Audio/confirmation_002.ogg", "volume": 0.6 },
-  "nothing": { "file": "kenney_interface-sounds/Audio/back_002.ogg", "volume": 0.5 },
+  "blocked": { "file": "merlin/no.wav", "volume": 0.5 },
+  "effect": { "file": "merlin/effect.wav", "volume": 0.55 },
+  "nothing": { "file": "merlin/nothing.wav", "volume": 0.3 },
   "refuse": { "file": "kenney_interface-sounds/Audio/error_004.ogg", "volume": 0.4 },
-  "victory": { "file": "kenney_interface-sounds/Audio/glass_006.ogg", "volume": 0.7 }
+  "victory": { "file": "merlin/victory.wav", "volume": 0.7 }
 }

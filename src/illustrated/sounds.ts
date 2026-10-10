@@ -1,6 +1,7 @@
-// Short sound effects, from the Kenney sound packs (CC0). Which file plays
-// for each moment, and how loud, is set in sounds.json; npm run art:build
-// turns those files into MP3s in public/fx.
+// Short sound effects: our own magical ones (npm run sounds makes them) and
+// some from the Kenney sound packs (CC0). Which file plays for each moment,
+// and how loud, is set in sounds.json; npm run art:build turns those files
+// into MP3s in public/fx.
 
 import { soundOn } from "../shared/storage";
 import SOUNDS from "./sounds.json";

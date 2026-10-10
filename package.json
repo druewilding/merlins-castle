@@ -19,7 +19,8 @@
     "lint:check": "eslint",
     "art:status": "node scripts/art.js --list",
     "art": "node scripts/art.js",
-    "art:build": "node scripts/build-art.js"
+    "art:build": "node scripts/build-art.js",
+    "sounds": "node scripts/make-sounds.js"
   },
   "prettier": "eslint-config-plus-prettier/prettier",
   "devDependencies": {
