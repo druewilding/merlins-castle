@@ -79,6 +79,10 @@ export class IllustratedApp {
     handoff: GameState | null = null
   ) {
     this.stage.append(this.sceneImg, this.placeholder, motes(), this.things);
+    // The ways out on wide screens sit just above the text panel.
+    new ResizeObserver(() =>
+      document.documentElement.style.setProperty("--panel-h", `${this.panel.offsetHeight}px`)
+    ).observe(this.panel);
     this.things.addEventListener("pointermove", (event) => this.hover(event));
     this.things.addEventListener("pointerleave", () => this.hover(null));
     this.things.addEventListener("click", (event) => this.clickThings(event));
