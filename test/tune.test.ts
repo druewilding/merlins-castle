@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { titleSteps } from "../src/classic/title-picture";
 import { chords } from "../src/classic/tune";
 
 describe("the victory tune", () => {
@@ -22,5 +23,11 @@ describe("the victory tune", () => {
     const pitches = tune.flatMap((chord) => chord.pitches);
     expect(pitches).toContain(141); // B flat
     expect(pitches).toContain(153); // C sharp, an octave up
+  });
+});
+
+describe("the title picture", () => {
+  it("is drawn in steps: the wall, ten towers one by one, the gate, then the title", () => {
+    expect(titleSteps(() => 0.3)).toHaveLength(13);
   });
 });
