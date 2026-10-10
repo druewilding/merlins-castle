@@ -160,8 +160,8 @@ gain pictures batch by batch, like v1 did.
 
 1. ~~Engine, tests and the art pipeline (no visible change yet).~~ ✅ `effects()`,
    the `effects` art kind with `reference: edit`, and all 33 prompts.
-2. Picture choice, crossfade and preload, tested with one effect:
-   `old-stone-wall--ladder`, the one that started all this.
+2. ~~Picture choice, crossfade and preload, tested with one effect:
+   `old-stone-wall--ladder`, the one that started all this.~~ ✅
 3. Repaint yellow-flowers.
 4. Paint the rest in exploring order, releasing as we go.
 5. Add a Decisions row to PLAN.md. v1 said "no objects painted into rooms",
