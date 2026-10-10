@@ -21,6 +21,6 @@ The decorated chamber to the south is behind the viewer, so the text describes i
 
 ## Prompt
 
-> A grand hall in the castle: a high vaulted ceiling, tall stone columns, faded tapestries and banners, a long stone floor. There are doors in all directions: a great double door to the north, a sturdy door to the west (to the kitchen) and another to the east (to the dungeon). **Merlin's goblins are very close**: small, mischievous grey-green goblins with big ears and bright eyes peep from behind columns and around the west and east doors, whispering and pointing. More impish than scary.
+> A grand hall in the castle: a high vaulted ceiling, tall stone columns, faded tapestries and banners, a long stone floor. There are doors in all directions: a great double door to the north, standing open onto the sunny courtyard (as in the neighbouring courtyard picture: cobbles, a little stone well with a wooden roof, walls covered in pink roses), a sturdy door to the west (to the kitchen) and another to the east (to the dungeon). **Merlin's goblins are very close**: small, mischievous grey-green goblins with big ears and bright eyes peep out from behind the edges of the west and east doors, showing only their heads, pointed ears and a hand curled around the door's edge, grinning. More impish than scary.
 >
 > Keep the bottom quarter as plain flagstones.

@@ -52,7 +52,8 @@ and the attached anchors are what keep 75 images looking like one world.
 > the picture, south at the bottom/front edge, west on the left and east on
 > the right. Only paint the ways out that are listed: where there is no exit,
 > there is solid wall, rock, water or dense trees, never an opening, path or
-> tunnel. Paths, doors or tunnels that lead away must leave the picture on
+> tunnel. Doors and gates you can go through stand open, unless the
+> description says they are locked or shut. Paths, doors or tunnels that lead away must leave the picture on
 > the matching side. West and east ways run sideways across the middle ground
 > and leave the left or right edge about halfway up the picture, like a road
 > crossing a stage. They do not curve away into the distance, because the

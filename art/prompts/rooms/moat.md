@@ -20,6 +20,7 @@ The moat, toll gate and raised drawbridge are all to the south, behind the viewe
 
 > The north bank of a castle **moat**. In the lower middle, at the water's edge, two castle **guards** in tabards with halberds stand seen from behind, their heads turned as if they've noticed someone. Beside them is a little red-and-white striped **toll** booth with a pointed roof. There is no gate or barrier across the way. Beyond them (out of the bottom of the picture) is the castle; only the moat's still water shows along the bottom edge.
 >
-> - North (top): a stone **archway** with a path leading through it towards a river and fields.
+> - North (top): a stone **archway** with a path leading through it. Through the arch, in the distance, the river runs sideways from left to right (west to east), as in the neighbouring river picture, with fields beyond.
+> - West (left) and East (right): no paths, just grass, bushes and boulders. The only path runs straight from the archway down to the guards.
 >
 > Summer light, water lilies, reeds.

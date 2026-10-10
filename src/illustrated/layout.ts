@@ -22,6 +22,7 @@ const ROOM_ZONES: Partial<Record<RoomId, Zone>> = {
   "grassy-bank": { x0: 10, x1: 88, y0: 53, y1: 74 },
   "dragon-cave": { x0: 8, x1: 40, y0: 50, y1: 66 },
   "merlins-lair": { x0: 26, x1: 74, y0: 60, y1: 72 },
+  courtyard: { x0: 14, x1: 86, y0: 66, y1: 74 },
 };
 
 // Roughly how far apart neighbouring spots are, so objects don't pile up.
