@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/druewilding/merlins-castle/compare/v1.1.1...v1.2.0) (2026-10-10)
+
+
+### Features
+
+* Put the ways out at the edges of the picture on wide screens ([#16](https://github.com/druewilding/merlins-castle/issues/16)) ([1af2aaf](https://github.com/druewilding/merlins-castle/commit/1af2aafee12d875a8ac4dd3751f408bbe829f180))
+
+
+### Bug Fixes
+
+* Fade the music on iPads and start downloading it on the title screen ([#15](https://github.com/druewilding/merlins-castle/issues/15)) ([abed7fe](https://github.com/druewilding/merlins-castle/commit/abed7fe731f4ee2caa586add443f97614ae3f604))
+
 ## [1.1.1](https://github.com/druewilding/merlins-castle/compare/v1.1.0...v1.1.1) (2026-10-10)
 
 
