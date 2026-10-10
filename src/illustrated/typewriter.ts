@@ -4,7 +4,7 @@
 import { h } from "../shared/dom";
 import type { Segment } from "./text";
 
-const LETTERS_PER_SECOND = 70;
+const LETTERS_PER_SECOND = 100;
 
 export class Typewriter {
   private shown = 0;
