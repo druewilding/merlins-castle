@@ -814,13 +814,28 @@ export class IllustratedApp {
               { class: "when" },
               new Date(slot.savedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })
             ),
-            link("Delete", () => {
-              deleteSave(slot.name);
-              fill();
-            })
+            h(
+              "span",
+              { class: "actions" },
+              link("Delete", (event) => confirmDelete(event, slot.name))
+            )
           )
         )
       );
+    // Deleting can't be undone, so it asks first, in place of the Delete link.
+    const confirmDelete = (event: Event, name: string) => {
+      const actions = (event.currentTarget as HTMLElement).parentElement!;
+      const no = link("Keep", () => fill());
+      actions.replaceChildren(
+        h("span", { class: "ask" }, "Delete?"),
+        link("Yes", () => {
+          deleteSave(name);
+          fill();
+        }),
+        no
+      );
+      no.focus();
+    };
     fill();
     // On the score screen, the save list takes the score card's place.
     if (this.mode === "over") this.overlay.hidden = true;
@@ -837,7 +852,13 @@ export class IllustratedApp {
       h(
         "div",
         { class: "buttons" },
-        h("button", { type: "button", class: "pill quiet", onclick: () => this.closeDialog() }, "Close")
+        // Focus starts here, not on the first save, whose focus ring looks
+        // like a box to type in.
+        h(
+          "button",
+          { type: "button", class: "pill quiet", autofocus: true, onclick: () => this.closeDialog() },
+          "Close"
+        )
       )
     );
     dialog.addEventListener("close", () => (this.overlay.hidden = false));

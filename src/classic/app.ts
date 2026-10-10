@@ -43,6 +43,7 @@ export class App {
   private screen: Screen = { name: "title" };
   private stopTitle: (() => void) | null = null;
   private game: GameState | null = null;
+  private deleting: string | null = null; // the save waiting for "delete? yes"
 
   constructor(
     private root: HTMLElement,
@@ -56,6 +57,7 @@ export class App {
 
   private go(screen: Screen) {
     this.screen = screen;
+    this.deleting = null;
     this.render();
   }
 
@@ -391,12 +393,31 @@ export class App {
           "white",
           button(slot.name, "yellow", () => this.start(slot.state)),
           h("span", { class: "cyan" }, `  ${when}  `),
-          button("delete", "red", () => {
-            deleteSave(slot.name);
-            this.render();
-          })
+          this.deleting !== slot.name &&
+            button("delete", "red", () => {
+              this.deleting = slot.name;
+              this.render();
+            })
         )
       );
+      // Deleting can't be undone, so it asks first, on the line below.
+      if (this.deleting === slot.name)
+        rows.push(
+          row(
+            "red",
+            "  Delete it?  ",
+            button("yes", "red", () => {
+              deleteSave(slot.name);
+              this.deleting = null;
+              this.render();
+            }),
+            "  ",
+            button("keep", "green", () => {
+              this.deleting = null;
+              this.render();
+            })
+          )
+        );
     }
     rows.push(this.bar("Back to the menu", () => this.go({ name: "menu" })));
     return rows;
