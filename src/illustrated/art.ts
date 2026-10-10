@@ -1,5 +1,5 @@
 // URLs for the web images that exist (see scripts/build-art.js). Anything not
-// painted yet returns null, and the game shows a gentle placeholder instead.
+// painted yet returns null, and the game shows the night sky and its fireflies.
 
 import manifest from "./art-manifest.json";
 

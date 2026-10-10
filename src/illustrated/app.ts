@@ -53,7 +53,7 @@ export class IllustratedApp {
 
   private readonly stage = h("div", { class: "stage" });
   private readonly sceneImg = h("img", { class: "scene-img", alt: "" }) as HTMLImageElement;
-  private readonly placeholder = h("div", { class: "placeholder" }, "This scene hasn't been painted yet");
+  private readonly placeholder = h("div", { class: "placeholder" });
   private readonly things = h("div", { class: "things" });
   private readonly fader = h("div", { class: "fader" });
   private readonly topbar = h("header", { class: "topbar" });
