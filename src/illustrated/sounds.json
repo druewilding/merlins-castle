@@ -1,10 +1,10 @@
 {
-  "discover": { "file": "merlin/discover.wav", "volume": 0.3 },
+  "discover": { "file": "merlin/discover.wav", "volume": 0.16 },
   "take": { "file": "kenney_rpg-audio/Audio/handleSmallLeather.ogg", "volume": 0.7 },
   "drop": { "file": "kenney_rpg-audio/Audio/dropLeather.ogg", "volume": 0.45 },
   "step": { "file": "kenney_impact-sounds/Audio/footstep_grass_000.ogg", "volume": 0.35 },
   "blocked": { "file": "merlin/no.wav", "volume": 0.5 },
-  "effect": { "file": "merlin/effect.wav", "volume": 0.55 },
+  "effect": { "file": "merlin/effect.wav", "volume": 0.17 },
   "nothing": { "file": "merlin/nothing.wav", "volume": 0.3 },
   "refuse": { "file": "kenney_interface-sounds/Audio/error_004.ogg", "volume": 0.4 },
   "victory": { "file": "merlin/victory.wav", "volume": 0.7 }
