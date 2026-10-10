@@ -78,10 +78,13 @@
     "victory"
   ],
   "effects": [
+    "deep-river--plank",
+    "mountain-path--axe",
     "old-stone-wall--ladder",
     "old-wall--ladder+lamp",
     "old-wall--ladder",
     "old-wall--lamp",
+    "river-south-bank--plank",
     "rusty-gate--key",
     "yellow-flowers--key"
   ]
