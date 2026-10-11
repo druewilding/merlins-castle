@@ -831,6 +831,13 @@ def in_a_hall(x, y, floor, margin=0.0):
 
 
 def quad(builder, pts, colour, vary=0.12):
+    # Anything lying flat faces up: facing down, the sun's shadows fall on it
+    # in stripes ("shadow acne").
+    (ax, ay, az), (bx, by, bz), (cx_, cy_, cz) = pts[0], pts[1], pts[2]
+    ux, uy, uz, vx, vy, vz = bx - ax, by - ay, bz - az, cx_ - ax, cy_ - ay, cz - az
+    nz = ux * vy - uy * vx
+    if nz < 0 and abs(nz) > 0.5 * math.sqrt((uy * vz - uz * vy) ** 2 + (uz * vx - ux * vz) ** 2 + nz * nz):
+        pts = pts[::-1]
     builder.add(pts, [(0, 1, 2, 3)], [c.vary(colour, vary, Vector(pts[0])) for _ in pts])
 
 
@@ -948,6 +955,12 @@ for way in WAYS.values():
                 pa = [side(a, inner), side(a, outer)]
                 pb = [side(b, outer), side(b, inner)]
                 quad(tunnel, [(*p, height(*p) + 0.32) for p in pa + pb], STONE)
+                # Solid down into the ground at its outer edge and its ends,
+                # so there's nothing to see under it.
+                (ia, oa), (ob, ib) = pa, pb
+                for p0, p1 in ((oa, ob), (ia, oa), (ib, ob)):
+                    quad(tunnel, [(*p0, height(*p0) + 0.32), (*p1, height(*p1) + 0.32), (*p1, height(*p1) - 0.6),
+                                  (*p0, height(*p0) - 0.6)], STONE)
         if a[5] != b[5]:
             # The lintel: the face of earth and stone over the opening.
             row = b if b[5] else a
@@ -987,8 +1000,13 @@ for way in WAYS.values():
             for j in range(len(across) - 1):
                 pts = [grid[i][j], grid[i][j + 1], grid[i + 1][j + 1], grid[i + 1][j]]
                 quad(tunnel, [(x, y, height(x, y) + 0.06) for x, y in pts], STONE, 0.1)
-        # Its edge over the ramp, down to the ramp's floor: seen from below,
-        # there's nothing to look under.
+        # Its sides, down into the ground; and its edge over the ramp, down to
+        # the ramp's floor: seen from below, there's nothing to look under.
+        for i in range(len(steps) - 1):
+            for j in (0, len(across) - 1):
+                (x0, y0), (x1, y1) = grid[i][j], grid[i + 1][j]
+                quad(tunnel, [(x0, y0, height(x0, y0) + 0.06), (x1, y1, height(x1, y1) + 0.06), (x1, y1, height(x1, y1) - 0.6),
+                              (x0, y0, height(x0, y0) - 0.6)], STONE, 0.1)
         for j in range(len(across) - 1):
             (x0, y0), (x1, y1) = grid[0][j], grid[0][j + 1]
             quad(tunnel, [(x0, y0, height(x0, y0) + 0.06), (x1, y1, height(x1, y1) + 0.06), (x1, y1, ef - 0.3),
