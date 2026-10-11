@@ -609,12 +609,18 @@ trees.build("trees", smooth=False)
 
 # Water: the river, and the moat round the castle.
 water = c.Builder()
-for (ax, ay), (bx, by) in zip(RIVER, RIVER[1:]):
-    dx, dy = bx - ax, by - ay
-    dd = math.hypot(dx, dy) or 1
-    ox, oy = -dy / dd * 7, dx / dd * 7
-    water.add([(ax - ox, ay - oy, -1), (ax + ox, ay + oy, -1), (bx + ox, by + oy, -1), (bx - ox, by - oy, -1)],
-              [(0, 1, 2, 3)], [WATER] * 4)
+# The river: one ribbon, its sides joined round the bends (separate pieces
+# leave wedges of riverbed showing between them).
+verts, faces = [], []
+for k, (x, y) in enumerate(RIVER):
+    (ax, ay), (bx, by) = RIVER[max(k - 1, 0)], RIVER[min(k + 1, len(RIVER) - 1)]
+    dd = math.hypot(bx - ax, by - ay) or 1
+    ox, oy = -(by - ay) / dd * 7, (bx - ax) / dd * 7
+    verts += [(x + ox, y + oy, -1), (x - ox, y - oy, -1)]
+    if k:
+        a = (k - 1) * 2
+        faces.append((a, a + 2, a + 3, a + 1))
+water.add(verts, faces, [WATER] * len(verts))
 # The moat: a ring round the castle (not a sheet under it, where the dungeon is).
 mw, me, ms, mn = MOAT
 iw, ie, is_, in_ = CASTLE[0] - 2, CASTLE[1] + 2, CASTLE[2] - 2, CASTLE[3] + 2
