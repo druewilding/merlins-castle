@@ -1460,12 +1460,12 @@ obstacle(["grand-hall west"], "box", gh.x - gh.w - 0.5, -gh.y, 0.5, TUNNEL_HALF 
 obstacle(["wizards-kitchen east"], "box", wk.x + wk.w + 0.5, -gh.y, 0.5, TUNNEL_HALF + 0.3, under=True)  # Merlin
 obstacle(["grand-hall east"], "box", gh.x + gh.w + 1.5, -gh.y, 1.0, TUNNEL_HALF + 0.3, under=True)  # the goblins
 obstacle(["dungeon south"], "box", du.x, -(du.y - du.d - 1.5), TUNNEL_HALF + 0.3, 1.0, under=True)  # the old woman
-obstacle(["merlins-lair north"], "box", gh.x, -(ml.y + ml.d + 0.5), TUNNEL_HALF + 0.3, 0.5, under=True)  # Merlin
 # The hidden door into the hall, which looks like wall from the hall's side
-# and won't open from there ("You cannot pass.").
+# and won't open from there ("You cannot pass."); from the lair, Merlin
+# turns you into a frog.
 hy_ = gh.y - gh.d - 0.6
 block(rooms, gh.x - TUNNEL_HALF, hy_ - 0.15, gh.floor, gh.x + TUNNEL_HALF, hy_ + 0.15, gh.floor + TUNNEL_TALL, gh.wall, solid=False)
-obstacle(["grand-hall south"], "box", gh.x, -hy_, TUNNEL_HALF + 0.3, 0.5, under=True)
+obstacle(["grand-hall south", "merlins-lair north"], "box", gh.x, -hy_, TUNNEL_HALF + 0.3, 0.5, under=True)
 # The lair's door, which slams and locks behind you.
 lx_, ly_ = ml.x + ml.w + 0.6, SR[1]
 block(rooms, lx_ - 0.15, ly_ - TUNNEL_HALF, ml.floor, lx_ + 0.15, ly_ + TUNNEL_HALF, ml.floor + TUNNEL_TALL, OAK, solid=False)

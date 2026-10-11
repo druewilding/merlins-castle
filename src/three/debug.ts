@@ -3,7 +3,8 @@
 // map. Opened with the 0 key (on the number row or the number pad, so it
 // works whatever the keyboard's language). P copies what you're looking at
 // to the clipboard, for pasting into a chat. R shows the obstacles, and how
-// far they reach: red where trying them kills you.
+// far each reaches out on the side it stops you from: red where trying it
+// kills you.
 //
 // Only on the dev server: main.ts loads this behind import.meta.env.DEV, so
 // the built game doesn't contain it at all.
@@ -174,47 +175,53 @@ export function debug(world: DebugWorld, onOpen: () => void) {
   }
 
   // Each obstacle in the world: the thing itself, a glassy box (or drum) as
-  // tall as you; how far it reaches out (front and back, along its thinner
-  // side), a fainter one with its edges drawn; and which exits it blocks.
+  // tall as you, red if trying it kills you whichever way you come; and for
+  // each exit it blocks, how far it reaches out on the side it stops you
+  // from (one way, as in the original), in that exit's own colour, named.
   function obstacleMarks() {
     const group = new Group();
     const TALL = 3;
+    const colourOf = (fatal: boolean) => new Color(fatal ? FATAL : BLOCKS);
+    const glass = (fatal: boolean, opacity: number) =>
+      new MeshBasicMaterial({ color: colourOf(fatal), transparent: true, opacity, depthWrite: false });
+    const add = (thing: Mesh | LineSegments | Sprite, x: number, y: number, z: number) => {
+      thing.position.set(x, y, z);
+      group.add(thing);
+    };
     for (const { box, circle, under, names } of world.obstacles) {
       const [x, z] = box ?? circle!;
-      const colour = new Color(names.some(world.fatal) ? FATAL : BLOCKS);
       const y = under ? floorAt(x, z) : standingAt(x, z);
-      let core;
-      let zone;
-      if (box) {
-        const [, , hx, hz] = box;
-        core = new BoxGeometry(hx * 2, TALL, hz * 2);
-        zone =
-          hx < hz
-            ? new BoxGeometry((hx + world.ahead) * 2, TALL, hz * 2)
-            : new BoxGeometry(hx * 2, TALL, (hz + world.ahead) * 2);
-      } else {
-        const r = circle![2];
-        core = new CylinderGeometry(r, r, TALL, 32);
-        zone = new CylinderGeometry(r + world.ahead, r + world.ahead, TALL, 32);
+      const core = box
+        ? new BoxGeometry(box[2] * 2, TALL, box[3] * 2)
+        : new CylinderGeometry(circle![2], circle![2], TALL, 32);
+      add(new Mesh(core, glass(names.every(world.fatal), 0.55)), x, y + TALL / 2, z);
+      for (const exit of names) {
+        const [id, direction] = exit.split(" ");
+        const fatal = world.fatal(exit);
+        // Where you'd be coming from, through this exit: south of it to go north.
+        const from = { north: [0, 1], south: [0, -1], east: [-1, 0], west: [1, 0] }[direction] ?? [0, 0];
+        let zone;
+        let middle;
+        if (box) {
+          const [, , hx, hz] = box;
+          // The reach is along the thinner side; the other way, just the obstacle's own half.
+          const deep = from[0] !== 0 ? hx + (hx < hz ? world.ahead : 0) : hz + (hx < hz ? 0 : world.ahead);
+          zone = from[0] !== 0 ? new BoxGeometry(deep, TALL, hz * 2) : new BoxGeometry(hx * 2, TALL, deep);
+          middle = [x + (from[0] * deep) / 2, z + (from[1] * deep) / 2];
+        } else {
+          const r = circle![2] + world.ahead;
+          zone = new CylinderGeometry(r, r, TALL, 32);
+          middle = [x, z];
+        }
+        add(new Mesh(zone, glass(fatal, 0.1)), middle[0], y + TALL / 2, middle[1]);
+        add(
+          new LineSegments(new EdgesGeometry(zone), new LineBasicMaterial({ color: colourOf(fatal) })),
+          middle[0],
+          y + TALL / 2,
+          middle[1]
+        );
+        add(tag([`${world.name(id)} ${direction}${fatal ? " ☠" : ""}`]), middle[0], y + TALL + 0.9, middle[1]);
       }
-      const glass = (opacity: number) =>
-        new MeshBasicMaterial({ color: colour, transparent: true, opacity, depthWrite: false });
-      for (const thing of [
-        new Mesh(core, glass(0.55)),
-        new Mesh(zone, glass(0.1)),
-        new LineSegments(new EdgesGeometry(zone), new LineBasicMaterial({ color: colour })),
-      ]) {
-        thing.position.set(x, y + TALL / 2, z);
-        group.add(thing);
-      }
-      const label = tag(
-        names.map((exit) => {
-          const [id, direction] = exit.split(" ");
-          return `${world.name(id)} ${direction}${world.fatal(exit) ? " ☠" : ""}`;
-        })
-      );
-      label.position.set(x, y + TALL + 0.9, z);
-      group.add(label);
     }
     return group;
   }
