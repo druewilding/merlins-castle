@@ -137,6 +137,20 @@ export function debug(world: DebugWorld, onOpen: () => void) {
       }
       pen.stroke();
     }
+    // Ways underground, dotted.
+    pen.strokeStyle = "#d9a066";
+    pen.lineWidth = 2;
+    pen.setLineDash([3, 3]);
+    for (const way of player.ways) {
+      pen.beginPath();
+      way.points.forEach(([x, z], k) => {
+        const [mx, my] = toMap(x, z);
+        if (k) pen.lineTo(mx, my);
+        else pen.moveTo(mx, my);
+      });
+      pen.stroke();
+    }
+    pen.setLineDash([]);
     pen.textAlign = "center";
     const dot = (x: number, z: number, colour: string, r: number) => {
       const [mx, my] = toMap(x, z);
@@ -240,7 +254,7 @@ export function debug(world: DebugWorld, onOpen: () => void) {
       frames = 0;
       since = now;
       const p = player.position;
-      where.textContent = `${world.name(world.room())} · x ${p.x.toFixed(0)} · z ${p.z.toFixed(0)} · height ${p.y.toFixed(1)} · ${fps} fps`;
+      where.textContent = `${world.name(world.room())}${player.inside ? " (underground)" : ""} · x ${p.x.toFixed(0)} · z ${p.z.toFixed(0)} · height ${p.y.toFixed(1)} · ${fps} fps`;
       drawMap();
     }
     requestAnimationFrame(tick);

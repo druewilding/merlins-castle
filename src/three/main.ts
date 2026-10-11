@@ -18,6 +18,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   PCFShadowMap,
+  PointLight,
   Scene,
   Sprite,
   SpriteMaterial,
@@ -52,9 +53,17 @@ renderer.shadowMap.type = PCFShadowMap;
 root.append(renderer.domElement);
 
 const scene = new Scene();
-scene.fog = new Fog(HAZE, 40, 320);
+const fog = new Fog(HAZE, 40, 320);
+scene.fog = fog;
 scene.add(sky(SUN, HAZE));
-scene.add(new HemisphereLight("#cfe2ff", "#6d7a3c", 1.25));
+const skylight = new HemisphereLight("#cfe2ff", "#6d7a3c", 1.25);
+scene.add(skylight);
+
+// Underground, the daylight fades and a warm lamp glow takes over (one day,
+// only if you've lit the lamp).
+const lamp = new PointLight("#ffb866", 0, 16, 1.6);
+scene.add(lamp);
+const DARK = new Color("#0b0806");
 
 const sunlight = new DirectionalLight("#ffdcae", 2.8);
 sunlight.castShadow = true;
@@ -80,7 +89,7 @@ const [model, file] = await Promise.all([
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
-  node.castShadow = !["ground", "paths", "water"].includes(node.name);
+  node.castShadow = !["paths", "water"].includes(node.name);
   node.receiveShadow = node.name !== "water";
 });
 scene.add(model.scene);
@@ -107,6 +116,7 @@ const walkable: Walkable = (x, z) => {
   return i >= 0 && j >= 0 && i < mask.nx && j < mask.ny && standable[j * mask.nx + i] === 1;
 };
 player.standOn(ground, walkable);
+player.ways = Object.values(land.ways);
 
 // Solid things, and the obstacles (all closed, until the game can open them).
 const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
@@ -162,8 +172,9 @@ for (const [id, { x, z }] of PLACES) {
   labels.add(label);
 }
 scene.add(labels);
+let showLabels = true;
 addEventListener("keydown", (event) => {
-  if (event.code === "KeyL") labels.visible = !labels.visible;
+  if (event.code === "KeyL") showLabels = !showLabels;
 });
 
 const start = PLACES.get("grassy-bank")!;
@@ -220,12 +231,28 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
+// From daylight (0) to lamplight (1) over the first few metres down.
+function lightFor(depth: number, time: number) {
+  const under = Math.min(1, Math.max(0, (depth - 0.5) / 3));
+  sunlight.intensity = 2.8 * (1 - under);
+  skylight.intensity = 1.25 * (1 - under * 0.92);
+  const flicker = reducedMotion ? 1 : 0.92 + 0.05 * Math.sin(time / 90) + 0.03 * Math.sin(time / 37);
+  lamp.intensity = 14 * under * flicker;
+  lamp.position.set(player.position.x + 0.3, player.position.y + 1.4, player.position.z);
+  fog.color.copy(HAZE).lerp(DARK, under);
+  fog.near = 40 - 38 * under;
+  fog.far = 320 - 290 * under;
+}
+
 const timer = new Timer();
 renderer.setAnimationLoop((time) => {
   timer.update(time);
   const dt = Math.min(timer.getDelta(), 0.1);
   player.update(dt, reducedMotion);
-  room = placeAt(player.position.x, player.position.z, room);
+  // Under the land, you're still where you set off from (PLAN-V3.md).
+  if (!player.inside) room = placeAt(player.position.x, player.position.z, room);
+  lightFor(player.depth, time);
+  labels.visible = showLabels && !player.inside; // they'd show through the tunnel's walls
   here.textContent = name(room);
   // The sun's shadows follow you, so they're sharp wherever you are.
   sunlight.target.position.copy(player.position);

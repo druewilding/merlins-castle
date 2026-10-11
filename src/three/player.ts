@@ -23,6 +23,32 @@ export type Ground = (x: number, z: number) => number | undefined;
 /** Whether you can stand at a spot: not in the forest, the river or the moat. */
 export type Walkable = (x: number, z: number) => boolean;
 
+/** A way underground (a tunnel): points [x, z, floor height], and half its width. */
+export interface Way {
+  half: number;
+  points: number[][];
+}
+
+/** How far a spot is from the middle of a way, its floor there, and whether it's past an end. */
+function nearest(way: Way, x: number, z: number) {
+  let best = { d: Infinity, floor: 0, beyond: false };
+  const last = way.points.length - 2;
+  for (let k = 0; k <= last; k++) {
+    const [ax, az, af] = way.points[k];
+    const [bx, bz, bf] = way.points[k + 1];
+    const dx = bx - ax;
+    const dz = bz - az;
+    const t = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz);
+    const tc = Math.max(0, Math.min(1, t));
+    const d = Math.hypot(x - ax - tc * dx, z - az - tc * dz);
+    if (d < best.d) best = { d, floor: af + (bf - af) * tc, beyond: (k === 0 && t < 0) || (k === last && t > 1) };
+  }
+  return best;
+}
+
+/** How near the ground a tunnel's floor must be, at its mouth, to step in or out. */
+const LIP = 0.6;
+
 const CELL = 16; // metres, for finding the solid things near you
 
 interface Near {
@@ -32,7 +58,7 @@ interface Near {
 
 const EYE = 1.65; // metres above the ground
 const WALK = 4.2; // metres a second
-const RUN = 8;
+const RUN = WALK * 3; // the land is big, and the tunnel long
 const BODY = 0.35; // your own radius, for bumping into things
 const LOOK = 0.0022; // radians per pixel of mouse movement
 const TOUCH_LOOK = 0.005;
@@ -48,6 +74,10 @@ export class Player {
   fly = false;
   ghost = false;
   boost = 1;
+
+  ways: Way[] = [];
+  /** The way you're in, if you're underground. */
+  inside: Way | undefined;
 
   private keys = new Set<string>();
   private ground: Ground = () => 0;
@@ -96,6 +126,7 @@ export class Player {
   }
 
   place(x: number, z: number, yaw = 0) {
+    this.inside = undefined;
     this.position.set(x, this.groundAt(x, z) ?? 0, z);
     this.yaw = yaw;
     this.pitch = 0;
@@ -147,23 +178,50 @@ export class Player {
     this.keepInside();
   }
 
-  // Moves you, unless it would take you into the forest or the water: then
-  // you slide along the edge, as far as you can.
+  // Moves you, unless it would take you into the forest or the water (or a
+  // tunnel's wall): then you slide along the edge, as far as you can.
   private step(dx: number, dz: number) {
     const p = this.position;
     if (this.ghost) {
       p.set(p.x + dx, p.y, p.z + dz);
       return;
     }
-    const fits = (x: number, z: number) =>
+    for (const [x, z] of [
+      [p.x + dx, p.z + dz],
+      [p.x + dx, p.z],
+      [p.x, p.z + dz],
+    ]) {
+      const where = this.fits(x, z);
+      if (where === false) continue;
+      p.x = x;
+      p.z = z;
+      this.inside = where;
+      return;
+    }
+  }
+
+  // Whether you can stand somewhere, and if so whether that's on the land
+  // (undefined) or in a way underground.
+  private fits(x: number, z: number): Way | undefined | false {
+    const onLand = () =>
       this.walkable(x, z) &&
       this.walkable(x + BODY, z) &&
       this.walkable(x - BODY, z) &&
       this.walkable(x, z + BODY) &&
       this.walkable(x, z - BODY);
-    if (fits(p.x + dx, p.z + dz)) p.set(p.x + dx, p.y, p.z + dz);
-    else if (fits(p.x + dx, p.z)) p.x += dx;
-    else if (fits(p.x, p.z + dz)) p.z += dz;
+    const nearGround = (floor: number) => Math.abs(floor - (this.ground(x, z) ?? floor)) < LIP;
+    if (this.inside) {
+      const n = nearest(this.inside, x, z);
+      if (!n.beyond && n.d <= this.inside.half - BODY) return this.inside;
+      // Out of the way's end, at a mouth, onto the land.
+      return n.beyond && nearGround(n.floor) && onLand() ? undefined : false;
+    }
+    // Into a way, at the top of its ramp.
+    for (const way of this.ways) {
+      const n = nearest(way, x, z);
+      if (!n.beyond && n.d <= way.half - BODY && nearGround(n.floor)) return way;
+    }
+    return onLand() ? undefined : false;
   }
 
   private axis(...codes: string[]) {
@@ -171,13 +229,18 @@ export class Player {
   }
 
   private groundAt(x: number, z: number): number | undefined {
-    return this.ground(x, z);
+    return this.inside ? nearest(this.inside, x, z).floor : this.ground(x, z);
+  }
+
+  /** How far below the land you are: 0 on it, more the deeper you go. */
+  get depth() {
+    return Math.max(0, (this.ground(this.position.x, this.position.z) ?? 0) - this.position.y);
   }
 
   // Pushes you out of anything solid you've walked into.
   private collide() {
     const p = this.position;
-    if (this.ghost) return this.keepInside();
+    if (this.ghost || this.inside) return this.keepInside();
     const near = this.near.get(`${Math.floor(p.x / CELL)},${Math.floor(p.z / CELL)}`) ?? { circles: [], boxes: [] };
     for (const c of near.circles) {
       const dx = p.x - c.x;

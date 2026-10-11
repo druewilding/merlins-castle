@@ -369,9 +369,10 @@ and wings) may need a bought or free model.
    - ~~**Above ground**~~ ✅ `npm run models` runs `art/blender/land.py` in
      Blender with no window (add `-- land --preview` for a picture in
      `art/blender/previews/`). Open `http://localhost:5173/3d.html`.
-   - **Underground and indoors**: the lamp tunnel, the caves in the
-     mountain, the dragon's tunnel to the giant, the dark tunnels, and the
-     tower, the hut and the castle rooms.
+   - **Underground and indoors**: ~~the lamp tunnel~~ ✅ (walkable from the
+     old wall to the cave entrance, no lamp needed yet), then the caves in
+     the mountain, the dragon's tunnel to the giant, the dark tunnels, and
+     the tower, the hut and the castle rooms.
    - **The game**: objects to take and use, the obstacles opening, deaths,
      the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and
@@ -422,13 +423,25 @@ and wings) may need a bought or free model.
   in the game: the moat and walls keep you out (the only way in is still the
   drawbridge and the penny), it leads nowhere else, and the castle rooms are
   all more than 30 m from it, so you never count as being in one.
+- **Ways underground** are lines with a floor height at each point
+  (`ways` in `land.json`). The ground has a hole only over their ramps, lined
+  with stone walls, with a lintel where the roof begins. You step into a way
+  at the top of its ramp; from then on its floor holds you up and its walls
+  hold you in until you walk out of an end. While you're in one, you're
+  still in the place you set off from.
+- **Underground light**: as you go down, the sun and sky fade and a warm
+  lamp glow round you takes over (one day only with the lamp lit). The land
+  casts shadows, so the sun can't shine into a tunnel from above.
 - **A debug panel** on the dev server only (the 0 key): fly (F), walk
   through anything (N), open every obstacle (O), go up to 10× faster (, and
   .), and a map to jump anywhere. The letter keys work with the panel closed
   too. `src/three/debug.ts` and `debug.css` are loaded behind
   `import.meta.env.DEV`, so the built game contains none of it.
 - **Names over the places** (press L) while the world is grey, and the place
-  you're in at the top left.
+  you're in at the top left. The floating names may move into the debug panel
+  later. For now they're made from the code's names (so "Merlins lair",
+  without its apostrophe); they should become the original's own names, in
+  English and Danish, when the game is wired in.
 
 ## Still to decide
 

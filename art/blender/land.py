@@ -147,6 +147,12 @@ for key, spot in {**LOST, **DEATHS}.items():
     if KIND.get(place) != "cave" and key != "mossy-steps east":
         paths.append([P[place], spot])
 
+# Up to the lamp tunnel's mouths: in the rocky bank west of the old wall, and
+# down the steps south of the cave entrance.
+WEST_LIP = (P["old-wall"][0] - 13, P["old-wall"][1])
+EAST_LIP = (P["cave-entrance"][0], P["cave-entrance"][1] - 11)
+paths += [[P["old-wall"], WEST_LIP], [P["cave-entrance"], EAST_LIP]]
+
 path_lines = Lines()
 for line in paths:
     path_lines.add(line)
@@ -200,6 +206,70 @@ def deck(x, y):
     return None
 
 
+# ---------------------------------------------------------------- the lamp tunnel
+
+TUNNEL_HALF = 1.7  # half its width
+TUNNEL_TALL = 3.2  # floor to roof
+DEEP = -5.0  # its floor, under the meadows
+
+
+class Way:
+    """A way underground: a line of points, each with its floor's height."""
+
+    def __init__(self, points):
+        self.points = points
+        self.segments = list(zip(points, points[1:]))
+
+    def nearest(self, x, y):
+        """How far from the middle of the way, the floor's height there, and
+        whether the spot is past either end."""
+        best = None
+        last = len(self.segments) - 1
+        for k, ((ax, ay, af), (bx, by, bf)) in enumerate(self.segments):
+            dx, dy = bx - ax, by - ay
+            t = ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)
+            tc = max(0.0, min(1.0, t))
+            d = math.hypot(x - ax - tc * dx, y - ay - tc * dy)
+            if best is None or d < best[0]:
+                best = (d, af + (bf - af) * tc, (k == 0 and t < 0) or (k == last and t > 1))
+        return best
+
+    def samples(self, step=0.5):
+        """Points along the way, every half metre."""
+        out = []
+        for (ax, ay, af), (bx, by, bf) in self.segments:
+            n = max(1, int(math.hypot(bx - ax, by - ay) / step))
+            out += [(ax + (bx - ax) * k / n, ay + (by - ay) * k / n, af + (bf - af) * k / n) for k in range(n)]
+        out.append(self.points[-1])
+        return out
+
+
+# From the rocky bank west of the old wall, down and round under the old stone
+# wall, the meadow and the grassy bank, and up the steps into the cave entrance.
+LAMP_TUNNEL = Way([
+    (*WEST_LIP, height(*WEST_LIP)),
+    (WEST_LIP[0] - 12, WEST_LIP[1], DEEP),
+    (WEST_LIP[0] - 15, WEST_LIP[1] - 3, DEEP),
+    (WEST_LIP[0] - 15, WEST_LIP[1] - 7, DEEP),
+    (WEST_LIP[0] - 12, WEST_LIP[1] - 10, DEEP),
+    (-40, -10, DEEP),
+    (-30, -23, DEEP),
+    (EAST_LIP[0], -23, DEEP),
+    (*EAST_LIP, height(*EAST_LIP)),
+])
+WAYS = {"lamp-tunnel": LAMP_TUNNEL}
+
+
+def open_to_the_sky(x, y, margin):
+    """Over a ramp down into a tunnel, where there's no earth over it: the
+    ground has a hole here. Gives the floor's height there, or None."""
+    for way in WAYS.values():
+        d, floor, beyond = way.nearest(x, y)
+        if not beyond and d < TUNNEL_HALF + margin and floor + TUNNEL_TALL > height(x, y) - 0.4:
+            return floor
+    return None
+
+
 # ---------------------------------------------------------------- where the forest isn't
 
 CLEARING = {"grassy-bank": 17, "deep-river": 15, "river-south-bank": 15}
@@ -232,6 +302,9 @@ def walkable(x, y):
         return True
     if river.distance(x, y) < 6.5 or in_moat(x, y):
         return False
+    floor = open_to_the_sky(x, y, 2.0)
+    if floor is not None and floor < height(x, y) - 0.35:
+        return False  # over the ramp: you go in at the top
     return open_ground(x, y)
 
 
@@ -259,6 +332,8 @@ for j in range(ny):
         colours.append(c.vary(col, 0.12, Vector((x / 6, y / 6, 5.0))))
 for j in range(ny - 1):
     for i in range(nx - 1):
+        if open_to_the_sky(X0 + (i + 0.5) * STEP, Y0 + (j + 0.5) * STEP, 1.0) is not None:
+            continue  # the hole over a ramp
         a = j * nx + i
         faces.append((a, a + 1, a + nx + 1, a + nx))
 c.mesh_object("ground", verts, faces, colours)
@@ -335,7 +410,7 @@ trees = c.Builder()
 for gx in range(X0 + 3, X1 - 2, 5):
     for gy in range(Y0 + 3, Y1 - 2, 5):
         x, y = gx + random.uniform(-2, 2), gy + random.uniform(-2, 2)
-        if open_ground(x, y):
+        if open_ground(x, y) or open_to_the_sky(x, y, 4.5) is not None:
             continue
         z = height(x, y)
         tall = random.uniform(9, 14)
@@ -453,6 +528,62 @@ tower(built, cx + 4, cy - 2, 1.2, 1.0, STONE)  # the well
 
 built.build("built", smooth=False)
 
+# The lamp tunnel: floor, walls and roof, stone walls up the ramps, a lip of
+# stone round the hole, and a lintel where the roof begins.
+tunnel = c.Builder()
+EARTH = c.linear("#5a4632")
+TUNNEL_STONE = c.linear("#7d7568")
+for way in WAYS.values():
+    points = way.samples()
+    rows = []
+    for k, (x, y, floor) in enumerate(points):
+        ax, ay, _ = points[max(k - 1, 0)]
+        bx, by, _ = points[min(k + 1, len(points) - 1)]
+        d = math.hypot(bx - ax, by - ay) or 1
+        nx_, ny_ = -(by - ay) / d, (bx - ax) / d
+        ground = height(x, y)
+        covered = floor + TUNNEL_TALL <= ground - 0.4
+        rows.append((x, y, floor, nx_, ny_, covered))
+
+    def side(row, offset):
+        x, y, _, nx_, ny_, _ = row
+        return x + nx_ * offset, y + ny_ * offset
+
+    for (a, b) in zip(rows, rows[1:]):
+        quad = lambda pts, colour: tunnel.add(pts, [(0, 1, 2, 3)], [c.vary(colour, 0.12, Vector(pts[0])) for _ in pts])  # noqa: E731
+        (alx, aly), (arx, ary) = side(a, -TUNNEL_HALF), side(a, TUNNEL_HALF)
+        (blx, bly), (brx, bry) = side(b, -TUNNEL_HALF), side(b, TUNNEL_HALF)
+        quad([(alx, aly, a[2]), (arx, ary, a[2]), (brx, bry, b[2]), (blx, bly, b[2])], EARTH)
+        for (ax_, ay_), (bx_, by_) in (((alx, aly), (blx, bly)), ((arx, ary), (brx, bry))):
+            top_a = a[2] + TUNNEL_TALL if a[5] else max(height(ax_, ay_) + 0.3, a[2] + 0.6)
+            top_b = b[2] + TUNNEL_TALL if b[5] else max(height(bx_, by_) + 0.3, b[2] + 0.6)
+            quad([(ax_, ay_, a[2]), (bx_, by_, b[2]), (bx_, by_, top_b), (ax_, ay_, top_a)], TUNNEL_STONE)
+        if a[5] and b[5]:
+            quad([(alx, aly, a[2] + TUNNEL_TALL), (arx, ary, a[2] + TUNNEL_TALL), (brx, bry, b[2] + TUNNEL_TALL),
+                  (blx, bly, b[2] + TUNNEL_TALL)], c.mix(TUNNEL_STONE, EARTH, 0.5))
+        if not a[5] and not b[5]:
+            # A lip of stone round the hole, hiding its ragged edge.
+            for inner, outer in ((TUNNEL_HALF, TUNNEL_HALF + 2.4), (-TUNNEL_HALF, -TUNNEL_HALF - 2.4)):
+                pa = [side(a, inner), side(a, outer)]
+                pb = [side(b, outer), side(b, inner)]
+                quad([(*p, height(*p) + 0.32) for p in pa + pb], STONE)
+        if a[5] != b[5]:
+            # The lintel: the face of earth and stone over the opening.
+            row = b if b[5] else a
+            l1, r1 = side(row, -TUNNEL_HALF - 2.4), side(row, TUNNEL_HALF + 2.4)
+            low = row[2] + TUNNEL_TALL
+            high = max(height(*l1), height(*r1), height(row[0], row[1])) + 0.8
+            quad([(*l1, low), (*r1, low), (*r1, high), (*l1, high)], STONE)
+tunnel.build("tunnel", smooth=False)
+
+# Rocks either side of the mouths.
+rocks = c.Builder()
+for x, y, r in ((WEST_LIP[0] - 6, WEST_LIP[1] + 6.5, 4.2), (WEST_LIP[0] - 6, WEST_LIP[1] - 6.5, 4.2),
+                (WEST_LIP[0] - 15, WEST_LIP[1], 6.5), (EAST_LIP[0] - 5, EAST_LIP[1] - 5, 2.8), (EAST_LIP[0] + 5, EAST_LIP[1] - 5, 2.8)):
+    rocks.blob((x, y, height(x, y) - 0.5), r, ROCK, squash=0.7, lumpy=0.25, seed=x + y)
+    solid_circle(x, y, r * 0.85)
+rocks.build("rocks", smooth=True)
+
 # ---------------------------------------------------------------- write it all out
 
 # Where you can stand, a square metre at a time.
@@ -469,6 +600,9 @@ if out:
         "ground": {"x0": X0, "y0": Y0, "step": STEP, "nx": nx, "ny": ny},
         "walkable": {"x0": X0, "y0": Y0, "step": MASK_STEP, "nx": mx, "ny": my, "offset": len(walk) * 4},
         "obstacles": obstacles,
+        # The ways underground: points [x, z, floor] in three.js's axes.
+        "ways": {name: {"half": TUNNEL_HALF, "points": [[round(x, 2), round(-y, 2), round(f, 2)] for x, y, f in way.points]}
+                 for name, way in WAYS.items()},
         "bounds": [X0 + 4, X1 - 4, Y0 + 4, Y1 - 4],
         "circles": circles,
         "boxes": boxes,
