@@ -666,10 +666,10 @@ for k, line in enumerate(paths):
         n = max(1, int(math.hypot(bx - ax, by - ay) / 0.5))
         samples += [(ax + (bx - ax) * f / n, ay + (by - ay) * f / n) for f in range(n)]
     samples.append(line[-1])
-    # (Only just above the grass: the game draws paths over it where they
-    # meet, so they don't flicker into it far off. A little apart from each
-    # other, where they cross.)
-    lift = 0.01 + 0.002 * (k % 10)
+    # (A few centimetres above the grass, so the two don't flicker into each
+    # other far off, nor the grass come up through it on a slope; and a
+    # little apart from each other, where they cross.)
+    lift = 0.04 + 0.003 * (k % 10)
     verts, colours, faces = [], [], []
     for i, (x, y) in enumerate(samples):
         nx_, ny_ = samples[min(i + 1, len(samples) - 1)]
@@ -690,6 +690,15 @@ for k, line in enumerate(paths):
                 a = (i - 1) * m + j
                 faces.append((a, a + m, a + m + 1, a + 1))
     strips.add(verts, faces, colours)
+    # Its sides, down into the ground, so you never see under its edge (not
+    # across its ends, which mostly meet another path, and would stand up
+    # through it).
+    m = len(ACROSS)
+    for edge in (0, m - 1):
+        tops = verts[edge::m]
+        for p0, p1 in zip(tops, tops[1:]):
+            side = [p0, p1, (*p1[:2], p1[2] - lift - 0.25), (*p0[:2], p0[2] - lift - 0.25)]
+            strips.add(side, [(0, 1, 2, 3)], [c.vary(DIRT, 0.12, Vector(p0))] * 4)
 strips.build("paths")
 
 # ---------------------------------------------------------------- what's solid

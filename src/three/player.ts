@@ -124,6 +124,8 @@ const CROUCHED = 1.1; // the eye's height, crouching
 const CROUCHING = 0.5; // how much of your speed you have, crouching
 const GRAVITY = 9.8; // metres a second, each second
 const STEP = 0.4; // metres: you walk up (and down) anything this high, like a stair
+const ROOF = 3.2; // a way's floor to its roof (TUNNEL_TALL in art/blender/land.py)
+const HEADROOM = 0.15; // how close your eye comes to a roof, jumping
 export const JUMP_HEIGHT = 0.6; // metres, how high a jump lifts you (a game hop, more than a real one)
 const FLY_HEIGHT = 35; // metres above the ground, flying
 const WALK = 4.2; // metres a second
@@ -316,6 +318,16 @@ export class Player {
       p.y = surface;
     } else {
       p.y += (surface - p.y) * Math.min(1, dt * 12); // up a slope or a step, or down one
+    }
+    // Under a roof, a jump stops at it: jumping where a tunnel drops away
+    // steeply, the roof drops with the floor, and would leave you behind.
+    if (this.under && this.lift > 0) {
+      const tall = this.under.hall ? (this.halls.get(this.under.hall)?.tall ?? ROOF) : ROOF;
+      const most = Math.max(0, this.under.floor + tall - HEADROOM - this.eye - p.y);
+      if (this.lift > most) {
+        this.lift = most;
+        this.rise = Math.min(this.rise, 0);
+      }
     }
   }
 

@@ -13,7 +13,6 @@ import {
   DirectionalLight,
   Fog,
   HemisphereLight,
-  type Material,
   Mesh,
   MeshBasicMaterial,
   PCFShadowMap,
@@ -101,15 +100,6 @@ model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
   node.castShadow = !["paths", "water"].includes(node.name);
   node.receiveShadow = node.name !== "water";
-  if (node.name === "paths") {
-    // Drawn over the grass they lie just above, even far off, where the
-    // two would otherwise flicker into each other. (By a fixed amount: one
-    // that grows on a slope seen edge on puts far paths in front of hills.)
-    const material = node.material as Material;
-    material.polygonOffset = true;
-    material.polygonOffsetFactor = 0;
-    material.polygonOffsetUnits = -4;
-  }
 });
 scene.add(model.scene);
 
