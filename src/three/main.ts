@@ -8,20 +8,16 @@ import "./style.css";
 
 import {
   ACESFilmicToneMapping,
-  CanvasTexture,
   Color,
   CylinderGeometry,
   DirectionalLight,
   Fog,
-  Group,
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
   PCFShadowMap,
   PointLight,
   Scene,
-  Sprite,
-  SpriteMaterial,
   SRGBColorSpace,
   Timer,
   Vector3,
@@ -195,35 +191,8 @@ for (const { x, z } of DEATHS) {
   scene.add(mark);
 }
 
-// The places' names, floating over them: for finding your way while the
-// world is grey.
+// A place's name, from its id (for now; PLAN-V3.md).
 const name = (id: string) => id.replace(/-/g, " ").replace(/^./, (letter) => letter.toUpperCase());
-const labels = new Group();
-for (const [id, { x, z }] of PLACES) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 96;
-  const pen = canvas.getContext("2d")!;
-  pen.font = "600 48px Cinzel, Georgia, serif";
-  pen.textAlign = "center";
-  pen.textBaseline = "middle";
-  pen.lineWidth = 8;
-  pen.strokeStyle = "rgba(20, 14, 8, 0.85)";
-  pen.fillStyle = "#f6ecd2";
-  pen.strokeText(name(id), 256, 48);
-  pen.fillText(name(id), 256, 48);
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  const label = new Sprite(new SpriteMaterial({ map: texture, depthTest: false, fog: false }));
-  label.scale.set(12, 2.25, 1);
-  label.position.set(x, (ground(x, z) ?? 0) + 9, z);
-  labels.add(label);
-}
-scene.add(labels);
-let showLabels = true;
-addEventListener("keydown", (event) => {
-  if (event.code === "KeyL") showLabels = !showLabels;
-});
 
 const start = PLACES.get("grassy-bank")!;
 const at = new URLSearchParams(location.search).get("at")?.split(",").map(Number);
@@ -291,7 +260,7 @@ if (import.meta.env.DEV) {
 overlay.innerHTML = `
   <h1>Merlin's Castle</h1>
   <p class="start">Click to walk</p>
-  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · L for names · Esc to stop</p>
+  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · Esc to stop</p>
   <p class="keys touch">Left thumb to walk · right thumb to look</p>`;
 overlay.hidden = Boolean(at);
 overlay.addEventListener("click", () => {
@@ -353,7 +322,6 @@ renderer.setAnimationLoop((time) => {
   if (player.under?.hall) room = player.under.hall;
   else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
   lightFor(player.depth, time, dt);
-  labels.visible = showLabels && !player.inside; // they'd show through the tunnel's walls
   here.textContent = name(room);
   // The sun's shadows follow you, so they're sharp wherever you are.
   sunlight.target.position.copy(player.position);

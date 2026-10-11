@@ -90,13 +90,14 @@ npm run build && npm run preview  # try the built version at http://localhost:41
 ```
 
 Mouse to look, WASD or the arrow keys to walk, Shift to run, Space to jump
-(how high is `JUMP_HEIGHT` in `src/three/player.ts`), Ctrl or C to crouch, L
-to show the places' names. On the dev server only, **0** opens the debug
-panel: fly (F takes you 35 m up, and F again drops you back down), walk
-through anything (N), open every obstacle (O), show the obstacles and how
-far they reach, red where they kill you (R), turn the sky magenta to spot
-gaps you can see it through (G), go faster or slower (. and ,), copy a
-picture of what you see to the clipboard (P), and a map to jump anywhere. The build leaves the debug panel out entirely, so
+(how high is `JUMP_HEIGHT` in `src/three/player.ts`), Ctrl or C to crouch.
+On the dev server only, **0** opens the debug panel: fly (F takes you 35 m
+up, and F again drops you back down), walk through anything (N), open every
+obstacle (O), show the obstacles and how far they reach, red where they kill
+you (R), turn the sky magenta to spot gaps you can see it through (G), float
+the places' names over them (L), go faster or slower (. and ,), copy a
+picture of what you see to the clipboard (P), and a map to jump anywhere.
+The letter keys work with the panel closed, too. The build leaves the debug panel out entirely, so
 check with `npm run build && npm run preview` that something works without
 it.
 

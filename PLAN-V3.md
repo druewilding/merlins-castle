@@ -533,13 +533,14 @@ and wings) may need a bought or free model.
   casts shadows, so the sun can't shine into a tunnel from above.
 - **A debug panel** on the dev server only (the 0 key): fly (F), walk
   through anything (N), open every obstacle (O), show the obstacles and
-  their reach (R, red where they kill you), go up to 10× faster (, and .),
-  and a map to jump anywhere. The letter keys work with the panel closed
+  their reach (R, red where they kill you), show gaps with a magenta sky
+  (G), float the places' names (L), go up to 10× faster (, and .), copy a
+  picture (P), and a map to jump anywhere. The letter keys work with the panel closed
   too. `src/three/debug.ts` and `debug.css` are loaded behind
   `import.meta.env.DEV`, so the built game contains none of it.
-- **Names over the places** (press L) while the world is grey, and the place
-  you're in at the top left. The floating names may move into the debug panel
-  later. For now they're made from the code's names (so "Merlins lair",
+- **Names over the places** (L, in the debug panel only; off to start with)
+  while the world is grey, and the place you're in at the top left. For now
+  they're made from the code's names (so "Merlins lair",
   without its apostrophe); they should become the original's own names, in
   English and Danish, when the game is wired in.
 
