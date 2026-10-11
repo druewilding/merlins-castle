@@ -17,3 +17,6 @@ art/originals/
 # Pictures from npm run models -- <place> --preview, for checking
 art/blender/previews/
 __pycache__/
+
+# The 3D version built on its own (npm run build:3d)
+dist-3d/
