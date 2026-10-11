@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/druewilding/merlins-castle/compare/v2.0.1...v2.1.0) (2026-10-11)
+
+
+### Features
+
+* Tidy up end scenes so that they are more obvious what happened ([#42](https://github.com/druewilding/merlins-castle/issues/42)) ([66ffbee](https://github.com/druewilding/merlins-castle/commit/66ffbeedb6ede1b5724cc0ddf638021ab6cda97d))
+
 ## [2.0.1](https://github.com/druewilding/merlins-castle/compare/v2.0.0...v2.0.1) (2026-10-10)
 
 
