@@ -29,6 +29,7 @@ c.clear()
 layout = json.loads((HERE / "layout.json").read_text())
 world = json.loads((HERE.parents[1] / "data/world.json").read_text())
 S = layout["spacing"]
+K = S / 40  # the land below was laid out 40 metres apart: K scales it
 OX, OY = layout["origin"]
 
 
@@ -43,7 +44,7 @@ KIND = {place: kind for kind, places in layout["kinds"].items() if kind != "_" f
 LOST = {k: at(v) for k, v in layout["lost"].items() if k != "_" and KIND.get(k.split(" ")[0]) != "cave"}
 DEATHS = {k: at(v) for k, v in layout["deaths"].items() if k != "_"}
 
-X0, X1, Y0, Y1 = -200, 200, -290, 210
+X0, X1, Y0, Y1 = (round(v * K) for v in (-200, 200, -290, 210))
 STEP = 2.0
 
 GRASS = c.linear("#77a03a")
@@ -102,11 +103,11 @@ class Lines:
 
 # ---------------------------------------------------------------- the river
 
-RIVER = chaikin([(-215, -40), (-150, -41), (-120, -40), (-100, -36), (-82, -24), (-64, -25), (-44, -46),
-                 (-20, -60), (20, -60), (60, -61), (94, -60)])
+RIVER = chaikin([(x * K, y * K) for x, y in [(-215, -40), (-150, -41), (-120, -40), (-100, -36), (-82, -24), (-64, -25),
+                                             (-44, -46), (-20, -60), (20, -60), (60, -61), (94, -60)]])
 river = Lines()
 river.add(RIVER)
-BRIDGE = P["old-wall"][0], -40  # where the path south from the old wall crosses
+BRIDGE = P["old-wall"][0], -40 * K  # where the path south from the old wall crosses
 
 # ---------------------------------------------------------------- the paths
 
@@ -120,7 +121,7 @@ NOT_A_PATH = {
 }
 SHAPES = {
     # The slide from the deep river down the mossy bank into the glade.
-    ("deep-river", "evergreen-glade"): [P["deep-river"], (22, -32), (34, -14), P["evergreen-glade"]],
+    ("deep-river", "evergreen-glade"): [P["deep-river"], (22 * K, -32 * K), (34 * K, -14 * K), P["evergreen-glade"]],
 }
 
 paths = []
@@ -161,8 +162,8 @@ for line in paths:
 
 MOUND = Vector((P["grassy-bank"][0] - 9, P["grassy-bank"][1] + 9))  # between the west and north paths
 TOWER = (P["tower"][0], P["tower"][1] + 6)
-CASTLE = (-62, 62, -262, -142)  # its walls: west, east, south, north
-MOAT = (-72, 72, -272, -130)
+CASTLE = (-62 * K, 62 * K, -262 * K, -142 * K)  # its walls: west, east, south, north
+MOAT = (-72 * K, 72 * K, -272 * K, -130 * K)
 
 
 def in_moat(x, y):
@@ -172,6 +173,7 @@ def in_moat(x, y):
 
 
 def mountain(x, y):
+    x, y = x / K, y / K
     across = smooth((95 - abs(x)) / 45)
     return 30 * smooth((y - 45) / 75) * across + 28 * smooth((y - 150) / 45) * smooth((80 - abs(x)) / 40)
 
@@ -201,7 +203,7 @@ def deck(x, y):
     """The bridge and drawbridge, for walking on."""
     if abs(x - BRIDGE[0]) <= 2.2 and abs(y - BRIDGE[1]) <= 9:
         return 0.9
-    if abs(x) <= 3 and -143 <= y <= -127:
+    if abs(x) <= 3 and -143 * K <= y <= -127 * K:
         return 0.6
     return None
 
@@ -252,9 +254,9 @@ LAMP_TUNNEL = Way([
     (WEST_LIP[0] - 15, WEST_LIP[1] - 3, DEEP),
     (WEST_LIP[0] - 15, WEST_LIP[1] - 7, DEEP),
     (WEST_LIP[0] - 12, WEST_LIP[1] - 10, DEEP),
-    (-40, -10, DEEP),
-    (-30, -23, DEEP),
-    (EAST_LIP[0], -23, DEEP),
+    (-40 * K, -10, DEEP),
+    (-30 * K, EAST_LIP[1] - 12, DEEP),
+    (EAST_LIP[0], EAST_LIP[1] - 12, DEEP),
     (*EAST_LIP, height(*EAST_LIP)),
 ])
 WAYS = {"lamp-tunnel": LAMP_TUNNEL}
@@ -273,12 +275,12 @@ def open_to_the_sky(x, y, margin):
 # ---------------------------------------------------------------- where the forest isn't
 
 CLEARING = {"grassy-bank": 17, "deep-river": 15, "river-south-bank": 15}
-OPEN_ZONES = [
+OPEN_ZONES = [(w * K, e * K, s * K, n * K) for w, e, s, n in [
     (-96, 25, -7, 22),  # the meadow, along the long path to the old stone wall
     (-50, 50, 58, 178),  # the mountain top and the maze
     (-80, 80, -282, -124),  # the castle grounds
-]
-AXE_TREES = (-14, 14, 49, 58)  # the dense trees across the mountain path
+]]
+AXE_TREES = (-14, 14, 49 * K, 58 * K)  # the dense trees across the mountain path
 
 
 def open_ground(x, y):
@@ -445,26 +447,28 @@ block(built, BRIDGE[0] - 2.4, BRIDGE[1] - 9, 0.5, BRIDGE[0] + 2.4, BRIDGE[1] + 9
 for side in (-1, 1):
     block(built, BRIDGE[0] + side * 2.4 - 0.15, BRIDGE[1] - 9, 0.9, BRIDGE[0] + side * 2.4 + 0.15, BRIDGE[1] + 9, 1.9,
           c.linear("#6b4426"))
-block(built, -3, -143, 0.2, 3, -127, 0.6, c.linear("#7a5230"), solid=False)
-obstacle(["moat south"], "box", 0, 129, 3.2, 1.5)  # the drawbridge is up
+block(built, -3, -143 * K, 0.2, 3, -127 * K, 0.6, c.linear("#7a5230"), solid=False)
+obstacle(["moat south"], "box", 0, 129 * K, 3.2, 1.5)  # the drawbridge is up
 
 # The old stone wall: north from the forest, west along the gate, north again.
 WALL = 4.5
-y = -18
-while y < 60:
-    block(built, -100.6, y, height(-100, y) - 0.5, -99.4, min(y + 2, 60.6), height(-100, y) + WALL, STONE)
+WX, WY = -100 * K, 60 * K  # the corner by the old stone wall, and the gate's line
+y = -18 * K
+while y < WY:
+    block(built, WX - 0.6, y, height(WX, y) - 0.5, WX + 0.6, min(y + 2, WY + 0.6), height(WX, y) + WALL, STONE)
     y += 2
-GATE = (-122.2, -117.8)  # the gap in the wall, exactly the gate's width
-for start, end in ((-140.6, GATE[0]), (GATE[1], -99.4)):
+GATE = (P["rusty-gate"][0] - 2.2, P["rusty-gate"][0] + 2.2)  # the gap in the wall, exactly the gate's width
+WW = -140 * K  # where it turns north again, up the west of the yellow flowers
+for start, end in ((WW - 0.6, GATE[0]), (GATE[1], WX + 0.6)):
     x = start
     while x < end - 0.01:
-        block(built, x, 59.4, height(x, 60) - 0.5, min(x + 2, end), 60.6, height(x, 60) + WALL, STONE)
+        block(built, x, WY - 0.6, height(x, WY) - 0.5, min(x + 2, end), WY + 0.6, height(x, WY) + WALL, STONE)
         x += 2
-block(built, GATE[0], 59.7, 0.0, GATE[1], 60.3, 3.6, c.linear("#a5532c"), solid=False)  # the rusty gate, locked
-obstacle(["rusty-gate north", "yellow-flowers south"], "box", (GATE[0] + GATE[1]) / 2, -60, (GATE[1] - GATE[0]) / 2, 0.6)
-y = 60
-while y < 118:
-    block(built, -140.6, y, height(-140, y) - 0.5, -139.4, y + 2, height(-140, y) + WALL, STONE)
+block(built, GATE[0], WY - 0.3, 0.0, GATE[1], WY + 0.3, 3.6, c.linear("#a5532c"), solid=False)  # the rusty gate, locked
+obstacle(["rusty-gate north", "yellow-flowers south"], "box", (GATE[0] + GATE[1]) / 2, -WY, (GATE[1] - GATE[0]) / 2, 0.6)
+y = WY
+while y < 118 * K:
+    block(built, WW - 0.6, y, height(WW, y) - 0.5, WW + 0.6, y + 2, height(WW, y) + WALL, STONE)
     y += 2
 
 # The tower on its knoll, with the balcony high on its east side, and the
@@ -492,7 +496,7 @@ dc = P["dragon-cave"]
 built.blob((dc[0] + 17, dc[1], height(*dc) - 2), 15, ROCK, squash=0.75, lumpy=0.25, seed=3)
 solid_circle(dc[0] + 17, dc[1], 12.5)
 block(built, dc[0] + 3.5, dc[1] - 3, height(*dc) - 0.2, dc[0] + 5.5, dc[1] + 3, height(*dc) + 5, c.linear("#1d1915"), solid=False)
-built.blob((P["river-south-bank"][0] + 100, -60, -2), 9, ROCK, squash=0.7, lumpy=0.3, seed=4)  # where the river goes under
+built.blob((RIVER[-1][0] + 6, RIVER[-1][1], -2), 9, ROCK, squash=0.7, lumpy=0.3, seed=4)  # where the river goes under
 
 # The castle: walls with a gate to the north, corner towers, and the rooms as
 # buildings round the courtyard. The golden spire rises from the great hall.
