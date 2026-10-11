@@ -271,7 +271,14 @@ if (import.meta.env.DEV) {
       walkable,
       heights: { values: heights, ...land.ground },
       grid: land.walkable,
-      obstacles,
+      scene,
+      ground,
+      obstacles: [...shapes.values()],
+      ahead: AHEAD,
+      fatal: (exit) => {
+        const [id, direction] = exit.split(" ");
+        return Boolean(english.rooms[id]?.exits[direction as Direction]?.obstacle?.fatal);
+      },
       openObstacles,
       room: () => room,
       name,

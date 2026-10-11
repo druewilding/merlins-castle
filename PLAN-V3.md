@@ -471,8 +471,9 @@ and wings) may need a bought or free model.
   lamp glow round you takes over (one day only with the lamp lit). The land
   casts shadows, so the sun can't shine into a tunnel from above.
 - **A debug panel** on the dev server only (the 0 key): fly (F), walk
-  through anything (N), open every obstacle (O), go up to 10× faster (, and
-  .), and a map to jump anywhere. The letter keys work with the panel closed
+  through anything (N), open every obstacle (O), show the obstacles and
+  their reach (R, red where they kill you), go up to 10× faster (, and .),
+  and a map to jump anywhere. The letter keys work with the panel closed
   too. `src/three/debug.ts` and `debug.css` are loaded behind
   `import.meta.env.DEV`, so the built game contains none of it.
 - **Names over the places** (press L) while the world is grey, and the place

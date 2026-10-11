@@ -91,11 +91,12 @@ npm run build && npm run preview  # try the built version at http://localhost:41
 
 Mouse to look, WASD or the arrow keys to walk, Shift to run, L to show the
 places' names. On the dev server only, **0** opens the debug panel: fly
-(F), walk through anything (N), open every obstacle (O), go faster or
+(F), walk through anything (N), open every obstacle (O), show the
+obstacles and how far they reach, red where they kill you (R), go faster or
 slower (. and ,), copy a picture of what you see to the clipboard (P), and
-a map to jump anywhere. The build leaves the debug
-panel out entirely, so check with `npm run build && npm run preview` that
-something works without it.
+a map to jump anywhere. The build leaves the debug panel out entirely, so
+check with `npm run build && npm run preview` that something works without
+it.
 
 The land is made in [Blender](https://www.blender.org/) (free), driven by
 Python scripts in `art/blender/`: `npm run models` runs each one with no

@@ -2,16 +2,45 @@
 // through anything, open every obstacle, go faster, and jump anywhere on a
 // map. Opened with the 0 key (on the number row or the number pad, so it
 // works whatever the keyboard's language). P copies what you're looking at
-// to the clipboard, for pasting into a chat.
+// to the clipboard, for pasting into a chat. R shows the obstacles, and how
+// far they reach: red where trying them kills you.
 //
 // Only on the dev server: main.ts loads this behind import.meta.env.DEV, so
 // the built game doesn't contain it at all.
 
 import "./debug.css";
 
+import {
+  BoxGeometry,
+  CanvasTexture,
+  Color,
+  CylinderGeometry,
+  EdgesGeometry,
+  Group,
+  LineBasicMaterial,
+  LineSegments,
+  Mesh,
+  MeshBasicMaterial,
+  type Scene,
+  Sprite,
+  SpriteMaterial,
+  SRGBColorSpace,
+} from "three";
+
 import type { RoomId } from "../engine/types";
 import { DEATHS, LOST, PLACES } from "./layout";
-import type { Player, Walkable } from "./player";
+import { type Ground, nearest, type Player, type Walkable } from "./player";
+
+/** An obstacle's shape, with the names of the exits it blocks ("rusty-gate north"). */
+export interface DebugObstacle {
+  box?: number[];
+  circle?: number[];
+  under?: boolean;
+  names: string[];
+}
+
+const FATAL = "#e0412f";
+const BLOCKS = "#ffa62e";
 
 export interface DebugWorld {
   player: Player;
@@ -20,7 +49,13 @@ export interface DebugWorld {
   heights: { values: Float32Array; x0: number; y0: number; step: number; nx: number; ny: number };
   /** The walkability map's grid, the same way round. */
   grid: { x0: number; y0: number; step: number; nx: number; ny: number };
-  obstacles: Record<string, { box?: number[]; circle?: number[] }>;
+  scene: Scene;
+  ground: Ground;
+  obstacles: DebugObstacle[];
+  /** How far an obstacle in your way reaches out to bounce you back. */
+  ahead: number;
+  /** Whether trying an exit without the right object kills you. */
+  fatal: (exit: string) => boolean;
   openObstacles: (open: boolean) => void;
   room: () => RoomId;
   name: (id: RoomId) => string;
@@ -39,6 +74,7 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     <label><input type="checkbox" id="debug-fly" /> Fly <kbd>F</kbd> <small>Space up, C down</small></label>
     <label><input type="checkbox" id="debug-ghost" /> Walk through anything <kbd>N</kbd></label>
     <label><input type="checkbox" id="debug-open" /> Open every obstacle <kbd>O</kbd></label>
+    <label><input type="checkbox" id="debug-reach" /> Show obstacles and their reach <kbd>R</kbd> <small>red: fatal</small></label>
     <p class="debug-hint">Copy a picture of what you see <kbd>P</kbd></p>
     <label class="debug-speed">Speed <kbd>,</kbd><input type="range" id="debug-speed" min="1" max="10" step="1" value="1" /><kbd>.</kbd><output>1×</output></label>
     <canvas class="debug-map" aria-label="Map: click to jump there"></canvas>
@@ -49,17 +85,24 @@ export function debug(world: DebugWorld, onOpen: () => void) {
   const fly = panel.querySelector<HTMLInputElement>("#debug-fly")!;
   const ghost = panel.querySelector<HTMLInputElement>("#debug-ghost")!;
   const open = panel.querySelector<HTMLInputElement>("#debug-open")!;
+  const reach = panel.querySelector<HTMLInputElement>("#debug-reach")!;
   const speed = panel.querySelector<HTMLInputElement>("#debug-speed")!;
   const speedShown = panel.querySelector("output")!;
   fly.addEventListener("change", () => (player.fly = fly.checked));
   ghost.addEventListener("change", () => (player.ghost = ghost.checked));
   open.addEventListener("change", () => world.openObstacles(open.checked));
+  let marks: Group | undefined;
+  reach.addEventListener("change", () => {
+    if (!marks) world.scene.add((marks = obstacleMarks()));
+    marks.visible = reach.checked;
+  });
   speed.addEventListener("input", () => {
     player.boost = Number(speed.value);
     speedShown.textContent = `${speed.value}×`;
   });
   // Keys pressed in the panel move you, not its controls.
-  for (const input of [fly, ghost, open, speed]) input.addEventListener("keydown", (event) => event.preventDefault());
+  for (const input of [fly, ghost, open, reach, speed])
+    input.addEventListener("keydown", (event) => event.preventDefault());
 
   // The same, from the keyboard, with the panel open or not (the mouse is
   // usually busy looking round). By the key's place, whatever the language.
@@ -89,6 +132,7 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     if (event.code === "KeyF") flip(fly, "Flying", "Walking");
     else if (event.code === "KeyN") flip(ghost, "Walking through anything", "Bumping into things");
     else if (event.code === "KeyO") flip(open, "Every obstacle open", "Obstacles closed");
+    else if (event.code === "KeyR") flip(reach, "Showing obstacles", "Obstacles hidden");
     else if (event.code === "Comma") faster(-1);
     else if (event.code === "Period") faster(1);
     else if (event.code === "KeyP") copyPicture();
@@ -129,6 +173,87 @@ export function debug(world: DebugWorld, onOpen: () => void) {
       .catch((error: Error) => say(`Couldn't copy the picture (${error.message})`));
   }
 
+  // Each obstacle in the world: the thing itself, a glassy box (or drum) as
+  // tall as you; how far it reaches out (front and back, along its thinner
+  // side), a fainter one with its edges drawn; and which exits it blocks.
+  function obstacleMarks() {
+    const group = new Group();
+    const TALL = 3;
+    for (const { box, circle, under, names } of world.obstacles) {
+      const [x, z] = box ?? circle!;
+      const colour = new Color(names.some(world.fatal) ? FATAL : BLOCKS);
+      const y = under ? floorAt(x, z) : (world.ground(x, z) ?? 0);
+      let core;
+      let zone;
+      if (box) {
+        const [, , hx, hz] = box;
+        core = new BoxGeometry(hx * 2, TALL, hz * 2);
+        zone =
+          hx < hz
+            ? new BoxGeometry((hx + world.ahead) * 2, TALL, hz * 2)
+            : new BoxGeometry(hx * 2, TALL, (hz + world.ahead) * 2);
+      } else {
+        const r = circle![2];
+        core = new CylinderGeometry(r, r, TALL, 32);
+        zone = new CylinderGeometry(r + world.ahead, r + world.ahead, TALL, 32);
+      }
+      const glass = (opacity: number) =>
+        new MeshBasicMaterial({ color: colour, transparent: true, opacity, depthWrite: false });
+      for (const thing of [
+        new Mesh(core, glass(0.55)),
+        new Mesh(zone, glass(0.1)),
+        new LineSegments(new EdgesGeometry(zone), new LineBasicMaterial({ color: colour })),
+      ]) {
+        thing.position.set(x, y + TALL / 2, z);
+        group.add(thing);
+      }
+      const label = tag(
+        names.map((exit) => {
+          const [id, direction] = exit.split(" ");
+          return `${world.name(id)} ${direction}${world.fatal(exit) ? " ☠" : ""}`;
+        })
+      );
+      label.position.set(x, y + TALL + 0.9, z);
+      group.add(label);
+    }
+    return group;
+  }
+
+  // The floor underground at a spot: the hall's, or the nearest way's.
+  function floorAt(x: number, z: number) {
+    const hall = player.hallAt(x, z);
+    if (hall) return hall.floor;
+    let best = { d: Infinity, floor: 0 };
+    for (const way of player.ways) {
+      const n = nearest(way, x, z);
+      if (n.d < best.d) best = n;
+    }
+    return best.floor;
+  }
+
+  // A few lines of writing, floating.
+  function tag(lines: string[]) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 52 * lines.length + 12;
+    const pen = canvas.getContext("2d")!;
+    pen.font = "600 38px system-ui, sans-serif";
+    pen.textAlign = "center";
+    pen.textBaseline = "middle";
+    pen.lineWidth = 7;
+    pen.strokeStyle = "rgba(20, 14, 8, 0.85)";
+    pen.fillStyle = "#fff7e2";
+    lines.forEach((line, k) => {
+      pen.strokeText(line, 256, 32 + k * 52);
+      pen.fillText(line, 256, 32 + k * 52);
+    });
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    const sprite = new Sprite(new SpriteMaterial({ map: texture, fog: false }));
+    sprite.scale.set(5, (5 * canvas.height) / canvas.width, 1);
+    return sprite;
+  }
+
   // The map: a pixel for every square metre, north at the top.
   const { grid } = world;
   const canvas = panel.querySelector<HTMLCanvasElement>(".debug-map")!;
@@ -163,9 +288,10 @@ export function debug(world: DebugWorld, onOpen: () => void) {
   function drawMap() {
     pen.putImageData(land, 0, 0);
     pen.lineWidth = 2;
-    // Obstacles, orange while closed.
-    pen.strokeStyle = open.checked ? "rgba(255,170,60,0.35)" : "#ff9a2e";
-    for (const { box, circle } of Object.values(world.obstacles)) {
+    // Obstacles, orange while closed (red where trying them kills you).
+    for (const { box, circle, names } of world.obstacles) {
+      pen.strokeStyle = names.some(world.fatal) ? FATAL : BLOCKS;
+      pen.globalAlpha = open.checked ? 0.35 : 1;
       pen.beginPath();
       if (box) {
         const [mx, my] = toMap(box[0], box[1]);
@@ -177,6 +303,7 @@ export function debug(world: DebugWorld, onOpen: () => void) {
       }
       pen.stroke();
     }
+    pen.globalAlpha = 1;
     // Ways underground, dotted.
     pen.strokeStyle = "#d9a066";
     pen.lineWidth = 2;
