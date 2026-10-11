@@ -9,8 +9,8 @@
 // npm run gaps, but from wherever you fly). L floats the places' names over
 // them, for finding your way while the world is grey.
 //
-// Only on the dev server: main.ts loads this behind import.meta.env.DEV, so
-// the built game doesn't contain it at all.
+// Only at /3d?debug, on the dev server as in the built game: main.ts only
+// loads this then, so nobody else downloads it.
 
 import "./debug.css";
 

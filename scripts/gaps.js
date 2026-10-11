@@ -47,7 +47,7 @@ const browser = await webkit.launch();
 try {
   const page = await browser.newPage({ viewport: SCAN });
   page.on("pageerror", (error) => console.error("page:", error.message));
-  await page.goto(`${server.resolvedUrls.local[0]}3d.html?at=0,0,0`);
+  await page.goto(`${server.resolvedUrls.local[0]}3d?debug&at=0,0,0`);
   await page.waitForFunction(() => window.world?.renderer, null, { timeout: 60_000 });
   await page.evaluate(install, { ways: land.ways, halls: land.halls });
 

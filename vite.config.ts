@@ -57,8 +57,8 @@ function offline(): Plugin {
         const url = "./" + relative(outDir, path).split("\\").join("/");
         if (url === "./sw.js" || url === "./social.jpg") continue;
         // The 3D version isn't stored for offline play: it's only fetched by
-        // those who open 3d.html, and changing it doesn't touch the game's version.
-        if (url === "./3d.html" || url.startsWith("./3d/")) continue;
+        // those who open /3d, and changing it doesn't touch the game's version.
+        if (url === "./3d.html" || url.startsWith("./3d-files/")) continue;
         const fingerprint = hash(readFileSync(path));
         all += url + fingerprint;
         if (/^\.\/(art|music)\//.test(url)) media[url] = fingerprint;
@@ -73,8 +73,9 @@ function offline(): Plugin {
   };
 }
 
-// Everything that only the 3D version uses goes in dist/3d/, so it's easy to
-// keep apart (see offline() above).
+// Everything that only the 3D version uses goes in dist/3d-files/, so it's
+// easy to keep apart (see offline() above). (Not dist/3d/: the page is
+// 3d.html, served at /3d, and a folder by the same name would get in its way.)
 const for3d = (names: readonly string[] = []) => names.some((name) => /(^|\/)(src\/three\/|3d[.-])/.test(name));
 
 // Relative base: the same build works at merlinscastle.net and under a path
@@ -91,11 +92,11 @@ export default defineConfig({
       // The game, and the 3D version in the making (not linked from anywhere yet).
       input: { index: "index.html", "3d": "3d.html" },
       output: {
-        entryFileNames: (chunk) => (chunk.name === "3d" ? "3d/[name]-[hash].js" : "assets/[name]-[hash].js"),
-        chunkFileNames: (chunk) => (for3d(chunk.moduleIds) ? "3d/[name]-[hash].js" : "assets/[name]-[hash].js"),
+        entryFileNames: (chunk) => (chunk.name === "3d" ? "3d-files/[name]-[hash].js" : "assets/[name]-[hash].js"),
+        chunkFileNames: (chunk) => (for3d(chunk.moduleIds) ? "3d-files/[name]-[hash].js" : "assets/[name]-[hash].js"),
         assetFileNames: (asset) =>
           for3d([...asset.names, ...asset.originalFileNames])
-            ? "3d/[name]-[hash][extname]"
+            ? "3d-files/[name]-[hash][extname]"
             : "assets/[name]-[hash][extname]",
       },
     },

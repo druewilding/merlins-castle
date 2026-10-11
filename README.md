@@ -79,14 +79,14 @@ Dependencies are updated monthly by `.github/workflows/update-please.yml`.
 ## The 3D version (in the making)
 
 A first-person version you walk through, on the same game engine: see
-`PLAN-V3.md`. It's built and deployed with everything else, at `3d.html`, but
+`PLAN-V3.md`. It's built and deployed with everything else, at `/3d`, but
 nothing links to it yet.
 
 ```sh
-npm run dev                       # walk it at http://localhost:5173/3d.html
+npm run dev                       # walk it at http://localhost:5173/3d
 npm run models                    # rebuild the land in Blender (see below)
 npm run models -- land --preview  # …and render a picture of it
-npm run build && npm run preview  # try the built version at http://localhost:4173/3d.html
+npm run build && npm run preview  # try the built version at http://localhost:4173/3d
 ```
 
 Mouse to look, WASD or the arrow keys to walk, Shift to run, Space to jump
@@ -96,15 +96,14 @@ slots is in your hand, a click uses it and G drops it. (Only the ladder and
 the key are in the world so far: their models are made by
 `art/blender/items.py`. Use the ladder by the old stone wall and walk into
 it to climb over; use the key by the rusty gate.)
-On the dev server only, **0** opens the debug panel: fly (F takes you 35 m
+With `?debug` (`/3d?debug`, on the dev server as in the build), **0** opens the debug panel: fly (F takes you 35 m
 up, and F again drops you back down), walk through anything (N), open every
 obstacle (O), show the obstacles and how far they reach, red where they kill
 you (R), turn the sky magenta to spot gaps you can see it through (M), float
 the places' names over them (L), go faster or slower (. and ,), copy a
 picture of what you see to the clipboard (P), and a map to jump anywhere.
-The letter keys work with the panel closed, too. The build leaves the debug panel out entirely, so
-check with `npm run build && npm run preview` that something works without
-it.
+The letter keys work with the panel closed, too. Without `?debug`, the
+debug panel isn't even loaded, so you see the game as players do.
 
 The land is made in [Blender](https://www.blender.org/) (free), driven by
 Python scripts in `art/blender/`: `npm run models` runs each one with no
@@ -113,7 +112,7 @@ committed, so you only need Blender to change the land, not to run the game.
 Blender is found in `/Applications` on a Mac; elsewhere, set `BLENDER` to its
 path.
 
-Everything only the 3D version uses is built into `dist/3d/`, which the
+Everything only the 3D version uses is built into `dist/3d-files/`, which the
 service worker leaves out, so players of the game never download it.
 `test/land.test.ts` walks the land with every obstacle closed and fails if
 you can reach somewhere the original doesn't allow, such as a gap in the
