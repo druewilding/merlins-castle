@@ -182,7 +182,7 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     for (const { box, circle, under, names } of world.obstacles) {
       const [x, z] = box ?? circle!;
       const colour = new Color(names.some(world.fatal) ? FATAL : BLOCKS);
-      const y = under ? floorAt(x, z) : (world.ground(x, z) ?? 0);
+      const y = under ? floorAt(x, z) : standingAt(x, z);
       let core;
       let zone;
       if (box) {
@@ -229,6 +229,14 @@ export function debug(world: DebugWorld, onOpen: () => void) {
       if (n.d < best.d) best = n;
     }
     return best.floor;
+  }
+
+  // Where you'd stand on the land at a spot: on the ground, or down a
+  // tunnel's ramp, if it's in one (the ground there is the hill over it).
+  function standingAt(x: number, z: number) {
+    const ground = world.ground(x, z) ?? 0;
+    const ramps = player.ways.map((way) => nearest(way, x, z)).filter((n) => !n.beyond && n.d < 2.5);
+    return Math.min(ground, ...ramps.map((n) => n.floor));
   }
 
   // A few lines of writing, floating.

@@ -489,6 +489,27 @@ def walkable(x, y):
 
 # ---------------------------------------------------------------- the ground
 
+
+def drawn_height(x, y):
+    """The ground's height as drawn: flat triangles between the grid's points
+    (whichever way each square is split), so a little under height()."""
+    fi, fj = (x - X0) / STEP, (y - Y0) / STEP
+    i, j = math.floor(fi), math.floor(fj)
+    fx, fy = fi - i, fj - j
+    x0, y0 = X0 + i * STEP, Y0 + j * STEP
+    h00, h10 = height(x0, y0), height(x0 + STEP, y0)
+    h01, h11 = height(x0, y0 + STEP), height(x0 + STEP, y0 + STEP)
+    if fx > fy:
+        a = h00 + fx * (h10 - h00) + fy * (h11 - h10)
+    else:
+        a = h00 + fy * (h01 - h00) + fx * (h11 - h01)
+    if fx + fy < 1:
+        b = h00 + fx * (h10 - h00) + fy * (h01 - h00)
+    else:
+        b = h11 + (1 - fx) * (h01 - h11) + (1 - fy) * (h10 - h11)
+    return min(a, b)
+
+
 nx, ny = int((X1 - X0) / STEP) + 1, int((Y1 - Y0) / STEP) + 1
 verts, colours, faces, walk = [], [], [], []
 for j in range(ny):
@@ -840,6 +861,20 @@ def in_a_hall(x, y, floor, margin=0.0):
     return None
 
 
+def earth_wall(e0, e1, bottom0, bottom1):
+    """A wall of earth from a roof's edge up to just under the ground (as it's
+    drawn, so it never shows through on a slope), in pieces a metre long."""
+    n = max(1, math.ceil(math.dist(e0, e1)))
+    for k in range(n):
+        f0, f1 = k / n, (k + 1) / n
+        p0 = (e0[0] + (e1[0] - e0[0]) * f0, e0[1] + (e1[1] - e0[1]) * f0)
+        p1 = (e0[0] + (e1[0] - e0[0]) * f1, e0[1] + (e1[1] - e0[1]) * f1)
+        b0, b1 = bottom0 + (bottom1 - bottom0) * f0, bottom0 + (bottom1 - bottom0) * f1
+        t0, t1 = drawn_height(*p0) - 0.05, drawn_height(*p1) - 0.05
+        if t0 > b0 or t1 > b1:
+            quad(tunnel, [(*p0, b0), (*p1, b1), (*p1, max(t1, b1)), (*p0, max(t0, b0))], EARTH)
+
+
 def quad(builder, pts, colour, vary=0.12):
     # Anything lying flat faces up: facing down, the sun's shadows fall on it
     # in stripes ("shadow acne").
@@ -996,12 +1031,9 @@ for way in WAYS.values():
                 quad(tunnel, [(*l0, r0[2] + TUNNEL_TALL + 0.02), (*q0, r0[2] + TUNNEL_TALL + 0.02),
                               (*q1, r1[2] + TUNNEL_TALL + 0.02), (*l1_, r1[2] + TUNNEL_TALL + 0.02)], EARTH)
                 for e0, e1 in ((l0, l1_), (q0, q1)):
-                    quad(tunnel, [(*e0, r0[2] + TUNNEL_TALL), (*e1, r1[2] + TUNNEL_TALL), (*e1, height(*e1) + 0.3),
-                                  (*e0, height(*e0) + 0.3)], EARTH)
+                    earth_wall(e0, e1, r0[2] + TUNNEL_TALL, r1[2] + TUNNEL_TALL)
             back = span[-1]
-            l_, q_ = side(back, -wide), side(back, wide)
-            quad(tunnel, [(*l_, back[2] + TUNNEL_TALL), (*q_, back[2] + TUNNEL_TALL), (*q_, height(*q_) + 0.3),
-                          (*l_, height(*l_) + 0.3)], EARTH)
+            earth_wall(side(back, -wide), side(back, wide), back[2] + TUNNEL_TALL, back[2] + TUNNEL_TALL)
             # The lintel: the face of earth and stone over the opening.
             row = b if b[5] else a
             l1, r1 = side(row, -half - 2.4), side(row, half + 2.4)
