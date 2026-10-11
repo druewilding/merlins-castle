@@ -20,7 +20,8 @@ Classic and Illustrated stay as they are. v3 is a third way to play.
 Status: **step 2 begun.** The whole land above ground and underground is
 built in grey boxes (`art/blender/land.py`) and you can walk it at `3d.html`.
 It's built and deployed with the site, but not linked from anywhere yet.
-Next: indoors (the tower, the hut and the castle rooms).
+The castle's rooms are built inside its keep. Next: the tower and the hut, then
+wiring in the game.
 
 ## Keep the engine
 
@@ -375,7 +376,13 @@ and wings) may need a bought or free model.
      rocky hill past the leaves, its long tunnel up under a ridge into the
      giant's east side, and its way down to the dark tunnels (which run out
      west and east into the mist) and the beautiful chamber.
-   - **Indoors**: the tower, the hut and the castle rooms.
+   - **The castle** ✅: the courtyard (well, flowers) with the coach house
+     as a barn; the keep across its south, entered from the courtyard into
+     the grand hall, with corridors west to the kitchen, east and down steps
+     to the dungeon, south and up to the small room, west through the door
+     that locks behind you to Merlin's lair, and the hidden way north back
+     to the hall. Each room furnished after its painting, with its own light.
+   - **Indoors**: the tower and the hut.
    - **The game**: objects to take and use, the obstacles opening, deaths,
      the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and
@@ -435,6 +442,10 @@ and wings) may need a bought or free model.
 - **Halls** are the caverns the ways join (`halls` in `land.json`): round,
   with a flat floor and a domed roof. Walking into one is walking into its
   place. Some have their own light: torches, the dragon's fire, gold.
+- **Rooms** are halls with square corners (`w` and `d`), and corridors are
+  ways marked `indoor`: walls and a roof all the way, and the light of
+  indoors as you go in at the door. The keep and the coach house are cut out
+  of the land, so you're only ever in them along a way.
 - **Obstacles underground** block only the ways (`"under": true`), so the
   old stone wall over the lamp tunnel doesn't stop you down below. The test
   walks the ways and halls too, with every obstacle closed and every one open.

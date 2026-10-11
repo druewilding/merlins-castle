@@ -27,20 +27,41 @@ export type Walkable = (x: number, z: number) => boolean;
 export interface Way {
   half: number;
   points: number[][];
+  /** A corridor in a building, rather than a tunnel. */
+  indoor?: boolean;
 }
 
-/** A hall underground (a cavern, or a room): round, with a flat floor. Being in one is being in its place. */
+/**
+ * A hall underground (a cavern, round) or a room in a building (with half
+ * its width w and depth d): flat-floored. Being in one is being in its place.
+ */
 export interface Hall {
   x: number;
   z: number;
   floor: number;
   r: number;
+  w?: number;
+  d?: number;
+  indoor?: boolean;
 }
 
-/** Where you are underground: the height of the floor, and the hall you're in, if you're in one. */
+/** Whether a spot is in a hall, with room for you. */
+function inHall(hall: Hall, x: number, z: number) {
+  if (hall.w !== undefined && hall.d !== undefined) {
+    return Math.abs(x - hall.x) <= hall.w - BODY && Math.abs(z - hall.z) <= hall.d - BODY;
+  }
+  return Math.hypot(x - hall.x, z - hall.z) <= hall.r - BODY;
+}
+
+/**
+ * Where you are when you're off the land (underground, or indoors): the
+ * height of the floor, the hall you're in if you're in one, and whether
+ * there's a building round you.
+ */
 export interface Under {
   floor: number;
   hall?: string;
+  indoor?: boolean;
 }
 
 /** How far a spot is from the middle of a way, its floor there, and whether it's past an end. */
@@ -249,7 +270,7 @@ export class Player {
     // Into a way, at the top of its ramp.
     for (const way of this.ways) {
       const n = nearest(way, x, z);
-      if (!n.beyond && n.d <= way.half - BODY && nearGround(n.floor)) return { floor: n.floor };
+      if (!n.beyond && n.d <= way.half - BODY && nearGround(n.floor)) return { floor: n.floor, indoor: way.indoor };
     }
     return onLand() ? undefined : false;
   }
@@ -257,7 +278,7 @@ export class Player {
   /** The hall a spot is in, if any (for being put straight into one). */
   hallAt(x: number, z: number): Under | undefined {
     for (const [place, hall] of this.halls) {
-      if (Math.hypot(x - hall.x, z - hall.z) <= hall.r - BODY) return { floor: hall.floor, hall: place };
+      if (inHall(hall, x, z)) return { floor: hall.floor, hall: place, indoor: hall.indoor };
     }
     return undefined;
   }
@@ -266,15 +287,17 @@ export class Player {
   // or in a way (the one nearest that floor, where they cross).
   private underAt(x: number, z: number, floor: number): Under | undefined {
     for (const [place, hall] of this.halls) {
-      if (Math.abs(hall.floor - floor) < CLIMB && Math.hypot(x - hall.x, z - hall.z) <= hall.r - BODY) {
-        return { floor: hall.floor, hall: place };
+      if (Math.abs(hall.floor - floor) < CLIMB && inHall(hall, x, z)) {
+        return { floor: hall.floor, hall: place, indoor: hall.indoor };
       }
     }
     let best: Under | undefined;
     for (const way of this.ways) {
       const n = nearest(way, x, z);
       if (n.beyond || n.d > way.half - BODY || Math.abs(n.floor - floor) >= CLIMB) continue;
-      if (!best || Math.abs(n.floor - floor) < Math.abs(best.floor - floor)) best = { floor: n.floor };
+      if (!best || Math.abs(n.floor - floor) < Math.abs(best.floor - floor)) {
+        best = { floor: n.floor, indoor: way.indoor };
+      }
     }
     return best;
   }

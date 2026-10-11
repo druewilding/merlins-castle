@@ -151,7 +151,11 @@ function underground(from: string, open: boolean) {
   const floorsAt = (x: number, z: number) => {
     const floors: { floor: number; hall?: string }[] = [];
     for (const [place, hall] of halls) {
-      if (Math.hypot(x - hall.x, z - hall.z) <= hall.r - BODY) floors.push({ floor: hall.floor, hall: place });
+      const inside =
+        "w" in hall
+          ? Math.abs(x - hall.x) <= hall.w - BODY && Math.abs(z - hall.z) <= hall.d - BODY
+          : Math.hypot(x - hall.x, z - hall.z) <= hall.r - BODY;
+      if (inside) floors.push({ floor: hall.floor, hall: place });
     }
     for (const way of ways) {
       const n = nearest(way.points, x, z);
@@ -159,8 +163,16 @@ function underground(from: string, open: boolean) {
     }
     return blocked(x, z) ? [] : floors;
   };
-  const start = land.halls[from as keyof typeof land.halls];
-  const queue = [[Math.round(start.x / STEP), Math.round(start.z / STEP), start.floor]];
+  // From the hall's middle, or beside it if something stands there (the dungeon's well).
+  const hall = land.halls[from as keyof typeof land.halls];
+  const [dx, dz] = [
+    [0, 0],
+    [0, 2.5],
+    [2.5, 0],
+    [0, -2.5],
+    [-2.5, 0],
+  ].find(([dx, dz]) => floorsAt(hall.x + dx, hall.z + dz).length > 0)!;
+  const queue = [[Math.round((hall.x + dx) / STEP), Math.round((hall.z + dz) / STEP), hall.floor]];
   const seen = new Set<string>();
   const reached = new Set<string>();
   while (queue.length) {
@@ -173,10 +185,12 @@ function underground(from: string, open: boolean) {
     if (seen.has(key)) continue;
     seen.add(key);
     if (here.hall) reached.add(here.hall);
-    // At a way's mouth (an end on the ground): out onto the land.
+    // At a way's mouth (an end on the ground, not in a hall): out onto the land.
     for (const way of ways) {
       for (const end of [way.points[0], way.points.at(-1)!]) {
-        const mouth = Math.abs(groundAt(end[0], end[1]) - end[2]) < 0.6;
+        const mouth =
+          Math.abs(groundAt(end[0], end[1]) - end[2]) < 0.6 &&
+          !halls.some(([, hall]) => Math.hypot(end[0] - hall.x, end[1] - hall.z) < 0.5);
         if (mouth && Math.hypot(x - end[0], z - end[1]) < 1 && Math.abs(end[2] - here.floor) < CLIMB) {
           const outside = places.filter((place) => !(place.id in land.halls));
           reached.add(
@@ -204,6 +218,32 @@ describe("underground, with every obstacle closed", () => {
   it("keeps the leaves in the dragon's way, and its fire, and the dark", () => {
     expect(underground("dragon-cave", false)).toEqual(["dragon-cave", "giant"]);
     expect(underground("dark-tunnels", false)).toEqual(["dark-tunnels"]);
+  });
+});
+
+describe("in the castle, with every obstacle closed", () => {
+  it("lets you in from the courtyard to the grand hall and the coach house, and no further", () => {
+    expect(underground("grand-hall", false)).toEqual(["courtyard", "grand-hall"]);
+    expect(underground("coach-house", false)).toEqual(["coach-house", "courtyard"]);
+  });
+
+  it("keeps the goblins, Merlin, the old woman and the doors in the corridors", () => {
+    for (const room of ["wizards-kitchen", "dungeon", "small-room", "merlins-lair"]) {
+      expect(underground(room, false)).toEqual([room]);
+    }
+  });
+});
+
+describe("in the castle, with every obstacle open", () => {
+  it("joins every room in the keep", () => {
+    expect(underground("grand-hall", true)).toEqual([
+      "courtyard",
+      "dungeon",
+      "grand-hall",
+      "merlins-lair",
+      "small-room",
+      "wizards-kitchen",
+    ]);
   });
 });
 

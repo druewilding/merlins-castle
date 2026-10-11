@@ -156,7 +156,8 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     for (const hall of player.halls.values()) {
       const [mx, my] = toMap(hall.x, hall.z);
       pen.beginPath();
-      pen.arc(mx, my, hall.r, 0, Math.PI * 2);
+      if (hall.w !== undefined && hall.d !== undefined) pen.rect(mx - hall.w, my - hall.d, hall.w * 2, hall.d * 2);
+      else pen.arc(mx, my, hall.r, 0, Math.PI * 2);
       pen.fill();
       pen.stroke();
     }

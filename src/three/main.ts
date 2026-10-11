@@ -205,7 +205,7 @@ const start = PLACES.get("grassy-bank")!;
 const at = new URLSearchParams(location.search).get("at")?.split(",").map(Number);
 if (at && at.length >= 2) player.place(at[0], at[1], ((at[2] ?? 0) * Math.PI) / 180);
 else player.place(start.x, start.z + 12, 0);
-let room = placeAt(player.position.x, player.position.z, "grassy-bank");
+let room = player.under?.hall ?? placeAt(player.position.x, player.position.z, "grassy-bank", player.halls);
 
 // While developing: the debug panel (the 0 key), and a handle for test scripts.
 // The built game leaves all of this out.
@@ -255,11 +255,14 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-// From daylight (0) to lamplight (1) over the first few metres down; and in
-// a lit cave, its own light comes up as you walk in.
+// From daylight (0) to lamplight (1) over the first few metres down, or as
+// you go in at a door; and in a lit cave or room, its own light comes up as
+// you walk in.
 let caveLit = 0;
+let indoors = 0;
 function lightFor(depth: number, time: number, dt: number) {
-  const under = Math.min(1, Math.max(0, (depth - 0.5) / 3));
+  indoors += ((player.under?.indoor ? 1 : 0) - indoors) * Math.min(1, dt * 4);
+  const under = Math.max(indoors, Math.min(1, Math.max(0, (depth - 0.5) / 3)));
   sunlight.intensity = 2.8 * (1 - under);
   skylight.intensity = 1.25 * (1 - under * 0.92);
   const flicker = reducedMotion ? 1 : 0.92 + 0.05 * Math.sin(time / 90) + 0.03 * Math.sin(time / 37);
@@ -287,7 +290,7 @@ renderer.setAnimationLoop((time) => {
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   if (player.under?.hall) room = player.under.hall;
-  else if (!player.inside) room = placeAt(player.position.x, player.position.z, room);
+  else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
   lightFor(player.depth, time, dt);
   labels.visible = showLabels && !player.inside; // they'd show through the tunnel's walls
   here.textContent = name(room);

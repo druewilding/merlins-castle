@@ -31,13 +31,15 @@ export const DEATHS = entries(layout.deaths).map(([exit, cr]) => ({ exit, ...spo
 const REACH = 17;
 
 /**
- * The place you're in. Between places, along a path or a tunnel, you're
- * still in the one you came from, as PLAN-V3.md says.
+ * The place you're in, on the land. Between places, along a path or a
+ * tunnel, you're still in the one you came from, as PLAN-V3.md says. Places
+ * you can only be in through a door or a cave's mouth (`inside`) don't count.
  */
-export function placeAt(x: number, z: number, current: RoomId): RoomId {
+export function placeAt(x: number, z: number, current: RoomId, inside: { has(id: string): boolean }): RoomId {
   let best = current;
   let nearest = REACH;
   for (const [id, p] of PLACES) {
+    if (inside.has(id)) continue;
     const d = Math.hypot(x - p.x, z - p.z);
     if (d < nearest) {
       nearest = d;

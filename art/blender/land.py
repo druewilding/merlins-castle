@@ -10,7 +10,8 @@
 # Underground, ways (tunnels) join halls (caverns, and the treasure room and
 # the beautiful chamber): the lamp tunnel, the caves in the mountain behind
 # the maze, and the dragon's cave, with its long tunnel up to the giant and
-# its way down to the dark tunnels.
+# its way down to the dark tunnels. Indoors is the same: the castle's rooms
+# are halls with square corners, in the keep, joined by corridors.
 #
 # Writes land.glb (what you see), land.json (what's solid, and how high the
 # ground is) and land.bin (the ground's heights).
@@ -117,6 +118,8 @@ BRIDGE = P["old-wall"][0], -40 * K  # where the path south from the old wall cro
 
 # ---------------------------------------------------------------- the paths
 
+CASTLE_ROOMS = {"coach-house", "wizards-kitchen", "grand-hall", "dungeon", "merlins-lair", "small-room"}
+
 # Exits that aren't walked along the land: across the river by plank, the
 # tunnels, and everything underground.
 NOT_A_PATH = {
@@ -144,6 +147,8 @@ for place, room in world["rooms"].items():
             continue
         if KIND.get(place) == "cave" or KIND.get(to) == "cave":
             continue  # underground, or in at a cave's mouth (below)
+        if {place, to} & CASTLE_ROOMS:
+            continue  # indoors, along the castle's corridors
         done.add(pair)
         paths.append(SHAPES.get((place, to)) or SHAPES.get((to, place)) or [P[place], P[to]])
 # Into the mist, and to Merlin's trap.
@@ -178,9 +183,10 @@ class Way:
     """A way underground: a line of points, each with its floor's height.
     A floor of None is the ground's height there: a mouth."""
 
-    def __init__(self, points, half=TUNNEL_HALF):
+    def __init__(self, points, half=TUNNEL_HALF, indoor=False):
         self.points = points
         self.half = half
+        self.indoor = indoor  # a corridor in a building: walls and a roof all the way
         self.segments = list(zip(points, points[1:]))
         xs, ys = [p[0] for p in points], [p[1] for p in points]
         self.box = (min(xs), max(xs), min(ys), max(ys))
@@ -219,17 +225,24 @@ class Way:
 
 
 class Hall:
-    """A cavern (or a room) underground: round, with a flat floor and a domed
-    roof. Being in it is being in its place."""
+    """A cavern underground, round with a domed roof; or (given half its
+    width w and depth d) a room in a building, square-cornered with a flat
+    ceiling. Either way it has a flat floor, and being in it is being in its
+    place."""
 
-    def __init__(self, place, floor, r, tall, ground, wall, light=None, glow=0.0):
+    def __init__(self, place, floor, r, tall, ground, wall, light=None, glow=0.0, w=None, d=None):
         self.place = place
         self.x, self.y = P[place]
-        self.floor, self.r, self.tall = floor, r, tall
+        self.floor, self.tall = floor, tall
+        self.w, self.d = w, d
+        self.room = w is not None
+        self.r = math.hypot(w, d) if self.room else r  # how far it reaches, at most
         self.ground, self.wall = ground, wall  # colours
         self.light, self.glow = light, glow  # its own light, if it has one
 
     def inside(self, x, y, margin=0.0):
+        if self.room:
+            return abs(x - self.x) < self.w + margin and abs(y - self.y) < self.d + margin
         return math.hypot(x - self.x, y - self.y) < self.r + margin
 
 
@@ -243,10 +256,20 @@ HALLS = {h.place: h for h in [
     Hall("dragon-cave", 0.2, 10, 9, c.linear("#7a5a3a"), c.linear("#8a6244"), "#ff7a30", 14),
     Hall("dark-tunnels", -8, 7, 5, c.linear("#3a342c"), c.linear("#4a4238")),
     Hall("beautiful-chamber", -10, 12, 8, c.linear("#f2eee2"), c.linear("#d9a640"), "#ffd98a", 26),
+    # The castle's rooms, in the keep (and the coach house, in the courtyard).
+    Hall("grand-hall", 0.4, 0, 9, c.linear("#c9bca0"), c.linear("#a89d88"), "#ffcf87", 16, w=10, d=8),
+    Hall("wizards-kitchen", 0.4, 0, 6, c.linear("#b3a58a"), c.linear("#9a8e78"), "#ff9a4a", 10, w=7, d=6),
+    Hall("dungeon", -3, 0, 6, c.linear("#5c5850"), c.linear("#6c675c"), "#a9c6ff", 7, w=7, d=7),
+    Hall("small-room", 0.4, 0, 4.5, c.linear("#7a4a2a"), c.linear("#8e2a26"), "#ffb070", 6, w=6, d=6),
+    Hall("merlins-lair", 0.4, 0, 7, c.linear("#6f6a62"), c.linear("#5d5868"), "#a8ff86", 10, w=8, d=7),
+    Hall("coach-house", 0.4, 0, 6, c.linear("#b89a5a"), c.linear("#8a6a44"), "#ffd28a", 9, w=8, d=6),
 ]}
 
 T, O, G, DM = P["trolls"], P["oak-door"], P["giant"], P["damp-tunnels"]
 TR, MZ, DK, BC = P["treasure-room"], P["maze"], P["dark-tunnels"], P["beautiful-chamber"]
+GH, WK, DU = P["grand-hall"], P["wizards-kitchen"], P["dungeon"]
+SR, ML, CH = P["small-room"], P["merlins-lair"], P["coach-house"]
+KEEP_NORTH = P["courtyard"][1] - 16  # the keep's front, across the south of the courtyard
 MAZE_CELLS, MAZE_CELL = 5, 4.4
 MAZE_HALF = MAZE_CELLS * MAZE_CELL / 2  # to the maze's outer wall
 
@@ -298,6 +321,18 @@ WAYS = {
     "dark-west": Way([(*DK, -8), (DK[0] - 34, DK[1], -8)]),
     "dark-east": Way([(*DK, -8), (DK[0] + 34, DK[1], -8)]),
     "dark-beautiful": Way([(*DK, -8), (DK[0], DK[1] - 10, -8), (BC[0], BC[1] + 12, -10), (*BC, -10)]),
+    # The castle: in at the keep's door to the grand hall, and on along its
+    # corridors: west to the kitchen, east and down the steps to the dungeon,
+    # south and up again to the small room, west through the door that locks
+    # behind you into Merlin's lair, and north by the hidden way to the hall.
+    "keep-door": Way([(GH[0], KEEP_NORTH + 1.2, None), (*GH, 0.4)], indoor=True),
+    "hall-kitchen": Way([(*GH, 0.4), (*WK, 0.4)], indoor=True),
+    "hall-dungeon": Way([(*GH, 0.4), (GH[0] + 13, GH[1], 0.4), (DU[0] - 9, DU[1], -3), (*DU, -3)], indoor=True),
+    "dungeon-small": Way([(*DU, -3), (DU[0], DU[1] - 9, -3), (SR[0], SR[1] + 9, 0.4), (*SR, 0.4)], indoor=True),
+    "small-lair": Way([(*SR, 0.4), (*ML, 0.4)], indoor=True),
+    "lair-hall": Way([(*ML, 0.4), (*GH, 0.4)], indoor=True),
+    # And in through the coach house's wide doors.
+    "coach-door": Way([(CH[0] - HALLS["coach-house"].w - 1.8, CH[1], None), (*CH, 0.4)], half=2.4, indoor=True),
 }
 
 # ---------------------------------------------------------------- the shape of the land
@@ -306,6 +341,16 @@ MOUND = Vector((P["grassy-bank"][0] - 9, P["grassy-bank"][1] + 9))  # between th
 TOWER = (P["tower"][0], P["tower"][1] + 6)
 CASTLE = (-62 * K, 62 * K, -262 * K, -142 * K)  # its walls: west, east, south, north
 MOAT = (-72 * K, 72 * K, -272 * K, -130 * K)
+KEEP = (CASTLE[0] + 1, CASTLE[1] - 1, CASTLE[2] + 1, KEEP_NORTH)  # west, east, south, north
+
+
+def in_building(x, y):
+    """Inside the keep or the coach house, where you only ever are along a way."""
+    w, e, s, n = KEEP
+    if w <= x <= e and s <= y <= n:
+        return True
+    coach = HALLS["coach-house"]
+    return abs(x - coach.x) <= coach.w + 0.6 and abs(y - coach.y) <= coach.d + 0.6
 
 
 def in_moat(x, y):
@@ -435,7 +480,7 @@ def walkable(x, y):
     floor = open_to_the_sky(x, y, 2.0)
     if floor is not None and floor < height(x, y) - 0.35:
         return False  # over the ramp: you go in at the top
-    return open_ground(x, y) and not rocky(x, y)
+    return open_ground(x, y) and not rocky(x, y) and not in_building(x, y)
 
 
 # ---------------------------------------------------------------- the ground
@@ -462,8 +507,9 @@ for j in range(ny):
         colours.append(c.vary(col, 0.12, Vector((x / 6, y / 6, 5.0))))
 for j in range(ny - 1):
     for i in range(nx - 1):
-        if open_to_the_sky(X0 + (i + 0.5) * STEP, Y0 + (j + 0.5) * STEP, 1.0) is not None:
-            continue  # the hole over a ramp
+        qx, qy = X0 + (i + 0.5) * STEP, Y0 + (j + 0.5) * STEP
+        if open_to_the_sky(qx, qy, 1.0) is not None or in_building(qx, qy):
+            continue  # the hole over a ramp, or the floor of a building
         a = j * nx + i
         faces.append((a, a + 1, a + nx + 1, a + nx))
 c.mesh_object("ground", verts, faces, colours)
@@ -563,8 +609,11 @@ for (ax, ay), (bx, by) in zip(RIVER, RIVER[1:]):
     ox, oy = -dy / dd * 7, dx / dd * 7
     water.add([(ax - ox, ay - oy, -1), (ax + ox, ay + oy, -1), (bx + ox, by + oy, -1), (bx - ox, by - oy, -1)],
               [(0, 1, 2, 3)], [WATER] * 4)
+# The moat: a ring round the castle (not a sheet under it, where the dungeon is).
 mw, me, ms, mn = MOAT
-water.add([(mw, ms, -1), (me, ms, -1), (me, mn, -1), (mw, mn, -1)], [(0, 1, 2, 3)], [WATER] * 4)
+iw, ie, is_, in_ = CASTLE[0] - 2, CASTLE[1] + 2, CASTLE[2] - 2, CASTLE[3] + 2
+for x0, y0, x1, y1 in ((mw, in_, me, mn), (mw, ms, me, is_), (mw, is_, iw, in_), (ie, is_, me, in_)):
+    water.add([(x0, y0, -1), (x1, y0, -1), (x1, y1, -1), (x0, y1, -1)], [(0, 1, 2, 3)], [WATER] * 4)
 water.build("water", smooth=False)
 
 # ---------------------------------------------------------------- built things
@@ -672,8 +721,7 @@ for i in range(n):
             maze_wall(x, y + MAZE_CELL, x + MAZE_CELL, y + MAZE_CELL)
 built.blob((RIVER[-1][0] + 6, RIVER[-1][1], -2), 9, ROCK, squash=0.7, lumpy=0.3, seed=4)  # where the river goes under
 
-# The castle: walls with a gate to the north, corner towers, and the rooms as
-# buildings round the courtyard. The golden spire rises from the great hall.
+# The castle: walls with a gate to the north, and corner towers.
 cw, ce_, cs, cn = CASTLE
 for x0, x1 in ((cw, -3), (3, ce_)):
     block(built, x0, cn - 1, 0, x1, cn + 1, 8, GREY)
@@ -684,25 +732,56 @@ for tx, ty in ((cw, cn), (ce_, cn), (cw, cs), (ce_, cs)):
     tower(built, tx, ty, 5, 13, GREY, ROOF, 8)
 for tx in (-6, 6):
     tower(built, tx, cn, 3, 11, GREY, ROOF, 5)
-ROOMS = {
-    "coach-house": (16, 12, 7),
-    "wizards-kitchen": (16, 14, 8),
-    "grand-hall": (26, 18, 12),
-    "dungeon": (14, 14, 10),
-    "merlins-lair": (18, 14, 9),
-    "small-room": (12, 12, 8),
-}
-for place, (bw, bd, bh) in ROOMS.items():
-    bx, by = P[place]
-    block(built, bx - bw / 2, by - bd / 2, 0.2, bx + bw / 2, by + bd / 2, bh, GREY)
-    built.cone((bx, by, bh), bh * 0.5, max(bw, bd) * 0.62, ROOF, sides=4, droop=0)
-gx, gy = P["grand-hall"]
-tower(built, gx, gy - 6, 4, 30, GREY)
-built.cone((gx, gy - 6, 30), 16, 4.6, GOLD, sides=12, droop=0)
-kx, ky = P["wizards-kitchen"]
-block(built, kx + 4, ky + 2, 7, kx + 6, ky + 4, 11, ROCK, solid=False)  # the chimney
+# The keep across the south of the courtyard, with its door to the grand
+# hall; the golden spire rises from the hall, through the roof. All of the
+# castle's other rooms are inside it.
+KEEP_TALL = 12
+kw, ke, ks, kn = KEEP
+door = TUNNEL_HALF + 0.1
+for x0, x1 in ((kw, GH[0] - door), (GH[0] + door, ke)):
+    block(built, x0, kn - 1, 0, x1, kn, KEEP_TALL, GREY, solid=False)
+block(built, GH[0] - door, kn - 1, TUNNEL_TALL + 0.4, GH[0] + door, kn, KEEP_TALL, GREY, solid=False)
+block(built, kw, ks, 0, ke, ks + 1, KEEP_TALL, GREY, solid=False)
+block(built, kw, ks, 0, kw + 1, kn, KEEP_TALL, GREY, solid=False)
+block(built, ke - 1, ks, 0, ke, kn, KEEP_TALL, GREY, solid=False)
+block(built, kw, ks, KEEP_TALL - 0.4, ke, kn, KEEP_TALL, c.linear("#8d8a80"), solid=False)
+x = kw
+while x < ke - 1:
+    block(built, x, kn - 1, KEEP_TALL, x + 1, kn, KEEP_TALL + 1, GREY, solid=False)  # battlements
+    x += 2
+gx, gy = GH
+built.cylinder((gx, gy - 6, KEEP_TALL - 0.5), (gx, gy - 6, 32), 4, 3.6, GREY, sides=14)
+built.cone((gx, gy - 6, 32), 16, 4.6, GOLD, sides=12, droop=0)
+kitchen = HALLS["wizards-kitchen"]
+block(built, kitchen.x - kitchen.w, kitchen.y - 1, KEEP_TALL - 0.5, kitchen.x - kitchen.w + 2, kitchen.y + 1, KEEP_TALL + 4,
+      ROCK, solid=False)  # the chimney, over the hearth
+
+# The coach house: a barn in the courtyard, its wide doors facing west.
+coach = HALLS["coach-house"]
+cw0, cw1, cd0, cd1 = coach.x - coach.w - 0.6, coach.x + coach.w + 0.6, coach.y - coach.d - 0.6, coach.y + coach.d + 0.6
+BARN = c.linear("#7a5634")
+wide = 2.4 + 0.1
+block(built, cw0, cd0, 0, cw1, cd0 + 0.5, 6.8, BARN, solid=False)
+block(built, cw0, cd1 - 0.5, 0, cw1, cd1, 6.8, BARN, solid=False)
+block(built, cw1 - 0.5, cd0, 0, cw1, cd1, 6.8, BARN, solid=False)
+block(built, cw0, cd0, 0, cw0 + 0.5, coach.y - wide, 6.8, BARN, solid=False)
+block(built, cw0, coach.y + wide, 0, cw0 + 0.5, cd1, 6.8, BARN, solid=False)
+block(built, cw0, coach.y - wide, TUNNEL_TALL + 0.4, cw0 + 0.5, coach.y + wide, 6.8, BARN, solid=False)
+built.cone((coach.x, coach.y, 6.8), 4.5, max(coach.w, coach.d) * 1.5, c.linear("#9a4c32"), sides=4, droop=0)
+
+# The well, and flowers along the walls.
 cx, cy = P["courtyard"]
-tower(built, cx + 4, cy - 2, 1.2, 1.0, STONE)  # the well
+tower(built, cx + 4, cy - 2, 1.2, 1.0, STONE)
+block(built, cx + 3.1, cy - 2.1, 1.4, cx + 3.3, cy - 1.9, 3.2, c.linear("#5e3b1f"), solid=False)
+block(built, cx + 4.7, cy - 2.1, 1.4, cx + 4.9, cy - 1.9, 3.2, c.linear("#5e3b1f"), solid=False)
+built.cone((cx + 4, cy - 2, 3.1), 1.0, 1.7, c.linear("#8a4a2e"), sides=4, droop=0)
+for k, (fx, fy) in enumerate([(CASTLE[0] + 3, cy + 8), (CASTLE[0] + 3, cy - 4), (CASTLE[0] + 3, KEEP_NORTH + 3),
+                              (-12, CASTLE[3] - 3), (12, CASTLE[3] - 3), (-24, CASTLE[3] - 3), (-8, KEEP_NORTH + 2.5)]):
+    built.blob((fx, fy, 0.5), 1.6, c.linear("#4e7a34"), squash=0.5, lumpy=0.3, seed=20 + k)
+    for m in range(5):
+        a = m * 1.3 + k
+        built.blob((fx + math.cos(a) * 1.0, fy + math.sin(a) * 0.9, 1.1), 0.35, c.linear(["#e0607e", "#f2a3b8", "#fff1c8"][m % 3]),
+                   squash=0.8, lumpy=0.2, seed=k * 5 + m, subdivisions=1)
 
 built.build("built", smooth=False)
 
@@ -715,6 +794,8 @@ IRON = c.linear("#2b2a2c")
 OAK = c.linear("#5e3b1f")
 GOLD_STONE = c.linear("#c9a25a")
 PIT_DARK = c.linear("#100b08")
+CORRIDOR_FLOOR = c.linear("#9a917f")
+CORRIDOR_WALL = c.linear("#8f8878")
 
 # What's solid underground, apart from the ways' and the halls' own walls.
 under_circles, under_boxes = [], []
@@ -782,8 +863,11 @@ for way in WAYS.values():
         d = math.hypot(bx - ax, by - ay) or 1
         nx_, ny_ = -(by - ay) / d, (bx - ax) / d
         ground = height(x, y)
-        covered = floor + TUNNEL_TALL <= ground - 0.4
+        covered = way.indoor or floor + TUNNEL_TALL <= ground - 0.4
         rows.append((x, y, floor, nx_, ny_, covered))
+    # Earth and rough stone underground; flagstones, walls and beams indoors.
+    floor_colour, wall_colour = (CORRIDOR_FLOOR, CORRIDOR_WALL) if way.indoor else (EARTH, TUNNEL_STONE)
+    roof_colour = c.linear("#5b4632") if way.indoor else c.mix(TUNNEL_STONE, EARTH, 0.5)
 
     def side(row, offset):
         x, y, _, nx_, ny_, _ = row
@@ -796,14 +880,14 @@ for way in WAYS.values():
         (alx, aly), (arx, ary) = side(a, -half), side(a, half)
         (blx, bly), (brx, bry) = side(b, -half), side(b, half)
         if not in_a_hall(*mid, 1.3) and not in_pit(mid[0], mid[1]):
-            quad(tunnel, [(alx, aly, a[2]), (arx, ary, a[2]), (brx, bry, b[2]), (blx, bly, b[2])], EARTH)
+            quad(tunnel, [(alx, aly, a[2]), (arx, ary, a[2]), (brx, bry, b[2]), (blx, bly, b[2])], floor_colour)
         for (ax_, ay_), (bx_, by_) in (((alx, aly), (blx, bly)), ((arx, ary), (brx, bry))):
             top_a = a[2] + TUNNEL_TALL if a[5] else max(height(ax_, ay_) + 0.3, a[2] + 0.6)
             top_b = b[2] + TUNNEL_TALL if b[5] else max(height(bx_, by_) + 0.3, b[2] + 0.6)
-            quad(tunnel, [(ax_, ay_, a[2]), (bx_, by_, b[2]), (bx_, by_, top_b), (ax_, ay_, top_a)], TUNNEL_STONE)
+            quad(tunnel, [(ax_, ay_, a[2]), (bx_, by_, b[2]), (bx_, by_, top_b), (ax_, ay_, top_a)], wall_colour)
         if a[5] and b[5]:
             quad(tunnel, [(alx, aly, a[2] + TUNNEL_TALL), (arx, ary, a[2] + TUNNEL_TALL), (brx, bry, b[2] + TUNNEL_TALL),
-                          (blx, bly, b[2] + TUNNEL_TALL)], c.mix(TUNNEL_STONE, EARTH, 0.5))
+                          (blx, bly, b[2] + TUNNEL_TALL)], roof_colour)
         if not a[5] and not b[5]:
             # A lip of stone round the hole, hiding its ragged edge.
             for inner, outer in ((half, half + 2.4), (-half, -half - 2.4)):
@@ -845,6 +929,8 @@ obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy, under=
 # openings where the ways come in, and a dome.
 caves = c.Builder()
 for hall in HALLS.values():
+    if hall.room:
+        continue  # (below)
     hx, hy, f, R = hall.x, hall.y, hall.floor, hall.r
     step = 1.5
     reach = R + 1.4
@@ -956,6 +1042,222 @@ for hall in HALLS.values():
                 block(caves, x - 0.08, y - 0.08, f + 1.9, x + 0.08, y + 0.08, f + 2.5, IRON, solid=False)
                 caves.cone((x, y, f + 2.5), 0.5, 0.16, FLAME, sides=6, droop=0)
 
+# The castle's rooms: a patterned floor out under the walls, walls with a
+# darker band at the bottom and doorways where the corridors come in, a
+# beamed ceiling, and what's in each room.
+rooms = c.Builder()
+WOOD = c.linear("#6b4a2c")
+DARK_WOOD = c.linear("#4a3220")
+RED = c.linear("#9e2b25")
+BLUE = c.linear("#2f4f8a")
+BRASS = c.linear("#c9a04a")
+
+
+def floor_colour(hall, i, j, x, y):
+    """The colour of a square of floor, and how much it varies."""
+    if hall.place in ("grand-hall", "wizards-kitchen", "merlins-lair"):
+        return c.mix(hall.ground, c.linear("#ffffff"), 0.08 if (i // 2 + j // 2) % 2 else 0.0), 0.08
+    if hall.place == "dungeon":
+        straw = noise.noise(Vector((x / 3, y / 3, 11.0))) > 0.2
+        return (c.linear("#a88a48") if straw else hall.ground), 0.15
+    if hall.place in ("small-room", "coach-house"):
+        plank = c.mix(hall.ground, DARK_WOOD, 0.3 if i % 2 else 0.0)  # boards, running north and south
+        if hall.place == "coach-house" and noise.noise(Vector((x / 2.5, y / 2.5, 12.0))) > 0.1:
+            plank = c.linear("#c9a85a")  # straw
+        return plank, 0.06
+    return hall.ground, 0.12
+
+
+def wall_panel(b, x, y, along, f, z0, z1, colour):
+    """Something flat on a wall: a banner, a curtain, a bookcase's face. `along`
+    is (dx, dy), half its width along the wall."""
+    dx, dy = along
+    quad(b, [(x - dx, y - dy, z0), (x + dx, y + dy, z0), (x + dx, y + dy, z1), (x - dx, y - dy, z1)], colour, 0.06)
+
+
+def furniture(b, x0, y0, x1, y1, z0, z1, colour):
+    """A solid thing standing on the floor."""
+    block(b, x0, y0, z0, x1, y1, z1, colour, solid=False)
+    under_box((x0 + x1) / 2, (y0 + y1) / 2, abs(x1 - x0) / 2, abs(y1 - y0) / 2)
+
+
+def flame(b, x, y, z, size=0.35):
+    b.cone((x, y, z), size, size * 0.3, FLAME, sides=6, droop=0)
+
+
+def room(b, hall):
+    hx, hy, f, W, D, tall = hall.x, hall.y, hall.floor, hall.w, hall.d, hall.tall
+    for i in range(-math.ceil(W + 1.5), math.ceil(W + 1.5)):
+        for j in range(-math.ceil(D + 1.5), math.ceil(D + 1.5)):
+            x0, y0 = hx + i, hy + j
+            colour, vary = floor_colour(hall, i, j, x0, y0)
+            quad(b, [(x0, y0, f - 0.03), (x0 + 1, y0, f - 0.03), (x0 + 1, y0 + 1, f - 0.03), (x0, y0 + 1, f - 0.03)], colour, vary)
+    E = 0.35
+    corners = [(hx - W - E, hy - D - E), (hx + W + E, hy - D - E), (hx + W + E, hy + D + E), (hx - W - E, hy + D + E)]
+    band = c.mix(hall.wall, c.linear("#000000"), 0.3)
+    for k in range(4):
+        (ax, ay), (bx, by) = corners[k], corners[(k + 1) % 4]
+        length = math.hypot(bx - ax, by - ay)
+        ox, oy = (by - ay) / length, -(bx - ax) / length  # outward
+        n = max(1, round(length))
+        for m in range(n):
+            p0 = (ax + (bx - ax) * m / n, ay + (by - ay) * m / n)
+            p1 = (ax + (bx - ax) * (m + 1) / n, ay + (by - ay) * (m + 1) / n)
+            mx, my = (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2
+            if opening(hall, mx + ox * 0.6, my + oy * 0.6):
+                quad(b, [(*p0, f + TUNNEL_TALL), (*p1, f + TUNNEL_TALL), (*p1, f + tall), (*p0, f + tall)], hall.wall)
+                continue
+            quad(b, [(*p0, f - 0.3), (*p1, f - 0.3), (*p1, f + 1.0), (*p0, f + 1.0)], band)
+            quad(b, [(*p0, f + 1.0), (*p1, f + 1.0), (*p1, f + tall), (*p0, f + tall)], hall.wall)
+    # The ceiling, and beams across it.
+    top = f + tall
+    quad(b, [(hx - W - E, hy - D - E, top), (hx + W + E, hy - D - E, top), (hx + W + E, hy + D + E, top),
+             (hx - W - E, hy + D + E, top)], c.mix(hall.wall, c.linear("#000000"), 0.35), 0.05)
+    y = hy - D + 1
+    while y < hy + D:
+        block(b, hx - W - E, y - 0.2, top - 0.45, hx + W + E, y + 0.2, top, DARK_WOOD, solid=False)
+        y += 2.5
+
+    if hall.place == "grand-hall":
+        # Two rows of pillars, a long red carpet from door to door with the
+        # compass in the middle, banners, and candles.
+        for px in (-6.5, 6.5):
+            for py in (-5.5, -2.2, 2.2, 5.5):
+                b.cylinder((hx + px, hy + py, f), (hx + px, hy + py, top), 0.55, 0.5, c.linear("#bdb39c"), sides=10)
+                under_circle(hx + px, hy + py, 0.55)
+        quad(b, [(hx - 1.4, hy - D - E, f + 0.02), (hx + 1.4, hy - D - E, f + 0.02), (hx + 1.4, hy + D + E, f + 0.02),
+                 (hx - 1.4, hy + D + E, f + 0.02)], RED, 0.05)
+        for radius, colour, lift in ((2.4, BRASS, 0.03), (1.9, c.linear("#3a3a5a"), 0.04), (0.6, BRASS, 0.05)):
+            sides = 24
+            verts = [(hx, hy, f + lift)] + [(hx + math.cos(2 * math.pi * k / sides) * radius,
+                                              hy + math.sin(2 * math.pi * k / sides) * radius, f + lift) for k in range(sides)]
+            b.add(verts, [(0, 1 + k, 1 + (k + 1) % sides) for k in range(sides)], [colour] * len(verts))
+        for side, colours in ((-1, (BLUE, RED)), (1, (RED, BLUE))):
+            for py, colour in zip((-5, 5), colours):
+                wall_panel(b, hx + side * (W + 0.3), hy + py, (0, 0.8), f, f + 3.2, f + 7.2, colour)
+        for px in (-5, 5):
+            wall_panel(b, hx + px, hy + D + 0.3, (0.8, 0), f, f + 3.2, f + 7.2, RED if px < 0 else BLUE)
+        for px, py in ((-3.5, -6.5), (3.5, -6.5), (-3.5, 6.5), (3.5, 6.5)):
+            block(b, hx + px - 0.08, hy + py - 0.08, f, hx + px + 0.08, hy + py + 0.08, f + 1.6, BRASS, solid=False)
+            flame(b, hx + px, hy + py, f + 1.6)
+            under_circle(hx + px, hy + py, 0.25)
+    elif hall.place == "wizards-kitchen":
+        # The hearth on the west wall with its cauldron, a long table with
+        # benches, and a dresser and shelves of pots.
+        hw = hx - W
+        furniture(b, hw - 0.35, hy - 2.6, hw + 1.2, hy - 2.0, f, f + 2.8, STONE)
+        furniture(b, hw - 0.35, hy + 2.0, hw + 1.2, hy + 2.6, f, f + 2.8, STONE)
+        block(b, hw - 0.35, hy - 2.6, f + 2.8, hw + 1.3, hy + 2.6, f + 3.4, STONE, solid=False)
+        block(b, hw - 0.35, hy - 2.0, f, hw + 1.2, hy + 2.0, f + 0.12, c.linear("#2a1c14"), solid=False)
+        under_box(hw + 0.4, hy, 0.8, 2.0)
+        for k in range(5):
+            flame(b, hw + 0.3 + (k % 2) * 0.3, hy - 1.2 + k * 0.6, f + 0.12, 0.6)
+        b.cylinder((hw + 0.6, hy, f + 0.5), (hw + 0.6, hy, f + 1.3), 0.6, 0.7, IRON, sides=12)
+        furniture(b, hx - 1.2, hy - 0.6, hx + 2.6, hy + 0.6, f + 0.75, f + 0.9, WOOD)
+        for lx in (hx - 1.0, hx + 2.4):
+            for ly in (hy - 0.45, hy + 0.45):
+                block(b, lx - 0.06, ly - 0.06, f, lx + 0.06, ly + 0.06, f + 0.75, DARK_WOOD, solid=False)
+        for by_ in (hy - 1.25, hy + 1.25):
+            furniture(b, hx - 1.0, by_ - 0.2, hx + 2.4, by_ + 0.2, f + 0.4, f + 0.5, DARK_WOOD)
+        furniture(b, hx - 4, hy + D - 0.6, hx + 1, hy + D + 0.35, f, f + 1.0, WOOD)
+        for z in (f + 1.9, f + 2.7):
+            block(b, hx - 4, hy + D - 0.1, z, hx + 3, hy + D + 0.35, z + 0.1, WOOD, solid=False)
+            for k in range(7):
+                px = hx - 3.6 + k * 0.95
+                b.cylinder((px, hy + D + 0.12, z + 0.1), (px, hy + D + 0.12, z + 0.45), 0.18, 0.13,
+                           c.linear(["#a85f3a", "#c9b38a", "#6a7a4a"][k % 3]), sides=8)
+    elif hall.place == "dungeon":
+        # Pillars, the old well under a shaft of light, chains, and stone
+        # beasts on their plinths in the corners.
+        for px in (-3.5, 3.5):
+            for py in (-3.5, 3.5):
+                b.cylinder((hx + px, hy + py, f), (hx + px, hy + py, top), 0.6, 0.55, c.linear("#7a756a"), sides=8)
+                under_circle(hx + px, hy + py, 0.6)
+        b.cylinder((hx, hy, f), (hx, hy, f + 0.8), 1.3, 1.3, STONE, sides=16)
+        verts = [(hx, hy, f + 0.75)] + [(hx + math.cos(2 * math.pi * k / 16) * 1.25, hy + math.sin(2 * math.pi * k / 16) * 1.25,
+                                         f + 0.75) for k in range(16)]
+        b.add(verts, [(0, 1 + k, 1 + (k + 1) % 16) for k in range(16)], [c.linear("#0c0a0a")] * 17)
+        under_circle(hx, hy, 1.4)
+        for a in range(4):
+            cxx, cyy = hx + math.cos(a * math.pi / 2 + 0.4) * 1.1, hy + math.sin(a * math.pi / 2 + 0.4) * 1.1
+            block(b, cxx - 0.03, cyy - 0.03, f + 0.8, cxx + 0.03, cyy + 0.03, top, IRON, solid=False)
+        for px, py in ((-5.6, -5.6), (5.6, -5.6), (-5.6, 5.6), (5.6, 5.6)):
+            furniture(b, hx + px - 0.6, hy + py - 0.6, hx + px + 0.6, hy + py + 0.6, f, f + 1.1, STONE)
+            b.blob((hx + px, hy + py, f + 1.8), 0.7, c.linear("#8a857a"), squash=1.1, lumpy=0.4, seed=int(px + py * 3))
+    elif hall.place == "small-room":
+        # A red room: curtains, a rug, and little tables with flowers.
+        quad(b, [(hx - 3.2, hy - 2.4, f + 0.02), (hx + 3.2, hy - 2.4, f + 0.02), (hx + 3.2, hy + 2.4, f + 0.02),
+                 (hx - 3.2, hy + 2.4, f + 0.02)], c.linear("#b0472c"), 0.05)
+        quad(b, [(hx - 2.7, hy - 1.9, f + 0.03), (hx + 2.7, hy - 1.9, f + 0.03), (hx + 2.7, hy + 1.9, f + 0.03),
+                 (hx - 2.7, hy + 1.9, f + 0.03)], c.linear("#7a2a2a"), 0.05)
+        for py in (-3.5, 3.5):
+            furniture(b, hx + W - 0.8, hy + py - 0.45, hx + W + 0.3, hy + py + 0.45, f, f + 0.8, DARK_WOOD)
+            b.blob((hx + W - 0.25, hy + py, f + 1.1), 0.35, c.linear("#e06a8a"), squash=0.9, lumpy=0.4, seed=int(py))
+        for k in range(8):
+            px = hx - W + 0.6 + k * (2 * W - 1.2) / 7
+            wall_panel(b, px, hy - D - 0.3, (0.35, 0), f, f, f + 4.4, c.linear("#7e1f1d"))
+    elif hall.place == "merlins-lair":
+        # The cauldron bubbling green on its round step, bookcases, and a desk.
+        dx, dy = hx - 3, hy - 2
+        b.cylinder((dx, dy, f), (dx, dy, f + 0.3), 2.0, 2.0, STONE, sides=20)
+        b.cylinder((dx, dy, f + 0.3), (dx, dy, f + 1.3), 1.0, 1.2, IRON, sides=16)
+        verts = [(dx, dy, f + 1.25)] + [(dx + math.cos(2 * math.pi * k / 16) * 1.15, dy + math.sin(2 * math.pi * k / 16) * 1.15,
+                                         f + 1.25) for k in range(16)]
+        b.add(verts, [(0, 1 + k, 1 + (k + 1) % 16) for k in range(16)], [c.linear("#5cff6a")] * 17)
+        under_circle(dx, dy, 2.0)
+        for x0, y0, x1, y1 in ((hx - W - 0.3, hy - 5, hx - W + 0.5, hy + 5), (hx - 6, hy - D - 0.3, hx + 6, hy - D + 0.5)):
+            furniture(b, x0, y0, x1, y1, f, f + 3.4, DARK_WOOD)
+            for z in (f + 0.5, f + 1.3, f + 2.1, f + 2.9):
+                for k in range(int(max(abs(x1 - x0), abs(y1 - y0)) / 0.4)):
+                    colour = c.linear(["#7a2a2a", "#2a4a7a", "#4a6a2a", "#8a6a2a", "#5a2a6a"][(k * 7 + int(z * 3)) % 5])
+                    if abs(x1 - x0) > abs(y1 - y0):
+                        bx_ = x0 + 0.2 + k * 0.4
+                        block(b, bx_, y1, z, bx_ + 0.3, y1 + 0.05, z + 0.6, colour, solid=False)
+                    else:
+                        by_ = y0 + 0.2 + k * 0.4
+                        block(b, x1, by_, z, x1 + 0.05, by_ + 0.3, z + 0.6, colour, solid=False)
+        furniture(b, hx + 3, hy + D - 1.6, hx + 6, hy + D - 0.6, f + 0.8, f + 0.9, WOOD)
+        b.blob((hx + 4.5, hy + D - 1.1, f + 1.15), 0.25, c.linear("#bfe6ff"), squash=1, lumpy=0.05, seed=3)  # crystal ball
+        for px, py in ((hx + 3.2, hy + D - 0.8), (hx + 5.8, hy + D - 0.8)):
+            flame(b, px, py, f + 0.9, 0.2)
+    elif hall.place == "coach-house":
+        # The red coach on its four wheels, and hay.
+        cxx, cyy = hx + 1.5, hy
+        furniture(b, cxx - 1.7, cyy - 0.85, cxx + 1.7, cyy + 0.85, f + 0.8, f + 2.3, c.linear("#a5281e"))
+        block(b, cxx - 1.9, cyy - 1.0, f + 2.3, cxx + 1.9, cyy + 1.0, f + 2.45, c.linear("#2a1a12"), solid=False)
+        for wx in (cxx - 1.1, cxx + 1.1):
+            for wy in (cyy - 0.95, cyy + 0.95):
+                b.cylinder((wx, wy - 0.06, f + 0.65), (wx, wy + 0.06, f + 0.65), 0.65, 0.65, c.linear("#3a2416"), sides=14)
+        for k, (px, py) in enumerate(((hx + W - 1.3, hy - D + 1.3), (hx + W - 1.3, hy + D - 1.3), (hx - 2, hy + D - 1.2))):
+            b.blob((px, py, f + 0.4), 1.3, c.linear("#d6b25a"), squash=0.6, lumpy=0.35, seed=30 + k)
+            under_circle(px, py, 1.2)
+        for px in (hx - 4.5, hx - 3.6):
+            b.cylinder((px, hy - D + 0.8, f), (px, hy - D + 0.8, f + 1.1), 0.4, 0.42, WOOD, sides=10)
+            under_circle(px, hy - D + 0.8, 0.45)
+
+
+for hall in HALLS.values():
+    if hall.room:
+        room(rooms, hall)
+
+# The castle's guards and doors, in its corridors.
+gh, wk, du, ml = HALLS["grand-hall"], HALLS["wizards-kitchen"], HALLS["dungeon"], HALLS["merlins-lair"]
+obstacle(["grand-hall west"], "box", gh.x - gh.w - 1.5, -gh.y, 1.0, TUNNEL_HALF + 0.3, under=True)  # the goblins' trap
+obstacle(["wizards-kitchen east"], "box", wk.x + wk.w + 1.5, -wk.y, 1.0, TUNNEL_HALF + 0.3, under=True)  # Merlin
+obstacle(["grand-hall east"], "box", gh.x + gh.w + 1.5, -gh.y, 1.0, TUNNEL_HALF + 0.3, under=True)  # the goblins
+obstacle(["dungeon south"], "box", du.x, -(du.y - du.d - 1.5), TUNNEL_HALF + 0.3, 1.0, under=True)  # the old woman
+obstacle(["merlins-lair north"], "box", ml.x, -(ml.y + ml.d + 1.5), TUNNEL_HALF + 0.3, 1.0, under=True)  # Merlin
+# The hidden door into the hall, which looks like wall from the hall's side
+# and won't open from there ("You cannot pass.").
+hy_ = gh.y - gh.d - 0.6
+block(rooms, gh.x - TUNNEL_HALF, hy_ - 0.15, gh.floor, gh.x + TUNNEL_HALF, hy_ + 0.15, gh.floor + TUNNEL_TALL, gh.wall, solid=False)
+obstacle(["grand-hall south"], "box", gh.x, -hy_, TUNNEL_HALF + 0.3, 0.5, under=True)
+# The lair's door, which slams and locks behind you.
+lx_ = ml.x + ml.w + 0.6
+block(rooms, lx_ - 0.15, ml.y - TUNNEL_HALF, ml.floor, lx_ + 0.15, ml.y + TUNNEL_HALF, ml.floor + TUNNEL_TALL, OAK, solid=False)
+obstacle(["merlins-lair east"], "box", lx_, -ml.y, 0.5, TUNNEL_HALF + 0.3, under=True)
+rooms.build("rooms", smooth=False)
+
 # Doors and things that block the ways (until the game opens them).
 t_edge = T[1] + HALLS["trolls"].r + 1.5
 obstacle(["trolls north"], "box", T[0], -t_edge, TUNNEL_HALF + 0.3, 1.0, under=True)  # the trolls, in the way
@@ -1003,10 +1305,12 @@ if out:
         "walkable": {"x0": X0, "y0": Y0, "step": MASK_STEP, "nx": mx, "ny": my, "offset": len(walk) * 4},
         "obstacles": obstacles,
         # The ways underground: points [x, z, floor] in three.js's axes.
-        "ways": {name: {"half": way.half, "points": [[round(x, 2), round(-y, 2), round(f, 2)] for x, y, f in way.points]}
+        "ways": {name: {"half": way.half, "points": [[round(x, 2), round(-y, 2), round(f, 2)] for x, y, f in way.points],
+                        **({"indoor": True} if way.indoor else {})}
                  for name, way in WAYS.items()},
         # The halls they join: being in one is being in its place.
-        "halls": {place: {"x": hall.x, "z": -hall.y, "floor": hall.floor, "r": hall.r, "tall": hall.tall,
+        "halls": {place: {"x": hall.x, "z": -hall.y, "floor": hall.floor, "r": round(hall.r, 2), "tall": hall.tall,
+                          **({"w": hall.w, "d": hall.d, "indoor": True} if hall.room else {}),
                           **({"light": hall.light, "glow": hall.glow} if hall.light else {})}
                   for place, hall in HALLS.items()},
         "under": {"circles": under_circles, "boxes": under_boxes},
