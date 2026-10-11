@@ -114,6 +114,9 @@ RIVER = chaikin([(x * K, y * K) for x, y in [(-215, -40), (-150, -41), (-120, -4
                                              (-44, -46), (-20, -60), (20, -60), (60, -61), (94, -60)]])
 river = Lines()
 river.add(RIVER)
+BANK = 8.5  # from the river's middle to where its banks come up out of the water
+SHORE = 10  # and to where you can walk: back from the edge, where the bank levels out
+BRIDGE_HALF = SHORE + 0.5  # half the forest bridge's length, so it reaches the shore
 BRIDGE = P["old-wall"][0], -40 * K  # where the path south from the old wall crosses
 TOWER = (P["tower"][0], P["tower"][1] + 6)  # on its knoll, north of the mossy steps
 TOWER_R = 6
@@ -503,7 +506,7 @@ for place, door in (("tower", "tower-door"), ("charcoal-hut", "hut-door")):
 
 def deck(x, y):
     """The bridge and drawbridge, for walking on."""
-    if abs(x - BRIDGE[0]) <= 2.2 and abs(y - BRIDGE[1]) <= 9:
+    if abs(x - BRIDGE[0]) <= 2.2 and abs(y - BRIDGE[1]) <= BRIDGE_HALF:
         return 0.9
     if abs(x) <= 3 and -143 * K <= y <= -127 * K:
         return 0.6
@@ -546,14 +549,14 @@ def open_ground(x, y):
     for spot in LOST.values():
         if math.hypot(x - spot[0], y - spot[1]) < 11:
             return True
-    return path_lines.distance(x, y) < 5.5 or river.distance(x, y) < 6.5 or in_moat(x, y)
+    return path_lines.distance(x, y) < 5.5 or river.distance(x, y) < BANK or in_moat(x, y)
 
 
 def walkable(x, y):
     """Where you can stand: open ground that isn't water, or a bridge."""
     if deck(x, y) is not None:
         return True
-    if river.distance(x, y) < 6.5 or in_moat(x, y):
+    if river.distance(x, y) < SHORE or in_moat(x, y):
         return False
     floor = open_to_the_sky(x, y, 2.0)
     if floor is not None and floor < height(x, y) - 0.35:
@@ -706,7 +709,7 @@ trees.build("trees", smooth=False)
 water = c.Builder()
 # The river: one ribbon, its sides joined round the bends (separate pieces
 # leave wedges of riverbed showing between them), reaching in under the
-# banks (they only come down to the water about 8 m out from the middle).
+# banks (which come up out of the water at BANK).
 verts, faces = [], []
 for k, (x, y) in enumerate(RIVER):
     (ax, ay), (bx, by) = RIVER[max(k - 1, 0)], RIVER[min(k + 1, len(RIVER) - 1)]
@@ -729,9 +732,11 @@ water.build("water", smooth=False)
 built = c.Builder()
 
 # The forest bridge and the drawbridge.
-block(built, BRIDGE[0] - 2.4, BRIDGE[1] - 9, 0.5, BRIDGE[0] + 2.4, BRIDGE[1] + 9, 0.9, c.linear("#8a5a33"), solid=False)
+block(built, BRIDGE[0] - 2.4, BRIDGE[1] - BRIDGE_HALF, 0.5, BRIDGE[0] + 2.4, BRIDGE[1] + BRIDGE_HALF, 0.9,
+      c.linear("#8a5a33"), solid=False)
 for side in (-1, 1):
-    block(built, BRIDGE[0] + side * 2.4 - 0.15, BRIDGE[1] - 9, 0.9, BRIDGE[0] + side * 2.4 + 0.15, BRIDGE[1] + 9, 1.9,
+    block(built, BRIDGE[0] + side * 2.4 - 0.15, BRIDGE[1] - BRIDGE_HALF, 0.9, BRIDGE[0] + side * 2.4 + 0.15,
+          BRIDGE[1] + BRIDGE_HALF, 1.9,
           c.linear("#6b4426"))
 block(built, -3, -143 * K, 0.2, 3, -127 * K, 0.6, c.linear("#7a5230"), solid=False)
 # The drawbridge is up: over the middle of the water, so its far half (where
