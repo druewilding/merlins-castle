@@ -360,13 +360,13 @@ export function items(options: {
 
   addEventListener("keydown", (event) => {
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (player.busy) return;
-    if (event.code === "KeyE" && aimed) take(aimed);
-    else if (event.code === "KeyG") drop();
-    else if (/^Digit[1-5]$/.test(event.code)) {
+    // (Climbing, you can get the next thing ready in your hand, but not take or drop.)
+    if (/^Digit[1-5]$/.test(event.code)) {
       held = Number(event.code.slice(5)) - 1;
       draw();
-    }
+    } else if (player.busy) return;
+    else if (event.code === "KeyE" && aimed) take(aimed);
+    else if (event.code === "KeyG") drop();
   });
 
   // ---- Each frame -----------------------------------------------------------
