@@ -2,7 +2,7 @@
 // thumb) to move. You follow the ground and are stopped by trees, rocks and
 // walls, which the place's file marks with colliders.
 
-import { Euler, type Object3D, PerspectiveCamera, Raycaster, Vector3 } from "three";
+import { Euler, PerspectiveCamera, Vector3 } from "three";
 
 export interface Circle {
   x: number;
@@ -17,6 +17,19 @@ export interface Box {
   halfZ: number;
 }
 
+/** The height of the ground at a spot, or undefined off the edge. */
+export type Ground = (x: number, z: number) => number | undefined;
+
+/** Whether you can stand at a spot: not in the forest, the river or the moat. */
+export type Walkable = (x: number, z: number) => boolean;
+
+const CELL = 16; // metres, for finding the solid things near you
+
+interface Near {
+  circles: Circle[];
+  boxes: Box[];
+}
+
 const EYE = 1.65; // metres above the ground
 const WALK = 4.2; // metres a second
 const RUN = 8;
@@ -29,14 +42,13 @@ export class Player {
   readonly position = new Vector3();
   yaw = 0; // 0 looks north (-z)
   pitch = 0;
-  circles: Circle[] = [];
-  boxes: Box[] = [];
-  bounds = 95;
+  /** West, east, north and south edges, in three.js's x and z. */
+  bounds = { west: -95, east: 95, north: -95, south: 95 };
 
   private keys = new Set<string>();
-  private ray = new Raycaster();
-  private down = new Vector3(0, -1, 0);
-  private ground: Object3D[] = [];
+  private ground: Ground = () => 0;
+  private walkable: Walkable = () => true;
+  private near = new Map<string, Near>();
   private stick = { x: 0, y: 0 }; // the thumb's walking stick, -1 to 1
   private bob = 0;
 
@@ -55,8 +67,28 @@ export class Player {
     return document.pointerLockElement === this.element;
   }
 
-  standOn(ground: Object3D[]) {
+  standOn(ground: Ground, walkable: Walkable) {
     this.ground = ground;
+    this.walkable = walkable;
+  }
+
+  /** The solid things, sorted into squares so only those near you are checked. */
+  solid(circles: Circle[], boxes: Box[]) {
+    this.near.clear();
+    // Adds a thing to every square it (or you, touching it) could be in.
+    const file = (x0: number, x1: number, z0: number, z1: number, add: (found: Near) => void) => {
+      for (let i = Math.floor((x0 - 1) / CELL); i <= Math.floor((x1 + 1) / CELL); i++) {
+        for (let j = Math.floor((z0 - 1) / CELL); j <= Math.floor((z1 + 1) / CELL); j++) {
+          let found = this.near.get(`${i},${j}`);
+          if (!found) this.near.set(`${i},${j}`, (found = { circles: [], boxes: [] }));
+          add(found);
+        }
+      }
+    };
+    for (const c of circles) file(c.x - c.r, c.x + c.r, c.z - c.r, c.z + c.r, (found) => found.circles.push(c));
+    for (const b of boxes) {
+      file(b.x - b.halfX, b.x + b.halfX, b.z - b.halfZ, b.z + b.halfZ, (found) => found.boxes.push(b));
+    }
   }
 
   place(x: number, z: number, yaw = 0) {
@@ -80,8 +112,7 @@ export class Player {
       const sin = Math.sin(this.yaw);
       const cos = Math.cos(this.yaw);
       // Forward is -z when yaw is 0; right is +x.
-      this.position.x += (-sin * forward + cos * right) * scale;
-      this.position.z += (-cos * forward - sin * right) * scale;
+      this.step((-sin * forward + cos * right) * scale, (-cos * forward - sin * right) * scale);
       this.bob += dt * speed * 1.6;
     }
     this.collide();
@@ -93,19 +124,34 @@ export class Player {
     this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
   }
 
+  // Moves you, unless it would take you into the forest or the water: then
+  // you slide along the edge, as far as you can.
+  private step(dx: number, dz: number) {
+    const p = this.position;
+    const fits = (x: number, z: number) =>
+      this.walkable(x, z) &&
+      this.walkable(x + BODY, z) &&
+      this.walkable(x - BODY, z) &&
+      this.walkable(x, z + BODY) &&
+      this.walkable(x, z - BODY);
+    if (fits(p.x + dx, p.z + dz)) p.set(p.x + dx, p.y, p.z + dz);
+    else if (fits(p.x + dx, p.z)) p.x += dx;
+    else if (fits(p.x, p.z + dz)) p.z += dz;
+  }
+
   private axis(...codes: string[]) {
     return codes.some((code) => this.keys.has(code)) ? 1 : 0;
   }
 
   private groundAt(x: number, z: number): number | undefined {
-    this.ray.set(new Vector3(x, 500, z), this.down);
-    return this.ray.intersectObjects(this.ground, false)[0]?.point.y;
+    return this.ground(x, z);
   }
 
   // Pushes you out of anything solid you've walked into.
   private collide() {
     const p = this.position;
-    for (const c of this.circles) {
+    const near = this.near.get(`${Math.floor(p.x / CELL)},${Math.floor(p.z / CELL)}`) ?? { circles: [], boxes: [] };
+    for (const c of near.circles) {
       const dx = p.x - c.x;
       const dz = p.z - c.z;
       const d = Math.hypot(dx, dz);
@@ -115,7 +161,7 @@ export class Player {
         p.z = c.z + (dz / d) * min;
       }
     }
-    for (const b of this.boxes) {
+    for (const b of near.boxes) {
       const dx = p.x - b.x;
       const dz = p.z - b.z;
       const ox = b.halfX + BODY - Math.abs(dx);
@@ -125,8 +171,8 @@ export class Player {
         else p.z += Math.sign(dz) * oz;
       }
     }
-    p.x = Math.max(-this.bounds, Math.min(this.bounds, p.x));
-    p.z = Math.max(-this.bounds, Math.min(this.bounds, p.z));
+    p.x = Math.max(this.bounds.west, Math.min(this.bounds.east, p.x));
+    p.z = Math.max(this.bounds.north, Math.min(this.bounds.south, p.z));
   }
 
   // On a touch screen: the left half is a walking stick, the right half looks.

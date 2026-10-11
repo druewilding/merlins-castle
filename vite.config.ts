@@ -74,5 +74,7 @@ function offline(): Plugin {
 // (as it once did at druewilding.com/merlins-castle/).
 export default defineConfig({
   base: "./",
+  // The 3D land's heights and where you can stand (src/three/models/land.bin).
+  assetsInclude: ["**/*.bin"],
   plugins: [artWatcher(), offline()],
 });

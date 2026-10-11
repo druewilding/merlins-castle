@@ -1,23 +1,26 @@
-// Merlin's Castle in 3D: the first step. One place, the grassy bank, built
-// in Blender (art/blender/grassy-bank.py) to walk around in. See PLAN-V3.md.
+// Merlin's Castle in 3D: the whole land in grey boxes, built in Blender
+// (art/blender/land.py), to walk from place to place. See PLAN-V3.md.
 //
-// For checking by eye: ?at=x,z,yaw (yaw in degrees, 0 looks north) starts you
-// somewhere else, already walking.
+// L shows or hides the places' names. For checking by eye: ?at=x,z,yaw (yaw
+// in degrees, 0 looks north) starts you somewhere else, already walking.
 
 import "./style.css";
 
 import {
   ACESFilmicToneMapping,
+  CanvasTexture,
   Color,
+  CylinderGeometry,
   DirectionalLight,
   Fog,
+  Group,
   HemisphereLight,
-  type Material,
   Mesh,
-  type MeshStandardMaterial,
-  type Object3D,
+  MeshBasicMaterial,
   PCFShadowMap,
   Scene,
+  Sprite,
+  SpriteMaterial,
   SRGBColorSpace,
   Timer,
   Vector3,
@@ -26,8 +29,11 @@ import {
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-import grassyBank from "./models/grassy-bank.glb?url";
-import { type Box, type Circle, Player } from "./player";
+import { DEATHS, LOST, placeAt, PLACES } from "./layout";
+import landHeights from "./models/land.bin?url";
+import landModel from "./models/land.glb?url";
+import land from "./models/land.json";
+import { type Box, type Circle, type Ground, Player, type Walkable } from "./player";
 import { sky } from "./sky";
 
 const HAZE = new Color("#d9dcc4");
@@ -46,71 +52,130 @@ renderer.shadowMap.type = PCFShadowMap;
 root.append(renderer.domElement);
 
 const scene = new Scene();
-scene.fog = new Fog(HAZE, 30, 260);
+scene.fog = new Fog(HAZE, 40, 320);
 scene.add(sky(SUN, HAZE));
 scene.add(new HemisphereLight("#cfe2ff", "#6d7a3c", 1.25));
 
 const sunlight = new DirectionalLight("#ffdcae", 2.8);
 sunlight.castShadow = true;
 sunlight.shadow.mapSize.set(2048, 2048);
-Object.assign(sunlight.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 300 });
+Object.assign(sunlight.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 400 });
 sunlight.shadow.bias = -0.0004;
-sunlight.shadow.normalBias = 0.04;
+sunlight.shadow.normalBias = 0.05;
 scene.add(sunlight, sunlight.target);
 
 const player = new Player(renderer.domElement);
 const overlay = document.createElement("div");
 overlay.className = "overlay";
-overlay.innerHTML = "<h1>Merlin's Castle</h1><p>Loading the grassy bank…</p>";
-root.append(overlay);
+overlay.innerHTML = "<h1>Merlin's Castle</h1><p>Loading the land…</p>";
+const here = document.createElement("div");
+here.className = "here";
+root.append(overlay, here);
 
-const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const place = await loader.loadAsync(grassyBank);
-const ground: Object3D[] = [];
-const circles: Circle[] = [];
-const boxes: Box[] = [];
-let start = { x: 0, z: 0 };
-
-place.scene.traverse((node) => {
-  if (node.name.startsWith("col-box")) {
-    boxes.push({ x: node.position.x, z: node.position.z, halfX: node.scale.x, halfZ: node.scale.z });
-  } else if (node.name.startsWith("col-")) {
-    circles.push({ x: node.position.x, z: node.position.z, r: node.scale.x });
-  } else if (node.name === "start") {
-    start = { x: node.position.x, z: node.position.z };
-  }
+// The land you see, and the heights of the ground you walk on.
+const [model, file] = await Promise.all([
+  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(landModel),
+  fetch(landHeights).then(async (response) => response.arrayBuffer()),
+]);
+const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
+model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
-  if (node.name.startsWith("far-")) {
-    // Far-off things are painted into the haze themselves, so the fog doesn't swallow them.
-    const material = (node.material as Material).clone() as MeshStandardMaterial;
-    material.fog = false;
-    const mountain = node.name === "far-mountain";
-    material.color = new Color(mountain ? "#b4b0c6" : "#b9c4b4");
-    // Lifting the shadows towards the sky's colour: the haze of distance.
-    material.emissive = new Color(mountain ? "#7d7f99" : "#3c4a3a");
-    node.material = material;
-    return;
-  }
-  node.castShadow = !["ground", "paths", "flowers"].includes(node.name);
-  node.receiveShadow = true;
-  if (node.name === "ground") ground.push(node);
+  node.castShadow = !["ground", "paths", "water"].includes(node.name);
+  node.receiveShadow = node.name !== "water";
 });
-scene.add(place.scene);
-player.standOn(ground);
-player.circles = circles;
-player.boxes = boxes;
+scene.add(model.scene);
+
+// The heights are in Blender's axes (y is north), on a grid; in between, blend.
+const { x0, y0, step, nx, ny } = land.ground;
+const ground: Ground = (x, z) => {
+  const i = (x - x0) / step;
+  const j = (-z - y0) / step;
+  if (i < 0 || j < 0 || i >= nx - 1 || j >= ny - 1) return undefined;
+  const i0 = Math.floor(i);
+  const j0 = Math.floor(j);
+  const fi = i - i0;
+  const fj = j - j0;
+  const h = (a: number, b: number) => heights[(j0 + b) * nx + i0 + a];
+  return (h(0, 0) * (1 - fi) + h(1, 0) * fi) * (1 - fj) + (h(0, 1) * (1 - fi) + h(1, 1) * fi) * fj;
+};
+// Where you can stand, a square metre at a time (again in Blender's axes).
+const mask = land.walkable;
+const standable = new Uint8Array(file, mask.offset, mask.nx * mask.ny);
+const walkable: Walkable = (x, z) => {
+  const i = Math.floor((x - mask.x0) / mask.step);
+  const j = Math.floor((-z - mask.y0) / mask.step);
+  return i >= 0 && j >= 0 && i < mask.nx && j < mask.ny && standable[j * mask.nx + i] === 1;
+};
+player.standOn(ground, walkable);
+
+// Solid things, and the obstacles (all closed, until the game can open them).
+const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
+const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
+for (const obstacle of Object.values(land.obstacles) as { box?: number[]; circle?: number[] }[]) {
+  if (obstacle.box)
+    boxes.push({ x: obstacle.box[0], z: obstacle.box[1], halfX: obstacle.box[2], halfZ: obstacle.box[3] });
+  if (obstacle.circle) circles.push({ x: obstacle.circle[0], z: obstacle.circle[1], r: obstacle.circle[2] });
+}
+player.solid(circles, boxes);
+const [west, east, south, north] = land.bounds;
+player.bounds = { west, east, north: -north, south: -south };
+
+// Mist where you'd get lost, and red where a way through kills you.
+const mist = new MeshBasicMaterial({ color: "#f4f6f8", transparent: true, opacity: 0.55, depthWrite: false });
+const danger = new MeshBasicMaterial({ color: "#d9503f", transparent: true, opacity: 0.5, depthWrite: false });
+for (const { x, z } of LOST) {
+  const cloud = new Mesh(new CylinderGeometry(10, 10, 10, 24, 1, true), mist);
+  cloud.position.set(x, (ground(x, z) ?? 0) + 5, z);
+  scene.add(cloud);
+}
+for (const { x, z } of DEATHS) {
+  const mark = new Mesh(new CylinderGeometry(3, 3, 6, 16, 1, true), danger);
+  mark.position.set(x, (ground(x, z) ?? 0) + 3, z);
+  scene.add(mark);
+}
+
+// The places' names, floating over them: for finding your way while the
+// world is grey.
+const name = (id: string) => id.replace(/-/g, " ").replace(/^./, (letter) => letter.toUpperCase());
+const labels = new Group();
+for (const [id, { x, z }] of PLACES) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 96;
+  const pen = canvas.getContext("2d")!;
+  pen.font = "600 48px Cinzel, Georgia, serif";
+  pen.textAlign = "center";
+  pen.textBaseline = "middle";
+  pen.lineWidth = 8;
+  pen.strokeStyle = "rgba(20, 14, 8, 0.85)";
+  pen.fillStyle = "#f6ecd2";
+  pen.strokeText(name(id), 256, 48);
+  pen.fillText(name(id), 256, 48);
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  const label = new Sprite(new SpriteMaterial({ map: texture, depthTest: false, fog: false }));
+  label.scale.set(12, 2.25, 1);
+  label.position.set(x, (ground(x, z) ?? 0) + 9, z);
+  labels.add(label);
+}
+scene.add(labels);
+addEventListener("keydown", (event) => {
+  if (event.code === "KeyL") labels.visible = !labels.visible;
+});
 
 // For checking by script while developing.
-if (import.meta.env.DEV) Object.assign(window, { world: { player, scene } });
+if (import.meta.env.DEV) Object.assign(window, { world: { player, scene, ground, walkable } });
 
+const start = PLACES.get("grassy-bank")!;
 const at = new URLSearchParams(location.search).get("at")?.split(",").map(Number);
 if (at && at.length >= 2) player.place(at[0], at[1], ((at[2] ?? 0) * Math.PI) / 180);
-else player.place(start.x, start.z, 0);
+else player.place(start.x, start.z + 12, 0);
+let room = placeAt(player.position.x, player.position.z, "grassy-bank");
 
 overlay.innerHTML = `
   <h1>Merlin's Castle</h1>
   <p class="start">Click to walk</p>
-  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Esc to stop</p>
+  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · L for names · Esc to stop</p>
   <p class="keys touch">Left thumb to walk · right thumb to look</p>`;
 overlay.hidden = Boolean(at);
 overlay.addEventListener("click", () => {
@@ -135,8 +200,10 @@ renderer.setAnimationLoop((time) => {
   timer.update(time);
   const dt = Math.min(timer.getDelta(), 0.1);
   player.update(dt, reducedMotion);
+  room = placeAt(player.position.x, player.position.z, room);
+  here.textContent = name(room);
   // The sun's shadows follow you, so they're sharp wherever you are.
   sunlight.target.position.copy(player.position);
-  sunlight.position.copy(player.position).addScaledVector(SUN, 150);
+  sunlight.position.copy(player.position).addScaledVector(SUN, 200);
   renderer.render(scene, player.camera);
 });

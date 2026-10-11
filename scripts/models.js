@@ -2,8 +2,8 @@
 // window, and writes the .glb files the 3D version loads.
 //
 //   npm run models                          every place
-//   npm run models -- grassy-bank           one place
-//   npm run models -- grassy-bank --preview also renders a picture of it
+//   npm run models -- land                  one
+//   npm run models -- land --preview        also renders a picture of it
 //                                           (art/blender/previews/)
 //
 // Blender is found at its usual place on a Mac, or set BLENDER to its path.

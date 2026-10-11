@@ -17,9 +17,9 @@ Three things make v3 what it is:
 
 Classic and Illustrated stay as they are. v3 is a third way to play.
 
-Status: **step 1 done.** The grassy bank is built in Blender and you can walk
-around it at `3d.html` on the dev server (not part of the built site yet).
-Next: the whole map in grey boxes.
+Status: **step 2 begun.** The whole land above ground is built in grey boxes
+(`art/blender/land.py`) and you can walk it at `3d.html` on the dev server
+(not part of the built site yet). Next: underground and indoors.
 
 ## Keep the engine
 
@@ -358,15 +358,21 @@ and wings) may need a bought or free model.
 
 ## Order of work
 
-1. ~~**Learn the pipeline on one place.**~~ ✅ `art/blender/grassy-bank.py`
-   builds the grassy bank; `npm run models` runs Blender with no window and
-   writes `src/three/models/grassy-bank.glb` (add `-- grassy-bank --preview`
-   for a rendered picture in `art/blender/previews/`). Open
-   `http://localhost:5173/3d.html` to walk around it.
+1. ~~**Learn the pipeline on one place.**~~ ✅ The grassy bank on its own,
+   now kept as a study of the look to aim for
+   (`art/blender/studies/grassy-bank.py`).
 2. **The whole map in grey boxes.** Every place as plain shapes at its spot,
    joined by paths and tunnels, with barriers, regions and the engine wired
    in. Playable from start to finish with stand-in objects. This settles the
    layout, the distances and the sight lines (the spire!) before any art.
+   - ~~**Above ground**~~ ✅ `npm run models` runs `art/blender/land.py` in
+     Blender with no window (add `-- land --preview` for a picture in
+     `art/blender/previews/`). Open `http://localhost:5173/3d.html`.
+   - **Underground and indoors**: the lamp tunnel, the caves in the
+     mountain, the dragon's tunnel to the giant, the dark tunnels, and the
+     tower, the hut and the castle rooms.
+   - **The game**: objects to take and use, the obstacles opening, deaths,
+     the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and
    the ladder (where v2 began), fully modelled, textured and lit. **Then
    decide** whether the look works and how long a place takes.
@@ -387,14 +393,31 @@ and wings) may need a bought or free model.
 - **Real-time light for now**, not baked: a low warm sun from the west-north-
   west, a sky-and-grass hemisphere light, and shadows that follow you. Baking
   comes later if phones need it.
-- **Simple bumping for now**, not Rapier: the ground is found by a ray, and
-  trees, rocks and walls are circles and boxes (empties named `col-…` in
-  Blender). Rapier comes in when there are steps, ladders and slopes to climb.
+- **Places are 40 m apart**: close, as the original felt. The whole map is
+  about 450 m from end to end; the grassy bank to the castle is half a
+  minute's walk.
+- **`art/blender/layout.json` says where everything is**, for both Blender
+  and the game: each place's square on the grid, which are buildings and
+  caves, and where the mists and deadly ways are.
+- **Forest is the barrier.** Trees grow wherever the ground isn't a place, a
+  path, the meadow, the mountain top or the castle grounds. A walkability map
+  (a square metre at a time) keeps you out of the forest, the river and the
+  moat, so there are no gaps between trees to slip through.
+- **Obstacles are named by the exit they block** (`land.json`): the axe
+  trees, the gate, the leaves, the drawbridge. Only obstacles that stop you
+  need one: where the original kills you for trying (the goblins, the
+  witches, the giant), you walk up and the game decides.
+- **`test/land.test.ts` walks the land** with every obstacle closed and checks
+  you only reach the places the original lets you: it found a gap beside the
+  gate that no screenshot would have shown.
+- **Simple bumping for now**, not Rapier: the ground's heights come from a
+  grid, and walls, buildings and rocks are circles and boxes. Rapier comes in
+  when there are steps, ladders and slopes to climb.
 - **Names use hyphens**: three.js drops dots from names when it loads a file.
-- **Meshopt compression**: the grassy bank is 3 MB, decoded by three.js with
-  no extra files.
-- **Far things** (the mountain, the ring of forest beyond the edge) are named
-  `far-…` and painted into the haze themselves, so the fog doesn't hide them.
+- **Meshopt compression**: the land is 5 MB, decoded by three.js with no
+  extra files.
+- **Names over the places** (press L) while the world is grey, and the place
+  you're in at the top left.
 
 ## Still to decide
 

@@ -1,11 +1,13 @@
+# A study: the grassy bank on its own, as the look to aim for when the grey
+# land gets its details. Not part of the game.
+#
+#   blender --background --python art/blender/studies/grassy-bank.py -- out.glb --preview=out.png
+#
 # The grassy bank, where the adventure starts: a crossroads of paths around a
 # low grassy mound, as in art/originals/rooms/grassy-bank.png. Leafy trees to
 # the north-west, firs to the east, open meadow to the south, the old stone
 # wall away to the west along the long path, and the mountain to the north.
 #
-#   npm run models                 builds every place
-#   npm run models -- grassy-bank  builds this one (add --preview for a picture)
-
 import math
 import random
 import sys
@@ -13,7 +15,7 @@ from pathlib import Path
 
 from mathutils import Vector, noise
 
-sys.path.append(str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).parents[1]))
 import common as c  # noqa: E402
 
 random.seed(20)
