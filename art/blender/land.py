@@ -1045,6 +1045,7 @@ def in_pit(x, y):
 # round the hole, and a lintel where the roof begins. Inside a hall, the
 # hall's own floor and walls take over, with a door frame where they meet.
 tunnel = c.Builder()
+DROPS = []  # (cave, and the two sides of where a way drops away out of it)
 for way in WAYS.values():
     half = way.half
     # The way's two edges, as lines meeting exactly at every bend (mitred,
@@ -1067,18 +1068,30 @@ for way in WAYS.values():
     for si, ((ax, ay, af), (bx, by, bf)) in enumerate(zip(pts, pts[1:])):
         n = max(1, int(math.hypot(bx - ax, by - ay) / 0.5))
         last = si == len(pts) - 2
+        length = math.hypot(bx - ax, by - ay)
+        bend = min(2 * half, length)  # how far from a bend its mitre reaches
         for k in range(n + 1 if last else n):
             t = k / n
             x, y, floor = ax + (bx - ax) * t, ay + (by - ay) * t, af + (bf - af) * t
             (c0x, c0y), (c1x, c1y) = corners[si], corners[si + 1]
+            sx, sy = seg_normals[si]
+            # (Square across the way, but for a bend's mitre, eased in over
+            # the last few metres to it: straight on, everything placed
+            # across the way meets the walls.)
+            w0, w1 = max(0.0, 1 - t * length / bend), max(0.0, 1 - (1 - t) * length / bend)
             for edge, off in ((edge_left, -half), (edge_right, half)):
-                e0 = (ax + c0x * off, ay + c0y * off)
-                e1 = (bx + c1x * off, by + c1y * off)
-                edge.append((e0[0] + (e1[0] - e0[0]) * t, e0[1] + (e1[1] - e0[1]) * t))
+                edge.append((x + sx * off + ((c0x - sx) * w0 + (c1x - sx) * w1) * off,
+                             y + sy * off + ((c0y - sy) * w0 + (c1y - sy) * w1) * off))
             ground = height(x, y)
             covered = way.indoor or floor + TUNNEL_TALL <= ground - 0.4
             nx_, ny_ = seg_normals[si]
             rows.append((x, y, floor, nx_, ny_, covered))
+    # Across the way at each row, as its walls go: after a bend, the mitred
+    # edges are skewed (one side runs on ahead of the other) all along to the
+    # next bend, so everything placed across the way (the lip, the lintel,
+    # the earth behind it, door frames) follows the same skew, not the square.
+    rows = [(x, y, floor, (rx - x) / half, (ry - y) / half, covered)
+            for (x, y, floor, _, _, covered), (rx, ry) in zip(rows, edge_right)]
     # Open to the sky from each mouth until it first goes under cover, and
     # covered from then on (on bumpy ground it would flip back and forth near
     # the lintel, leaving holes in the roof).
@@ -1187,6 +1200,21 @@ for way in WAYS.values():
             if not hall.indoor:
                 p, q = edge_left[i], edge_right[i]
                 quad(tunnel, [(*p, f + TUNNEL_TALL), (*q, f + TUNNEL_TALL), (*q, top), (*p, top)], hall.wall)
+    # Where it drops away steeply out of a cave's doorway: the cave's floor
+    # is cut off there (it reaches out under the cave's lumpy wall, and would
+    # stick out over the drop, a ledge).
+    skipped = []
+    for a, b in zip(rows, rows[1:]):
+        mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
+        hall = in_a_hall(*mid, 0.3)
+        skipped.append(hall if hall and hall.inside(mid[0], mid[1], hall.doorway) else None)
+    for k in range(len(skipped) - 1):
+        for inner, outer, step in ((k, k + 1, 1), (k + 1, k, -1)):
+            hall = skipped[inner]
+            if hall and not hall.indoor and not skipped[outer]:
+                on = rows[min(max(k + 1 + step * 4, 0), len(rows) - 1)]  # 2 m on
+                if on[2] < hall.floor - 0.5:
+                    DROPS.append((hall, edge_left[k + 1], edge_right[k + 1]))
     # A dead end, deep under the land (off into the mist): a metre more of
     # tunnel, and earth across the end of it.
     for row, edges, outward in ((rows[0], (edge_left[0], edge_right[0]), -1), (rows[-1], (edge_left[-1], edge_right[-1]), 1)):
@@ -1249,26 +1277,6 @@ for k in range(4):
 quad(pit, [(x, y, bottom) for x, y in corners], PIT_DARK)
 obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy, under=True)
 
-def doorways(hall):
-    """Where each way comes out of a cave, at its doorway (where its own
-    walls and floor begin): a point there, the way's direction outward, and
-    how far either side of it the way's floor reaches (with a square's width
-    to spare)."""
-    out = []
-    for way in WAYS.values():
-        pts = way.samples(0.1)
-        if not hall.inside(*pts[0][:2]):
-            pts = pts[::-1]
-        if not hall.inside(*pts[0][:2]) or abs(pts[0][2] - hall.floor) > 1.5:
-            continue
-        for (ax, ay, _), (bx, by, _) in zip(pts, pts[1:]):
-            if not hall.inside(bx, by, hall.doorway):
-                d = math.hypot(bx - ax, by - ay) or 1
-                out.append(((bx, by), ((bx - ax) / d, (by - ay) / d), way.half + 1.1))
-                break
-    return out
-
-
 def clip(polygon, px, py, tx, ty):
     """The part of a polygon on the near side of the line through px, py
     across the direction tx, ty."""
@@ -1294,20 +1302,25 @@ for hall in HALLS.values():
     step = 1.5
     reach = R + 1.4
     n = int(reach / step) + 1
-    doors = doorways(hall)
+    drops = [(left, right) for cave, left, right in DROPS if cave is hall]
     for i in range(-n, n):
         for j in range(-n, n):
             x0, y0 = hx + i * step, hy + j * step
             nearest_x, nearest_y = max(x0, min(hx, x0 + step)), max(y0, min(hy, y0 + step))
             if math.hypot(nearest_x - hx, nearest_y - hy) > reach:
                 continue
-            # (Cut off where a way goes out, at its doorway: its own floor
-            # goes on from there, and may drop away at once down a ramp.)
+            # (Cut off where a way drops away out of the doorway, along the
+            # way's first row of floor, which goes on down from there.)
             square = [(x0, y0), (x0 + step, y0), (x0 + step, y0 + step), (x0, y0 + step)]
-            for (dx, dy), (tx, ty), band in doors:
-                cx, cy = x0 + step / 2 - dx, y0 + step / 2 - dy
-                if abs(cx * -ty + cy * tx) < band:
-                    square = clip(square, dx, dy, tx, ty)
+            for (lx_, ly_), (rx_, ry_) in drops:
+                mx, my = (lx_ + rx_) / 2, (ly_ + ry_) / 2
+                across = math.hypot(rx_ - lx_, ry_ - ly_)
+                ux, uy = (rx_ - lx_) / across, (ry_ - ly_) / across
+                tx, ty = -uy, ux  # out of the cave
+                if (hx - mx) * tx + (hy - my) * ty > 0:
+                    tx, ty = -tx, -ty
+                if abs((x0 + step / 2 - mx) * ux + (y0 + step / 2 - my) * uy) < across / 2 + 1.1:
+                    square = clip(square, mx, my, tx, ty)
             if len(square) < 3:
                 continue
             colour, vary = hall.ground, 0.12
