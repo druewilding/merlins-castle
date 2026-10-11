@@ -965,6 +965,34 @@ for way in WAYS.values():
             for inner, outer in ((half, half + 1.8), (-half, -half - 1.8)):
                 p, q = side(row, inner), side(row, outer)
                 quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, f + TUNNEL_TALL), (*p, f + TUNNEL_TALL)], hall.wall)
+# A stone threshold at every mouth onto the land, over the ragged edge of the
+# hole in the ground (which comes in whole squares, so it reaches a little
+# past where the ramp begins, and shows the sky through the gap).
+for way in WAYS.values():
+    if way.indoor:
+        continue
+    for end, nextp in ((way.points[0], way.points[1]), (way.points[-1], way.points[-2])):
+        ex, ey, ef = end
+        if abs(ef - height(ex, ey)) > 0.6:
+            continue  # (an end deep underground, into the mist)
+        dx, dy = ex - nextp[0], ey - nextp[1]
+        dd = math.hypot(dx, dy) or 1
+        dx, dy = dx / dd, dy / dd  # outward, onto the land
+        sx, sy = -dy, dx
+        reach = way.half + 2.4
+        steps = [t / 2 for t in range(0, 7)]  # from the top of the ramp to 3 m out
+        across = [reach * (2 * k / 8 - 1) for k in range(9)]
+        grid = [[(ex + dx * t + sx * o, ey + dy * t + sy * o) for o in across] for t in steps]
+        for i in range(len(steps) - 1):
+            for j in range(len(across) - 1):
+                pts = [grid[i][j], grid[i][j + 1], grid[i + 1][j + 1], grid[i + 1][j]]
+                quad(tunnel, [(x, y, height(x, y) + 0.06) for x, y in pts], STONE, 0.1)
+        # Its edge over the ramp, down to the ramp's floor: seen from below,
+        # there's nothing to look under.
+        for j in range(len(across) - 1):
+            (x0, y0), (x1, y1) = grid[0][j], grid[0][j + 1]
+            quad(tunnel, [(x0, y0, height(x0, y0) + 0.06), (x1, y1, height(x1, y1) + 0.06), (x1, y1, ef - 0.3),
+                          (x0, y0, ef - 0.3)], STONE, 0.1)
 tunnel.build("tunnel", smooth=False)
 
 # The deep hole: straight down into the dark.
