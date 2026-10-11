@@ -136,6 +136,9 @@ type Obstacle = { box?: number[]; circle?: number[]; under?: boolean };
 const obstacles = land.obstacles as Record<string, Obstacle>;
 const underCircles: Circle[] = land.under.circles.map(([x, z, r]) => ({ x, z, r }));
 const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
+// You bump into an obstacle in your way this far before it, so you can see
+// what it is (and know there's something to do here).
+const AHEAD = 5;
 // One shape for each obstacle, with the names of every exit it blocks (a gate
 // blocks the way through from both sides).
 const shapes = new Map<string, Obstacle & { names: string[] }>();
@@ -151,12 +154,14 @@ function openObstacles(open: boolean) {
     // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
-        ...closed.flatMap(({ circle, names }) => (circle ? [{ x: circle[0], z: circle[1], r: circle[2], names }] : [])),
+        ...closed.flatMap(({ circle, names }) =>
+          circle ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: AHEAD }] : []
+        ),
         ...(under ? underCircles : circles),
       ],
       [
         ...closed.flatMap(({ box, names }) =>
-          box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names }] : []
+          box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names, ahead: AHEAD }] : []
         ),
         ...(under ? underBoxes : boxes),
       ],
@@ -235,8 +240,13 @@ said.className = "said";
 said.setAttribute("aria-live", "polite");
 root.append(said);
 let quiet = 0;
+// Only an obstacle in the way out of the place you're in reaches out, bounces
+// you back and says what's wrong: from the other side of a one-way door, it's
+// just the doorway.
+const inTheWay = (names: string[]) => names.find((name) => name.startsWith(`${room} `));
+player.inTheWay = (names) => inTheWay(names) !== undefined;
 player.onBump = (names) => {
-  const exit = names.find((name) => name.startsWith(`${room} `)) ?? names[0];
+  const exit = inTheWay(names)!;
   const [id, direction] = exit.split(" ");
   const way = world.rooms[id]?.exits[direction as Direction];
   const words = way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo;

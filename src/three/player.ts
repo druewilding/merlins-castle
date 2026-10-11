@@ -10,6 +10,8 @@ export interface Circle {
   r: number;
   /** An obstacle's names (the exits it blocks): walking into it bounces you back. */
   names?: string[];
+  /** How far before an obstacle in your way you bump into it. */
+  ahead?: number;
 }
 
 export interface Box {
@@ -18,6 +20,8 @@ export interface Box {
   halfX: number;
   halfZ: number;
   names?: string[];
+  /** Only on the sides you'd go through it from (along its thinner side), so not along a wall. */
+  ahead?: number;
 }
 
 /** The height of the ground at a spot, or undefined off the edge. */
@@ -121,7 +125,9 @@ export class Player {
   halls = new Map<string, Hall>();
   /** Where you are underground, if you are. */
   under: Under | undefined;
-  /** Called when you walk into an obstacle, with its names. */
+  /** Whether an obstacle (by its names) is in the way out of where you are: only then does it reach out and bounce you back. */
+  inTheWay: (names: string[]) => boolean = () => true;
+  /** Called when you bounce off an obstacle that's in your way, with its names. */
   onBump: (names: string[]) => void = () => {};
 
   private keys = new Set<string>();
@@ -171,9 +177,13 @@ export class Player {
         }
       }
     };
-    for (const c of circles) file(c.x - c.r, c.x + c.r, c.z - c.r, c.z + c.r, (found) => found.circles.push(c));
+    for (const c of circles) {
+      const r = c.r + (c.ahead ?? 0);
+      file(c.x - r, c.x + r, c.z - r, c.z + r, (found) => found.circles.push(c));
+    }
     for (const b of boxes) {
-      file(b.x - b.halfX, b.x + b.halfX, b.z - b.halfZ, b.z + b.halfZ, (found) => found.boxes.push(b));
+      const a = b.ahead ?? 0;
+      file(b.x - b.halfX - a, b.x + b.halfX + a, b.z - b.halfZ - a, b.z + b.halfZ + a, (found) => found.boxes.push(b));
     }
   }
 
@@ -343,25 +353,30 @@ export class Player {
     const square = `${Math.floor(p.x / CELL)},${Math.floor(p.z / CELL)}`;
     const near = (this.under ? this.nearUnder : this.near).get(square) ?? { circles: [], boxes: [] };
     for (const c of near.circles) {
+      const inTheWay = c.names !== undefined && this.inTheWay(c.names);
       const dx = p.x - c.x;
       const dz = p.z - c.z;
       const d = Math.hypot(dx, dz);
-      const min = c.r + BODY;
+      const min = c.r + (inTheWay ? (c.ahead ?? 0) : 0) + BODY;
       if (d < min && d > 0.0001) {
         p.x = c.x + (dx / d) * min;
         p.z = c.z + (dz / d) * min;
-        if (c.names) this.bounce(c.names, dx / d, dz / d);
+        if (inTheWay) this.bounce(c.names!, dx / d, dz / d);
       }
     }
     for (const b of near.boxes) {
+      const inTheWay = b.names !== undefined && this.inTheWay(b.names);
+      const reach = inTheWay ? (b.ahead ?? 0) : 0;
       const dx = p.x - b.x;
       const dz = p.z - b.z;
-      const ox = b.halfX + BODY - Math.abs(dx);
-      const oz = b.halfZ + BODY - Math.abs(dz);
+      const ox = b.halfX + (b.halfX < b.halfZ ? reach : 0) + BODY - Math.abs(dx);
+      const oz = b.halfZ + (b.halfX < b.halfZ ? 0 : reach) + BODY - Math.abs(dz);
       if (ox > 0 && oz > 0) {
-        if (ox < oz) p.x += Math.sign(dx) * ox;
+        // Back the way you came, off an obstacle in your way; otherwise out the nearest side.
+        const alongX = reach > 0 ? b.halfX < b.halfZ : ox < oz;
+        if (alongX) p.x += Math.sign(dx) * ox;
         else p.z += Math.sign(dz) * oz;
-        if (b.names) this.bounce(b.names, ox < oz ? Math.sign(dx) : 0, ox < oz ? 0 : Math.sign(dz));
+        if (inTheWay) this.bounce(b.names!, alongX ? Math.sign(dx) : 0, alongX ? 0 : Math.sign(dz));
       }
     }
     this.keepInside();

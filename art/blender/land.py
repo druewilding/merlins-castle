@@ -685,11 +685,13 @@ built.blob((ce[0] + 3, ce[1] + 8, height(*ce)), 7, ROCK, squash=0.55, lumpy=0.25
 solid_circle(ce[0] + 3, ce[1] + 8, 6)
 lx, ly = DRAGON_LIP[0] + 3, DRAGON_LIP[1]
 built.blob((lx, ly, WAYS["dragon-mouth"].nearest(lx, ly)[1] + 0.2), 2.6, LEAVES, squash=0.55, lumpy=0.35, seed=2)
-obstacle(["cave-entrance east"], "box", lx, -ly, 1.0, TUNNEL_HALF + 0.3, under=True)
 
-# The lamp tunnel's mouths: too dark to go in without the lamp.
-obstacle(["old-wall west"], "box", WEST_LIP[0] - 3, -WEST_LIP[1], 1.0, TUNNEL_HALF + 0.3, under=True)
-obstacle(["cave-entrance south"], "box", EAST_LIP[0], -(EAST_LIP[1] - 3), TUNNEL_HALF + 0.3, 1.0, under=True)
+# The tunnels' mouths are obstacles on the land, just inside the top of the
+# ramp, so you're stopped (and told why) before you go down: the leaves, and
+# the lamp tunnel's two mouths, too dark to go in without the lamp.
+obstacle(["cave-entrance east"], "box", DRAGON_LIP[0] + 1, -DRAGON_LIP[1], 1.0, TUNNEL_HALF + 0.3)
+obstacle(["old-wall west"], "box", WEST_LIP[0] - 1, -WEST_LIP[1], 1.0, TUNNEL_HALF + 0.3)
+obstacle(["cave-entrance south"], "box", EAST_LIP[0], -(EAST_LIP[1] - 1), TUNNEL_HALF + 0.3, 1.0)
 
 # The maze on the mountain top: old stone walls, one way through from every
 # side to every other.

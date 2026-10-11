@@ -204,9 +204,12 @@ own, about a minute's walk, with only your lamp to see by:
 - **You can turn back.** Halfway along, you're still in the place you set
   off from, so walking back out the way you came is fine.
 
-## No words
+## Few words
 
-The original speaks in messages. v3 shows each one instead:
+The original speaks in messages. v3 shows the places and what happens
+instead, but **obstacles keep their words**: when something's in your way,
+the original's message for it comes up at the bottom of the screen ("The
+wall is too high."), as well as what you see. Everything else is shown:
 
 | The original says                              | v3 shows                                                                   |
 | ---------------------------------------------- | -------------------------------------------------------------------------- |
@@ -223,8 +226,8 @@ The original speaks in messages. v3 shows each one instead:
 | A death message                                | The death, from where you stand                                            |
 | The score                                      | The treasure pile on the grassy bank (and a counter in the pause menu)     |
 
-So there's nothing to translate: v3 is the same in English and Danish. The
-only words are the title, the credit to Anita Straker and the menus (with
+So there's little to translate: the obstacles' messages (already in
+data/da.json), the title, the credit to Anita Straker and the menus (with
 icons where they can be).
 
 ### Clues without words
@@ -385,11 +388,10 @@ and wings) may need a bought or free model.
      hidden door). Each room furnished after its painting, with its own
      light.
    - **Indoors**: the tower and the hut.
-   - **Obstacles speak** ✅: walk into one and you bounce back, with the
-     original's words for it at the bottom of the screen ("The trees are too
-     dense."), in English or Danish, for the exit you're trying from the
-     place you're in. A stand-in for the plan's "no words", until each
-     obstacle can show what's wrong instead.
+   - **Obstacles speak** ✅: walk up to one and you bounce back 5 m before
+     it (so you can see what's in your way), with the original's words for it
+     at the bottom of the screen ("The trees are too dense."), in English or
+     Danish, for the exit you're trying from the place you're in.
    - **The game**: objects to take and use, the obstacles opening, deaths,
      the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and
@@ -456,8 +458,12 @@ and wings) may need a bought or free model.
 - **An obstacle is one shape with the names of every exit it blocks**: the
   gate is "rusty-gate north" and "yellow-flowers south", and the old stone
   wall between the old wall and the old stone wall is an obstacle too (for the
-  ladder). Bumping into one says the blocked message of the name for the
-  place you're in, or the exit's own message, or "You can't go that way."
+  ladder). Only an obstacle in the way out of the place you're in reaches 5 m
+  out (front and back, not along the wall it's in), bounces you back and says
+  its blocked message, or the exit's own message, or "You can't go that way."
+  From the other side of a one-way door, it's only the doorway. The tunnels'
+  mouths (the leaves, the lamp tunnel's dark) are obstacles on the land, at
+  the top of the ramp, so you're stopped before you go down.
 - **Obstacles underground** block only the ways (`"under": true`), so the
   old stone wall over the lamp tunnel doesn't stop you down below. The test
   walks the ways and halls too, with every obstacle closed and every one open.

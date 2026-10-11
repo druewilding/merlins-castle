@@ -12,6 +12,7 @@ import land from "../src/three/models/land.json";
 
 const BODY = 0.35; // as in src/three/player.ts
 const STEP = 0.5;
+const AHEAD = 5; // as in src/three/main.ts: you bump into an obstacle this far before it, front and back
 
 const [OX, OY] = layout.origin;
 const places = Object.entries(layout.places).map(([id, [col, row]]) => ({
@@ -36,7 +37,12 @@ const walkable = (x: number, z: number) => {
 
 type Solid = { circle: number[] } | { box: number[] };
 type Obstacle = Solid & { under?: boolean };
-const obstacles = Object.values(land.obstacles) as Obstacle[];
+const obstacles = (Object.values(land.obstacles) as Obstacle[]).map((obstacle): Obstacle => {
+  if ("circle" in obstacle)
+    return { ...obstacle, circle: [...obstacle.circle.slice(0, 2), obstacle.circle[2] + AHEAD] };
+  const [x, z, hx, hz] = obstacle.box;
+  return { ...obstacle, box: hx < hz ? [x, z, hx + AHEAD, hz] : [x, z, hx, hz + AHEAD] };
+});
 
 function sorted(solids: Solid[]) {
   const buckets = new Map<string, Solid[]>();
@@ -194,7 +200,9 @@ function underground(from: string | number[], open: boolean) {
       for (const end of [way.points[0], way.points.at(-1)!]) {
         const mouth =
           Math.abs(groundAt(end[0], end[1]) - end[2]) < 0.6 && !halls.some(([, hall]) => inHall(hall, end[0], end[1]));
-        if (mouth && Math.hypot(x - end[0], z - end[1]) < 1 && Math.abs(end[2] - here.floor) < CLIMB) {
+        // (Unless an obstacle on the land stands in the mouth: the leaves, the dark.)
+        const shut = !open && solidOnLand(end[0], end[1]);
+        if (mouth && !shut && Math.hypot(x - end[0], z - end[1]) < 1 && Math.abs(end[2] - here.floor) < CLIMB) {
           const outside = places.filter((place) => !(place.id in land.halls));
           reached.add(
             outside.reduce((a, b) => (Math.hypot(a.x - x, a.z - z) < Math.hypot(b.x - x, b.z - z) ? a : b)).id
