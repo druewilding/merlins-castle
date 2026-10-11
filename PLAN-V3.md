@@ -434,9 +434,10 @@ and wings) may need a bought or free model.
      light.
    - **Indoors** ✅: the charcoal burner's hut (its door north to the
      crossroads; a hearth, a straw bed, sacks of charcoal) and the round room
-     in the tower (its door south at the top of the mossy steps; a table and
-     candle, a chest, and steps curling up the wall to the floor above), each cut out of the
-     land like the coach house. The snake guards the tower's door from
+     in the tower (its door south at the top of the mossy steps; a chest, and
+     steps curling up the wall to the floor above, which you can climb; no
+     table in the middle, where you'd stop in the stone's reach), each cut
+     out of the land like the coach house. The snake guards the tower's door from
      outside, and the stone (the ring) the way out, in the doorway.
    - **Obstacles speak** ✅: walk up to one and you bounce back 5 m before
      it (so you can see what's in your way), with the original's words for it

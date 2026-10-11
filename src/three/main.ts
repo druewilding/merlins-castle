@@ -134,8 +134,8 @@ const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
 type Obstacle = { box?: number[]; circle?: number[]; under?: boolean };
 const obstacles = land.obstacles as Record<string, Obstacle>;
-const underCircles: Circle[] = land.under.circles.map(([x, z, r]) => ({ x, z, r }));
-const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
+const underCircles: Circle[] = land.under.circles.map(([x, z, r, top]) => ({ x, z, r, top }));
+const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ, top]) => ({ x, z, halfX, halfZ, top }));
 // You bump into an obstacle in your way this far before it, so you can see
 // what it is (and know there's something to do here).
 const AHEAD = 5;

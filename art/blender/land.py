@@ -996,12 +996,14 @@ CORRIDOR_WALL = c.linear("#8f8878")
 under_circles, under_boxes = [], []
 
 
-def under_circle(x, y, r):
-    under_circles.append([round(x, 2), round(-y, 2), round(r, 2)])
+# (Given its top, a thing low enough to climb onto: you can stand on it.)
+def under_circle(x, y, r, top=None):
+    under_circles.append([round(x, 2), round(-y, 2), round(r, 2)] + ([round(top, 2)] if top is not None else []))
 
 
-def under_box(x, y, half_x, half_y):
-    under_boxes.append([round(x, 2), round(-y, 2), round(half_x, 2), round(half_y, 2)])
+def under_box(x, y, half_x, half_y, top=None):
+    under_boxes.append([round(x, 2), round(-y, 2), round(half_x, 2), round(half_y, 2)]
+                       + ([round(top, 2)] if top is not None else []))
 
 
 def in_a_hall(x, y, floor, margin=0.0):
@@ -1487,7 +1489,7 @@ def wall_panel(b, x, y, along, f, z0, z1, colour):
 def furniture(b, x0, y0, x1, y1, z0, z1, colour):
     """A solid thing standing on the floor."""
     block(b, x0, y0, z0, x1, y1, z1, colour, solid=False)
-    under_box((x0 + x1) / 2, (y0 + y1) / 2, abs(x1 - x0) / 2, abs(y1 - y0) / 2)
+    under_box((x0 + x1) / 2, (y0 + y1) / 2, abs(x1 - x0) / 2, abs(y1 - y0) / 2, top=z1)
 
 
 def flame(b, x, y, z, size=0.35):
@@ -1725,11 +1727,9 @@ def round_room(b, hall):
     b.add([(*at(k, R + E), f + tall) for k in range(sides)], [tuple(range(sides))],
           [c.mix(hall.wall, c.linear("#000000"), 0.35)] * sides)
     if hall.place == "tower":
-        # A table in the middle, with a candle; a chest against the north wall;
-        # and stone steps curling up the wall from the west towards the north,
-        # to the floor above.
-        furniture(b, hx - 0.8, hy - 0.6, hx + 0.8, hy + 0.6, f, f + 0.8, WOOD)
-        flame(b, hx, hy, f + 0.8, 0.2)
+        # A chest against the north wall, and stone steps curling up the wall
+        # from the west towards the north, to the floor above. (Nothing in the
+        # middle: you'd stop there, in the reach of the stone that shuts you in.)
         furniture(b, hx - 0.9, hy + R - 1.0, hx + 0.9, hy + R - 0.3, f, f + 0.7, DARK_WOOD)
         for k in range(6):
             a0, a1 = math.pi - k * 0.2, math.pi - (k + 1) * 0.2
@@ -1741,7 +1741,7 @@ def round_room(b, hall):
             quad(b, [(*pts[1], f), (*pts[2], f), (*pts[2], top), (*pts[1], top)], STONE, 0.08)
             quad(b, [(*pts[3], f), (*pts[0], f), (*pts[0], top), (*pts[3], top)], STONE, 0.08)  # up from the step below
             mid = (a0 + a1) / 2
-            under_circle(hx + math.cos(mid) * (R - 0.5), hy + math.sin(mid) * (R - 0.5), 0.6)
+            under_circle(hx + math.cos(mid) * (R - 0.5), hy + math.sin(mid) * (R - 0.5), 0.6, top=top)
 
 
 for hall in HALLS.values():

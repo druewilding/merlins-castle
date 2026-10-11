@@ -12,6 +12,8 @@ export interface Circle {
   names?: string[];
   /** How far before an obstacle in your way you bump into it. */
   ahead?: number;
+  /** The height of its top, if it's low enough to climb onto. */
+  top?: number;
 }
 
 export interface Box {
@@ -22,6 +24,7 @@ export interface Box {
   names?: string[];
   /** Only on the sides you'd go through it from (along its thinner side), so not along a wall. */
   ahead?: number;
+  top?: number;
 }
 
 /** The height of the ground at a spot, or undefined off the edge. */
@@ -120,6 +123,7 @@ const EYE = 1.65; // metres above the ground
 const CROUCHED = 1.1; // the eye's height, crouching
 const CROUCHING = 0.5; // how much of your speed you have, crouching
 const GRAVITY = 9.8; // metres a second, each second
+const STEP = 0.4; // metres: you walk up (and down) anything this high, like a stair
 export const JUMP_HEIGHT = 0.6; // metres, how high a jump lifts you (a game hop, more than a real one)
 const FLY_HEIGHT = 35; // metres above the ground, flying
 const WALK = 4.2; // metres a second
@@ -221,6 +225,7 @@ export class Player {
   place(x: number, z: number, yaw = 0) {
     this.under = this.hallAt(x, z);
     this.position.set(x, this.groundAt(x, z) ?? 0, z);
+    this.lift = this.rise = 0;
     this.yaw = yaw;
     this.pitch = 0;
   }
@@ -270,11 +275,6 @@ export class Player {
       return;
     }
     this.eye += ((crouching ? CROUCHED : EYE) - this.eye) * Math.min(1, dt * 10);
-    if (this.rise !== 0 || this.lift > 0) {
-      this.lift += this.rise * dt;
-      this.rise -= GRAVITY * dt;
-      if (this.lift <= 0) this.lift = this.rise = 0;
-    }
     const bouncing = Math.hypot(this.knock.x, this.knock.z) > 0.5;
     if (bouncing) {
       this.step(this.knock.x * dt, this.knock.z * dt);
@@ -290,12 +290,51 @@ export class Player {
       this.bob += dt * speed * 1.6;
     }
     this.collide();
-    const ground = this.groundAt(this.position.x, this.position.z);
-    if (ground !== undefined) this.position.y += (ground - this.position.y) * Math.min(1, dt * 12);
+    this.upAndDown(dt);
 
     const bob = reducedMotion || length < 0.01 || bouncing || this.lift > 0 ? 0 : Math.sin(this.bob) * 0.04;
     this.camera.position.set(this.position.x, this.position.y + this.lift + this.eye + bob, this.position.z);
     this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
+  }
+
+  // What you're standing on (the ground, a floor, or a table or a step you've
+  // climbed onto), and how high you are above it: jumping, or falling off.
+  private upAndDown(dt: number) {
+    const p = this.position;
+    const ground = this.groundAt(p.x, p.z);
+    if (ground === undefined) return;
+    const feet = p.y + this.lift;
+    const surface = Math.max(ground, this.topUnder(feet));
+    if (this.lift > 0 || this.rise > 0) {
+      const next = feet + this.rise * dt;
+      this.rise -= GRAVITY * dt;
+      p.y = surface;
+      this.lift = Math.max(0, next - surface);
+      if (this.lift === 0) this.rise = 0; // landed
+    } else if (surface < p.y - STEP) {
+      this.lift = p.y - surface; // off the edge: falling
+      p.y = surface;
+    } else {
+      p.y += (surface - p.y) * Math.min(1, dt * 12); // up a slope or a step, or down one
+    }
+  }
+
+  // The top of the highest thing under you that you could stand on (up to a
+  // step above your feet).
+  private topUnder(feet: number) {
+    if (!this.under) return -Infinity;
+    const p = this.position;
+    const near = this.nearUnder.get(`${Math.floor(p.x / CELL)},${Math.floor(p.z / CELL)}`);
+    let best = -Infinity;
+    for (const c of near?.circles ?? []) {
+      if (c.top !== undefined && c.top <= feet + STEP && Math.hypot(p.x - c.x, p.z - c.z) < c.r)
+        best = Math.max(best, c.top);
+    }
+    for (const b of near?.boxes ?? []) {
+      if (b.top !== undefined && b.top <= feet + STEP && Math.abs(p.x - b.x) < b.halfX && Math.abs(p.z - b.z) < b.halfZ)
+        best = Math.max(best, b.top);
+    }
+    return best;
   }
 
   // Flying: forward is wherever you look (up or down, too).
@@ -417,7 +456,11 @@ export class Player {
     // Coming up out of a tunnel, you're going through its mouth the free way.
     const cameOut = this.wasInside && !this.under;
     this.wasInside = this.inside;
+    // (Anything you're above, or a step below, you go over, not into.)
+    const feet = p.y + this.lift;
+    const below = (thing: Circle | Box) => thing.top !== undefined && feet >= thing.top - STEP;
     for (const c of near.circles) {
+      if (below(c)) continue;
       const dx = p.x - c.x;
       const dz = p.z - c.z;
       const d = Math.hypot(dx, dz);
@@ -431,6 +474,7 @@ export class Player {
       }
     }
     for (const b of near.boxes) {
+      if (below(b)) continue;
       const reach = b.ahead ?? 0;
       const dx = p.x - b.x;
       const dz = p.z - b.z;
