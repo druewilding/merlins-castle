@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/druewilding/merlins-castle/compare/v2.1.0...v2.2.0) (2026-10-11)
+
+
+### Features
+
+* Early beginnings of a v3 with a 3D walkable connected map! ([#44](https://github.com/druewilding/merlins-castle/issues/44)) ([755ecaa](https://github.com/druewilding/merlins-castle/commit/755ecaa13de69c458524c2e20fd20603b2895435))
+
 ## [2.1.0](https://github.com/druewilding/merlins-castle/compare/v2.0.1...v2.1.0) (2026-10-11)
 
 
