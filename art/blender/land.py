@@ -588,9 +588,11 @@ def walkable(x, y):
 # ---------------------------------------------------------------- the ground
 
 
-def drawn_height(x, y):
+def drawn_height(x, y, exactly=False):
     """The ground's height as drawn: flat triangles between the grid's points
-    (whichever way each square is split), so a little under height()."""
+    (whichever way each square is split, so it's never above it), so a little
+    under height(). Exactly: as Blender splits them (from each square's first
+    corner to its third), for laying something right on it."""
     fi, fj = (x - X0) / STEP, (y - Y0) / STEP
     i, j = math.floor(fi), math.floor(fj)
     fx, fy = fi - i, fj - j
@@ -601,6 +603,8 @@ def drawn_height(x, y):
         a = h00 + fx * (h10 - h00) + fy * (h11 - h10)
     else:
         a = h00 + fy * (h01 - h00) + fx * (h11 - h01)
+    if exactly:
+        return a
     if fx + fy < 1:
         b = h00 + fx * (h10 - h00) + fy * (h01 - h00)
     else:
@@ -642,15 +646,21 @@ for j in range(ny - 1):
         faces.append((a, a + 1, a + nx + 1, a + nx))
 c.mesh_object("ground", verts, faces, colours)
 
-# Paths: strips of earth on the ground.
+# Paths: strips of earth on the ground, lying on it as it's drawn (flat
+# triangles, a little under height() on a rise), in pieces small enough to
+# bend with it, so they neither float over a mound nor sink into a hollow.
+ACROSS = [-1.5, -0.75, 0.0, 0.75, 1.5]
 strips = c.Builder()
 for k, line in enumerate(paths):
     samples = []
     for (ax, ay), (bx, by) in zip(line, line[1:]):
-        n = max(1, int(math.hypot(bx - ax, by - ay) / 1.0))
+        n = max(1, int(math.hypot(bx - ax, by - ay) / 0.5))
         samples += [(ax + (bx - ax) * f / n, ay + (by - ay) * f / n) for f in range(n)]
     samples.append(line[-1])
-    lift = 0.05 + 0.004 * (k % 10)
+    # (Only just above the grass: the game draws paths over it where they
+    # meet, so they don't flicker into it far off. A little apart from each
+    # other, where they cross.)
+    lift = 0.01 + 0.002 * (k % 10)
     verts, colours, faces = [], [], []
     for i, (x, y) in enumerate(samples):
         nx_, ny_ = samples[min(i + 1, len(samples) - 1)]
@@ -658,16 +668,18 @@ for k, line in enumerate(paths):
         tx, ty = nx_ - px_, ny_ - py_
         dd = math.hypot(tx, ty) or 1
         ox, oy = -ty / dd, tx / dd
-        for side in (-1.5, 1.5):
+        for side in ACROSS:
             vx, vy = x + ox * side, y + oy * side
             d = deck(vx, vy)
-            verts.append((vx, vy, (d if d is not None else height(vx, vy)) + lift))
+            verts.append((vx, vy, (d if d is not None else drawn_height(vx, vy, exactly=True)) + lift))
             colours.append(c.vary(DIRT, 0.12, Vector((vx, vy, 2.0))))
         if i:
             # (Wound to face up: facing down, the sun's shadows fall on the
             # path in stripes.)
-            a = (i - 1) * 2
-            faces.append((a, a + 2, a + 3, a + 1))
+            m = len(ACROSS)
+            for j in range(m - 1):
+                a = (i - 1) * m + j
+                faces.append((a, a + m, a + m + 1, a + 1))
     strips.add(verts, faces, colours)
 strips.build("paths")
 
