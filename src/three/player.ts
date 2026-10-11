@@ -372,8 +372,8 @@ export class Player {
       const ox = b.halfX + (b.halfX < b.halfZ ? reach : 0) + BODY - Math.abs(dx);
       const oz = b.halfZ + (b.halfX < b.halfZ ? 0 : reach) + BODY - Math.abs(dz);
       if (ox > 0 && oz > 0) {
-        // Back the way you came, off an obstacle in your way; otherwise out the nearest side.
-        const alongX = reach > 0 ? b.halfX < b.halfZ : ox < oz;
+        // Out the side you came in by (so coming at an obstacle from the side, you slide off it).
+        const alongX = ox < oz;
         if (alongX) p.x += Math.sign(dx) * ox;
         else p.z += Math.sign(dz) * oz;
         if (inTheWay) this.bounce(b.names!, alongX ? Math.sign(dx) : 0, alongX ? 0 : Math.sign(dz));
