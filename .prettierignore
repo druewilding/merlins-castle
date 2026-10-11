@@ -4,3 +4,4 @@ data/world.json
 dist/
 original/
 src/illustrated/art-manifest.json
+src/three/models/land.json
