@@ -25,6 +25,8 @@ export interface Box {
   /** Only on the sides you'd go through it from (along its thinner side), so not along a wall. */
   ahead?: number;
   top?: number;
+  /** A wall that's an obstacle's (the old stone wall): touch it and it says the obstacle's words, without a bounce. */
+  says?: string[];
 }
 
 /** The height of the ground at a spot, or undefined off the edge. */
@@ -550,6 +552,9 @@ export class Player {
         if (alongX) p.x += Math.sign(dx) * ox;
         else p.z += Math.sign(dz) * oz;
         if (exit) this.bounce(exit, alongX ? Math.sign(dx) : 0, alongX ? 0 : Math.sign(dz));
+        // (Right up against it, past its reach: landed by it, over the top.)
+        const says = b.says && wayThrough(b.says, b.x, b.z, p.x, p.z);
+        if (says) this.onBump(says);
       }
     }
     this.keepInside();
