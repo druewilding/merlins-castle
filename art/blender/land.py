@@ -573,8 +573,17 @@ def open_ground(x, y):
     return path_lines.distance(x, y) < 5.5 or river.distance(x, y) < BANK or in_moat(x, y)
 
 
+def under_a_tree(x, y):
+    """Within a tree's spreading branches (with room for you): a tree at the
+    forest's edge reaches out over the open ground."""
+    i, j = int(x // 10), int(y // 10)
+    return any(math.hypot(x - tx, y - ty) < r + 0.4
+               for di in (-1, 0, 1) for dj in (-1, 0, 1) for tx, ty, r in TREES.get((i + di, j + dj), ()))
+
+
 def walkable(x, y):
-    """Where you can stand: open ground that isn't water, or a bridge."""
+    """Where you can stand: open ground that isn't water, or a bridge, and
+    not under a tree."""
     if deck(x, y) is not None:
         return True
     if river.distance(x, y) < SHORE or in_moat(x, y):
@@ -582,7 +591,7 @@ def walkable(x, y):
     floor = open_to_the_sky(x, y, 2.0)
     if floor is not None and floor < height(x, y) - 0.35:
         return False  # over the ramp: you go in at the top
-    return open_ground(x, y) and not rocky(x, y) and not in_building(x, y)
+    return open_ground(x, y) and not rocky(x, y) and not in_building(x, y) and not under_a_tree(x, y)
 
 
 # ---------------------------------------------------------------- the ground
@@ -726,6 +735,7 @@ def tower(builder, x, y, radius, tall, colour, roof=None, roof_tall=None, sides=
 
 # Trees: on a jittered grid wherever the ground isn't open.
 trees = c.Builder()
+TREES = {}  # each tree's spot and how far its branches spread, by 10 m square
 for gx in range(X0 + 3, X1 - 2, 5):
     for gy in range(Y0 + 3, Y1 - 2, 5):
         x, y = gx + random.uniform(-2, 2), gy + random.uniform(-2, 2)
@@ -733,7 +743,9 @@ for gx in range(X0 + 3, X1 - 2, 5):
             continue
         z = height(x, y)
         tall = random.uniform(9, 14)
-        trees.cone((x, y, z - 0.3), tall, random.uniform(2.2, 3.0), c.vary(TREE, 0.2, Vector((x, y, 0))), sides=7, droop=0.3)
+        r = random.uniform(2.2, 3.0)
+        trees.cone((x, y, z - 0.3), tall, r, c.vary(TREE, 0.2, Vector((x, y, 0))), sides=7, droop=0.3)
+        TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
 # The dense trees across the mountain path, which only the axe will clear.
 w, e, s, n = AXE_TREES
 obstacle(["mountain-path north"], "box", (w + e) / 2, -(s + n) / 2, (e - w) / 2 + 2, (n - s) / 2)
@@ -862,11 +874,7 @@ fl = HALLS["charcoal-hut"].floor
 block(built, hx - gap, hy + 2.3, fl - 0.6, hx + gap, hy + 3.2, fl - 0.02, STONE, solid=False)
 solid_box(hx, hy, 4, 3)
 
-# The cave entrance's mound, and the pile of leaves filling the mouth of the
-# dragon's cave, just inside.
-ce = P["cave-entrance"]
-built.blob((ce[0] + 3, ce[1] + 8, height(*ce)), 7, ROCK, squash=0.55, lumpy=0.25, seed=1)
-solid_circle(ce[0] + 3, ce[1] + 8, 6)
+# The pile of leaves filling the mouth of the dragon's cave, just inside.
 lx, ly = DRAGON_LIP[0] + 3, DRAGON_LIP[1]
 built.blob((lx, ly, WAYS["dragon-mouth"].nearest(lx, ly)[1] + 0.2), 2.6, LEAVES, squash=0.55, lumpy=0.35, seed=2)
 
