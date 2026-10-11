@@ -86,7 +86,10 @@ right beside the witches. A long path between the old stone wall and
 the grassy bank moves the whole north-east one step across, so the deep river
 lies straight north of its south bank, and the castle straight south of the
 grassy bank. The [picture map](https://claude.ai/artifact/9LzdktTaSaPtsdec2Qswq6) draws
-this with every exit and the object it needs.
+this with every exit and the object it needs (a still of it is
+`docs/v3-map.png`), and `docs/v3-world.png` is the whole land painted from it
+in ChatGPT: concept art for the feel, while the grey-box world settles the
+exact distances.
 
 ```
 tower        .            oak-door     treasure     giant        .            .
