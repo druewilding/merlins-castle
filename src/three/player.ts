@@ -343,11 +343,19 @@ export class Player {
     if (f.t < 1) return;
     this.following = undefined;
     f.done();
-    // Landing in an obstacle's reach, you're going through it the free way.
     // (After done(): that can close obstacles again, which starts them afresh.)
-    const near = this.near.get(`${Math.floor(this.position.x / CELL)},${Math.floor(this.position.z / CELL)}`);
+    this.throughHere();
+  }
+
+  /**
+   * In an obstacle's reach where you stand (landed over a wall, or it's just
+   * closed behind you), you're going through it the free way: no bounce.
+   */
+  throughHere() {
+    const { x, z } = this.position;
+    const near = (this.under ? this.nearUnder : this.near).get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
     for (const thing of [...(near?.circles ?? []), ...(near?.boxes ?? [])]) {
-      if (thing.names && touching(thing, this.position.x, this.position.z, BODY)) this.passing.add(thing);
+      if (thing.names && touching(thing, x, z, BODY)) this.passing.add(thing);
     }
   }
 

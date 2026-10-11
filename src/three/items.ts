@@ -17,7 +17,7 @@ import { type Ground, type Hall, nearest, type Player, type Walkable } from "./p
 
 const SLOTS = 5;
 // How far you can reach to take something (from your eyes).
-const REACH = 8;
+const REACH = 10;
 // A thin object is easier to point at with a little room round it.
 const AIM_SLACK = 0.25;
 // The ground you walk on is a little smoother than the ground you see; an

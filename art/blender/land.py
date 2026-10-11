@@ -832,7 +832,28 @@ for start, end in ((WW - 0.6, GATE[0]), (GATE[1], WX + 0.6)):
     while x < end - 0.01:
         block(built, x, WY - 0.6, height(x, WY) - 0.5, min(x + 2, end), WY + 0.6, height(x, WY) + WALL, STONE)
         x += 2
-block(built, GATE[0], WY - 0.3, 0.0, GATE[1], WY + 0.3, 3.6, c.linear("#a5532c"), solid=False)  # the rusty gate, locked
+# The rusty gate, locked: two halves, each on its hinge at the wall, which
+# the game swings open (north, away from the rusty gate) while the key's in use.
+RUST = c.linear("#a5532c")
+GATE_FOOT = height((GATE[0] + GATE[1]) / 2, WY) - 0.1
+for name, hinge, way in (("gate-west", GATE[0], 1), ("gate-east", GATE[1], -1)):
+    leaf = c.Builder()
+    wide = (GATE[1] - GATE[0]) / 2 - 0.02
+
+    def bar(a0, a1, z0, z1, t=0.05):
+        """A piece of the gate, from a0 to a1 out from its hinge."""
+        lo, hi = sorted((a0 * way, a1 * way))
+        block(leaf, lo, -t, z0, hi, t, z1, RUST, solid=False)
+
+    bar(0, 0.12, 0, 3.6)  # the stile on the hinge
+    bar(wide - 0.1, wide, 0, 3.6)  # and where the two halves meet
+    for z in (0.15, 1.8, 3.35):
+        bar(0, wide, z, z + 0.12)  # the rails
+    for k in range(1, 8):
+        a = k * wide / 8
+        bar(a - 0.025, a + 0.025, 0, 3.8, t=0.025)  # the bars, poking up above the top rail
+    obj = leaf.build(name, smooth=False)
+    obj.location = (hinge, WY, GATE_FOOT)
 obstacle(["rusty-gate north", "yellow-flowers south"], "box", (GATE[0] + GATE[1]) / 2, -WY, (GATE[1] - GATE[0]) / 2, 0.6)
 y = WY
 while y < 118 * K:

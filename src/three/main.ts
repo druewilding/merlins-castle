@@ -15,6 +15,7 @@ import {
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
+  type Object3D,
   PCFShadowMap,
   PointLight,
   Scene,
@@ -176,6 +177,22 @@ const walls = new Set(
       })
   )
 );
+// Gates that swing open: the rusty gate's two halves (on their hinges, each
+// turning the way that swings it north), open while the key's in use there.
+const gates = new Map<Shape, { leaves: [Object3D, number][]; open: number; wants: number }>();
+const rusty = shapeOf.get("rusty-gate north");
+const leaves = (["gate-west", "gate-east"] as const).map((name) => model.scene.getObjectByName(name));
+if (rusty && leaves[0] && leaves[1]) {
+  gates.set(rusty, {
+    leaves: [
+      [leaves[0], 1],
+      [leaves[1], -1],
+    ],
+    open: 0,
+    wants: 0,
+  });
+}
+const SWING = 1.75; // radians, open
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 function solidify() {
@@ -201,6 +218,7 @@ function solidify() {
       under
     );
   }
+  player.throughHere();
 }
 function openObstacles(open: boolean) {
   allOpen = open;
@@ -289,14 +307,18 @@ const items = setUpItems({
 function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
+  // (Only the ways the 3D world can open so far: walls to climb, gates.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
     const shape = shapeOf.get(`${here} ${direction}`);
-    return needs && using.includes(needs) && shape && walls.has(shape) ? [`${here} ${direction}`] : [];
+    return needs && using.includes(needs) && shape && (walls.has(shape) || gates.has(shape))
+      ? [`${here} ${direction}`]
+      : [];
   });
   opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
   solidify();
-  const wall = exits[0];
+  for (const [shape, gate] of gates) gate.wants = opened.has(shape) ? 1 : 0;
+  const wall = exits.find((exit) => walls.has(shapeOf.get(exit)!));
   if (wall !== leaning) {
     ladder.away();
     if (wall) ladder.lean(shapeOf.get(wall)!.box!, wall, PLACES.get(here)!, itemLocations.ladder === "carried");
@@ -411,6 +433,12 @@ renderer.setAnimationLoop((time) => {
   if (!player.busy) {
     if (player.under?.hall) room = player.under.hall;
     else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
+  }
+  for (const gate of gates.values()) {
+    gate.open += Math.sign(gate.wants - gate.open) * Math.min(Math.abs(gate.wants - gate.open), dt * 0.8);
+    // (Slow to start and to stop, like a heavy old gate.)
+    const swing = SWING * (gate.open * gate.open * (3 - 2 * gate.open));
+    for (const [leaf, way] of gate.leaves) leaf.rotation.y = way * swing;
   }
   ladder.update((exit) => {
     if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;

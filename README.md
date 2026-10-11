@@ -92,9 +92,10 @@ npm run build && npm run preview  # try the built version at http://localhost:41
 Mouse to look, WASD or the arrow keys to walk, Shift to run, Space to jump
 (how high is `JUMP_HEIGHT` in `src/three/player.ts`), Ctrl or C to crouch.
 Look at an object and press E to take it; 1 to 5 picks which of your five
-slots is in your hand, a click uses it and G drops it. (Only the ladder is
-in the world so far: its model is made by `art/blender/items.py`. Use it by
-the old stone wall and walk into it to climb over.)
+slots is in your hand, a click uses it and G drops it. (Only the ladder and
+the key are in the world so far: their models are made by
+`art/blender/items.py`. Use the ladder by the old stone wall and walk into
+it to climb over; use the key by the rusty gate.)
 On the dev server only, **0** opens the debug panel: fly (F takes you 35 m
 up, and F again drops you back down), walk through anything (N), open every
 obstacle (O), show the obstacles and how far they reach, red where they kill
