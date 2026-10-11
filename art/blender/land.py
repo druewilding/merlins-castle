@@ -1700,12 +1700,15 @@ def room(b, hall):
 
 
 def round_room(b, hall):
-    """A round room: a floor of flagstones in rings, out just under the wall;
+    """A round room: a floor of flagstones in rings, out under the wall;
     the wall, with a doorway where a way comes in; and a flat ceiling."""
     hx, hy, f, R, tall = hall.x, hall.y, hall.floor, hall.r, hall.tall
     sides = 32
     at = lambda k, r: (hx + math.cos(2 * math.pi * k / sides) * r, hy + math.sin(2 * math.pi * k / sides) * r)
-    rings = [0.0, 1.4, 2.8, 4.2, R + 0.5]
+    # (In the tower, right out to its outer wall: by the doorway, where the
+    # room's own wall is open, you'd see the ground between them.)
+    out = TOWER_R * math.cos(math.pi / SIDES) - 0.02 if hall.place == "tower" else R + 0.5
+    rings = [0.0, 1.4, 2.8, 4.2, out]
     fl = f - 0.06  # (a shade under the doorway's floor, where they overlap)
     for i in range(len(rings) - 1):
         for k in range(sides):
