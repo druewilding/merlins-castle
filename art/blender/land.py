@@ -942,9 +942,10 @@ for way in WAYS.values():
                                        ((alx, aly), (arx, ary), a[2], a[2]), ((blx, bly), (brx, bry), b[2], b[2])):
                     quad(tunnel, [(*p0, z0), (*p1, z1), (*p1, min(z1 - 0.12, bottom)), (*p0, min(z0 - 0.12, bottom))],
                          floor_colour)
+        # (Up the ramps, the walls stop exactly under the stone lip on top of them.)
         for (ax_, ay_), (bx_, by_) in (((alx, aly), (blx, bly)), ((arx, ary), (brx, bry))):
-            top_a = a[2] + TUNNEL_TALL if a[5] else max(height(ax_, ay_) + 0.3, a[2] + 0.6)
-            top_b = b[2] + TUNNEL_TALL if b[5] else max(height(bx_, by_) + 0.3, b[2] + 0.6)
+            top_a = a[2] + TUNNEL_TALL if a[5] else max(height(ax_, ay_) + 0.32, a[2] + 0.6)
+            top_b = b[2] + TUNNEL_TALL if b[5] else max(height(bx_, by_) + 0.32, b[2] + 0.6)
             quad(tunnel, [(ax_, ay_, a[2]), (bx_, by_, b[2]), (bx_, by_, top_b), (ax_, ay_, top_a)], wall_colour)
         if a[5] and b[5]:
             quad(tunnel, [(alx, aly, a[2] + TUNNEL_TALL), (arx, ary, a[2] + TUNNEL_TALL), (brx, bry, b[2] + TUNNEL_TALL),
