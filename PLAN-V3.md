@@ -530,7 +530,12 @@ and wings) may need a bought or free model.
   walks the ways and halls too, with every obstacle closed and every one open.
 - **Underground light**: as you go down, the sun and sky fade and a warm
   lamp glow round you takes over (one day only with the lamp lit). The land
-  casts shadows, so the sun can't shine into a tunnel from above.
+  casts shadows, so the sun can't shine into a tunnel from above. Indoors in
+  a building the sun stays out (the roof's shadow keeps it off you, and it's
+  still day outside the door); only the sky's light softens. Every lit cave
+  and room keeps its own light on (the four nearest you, a fixed number of
+  lights, so materials never rebuild), so a room seen through a doorway is
+  lit too.
 - **A debug panel** on the dev server only (the 0 key): fly (F), walk
   through anything (N), open every obstacle (O), show the obstacles and
   their reach (R, red where they kill you), show gaps with a magenta sky

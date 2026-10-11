@@ -66,9 +66,13 @@ scene.add(skylight);
 // only if you've lit the lamp).
 const lamp = new PointLight("#ffb866", 0, 16, 1.6);
 scene.add(lamp);
-// And some caves have their own light: torches, the dragon's fire, gold.
-const caveLight = new PointLight("#ffa24a", 0, 30, 1.2);
-scene.add(caveLight);
+// And caves and rooms have their own light (torches, the dragon's fire,
+// gold, a hearth), always on, so a lit room seen through a doorway is lit.
+// A few lights go to the lit halls nearest you (always the same number of
+// lights: changing it makes every material rebuild, a stutter).
+const ROOM_LIGHTS = 4;
+const roomLights = Array.from({ length: ROOM_LIGHTS }, () => new PointLight("#ffa24a", 0, 30, 1.2));
+scene.add(...roomLights);
 const DARK = new Color("#0b0806");
 
 const sunlight = new DirectionalLight("#ffdcae", 2.8);
@@ -295,28 +299,36 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-// From daylight (0) to lamplight (1) over the first few metres down, or as
-// you go in at a door; and in a lit cave or room, its own light comes up as
-// you walk in.
+// From daylight (0) to lamplight (1) over the first few metres down; and
+// in a building, the sky's light softens a little (the sun stays out: the
+// roof's shadow keeps it off you, and outside the door it's still day).
 let caveLit = 0;
 let indoors = 0;
+const litHalls = Object.values(halls).filter((hall) => hall.light);
 function lightFor(depth: number, time: number, dt: number) {
   indoors += ((player.under?.indoor ? 1 : 0) - indoors) * Math.min(1, dt * 4);
-  const under = Math.max(indoors, Math.min(1, Math.max(0, (depth - 0.5) / 3)));
+  const under = Math.min(1, Math.max(0, (depth - 0.5) / 3));
   sunlight.intensity = 2.8 * (1 - under);
-  skylight.intensity = 1.25 * (1 - under * 0.92);
+  skylight.intensity = 1.25 * (1 - Math.max(under * 0.92, indoors * 0.55));
   const flicker = reducedMotion ? 1 : 0.92 + 0.05 * Math.sin(time / 90) + 0.03 * Math.sin(time / 37);
-  lamp.intensity = 14 * under * flicker;
+  lamp.intensity = 14 * Math.max(under, indoors * 0.4) * flicker;
   lamp.position.set(player.position.x + 0.3, player.position.y + 1.4, player.position.z);
+
+  // The lit halls nearest you, each with its own light.
+  const p = player.position;
+  const away = (hall: (typeof litHalls)[number]) => Math.hypot(hall.x - p.x, hall.floor - p.y, hall.z - p.z) - hall.r;
+  const nearest = litHalls.filter((hall) => away(hall) < 40).sort((a, b) => away(a) - away(b));
+  roomLights.forEach((light, k) => {
+    const hall = nearest[k];
+    light.intensity = hall ? (hall.glow ?? 0) * 4 * flicker : 0;
+    if (!hall) return;
+    light.color.set(hall.light!);
+    light.distance = hall.r * 1.8;
+    light.position.set(hall.x, hall.floor + hall.tall * 0.6, hall.z);
+  });
 
   const hall = player.under?.hall ? halls[player.under.hall] : undefined;
   caveLit += ((hall?.light ? 1 : 0) - caveLit) * Math.min(1, dt * 3);
-  if (hall?.light) {
-    caveLight.color.set(hall.light);
-    caveLight.distance = hall.r * 3;
-    caveLight.position.set(hall.x, hall.floor + hall.tall * 0.6, hall.z);
-  }
-  caveLight.intensity = (hall?.glow ?? 0) * 4 * caveLit * flicker;
   fog.color.copy(HAZE).lerp(DARK, under);
   fog.near = 40 - 38 * under;
   fog.far = 320 - 290 * under + 40 * caveLit;
