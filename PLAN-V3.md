@@ -443,7 +443,9 @@ and wings) may need a bought or free model.
      it (so you can see what's in your way), with the original's words for it
      at the bottom of the screen ("The trees are too dense."), in English or
      Danish, for the exit you're trying. One-way, as in the original.
-   - **The game**: objects to take and use, the obstacles opening, deaths,
+   - **The game**: objects to take and use (taking and dropping ✅, with the
+     ladder, the first object with a model: `art/blender/items.py`), the
+     obstacles opening, deaths,
      the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and
    the ladder (where v2 began), fully modelled, textured and lit. **Then
@@ -539,7 +541,7 @@ and wings) may need a bought or free model.
 - **A debug panel** on the dev server only (the 0 key): fly (F), walk
   through anything (N), open every obstacle (O), show the obstacles and
   their reach (R, red where they kill you), show gaps with a magenta sky
-  (G), float the places' names (L), go up to 10× faster (, and .), copy a
+  (M), float the places' names (L), go up to 10× faster (, and .), copy a
   picture (P), and a map to jump anywhere. The letter keys work with the panel closed
   too. `src/three/debug.ts` and `debug.css` are loaded behind
   `import.meta.env.DEV`, so the built game contains none of it.

@@ -1,8 +1,8 @@
 // Merlin's Castle in 3D: the whole land in grey boxes, built in Blender
 // (art/blender/land.py), to walk from place to place. See PLAN-V3.md.
 //
-// L shows or hides the places' names. For checking by eye: ?at=x,z,yaw (yaw
-// in degrees, 0 looks north) starts you somewhere else, already walking.
+// For checking by eye: ?at=x,z,yaw (yaw in degrees, 0 looks north) starts
+// you somewhere else, already walking.
 
 import "./style.css";
 
@@ -32,7 +32,9 @@ import { messages } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
 import type { Direction, World } from "../engine/types";
 import { LANGUAGE } from "../shared/strings";
+import { items as setUpItems } from "./items";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
+import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
@@ -92,9 +94,11 @@ here.className = "here";
 root.append(overlay, here);
 
 // The land you see, and the heights of the ground you walk on.
-const [model, file] = await Promise.all([
-  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(landModel),
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const [model, file, things] = await Promise.all([
+  loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
+  loader.loadAsync(itemModels),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 model.scene.traverse((node) => {
@@ -229,10 +233,13 @@ player.onBump = (exit) => {
   quiet = window.setTimeout(() => said.classList.remove("shown"), 3500);
 };
 
+// The objects, lying where the game puts them, and the five slots you carry them in.
+const items = setUpItems({ world, scene, player, models: things.scene, ground, walkable, root });
+
 // While developing: the debug panel (the 0 key), and a handle for test scripts.
 // The built game leaves all of this out.
 if (import.meta.env.DEV) {
-  Object.assign(window, { world: { player, scene, ground, walkable, renderer, places: PLACES } });
+  Object.assign(window, { world: { player, scene, ground, walkable, renderer, places: PLACES, items } });
   const { debug } = await import("./debug");
   debug(
     {
@@ -265,7 +272,7 @@ if (import.meta.env.DEV) {
 overlay.innerHTML = `
   <h1>Merlin's Castle</h1>
   <p class="start">Click to walk</p>
-  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · Esc to stop</p>
+  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · E to take · 1–5 to choose · G to drop · Esc to stop</p>
   <p class="keys touch">Left thumb to walk · right thumb to look</p>`;
 overlay.hidden = Boolean(at);
 overlay.addEventListener("click", () => {
@@ -335,6 +342,7 @@ renderer.setAnimationLoop((time) => {
   if (player.under?.hall) room = player.under.hall;
   else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
   lightFor(player.depth, time, dt);
+  items.update(room);
   here.textContent = name(room);
   // The sun's shadows follow you, so they're sharp wherever you are.
   sunlight.target.position.copy(player.position);

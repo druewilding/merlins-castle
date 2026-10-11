@@ -4,7 +4,7 @@
 // works whatever the keyboard's language). P copies what you're looking at
 // to the clipboard, for pasting into a chat. R shows the obstacles, and how
 // far each reaches out on the side it stops you from: red where trying it
-// kills you. G shows the gaps: the sky turns magenta, and the mist and haze
+// kills you. M shows the gaps: the sky turns magenta, and the mist and haze
 // go, so anywhere you can see through the land stands out (as in
 // npm run gaps, but from wherever you fly). L floats the places' names over
 // them, for finding your way while the world is grey.
@@ -81,7 +81,7 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     <label><input type="checkbox" id="debug-ghost" /> Walk through anything <kbd>N</kbd></label>
     <label><input type="checkbox" id="debug-open" /> Open every obstacle <kbd>O</kbd></label>
     <label><input type="checkbox" id="debug-reach" /> Show obstacles and their reach <kbd>R</kbd> <small>red: fatal</small></label>
-    <label><input type="checkbox" id="debug-gaps" /> Show gaps <kbd>G</kbd> <small>the sky in magenta</small></label>
+    <label><input type="checkbox" id="debug-gaps" /> Show gaps <kbd>M</kbd> <small>the sky in magenta</small></label>
     <label><input type="checkbox" id="debug-names" /> Show places' names <kbd>L</kbd></label>
     <p class="debug-hint">Copy a picture of what you see <kbd>P</kbd></p>
     <label class="debug-speed">Speed <kbd>,</kbd><input type="range" id="debug-speed" min="1" max="10" step="1" value="1" /><kbd>.</kbd><output>1×</output></label>
@@ -172,7 +172,7 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     else if (event.code === "KeyN") flip(ghost, "Walking through anything", "Bumping into things");
     else if (event.code === "KeyO") flip(open, "Every obstacle open", "Obstacles closed");
     else if (event.code === "KeyR") flip(reach, "Showing obstacles", "Obstacles hidden");
-    else if (event.code === "KeyG") flip(gaps, "Showing gaps in magenta", "Sky back");
+    else if (event.code === "KeyM") flip(gaps, "Showing gaps in magenta", "Sky back");
     else if (event.code === "KeyL") flip(names, "Showing places' names", "Names hidden");
     else if (event.code === "Comma") faster(-1);
     else if (event.code === "Period") faster(1);

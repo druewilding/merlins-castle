@@ -1,3 +1,9 @@
+:root {
+  --slot: clamp(48px, 5vw, 64px);
+  --ink: #f3ead6;
+  --gold: #ffd84a;
+}
+
 html,
 body {
   margin: 0;
@@ -86,7 +92,7 @@ body {
 .said {
   position: fixed;
   left: 50%;
-  bottom: max(28px, env(safe-area-inset-bottom));
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + var(--slot) + 20px);
   max-width: calc(100% - 32px);
   box-sizing: border-box;
   margin: 0;
@@ -115,5 +121,140 @@ body {
   .said {
     transition: opacity 0.4s;
     transform: translate(-50%, 0);
+  }
+}
+
+/* Where you're looking: a dot that brightens on something you can take. */
+.aim {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: rgba(243, 234, 214, 0.55);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  transition:
+    transform 0.15s,
+    background 0.15s;
+}
+
+.aim.on {
+  background: var(--gold);
+  transform: scale(2);
+}
+
+/* What pressing E does now. */
+.prompt {
+  position: fixed;
+  left: 50%;
+  top: calc(50% + 28px);
+  margin: 0;
+  transform: translateX(-50%);
+  color: var(--ink);
+  font-family: "IM Fell English", Georgia, serif;
+  font-size: 1.15rem;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.prompt.shown {
+  opacity: 1;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.2em;
+  padding: 0 0.3em;
+  border: 1px solid rgba(243, 234, 214, 0.6);
+  border-radius: 4px;
+  font:
+    600 0.85em Cinzel,
+    Georgia,
+    serif;
+  text-align: center;
+}
+
+/* The five slots: what you're carrying, the one in your hand lit up. */
+.slots {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 8px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--slot);
+  height: var(--slot);
+  padding: 6px;
+  border: 1px solid rgba(243, 234, 214, 0.35);
+  border-radius: 10px;
+  background: rgba(10, 7, 4, 0.5);
+  color: var(--ink);
+  font:
+    600 10px Cinzel,
+    Georgia,
+    serif;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.slot.held {
+  border-color: var(--gold);
+  box-shadow: 0 0 10px 1px rgba(255, 216, 74, 0.45);
+}
+
+.slot .key {
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  opacity: 0.6;
+}
+
+.slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
+}
+
+.slot.arriving img {
+  animation: arrive 0.35s ease-out;
+}
+
+@keyframes arrive {
+  from {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* Carrying too much: the slots flash. */
+.slots.full .slot {
+  animation: full 0.5s ease-out;
+}
+
+@keyframes full {
+  30% {
+    border-color: #d9503f;
+    box-shadow: 0 0 12px 2px rgba(217, 80, 63, 0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot.arriving img {
+    animation: none;
   }
 }
