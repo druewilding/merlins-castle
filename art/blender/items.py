@@ -8,7 +8,7 @@ import math
 import sys
 from pathlib import Path
 
-from mathutils import Vector
+from mathutils import Vector, noise
 
 HERE = Path(__file__).parent
 sys.path.append(str(HERE))
@@ -55,31 +55,62 @@ for k in range(n):
 ladder.build("ladder", smooth=False)
 
 # The key: a big old one (half a metre, so you can spot it in the grass),
-# in brass. A ring to hold it by, a shaft, and its bit with teeth.
-BRASS = c.linear("#c9a03a")
+# rusty bronze as in its picture: a curly bow (two loops and a little crown),
+# a round shaft with collars, and a chunky bit with notches.
+RUST = c.linear("#a8692f")
+RUST_DARK = c.linear("#62371a")
+RUST_LIGHT = c.linear("#d6903f")
+
+
+def rusty(p):
+    """Mottled: orange where it's rubbed, dark brown where it's rusted through."""
+    v = Vector(p) * 45
+    t = 0.5 + noise.noise(v) * 0.9
+    colour = c.mix(RUST_DARK, RUST_LIGHT, t)
+    if noise.noise(v * 0.5 + Vector((7, 3, 1))) > 0.25:
+        colour = c.mix(colour, RUST_DARK, 0.6)
+    return c.mix(colour, RUST, 0.25)
+
+
+def tube(builder, path, radius, closed=False, sides=7):
+    """A round bar along a path lying flat (in x and y, at the path's z), or straight along y."""
+    n = len(path)
+    rings = []
+    for k, p in enumerate(path):
+        a, b = path[(k - 1) % n if closed else max(k - 1, 0)], path[(k + 1) % n if closed else min(k + 1, n - 1)]
+        tangent = (Vector(b) - Vector(a)).normalized()
+        across = tangent.cross(Vector((0, 0, 1))).normalized()
+        rings.append([Vector(p) + across * math.cos(2 * math.pi * j / sides) * radius
+                      + Vector((0, 0, 1)) * math.sin(2 * math.pi * j / sides) * radius for j in range(sides)])
+    verts = [tuple(v) for ring in rings for v in ring]
+    faces = [(k * sides + j, k * sides + (j + 1) % sides, ((k + 1) % n) * sides + (j + 1) % sides,
+              ((k + 1) % n) * sides + j)
+             for k in range(n if closed else n - 1) for j in range(sides)]
+    if not closed:
+        faces += [tuple(range(sides))[::-1], tuple((n - 1) * sides + j for j in range(sides))]
+    builder.add(verts, faces, [rusty(v) for v in verts])
+
+
+def loop(cx, cy, r, z, points=18):
+    return [(cx + math.cos(2 * math.pi * k / points) * r, cy + math.sin(2 * math.pi * k / points) * r, z)
+            for k in range(points)]
+
+
 key = c.Builder()
-ring, thick = 0.075, 0.022
-sides = 10
-for k in range(sides):
-    a0, a1 = 2 * math.pi * k / sides, 2 * math.pi * (k + 1) / sides
-    x0, y0 = math.cos(a0) * ring, -0.17 + math.sin(a0) * ring
-    x1, y1 = math.cos(a1) * ring, -0.17 + math.sin(a1) * ring
-    # Each piece of the ring, a little box from one point round it to the next.
-    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-    half = math.dist((x0, y0), (x1, y1)) / 2 + 0.006
-    ux, uy = (x1 - x0) / (2 * half), (y1 - y0) / (2 * half)
-    vx, vy = -uy * thick / 2, ux * thick / 2
-    pts = [(cx - ux * half + vx, cy - uy * half + vy), (cx + ux * half + vx, cy + uy * half + vy),
-           (cx + ux * half - vx, cy + uy * half - vy), (cx - ux * half - vx, cy - uy * half - vy)]
-    verts = [(x, y, z) for z in (0, thick) for x, y in pts]
-    faces = [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)]
-    for face in faces:
-        f = [verts[i] for i in face]
-        key.add(f, [(0, 1, 2, 3)], [c.vary(BRASS, 0.12, Vector(p) * 9) for p in f])
-box(key, -0.014, -0.17 + ring - 0.01, 0, 0.014, 0.25, thick, BRASS)  # the shaft
-box(key, 0.014, 0.16, 0, 0.075, 0.25, thick, BRASS)  # the bit
-box(key, 0.075, 0.17, 0, 0.095, 0.195, thick, BRASS)  # and its teeth
-box(key, 0.075, 0.215, 0, 0.095, 0.24, thick, BRASS)
+Z = 0.02  # the shaft's middle, above the ground
+tube(key, loop(-0.042, -0.19, 0.04, Z), 0.012, closed=True)  # the bow's two loops
+tube(key, loop(0.042, -0.19, 0.04, Z), 0.012, closed=True)
+tube(key, loop(0, -0.255, 0.018, Z), 0.009, closed=True)  # and its little crown
+tube(key, [(0, -0.237, Z), (0, -0.14, Z)], 0.011)  # up the middle of the bow
+tube(key, [(0, y / 100, Z) for y in range(-15, 25)], 0.017)  # the shaft
+for y0, y1, r in ((-0.155, -0.125, 0.026), (0.09, 0.115, 0.025), (0.235, 0.25, 0.022)):
+    tube(key, [(0, y0, Z), (0, y1, Z)], r)  # its collars, and the end
+for x0, y0, x1, y1 in ((0.015, 0.13, 0.05, 0.225), (0.05, 0.13, 0.08, 0.155), (0.05, 0.172, 0.08, 0.193),
+                       (0.05, 0.21, 0.08, 0.225), (0.08, 0.13, 0.095, 0.14), (0.08, 0.21, 0.095, 0.225)):
+    corners = [(x, y, z) for z in (Z - 0.014, Z + 0.014) for y in (y0, y1) for x in (x0, x1)]
+    for face in [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]:
+        pts = [corners[i] for i in face]
+        key.add(pts, [(0, 1, 2, 3)], [rusty(p) for p in pts])  # the bit, and its notches
 key.build("key", smooth=False)
 
 if out:
