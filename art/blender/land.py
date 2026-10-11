@@ -540,8 +540,10 @@ for k, line in enumerate(paths):
             verts.append((vx, vy, (d if d is not None else height(vx, vy)) + lift))
             colours.append(c.vary(DIRT, 0.12, Vector((vx, vy, 2.0))))
         if i:
+            # (Wound to face up: facing down, the sun's shadows fall on the
+            # path in stripes.)
             a = (i - 1) * 2
-            faces.append((a, a + 1, a + 3, a + 2))
+            faces.append((a, a + 2, a + 3, a + 1))
     strips.add(verts, faces, colours)
 strips.build("paths")
 
