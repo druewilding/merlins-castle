@@ -705,12 +705,13 @@ trees.build("trees", smooth=False)
 # Water: the river, and the moat round the castle.
 water = c.Builder()
 # The river: one ribbon, its sides joined round the bends (separate pieces
-# leave wedges of riverbed showing between them).
+# leave wedges of riverbed showing between them), reaching in under the
+# banks (they only come down to the water about 8 m out from the middle).
 verts, faces = [], []
 for k, (x, y) in enumerate(RIVER):
     (ax, ay), (bx, by) = RIVER[max(k - 1, 0)], RIVER[min(k + 1, len(RIVER) - 1)]
     dd = math.hypot(bx - ax, by - ay) or 1
-    ox, oy = -(by - ay) / dd * 7, (bx - ax) / dd * 7
+    ox, oy = -(by - ay) / dd * 9.5, (bx - ax) / dd * 9.5
     verts += [(x + ox, y + oy, -1), (x - ox, y - oy, -1)]
     if k:
         a = (k - 1) * 2
