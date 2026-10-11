@@ -81,3 +81,39 @@ body {
   font-size: 1rem;
   pointer-events: none;
 }
+
+/* What the original says when something's in your way. */
+.said {
+  position: fixed;
+  left: 50%;
+  bottom: max(28px, env(safe-area-inset-bottom));
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.5rem 1.1rem;
+  border-radius: 8px;
+  background: rgba(10, 7, 4, 0.62);
+  color: #f3ead6;
+  font-family: "IM Fell English", Georgia, serif;
+  font-size: 1.35rem;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 6px);
+  transition:
+    opacity 0.4s,
+    transform 0.4s;
+}
+
+.said.shown {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .said {
+    transition: opacity 0.4s;
+    transform: translate(-50%, 0);
+  }
+}

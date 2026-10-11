@@ -149,7 +149,8 @@ const inHall = (hall: Hall, x: number, z: number) =>
     ? Math.abs(x - hall.x) <= hall.w - BODY && Math.abs(z - hall.z) <= hall.d - BODY
     : Math.hypot(x - hall.x, z - hall.z) <= hall.r - BODY;
 
-function underground(from: string, open: boolean) {
+/** From a hall, or from a spot along a way: [x, z, floor]. */
+function underground(from: string | number[], open: boolean) {
   const blocked = sorted(
     open ? [] : [...obstacles.filter((obstacle) => obstacle.under), ...land.under.circles.map((circle) => ({ circle }))]
   );
@@ -166,15 +167,16 @@ function underground(from: string, open: boolean) {
     return blocked(x, z) ? [] : floors;
   };
   // From the hall's middle, or beside it if something stands there (the dungeon's well).
-  const hall = land.halls[from as keyof typeof land.halls];
+  const [x0, z0, floor0] =
+    typeof from === "string" ? [land.halls[from as keyof typeof land.halls]].map((h) => [h.x, h.z, h.floor])[0] : from;
   const [dx, dz] = [
     [0, 0],
     [0, 2.5],
     [2.5, 0],
     [0, -2.5],
     [-2.5, 0],
-  ].find(([dx, dz]) => floorsAt(hall.x + dx, hall.z + dz).length > 0)!;
-  const queue = [[Math.round((hall.x + dx) / STEP), Math.round((hall.z + dz) / STEP), hall.floor]];
+  ].find(([dx, dz]) => floorsAt(x0 + dx, z0 + dz).length > 0)!;
+  const queue = [[Math.round((x0 + dx) / STEP), Math.round((z0 + dz) / STEP), floor0]];
   const seen = new Set<string>();
   const reached = new Set<string>();
   while (queue.length) {
@@ -219,6 +221,19 @@ describe("underground, with every obstacle closed", () => {
   it("keeps the leaves in the dragon's way, and its fire, and the dark", () => {
     expect(underground("dragon-cave", false)).toEqual(["dragon-cave", "giant"]);
     expect(underground("dark-tunnels", false)).toEqual(["dark-tunnels"]);
+  });
+});
+
+describe("the long lamp tunnel", () => {
+  const points = land.ways["lamp-tunnel"].points;
+  const middle = points[Math.floor(points.length / 2)];
+
+  it("is too dark to go into from either end without the lamp", () => {
+    expect(underground(middle, false)).toEqual([]);
+  });
+
+  it("joins the old wall and the cave entrance, with it", () => {
+    expect(underground(middle, true)).toEqual(["cave-entrance", "old-wall"]);
   });
 });
 

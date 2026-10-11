@@ -645,8 +645,11 @@ WALL = 4.5
 WX, WY = -100 * K, 60 * K  # the corner by the old stone wall, and the gate's line
 y = -18 * K
 while y < WY:
-    block(built, WX - 0.6, y, height(WX, y) - 0.5, WX + 0.6, min(y + 2, WY + 0.6), height(WX, y) + WALL, STONE)
+    block(built, WX - 0.6, y, height(WX, y) - 0.5, WX + 0.6, min(y + 2, WY + 0.6), height(WX, y) + WALL, STONE,
+          solid=False)
     y += 2
+# Between the old wall and the old stone wall, it's too high to climb without the ladder.
+obstacle(["old-wall east", "old-stone-wall west"], "box", WX, -(-18 * K + WY + 0.6) / 2, 0.6, (WY + 0.6 + 18 * K) / 2)
 GATE = (P["rusty-gate"][0] - 2.2, P["rusty-gate"][0] + 2.2)  # the gap in the wall, exactly the gate's width
 WW = -140 * K  # where it turns north again, up the west of the yellow flowers
 for start, end in ((WW - 0.6, GATE[0]), (GATE[1], WX + 0.6)):
@@ -683,6 +686,10 @@ solid_circle(ce[0] + 3, ce[1] + 8, 6)
 lx, ly = DRAGON_LIP[0] + 3, DRAGON_LIP[1]
 built.blob((lx, ly, WAYS["dragon-mouth"].nearest(lx, ly)[1] + 0.2), 2.6, LEAVES, squash=0.55, lumpy=0.35, seed=2)
 obstacle(["cave-entrance east"], "box", lx, -ly, 1.0, TUNNEL_HALF + 0.3, under=True)
+
+# The lamp tunnel's mouths: too dark to go in without the lamp.
+obstacle(["old-wall west"], "box", WEST_LIP[0] - 3, -WEST_LIP[1], 1.0, TUNNEL_HALF + 0.3, under=True)
+obstacle(["cave-entrance south"], "box", EAST_LIP[0], -(EAST_LIP[1] - 3), TUNNEL_HALF + 0.3, 1.0, under=True)
 
 # The maze on the mountain top: old stone walls, one way through from every
 # side to every other.

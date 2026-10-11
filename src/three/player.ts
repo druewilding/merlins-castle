@@ -8,6 +8,8 @@ export interface Circle {
   x: number;
   z: number;
   r: number;
+  /** An obstacle's names (the exits it blocks): walking into it bounces you back. */
+  names?: string[];
 }
 
 export interface Box {
@@ -15,6 +17,7 @@ export interface Box {
   z: number;
   halfX: number;
   halfZ: number;
+  names?: string[];
 }
 
 /** The height of the ground at a spot, or undefined off the edge. */
@@ -100,6 +103,7 @@ const RUN = WALK * 3; // the land is big, and the tunnel long
 const BODY = 0.35; // your own radius, for bumping into things
 const LOOK = 0.0022; // radians per pixel of mouse movement
 const TOUCH_LOOK = 0.005;
+const BOUNCE = 5; // metres a second, back off an obstacle, slowing to a stop in about half a metre
 
 export class Player {
   readonly camera = new PerspectiveCamera(70, 1, 0.1, 3000);
@@ -117,6 +121,8 @@ export class Player {
   halls = new Map<string, Hall>();
   /** Where you are underground, if you are. */
   under: Under | undefined;
+  /** Called when you walk into an obstacle, with its names. */
+  onBump: (names: string[]) => void = () => {};
 
   private keys = new Set<string>();
   private ground: Ground = () => 0;
@@ -125,6 +131,7 @@ export class Player {
   private nearUnder = new Map<string, Near>();
   private stick = { x: 0, y: 0 }; // the thumb's walking stick, -1 to 1
   private bob = 0;
+  private knock = { x: 0, z: 0 }; // bouncing back off an obstacle
 
   constructor(private element: HTMLElement) {
     addEventListener("keydown", (event) => this.keys.add(event.code));
@@ -194,7 +201,13 @@ export class Player {
       this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
       return;
     }
-    if (length > 0.01) {
+    const bouncing = Math.hypot(this.knock.x, this.knock.z) > 0.5;
+    if (bouncing) {
+      this.step(this.knock.x * dt, this.knock.z * dt);
+      const fade = Math.exp(-dt * 8);
+      this.knock.x *= fade;
+      this.knock.z *= fade;
+    } else if (length > 0.01) {
       const scale = (speed * dt * length) / Math.hypot(forward, right);
       const sin = Math.sin(this.yaw);
       const cos = Math.cos(this.yaw);
@@ -206,7 +219,7 @@ export class Player {
     const ground = this.groundAt(this.position.x, this.position.z);
     if (ground !== undefined) this.position.y += (ground - this.position.y) * Math.min(1, dt * 12);
 
-    const bob = reducedMotion || length < 0.01 ? 0 : Math.sin(this.bob) * 0.04;
+    const bob = reducedMotion || length < 0.01 || bouncing ? 0 : Math.sin(this.bob) * 0.04;
     this.camera.position.set(this.position.x, this.position.y + EYE + bob, this.position.z);
     this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
   }
@@ -337,6 +350,7 @@ export class Player {
       if (d < min && d > 0.0001) {
         p.x = c.x + (dx / d) * min;
         p.z = c.z + (dz / d) * min;
+        if (c.names) this.bounce(c.names, dx / d, dz / d);
       }
     }
     for (const b of near.boxes) {
@@ -347,9 +361,17 @@ export class Player {
       if (ox > 0 && oz > 0) {
         if (ox < oz) p.x += Math.sign(dx) * ox;
         else p.z += Math.sign(dz) * oz;
+        if (b.names) this.bounce(b.names, ox < oz ? Math.sign(dx) : 0, ox < oz ? 0 : Math.sign(dz));
       }
     }
     this.keepInside();
+  }
+
+  // Off an obstacle, the way you came (once, until you've stopped).
+  private bounce(names: string[], nx: number, nz: number) {
+    if (Math.hypot(this.knock.x, this.knock.z) > 0.5) return;
+    this.knock = { x: nx * BOUNCE, z: nz * BOUNCE };
+    this.onBump(names);
   }
 
   // The edge of the world.

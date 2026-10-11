@@ -30,6 +30,12 @@ import {
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
+import daJson from "../../data/da.json";
+import worldJson from "../../data/world.json";
+import { messages } from "../engine/engine";
+import { localise, type WorldText } from "../engine/localise";
+import type { Direction, World } from "../engine/types";
+import { LANGUAGE } from "../shared/strings";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
 import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
@@ -126,20 +132,33 @@ player.halls = new Map(Object.entries(halls));
 // Solid things, and the obstacles (all closed, until the game can open them).
 const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
-const obstacles = land.obstacles as Record<string, { box?: number[]; circle?: number[]; under?: boolean }>;
+type Obstacle = { box?: number[]; circle?: number[]; under?: boolean };
+const obstacles = land.obstacles as Record<string, Obstacle>;
 const underCircles: Circle[] = land.under.circles.map(([x, z, r]) => ({ x, z, r }));
 const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
+// One shape for each obstacle, with the names of every exit it blocks (a gate
+// blocks the way through from both sides).
+const shapes = new Map<string, Obstacle & { names: string[] }>();
+for (const [exit, obstacle] of Object.entries(obstacles)) {
+  const key = JSON.stringify(obstacle);
+  const shape = shapes.get(key) ?? { ...obstacle, names: [] };
+  shape.names.push(exit);
+  shapes.set(key, shape);
+}
 function openObstacles(open: boolean) {
   for (const under of [false, true]) {
-    const closed = open ? [] : Object.values(obstacles).filter((obstacle) => Boolean(obstacle.under) === under);
+    const closed = open ? [] : [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
+    // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
+        ...closed.flatMap(({ circle, names }) => (circle ? [{ x: circle[0], z: circle[1], r: circle[2], names }] : [])),
         ...(under ? underCircles : circles),
-        ...closed.flatMap(({ circle }) => (circle ? [{ x: circle[0], z: circle[1], r: circle[2] }] : [])),
       ],
       [
+        ...closed.flatMap(({ box, names }) =>
+          box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names }] : []
+        ),
         ...(under ? underBoxes : boxes),
-        ...closed.flatMap(({ box }) => (box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3] }] : [])),
       ],
       under
     );
@@ -206,6 +225,30 @@ const at = new URLSearchParams(location.search).get("at")?.split(",").map(Number
 if (at && at.length >= 2) player.place(at[0], at[1], ((at[2] ?? 0) * Math.PI) / 180);
 else player.place(start.x, start.z + 12, 0);
 let room = player.under?.hall ?? placeAt(player.position.x, player.position.z, "grassy-bank", player.halls);
+
+// Walking into an obstacle, the original's words for it at the bottom of the
+// screen: what it says when you try that exit from the place you're in.
+const english = worldJson as unknown as World;
+const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
+const said = document.createElement("p");
+said.className = "said";
+said.setAttribute("aria-live", "polite");
+root.append(said);
+let quiet = 0;
+player.onBump = (names) => {
+  const exit = names.find((name) => name.startsWith(`${room} `)) ?? names[0];
+  const [id, direction] = exit.split(" ");
+  const way = world.rooms[id]?.exits[direction as Direction];
+  const words = way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo;
+  // (A teletext colour code shows as a space.)
+  said.textContent = words
+    .replace(/\{\w+\}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  said.classList.add("shown");
+  clearTimeout(quiet);
+  quiet = window.setTimeout(() => said.classList.remove("shown"), 3500);
+};
 
 // While developing: the debug panel (the 0 key), and a handle for test scripts.
 // The built game leaves all of this out.

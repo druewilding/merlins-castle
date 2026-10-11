@@ -370,7 +370,7 @@ and wings) may need a bought or free model.
    - ~~**Above ground**~~ ✅ `npm run models` runs `art/blender/land.py` in
      Blender with no window (add `-- land --preview` for a picture in
      `art/blender/previews/`). Open `http://localhost:5173/3d.html`.
-   - **Underground** ✅: the lamp tunnel (no lamp needed yet); the caves in
+   - **Underground** ✅: the lamp tunnel (dark at both mouths, until there's a lamp); the caves in
      the mountain, dug into crags round the maze (trolls, oak door, treasure
      room over a deep hole, giant, damp tunnels); the dragon's cave inside a
      rocky hill past the leaves, its long tunnel up under a ridge into the
@@ -385,6 +385,11 @@ and wings) may need a bought or free model.
      hidden door). Each room furnished after its painting, with its own
      light.
    - **Indoors**: the tower and the hut.
+   - **Obstacles speak** ✅: walk into one and you bounce back, with the
+     original's words for it at the bottom of the screen ("The trees are too
+     dense."), in English or Danish, for the exit you're trying from the
+     place you're in. A stand-in for the plan's "no words", until each
+     obstacle can show what's wrong instead.
    - **The game**: objects to take and use, the obstacles opening, deaths,
      the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and
@@ -448,6 +453,11 @@ and wings) may need a bought or free model.
   ways marked `indoor`: walls and a roof all the way, and the light of
   indoors as you go in at the door. The keep and the coach house are cut out
   of the land, so you're only ever in them along a way.
+- **An obstacle is one shape with the names of every exit it blocks**: the
+  gate is "rusty-gate north" and "yellow-flowers south", and the old stone
+  wall between the old wall and the old stone wall is an obstacle too (for the
+  ladder). Bumping into one says the blocked message of the name for the
+  place you're in, or the exit's own message, or "You can't go that way."
 - **Obstacles underground** block only the ways (`"under": true`), so the
   old stone wall over the lamp tunnel doesn't stop you down below. The test
   walks the ways and halls too, with every obstacle closed and every one open.
