@@ -167,7 +167,13 @@ def collider(name, x, y, radius):
 
 def export(path):
     # Meshopt compression shrinks the file several times over, and three.js
-    # decodes it with no extra files to host.
+    # decodes it with no extra files to host. Blender keeps only 12 bits of
+    # each point's position, shared by its x, y and z: 150 m out, that rounds
+    # every height to 7 cm, and a carpet sinks into the floor under it. 16
+    # bits keeps it to a few millimetres, all the way to the edge.
+    from io_scene_gltf2.io.exp import meshopt
+
+    meshopt.EXP_FILTER_BITS = 16
     bpy.ops.export_scene.gltf(
         filepath=path,
         export_format="GLB",

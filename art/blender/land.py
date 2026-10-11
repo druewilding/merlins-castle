@@ -953,7 +953,7 @@ for hall in HALLS.values():
             elif hall.place == "damp-tunnels" and noise.noise(Vector((x0 / 4, y0 / 4, 9.0))) > 0.15:
                 colour = c.linear("#2f3c44")  # puddles
             # (A shade lower than the ways' floors, where they overlap.)
-            fl = f - 0.03
+            fl = f - 0.06
             quad(caves, [(x0, y0, fl), (x0 + step, y0, fl), (x0 + step, y0 + step, fl), (x0, y0 + step, fl)], colour, vary)
 
     sides = max(28, int(2 * math.pi * R / 1.1))
@@ -1095,7 +1095,8 @@ def room(b, hall):
         for j in range(-math.ceil(D + 1.5), math.ceil(D + 1.5)):
             x0, y0 = hx + i, hy + j
             colour, vary = floor_colour(hall, i, j, x0, y0)
-            quad(b, [(x0, y0, f - 0.03), (x0 + 1, y0, f - 0.03), (x0 + 1, y0 + 1, f - 0.03), (x0, y0 + 1, f - 0.03)], colour, vary)
+            fl = f - 0.06  # (a shade lower than the corridors' floors, where they overlap)
+            quad(b, [(x0, y0, fl), (x0 + 1, y0, fl), (x0 + 1, y0 + 1, fl), (x0, y0 + 1, fl)], colour, vary)
     E = 0.35
     corners = [(hx - W - E, hy - D - E), (hx + W + E, hy - D - E), (hx + W + E, hy + D + E), (hx - W - E, hy + D + E)]
     band = c.mix(hall.wall, c.linear("#000000"), 0.3)
@@ -1129,9 +1130,10 @@ def room(b, hall):
             for py in (-5.5, -2.2, 2.2, 5.5):
                 b.cylinder((hx + px, hy + py, f), (hx + px, hy + py, top), 0.55, 0.5, c.linear("#bdb39c"), sides=10)
                 under_circle(hx + px, hy + py, 0.55)
-        quad(b, [(hx - 1.4, hy - D - E, f + 0.02), (hx + 1.4, hy - D - E, f + 0.02), (hx + 1.4, hy + D + E, f + 0.02),
-                 (hx - 1.4, hy + D + E, f + 0.02)], RED, 0.05)
-        for radius, colour, lift in ((2.4, BRASS, 0.03), (1.9, c.linear("#3a3a5a"), 0.04), (0.6, BRASS, 0.05)):
+        # (Things lying on the floor are lifted well clear of it, or they flicker.)
+        quad(b, [(hx - 1.4, hy - D - E, f + 0.05), (hx + 1.4, hy - D - E, f + 0.05), (hx + 1.4, hy + D + E, f + 0.05),
+                 (hx - 1.4, hy + D + E, f + 0.05)], RED, 0.05)
+        for radius, colour, lift in ((2.4, BRASS, 0.1), (1.9, c.linear("#3a3a5a"), 0.15), (0.6, BRASS, 0.2)):
             sides = 24
             verts = [(hx, hy, f + lift)] + [(hx + math.cos(2 * math.pi * k / sides) * radius,
                                               hy + math.sin(2 * math.pi * k / sides) * radius, f + lift) for k in range(sides)]
@@ -1190,10 +1192,10 @@ def room(b, hall):
             b.blob((hx + px, hy + py, f + 1.8), 0.7, c.linear("#8a857a"), squash=1.1, lumpy=0.4, seed=int(px + py * 3))
     elif hall.place == "small-room":
         # A red room: curtains, a rug, and little tables with flowers.
-        quad(b, [(hx - 3.2, hy - 2.4, f + 0.02), (hx + 3.2, hy - 2.4, f + 0.02), (hx + 3.2, hy + 2.4, f + 0.02),
-                 (hx - 3.2, hy + 2.4, f + 0.02)], c.linear("#b0472c"), 0.05)
-        quad(b, [(hx - 2.7, hy - 1.9, f + 0.03), (hx + 2.7, hy - 1.9, f + 0.03), (hx + 2.7, hy + 1.9, f + 0.03),
-                 (hx - 2.7, hy + 1.9, f + 0.03)], c.linear("#7a2a2a"), 0.05)
+        quad(b, [(hx - 3.2, hy - 2.4, f + 0.05), (hx + 3.2, hy - 2.4, f + 0.05), (hx + 3.2, hy + 2.4, f + 0.05),
+                 (hx - 3.2, hy + 2.4, f + 0.05)], c.linear("#b0472c"), 0.05)
+        quad(b, [(hx - 2.7, hy - 1.9, f + 0.1), (hx + 2.7, hy - 1.9, f + 0.1), (hx + 2.7, hy + 1.9, f + 0.1),
+                 (hx - 2.7, hy + 1.9, f + 0.1)], c.linear("#7a2a2a"), 0.05)
         for py in (-3.5, 3.5):
             furniture(b, hx + W - 0.8, hy + py - 0.45, hx + W + 0.3, hy + py + 0.45, f, f + 0.8, DARK_WOOD)
             b.blob((hx + W - 0.25, hy + py, f + 1.1), 0.35, c.linear("#e06a8a"), squash=0.9, lumpy=0.4, seed=int(py))
@@ -1206,8 +1208,8 @@ def room(b, hall):
         # potions, his desk with the crystal ball, a chart of the stars, and
         # candles.
         dx, dy = hx - 3, hy - 2
-        verts = [(dx, dy, f + 0.02)] + [(dx + math.cos(2 * math.pi * k / 24) * 4.2, dy + math.sin(2 * math.pi * k / 24) * 3.4,
-                                         f + 0.02) for k in range(24)]
+        verts = [(dx, dy, f + 0.05)] + [(dx + math.cos(2 * math.pi * k / 24) * 4.2, dy + math.sin(2 * math.pi * k / 24) * 3.4,
+                                         f + 0.05) for k in range(24)]
         b.add(verts, [(0, 1 + k, 1 + (k + 1) % 24) for k in range(24)], [c.linear("#4a2a5e")] * 25)
         b.cylinder((dx, dy, f), (dx, dy, f + 0.3), 2.0, 2.0, STONE, sides=20)
         b.cylinder((dx, dy, f + 0.3), (dx, dy, f + 1.3), 1.0, 1.2, IRON, sides=16)

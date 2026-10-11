@@ -40,6 +40,7 @@ export interface Hall {
   z: number;
   floor: number;
   r: number;
+  tall: number;
   w?: number;
   d?: number;
   indoor?: boolean;
@@ -212,13 +213,18 @@ export class Player {
 
   // Flying: forward is wherever you look, Space goes up and C goes down.
   private flyAbout(dt: number, speed: number, forward: number, right: number) {
-    this.under = undefined; // flying is over the land
     const up = this.axis("Space") - this.axis("KeyC");
     const look = new Vector3(0, 0, -1).applyEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
     const side = new Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     const move = look.multiplyScalar(forward).addScaledVector(side, right);
     move.y += up;
     if (move.lengthSq() > 0.0001) this.position.addScaledVector(move.normalize(), speed * 1.5 * dt);
+    // Flying is over the land, unless you're between a hall's floor and its
+    // roof: then you're in it, with its light (and not under the sun).
+    const p = this.position;
+    const hall = this.hallAt(p.x, p.z);
+    const tall = hall?.hall ? (this.halls.get(hall.hall)?.tall ?? 0) : 0;
+    this.under = hall && p.y > hall.floor - 0.5 && p.y < hall.floor + tall ? hall : undefined;
     const ground = this.groundAt(this.position.x, this.position.z) ?? 0;
     this.position.y = Math.max(this.position.y, ground);
     this.keepInside();
