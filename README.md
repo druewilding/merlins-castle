@@ -116,8 +116,11 @@ land in a browser with no window (Playwright's WebKit), paints the sky
 magenta and looks round from hundreds of spots, along every tunnel, in every
 room and round every building. It takes a few minutes and writes
 `gaps/index.html`, the worst first, with a picture of each (the gaps in
-magenta). `npm run gaps -- --near=x,z,r` checks just round one spot, after a
-fix. The first time, `npx playwright install webkit` fetches the browser.
+magenta), and where the ray went through. `npm run gaps -- --near=x,z,r`
+checks just round one spot, after a fix, and
+`npm run gaps -- --look=x,z,eye,yaw,pitch` takes one picture from anywhere,
+to see what's wrong. The first time, `npx playwright install webkit` fetches
+the browser.
 
 ## How it's made
 
