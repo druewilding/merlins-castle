@@ -195,11 +195,7 @@ function solidify() {
         ...closed.flatMap(({ box, names }) =>
           box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names, ahead: AHEAD }] : []
         ),
-        // (Closed, its stone says why you can't go over, if you're right up against it.)
-        ...plain.map((shape) => {
-          const [x, z, halfX, halfZ] = shape.box!;
-          return { x, z, halfX, halfZ, ...(opened.has(shape) ? {} : { says: shape.names }) };
-        }),
+        ...plain.map(({ box }) => ({ x: box![0], z: box![1], halfX: box![2], halfZ: box![3] })),
         ...(under ? underBoxes : boxes),
       ],
       under

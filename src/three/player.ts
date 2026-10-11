@@ -25,8 +25,6 @@ export interface Box {
   /** Only on the sides you'd go through it from (along its thinner side), so not along a wall. */
   ahead?: number;
   top?: number;
-  /** A wall that's an obstacle's (the old stone wall): touch it and it says the obstacle's words, without a bounce. */
-  says?: string[];
 }
 
 /** The height of the ground at a spot, or undefined off the edge. */
@@ -176,6 +174,7 @@ export class Player {
   private knock = { x: 0, z: 0 }; // bouncing back off an obstacle
   // One-way obstacles you're going through the free way, until you're out of their reach.
   private passing = new Set<Circle | Box>();
+  private before = new Vector3(); // where you were, before this step
   private wasInside = false;
   private flying = false;
   private lift = 0; // how high you are off the ground, jumping
@@ -312,6 +311,7 @@ export class Player {
       return;
     }
     this.eye += ((crouching ? CROUCHED : EYE) - this.eye) * Math.min(1, dt * 10);
+    this.before.copy(this.position);
     const bouncing = Math.hypot(this.knock.x, this.knock.z) > 0.5;
     if (bouncing) {
       this.step(this.knock.x * dt, this.knock.z * dt);
@@ -530,6 +530,7 @@ export class Player {
       const d = Math.hypot(dx, dz);
       const min = c.r + (c.ahead ?? 0) + BODY;
       const exit = this.blocking(c, d < min, cameOut);
+      if (exit === null && d < min) this.turnedBack(c);
       if (exit === null) continue;
       if (d < min && d > 0.0001) {
         p.x = c.x + (dx / d) * min;
@@ -545,6 +546,7 @@ export class Player {
       const ox = b.halfX + (b.halfX < b.halfZ ? reach : 0) + BODY - Math.abs(dx);
       const oz = b.halfZ + (b.halfX < b.halfZ ? 0 : reach) + BODY - Math.abs(dz);
       const exit = this.blocking(b, ox > 0 && oz > 0, cameOut);
+      if (exit === null && ox > 0 && oz > 0) this.turnedBack(b);
       if (exit === null) continue;
       if (ox > 0 && oz > 0) {
         // Out the side you came in by (so coming at an obstacle from the side, you slide off it).
@@ -552,9 +554,6 @@ export class Player {
         if (alongX) p.x += Math.sign(dx) * ox;
         else p.z += Math.sign(dz) * oz;
         if (exit) this.bounce(exit, alongX ? Math.sign(dx) : 0, alongX ? 0 : Math.sign(dz));
-        // (Right up against it, past its reach: landed by it, over the top.)
-        const says = b.says && wayThrough(b.says, b.x, b.z, p.x, p.z);
-        if (says) this.onBump(says);
       }
     }
     this.keepInside();
@@ -573,6 +572,28 @@ export class Player {
     if (within) this.passing.add(thing);
     else this.passing.delete(thing);
     return null;
+  }
+
+  // Going through an obstacle the free way, once you're past its middle you
+  // can't turn back through it: a step back towards it stops, and it says why
+  // (no bounce: you're already in its reach, maybe right by it, landed over a wall).
+  private turnedBack(thing: Circle | Box) {
+    const p = this.position;
+    const exit = thing.names && wayThrough(thing.names, thing.x, thing.z, p.x, p.z);
+    if (!exit) return;
+    const b = this.before;
+    if ("r" in thing) {
+      if (Math.hypot(p.x - thing.x, p.z - thing.z) >= Math.hypot(b.x - thing.x, b.z - thing.z)) return;
+      p.x = b.x;
+      p.z = b.z;
+    } else if (thing.halfX < thing.halfZ) {
+      if (Math.abs(p.x - thing.x) >= Math.abs(b.x - thing.x)) return;
+      p.x = b.x;
+    } else {
+      if (Math.abs(p.z - thing.z) >= Math.abs(b.z - thing.z)) return;
+      p.z = b.z;
+    }
+    this.onBump(exit);
   }
 
   // Off an obstacle, the way you came (once, until you've stopped).
