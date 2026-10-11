@@ -151,6 +151,15 @@ export function debug(world: DebugWorld, onOpen: () => void) {
       pen.stroke();
     }
     pen.setLineDash([]);
+    // And the halls they join.
+    pen.fillStyle = "rgba(217, 160, 102, 0.35)";
+    for (const hall of player.halls.values()) {
+      const [mx, my] = toMap(hall.x, hall.z);
+      pen.beginPath();
+      pen.arc(mx, my, hall.r, 0, Math.PI * 2);
+      pen.fill();
+      pen.stroke();
+    }
     pen.textAlign = "center";
     const dot = (x: number, z: number, colour: string, r: number) => {
       const [mx, my] = toMap(x, z);
@@ -192,9 +201,10 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     pen.restore();
   }
 
-  // Jumping: to the spot clicked, or the nearest place you can stand.
+  // Jumping: to the spot clicked (in a cave, if it's over one), or the
+  // nearest place you can stand.
   function jump(x: number, z: number, yaw = player.yaw) {
-    if (!player.fly && !player.ghost && !world.walkable(x, z)) {
+    if (!player.fly && !player.ghost && !world.walkable(x, z) && !player.hallAt(x, z)) {
       search: for (let r = 1; r < 40; r++) {
         for (let a = 0; a < 16; a++) {
           const tx = x + Math.cos((a * Math.PI) / 8) * r;
@@ -209,7 +219,10 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     }
     const height = player.position.y;
     player.place(x, z, yaw);
-    if (player.fly) player.position.y = Math.max(height, player.position.y);
+    if (!player.fly) return;
+    if (player.inside)
+      player.fly = fly.checked = false; // into a cave: walk
+    else player.position.y = Math.max(height, player.position.y);
   }
   const spotAt = (event: MouseEvent) => {
     const box = canvas.getBoundingClientRect();

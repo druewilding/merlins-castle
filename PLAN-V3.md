@@ -17,10 +17,10 @@ Three things make v3 what it is:
 
 Classic and Illustrated stay as they are. v3 is a third way to play.
 
-Status: **step 2 begun.** The whole land above ground is built in grey boxes
-(`art/blender/land.py`) and you can walk it at `3d.html`. It's built and
-deployed with the site, but not linked from anywhere yet. Next: underground
-and indoors.
+Status: **step 2 begun.** The whole land above ground and underground is
+built in grey boxes (`art/blender/land.py`) and you can walk it at `3d.html`.
+It's built and deployed with the site, but not linked from anywhere yet.
+Next: indoors (the tower, the hut and the castle rooms).
 
 ## Keep the engine
 
@@ -369,10 +369,13 @@ and wings) may need a bought or free model.
    - ~~**Above ground**~~ ✅ `npm run models` runs `art/blender/land.py` in
      Blender with no window (add `-- land --preview` for a picture in
      `art/blender/previews/`). Open `http://localhost:5173/3d.html`.
-   - **Underground and indoors**: ~~the lamp tunnel~~ ✅ (walkable from the
-     old wall to the cave entrance, no lamp needed yet), then the caves in
-     the mountain, the dragon's tunnel to the giant, the dark tunnels, and
-     the tower, the hut and the castle rooms.
+   - **Underground** ✅: the lamp tunnel (no lamp needed yet); the caves in
+     the mountain, dug into crags round the maze (trolls, oak door, treasure
+     room over a deep hole, giant, damp tunnels); the dragon's cave inside a
+     rocky hill past the leaves, its long tunnel up under a ridge into the
+     giant's east side, and its way down to the dark tunnels (which run out
+     west and east into the mist) and the beautiful chamber.
+   - **Indoors**: the tower, the hut and the castle rooms.
    - **The game**: objects to take and use, the obstacles opening, deaths,
      the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and
@@ -429,6 +432,12 @@ and wings) may need a bought or free model.
   at the top of its ramp; from then on its floor holds you up and its walls
   hold you in until you walk out of an end. While you're in one, you're
   still in the place you set off from.
+- **Halls** are the caverns the ways join (`halls` in `land.json`): round,
+  with a flat floor and a domed roof. Walking into one is walking into its
+  place. Some have their own light: torches, the dragon's fire, gold.
+- **Obstacles underground** block only the ways (`"under": true`), so the
+  old stone wall over the lamp tunnel doesn't stop you down below. The test
+  walks the ways and halls too, with every obstacle closed and every one open.
 - **Underground light**: as you go down, the sun and sky fade and a warm
   lamp glow round you takes over (one day only with the lamp lit). The land
   casts shadows, so the sun can't shine into a tunnel from above.

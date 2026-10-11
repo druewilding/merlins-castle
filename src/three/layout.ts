@@ -23,10 +23,8 @@ export const PLACES = new Map<RoomId, Spot>(entries(layout.places).map(([id, cr]
 const CAVES = new Set(layout.kinds.cave);
 const underground = (exit: string) => CAVES.has(exit.split(" ")[0]);
 
-/** Where you get lost in the mist above ground (underground comes later). */
-export const LOST = entries(layout.lost)
-  .filter(([exit]) => !underground(exit))
-  .map(([exit, cr]) => ({ exit, ...spot(cr) }));
+/** Where you get lost in the mist: above ground, or along a way underground. */
+export const LOST = entries(layout.lost).map(([exit, cr]) => ({ exit, under: underground(exit), ...spot(cr) }));
 export const DEATHS = entries(layout.deaths).map(([exit, cr]) => ({ exit, ...spot(cr) }));
 
 /** How near a place's middle you have to be to be in it. */

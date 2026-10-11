@@ -29,8 +29,22 @@ export interface Way {
   points: number[][];
 }
 
+/** A hall underground (a cavern, or a room): round, with a flat floor. Being in one is being in its place. */
+export interface Hall {
+  x: number;
+  z: number;
+  floor: number;
+  r: number;
+}
+
+/** Where you are underground: the height of the floor, and the hall you're in, if you're in one. */
+export interface Under {
+  floor: number;
+  hall?: string;
+}
+
 /** How far a spot is from the middle of a way, its floor there, and whether it's past an end. */
-function nearest(way: Way, x: number, z: number) {
+export function nearest(way: Way, x: number, z: number) {
   let best = { d: Infinity, floor: 0, beyond: false };
   const last = way.points.length - 2;
   for (let k = 0; k <= last; k++) {
@@ -48,6 +62,8 @@ function nearest(way: Way, x: number, z: number) {
 
 /** How near the ground a tunnel's floor must be, at its mouth, to step in or out. */
 const LIP = 0.6;
+/** How much a floor can rise or fall in one step: more, and it's another floor (above or below). */
+const CLIMB = 1.2;
 
 const CELL = 16; // metres, for finding the solid things near you
 
@@ -76,13 +92,15 @@ export class Player {
   boost = 1;
 
   ways: Way[] = [];
-  /** The way you're in, if you're underground. */
-  inside: Way | undefined;
+  halls = new Map<string, Hall>();
+  /** Where you are underground, if you are. */
+  under: Under | undefined;
 
   private keys = new Set<string>();
   private ground: Ground = () => 0;
   private walkable: Walkable = () => true;
   private near = new Map<string, Near>();
+  private nearUnder = new Map<string, Near>();
   private stick = { x: 0, y: 0 }; // the thumb's walking stick, -1 to 1
   private bob = 0;
 
@@ -97,6 +115,10 @@ export class Player {
     this.touch();
   }
 
+  get inside() {
+    return this.under !== undefined;
+  }
+
   get locked() {
     return document.pointerLockElement === this.element;
   }
@@ -106,15 +128,16 @@ export class Player {
     this.walkable = walkable;
   }
 
-  /** The solid things, sorted into squares so only those near you are checked. */
-  solid(circles: Circle[], boxes: Box[]) {
-    this.near.clear();
+  /** The solid things on the land (or underground), sorted into squares so only those near you are checked. */
+  solid(circles: Circle[], boxes: Box[], under = false) {
+    const near = under ? this.nearUnder : this.near;
+    near.clear();
     // Adds a thing to every square it (or you, touching it) could be in.
     const file = (x0: number, x1: number, z0: number, z1: number, add: (found: Near) => void) => {
       for (let i = Math.floor((x0 - 1) / CELL); i <= Math.floor((x1 + 1) / CELL); i++) {
         for (let j = Math.floor((z0 - 1) / CELL); j <= Math.floor((z1 + 1) / CELL); j++) {
-          let found = this.near.get(`${i},${j}`);
-          if (!found) this.near.set(`${i},${j}`, (found = { circles: [], boxes: [] }));
+          let found = near.get(`${i},${j}`);
+          if (!found) near.set(`${i},${j}`, (found = { circles: [], boxes: [] }));
           add(found);
         }
       }
@@ -125,8 +148,9 @@ export class Player {
     }
   }
 
+  /** Puts you somewhere: in a hall underground, if the spot's in one. */
   place(x: number, z: number, yaw = 0) {
-    this.inside = undefined;
+    this.under = this.hallAt(x, z);
     this.position.set(x, this.groundAt(x, z) ?? 0, z);
     this.yaw = yaw;
     this.pitch = 0;
@@ -167,6 +191,7 @@ export class Player {
 
   // Flying: forward is wherever you look, Space goes up and C goes down.
   private flyAbout(dt: number, speed: number, forward: number, right: number) {
+    this.under = undefined; // flying is over the land
     const up = this.axis("Space") - this.axis("KeyC");
     const look = new Vector3(0, 0, -1).applyEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
     const side = new Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
@@ -195,14 +220,14 @@ export class Player {
       if (where === false) continue;
       p.x = x;
       p.z = z;
-      this.inside = where;
+      this.under = where;
       return;
     }
   }
 
   // Whether you can stand somewhere, and if so whether that's on the land
-  // (undefined) or in a way underground.
-  private fits(x: number, z: number): Way | undefined | false {
+  // (undefined) or underground.
+  private fits(x: number, z: number): Under | undefined | false {
     const onLand = () =>
       this.walkable(x, z) &&
       this.walkable(x + BODY, z) &&
@@ -210,18 +235,48 @@ export class Player {
       this.walkable(x, z + BODY) &&
       this.walkable(x, z - BODY);
     const nearGround = (floor: number) => Math.abs(floor - (this.ground(x, z) ?? floor)) < LIP;
-    if (this.inside) {
-      const n = nearest(this.inside, x, z);
-      if (!n.beyond && n.d <= this.inside.half - BODY) return this.inside;
-      // Out of the way's end, at a mouth, onto the land.
-      return n.beyond && nearGround(n.floor) && onLand() ? undefined : false;
+    if (this.under) {
+      const floor = this.under.floor;
+      const here = this.underAt(x, z, floor);
+      if (here) return here;
+      // Out of a way's end, at a mouth, onto the land.
+      const out = this.ways.some((way) => {
+        const n = nearest(way, x, z);
+        return n.beyond && n.d <= way.half && Math.abs(n.floor - floor) < CLIMB && nearGround(n.floor);
+      });
+      return out && onLand() ? undefined : false;
     }
     // Into a way, at the top of its ramp.
     for (const way of this.ways) {
       const n = nearest(way, x, z);
-      if (!n.beyond && n.d <= way.half - BODY && nearGround(n.floor)) return way;
+      if (!n.beyond && n.d <= way.half - BODY && nearGround(n.floor)) return { floor: n.floor };
     }
     return onLand() ? undefined : false;
+  }
+
+  /** The hall a spot is in, if any (for being put straight into one). */
+  hallAt(x: number, z: number): Under | undefined {
+    for (const [place, hall] of this.halls) {
+      if (Math.hypot(x - hall.x, z - hall.z) <= hall.r - BODY) return { floor: hall.floor, hall: place };
+    }
+    return undefined;
+  }
+
+  // Where you'd be underground at a spot, going on from a floor: in a hall,
+  // or in a way (the one nearest that floor, where they cross).
+  private underAt(x: number, z: number, floor: number): Under | undefined {
+    for (const [place, hall] of this.halls) {
+      if (Math.abs(hall.floor - floor) < CLIMB && Math.hypot(x - hall.x, z - hall.z) <= hall.r - BODY) {
+        return { floor: hall.floor, hall: place };
+      }
+    }
+    let best: Under | undefined;
+    for (const way of this.ways) {
+      const n = nearest(way, x, z);
+      if (n.beyond || n.d > way.half - BODY || Math.abs(n.floor - floor) >= CLIMB) continue;
+      if (!best || Math.abs(n.floor - floor) < Math.abs(best.floor - floor)) best = { floor: n.floor };
+    }
+    return best;
   }
 
   private axis(...codes: string[]) {
@@ -229,7 +284,7 @@ export class Player {
   }
 
   private groundAt(x: number, z: number): number | undefined {
-    return this.inside ? nearest(this.inside, x, z).floor : this.ground(x, z);
+    return this.under ? this.under.floor : this.ground(x, z);
   }
 
   /** How far below the land you are: 0 on it, more the deeper you go. */
@@ -240,8 +295,9 @@ export class Player {
   // Pushes you out of anything solid you've walked into.
   private collide() {
     const p = this.position;
-    if (this.ghost || this.inside) return this.keepInside();
-    const near = this.near.get(`${Math.floor(p.x / CELL)},${Math.floor(p.z / CELL)}`) ?? { circles: [], boxes: [] };
+    if (this.ghost) return this.keepInside();
+    const square = `${Math.floor(p.x / CELL)},${Math.floor(p.z / CELL)}`;
+    const near = (this.under ? this.nearUnder : this.near).get(square) ?? { circles: [], boxes: [] };
     for (const c of near.circles) {
       const dx = p.x - c.x;
       const dz = p.z - c.z;
