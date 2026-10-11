@@ -416,6 +416,16 @@ and wings) may need a bought or free model.
 - **Names use hyphens**: three.js drops dots from names when it loads a file.
 - **Meshopt compression**: the land is 5 MB, decoded by three.js with no
   extra files.
+- **You can walk round the outside of the moat**, all the way behind the
+  castle: a little extra for people who like to explore. It changes nothing
+  in the game: the moat and walls keep you out (the only way in is still the
+  drawbridge and the penny), it leads nowhere else, and the castle rooms are
+  all more than 30 m from it, so you never count as being in one.
+- **A debug panel** on the dev server only (the 0 key): fly (F), walk
+  through anything (N), open every obstacle (O), go up to 10× faster (, and
+  .), and a map to jump anywhere. The letter keys work with the panel closed
+  too. `src/three/debug.ts` and `debug.css` are loaded behind
+  `import.meta.env.DEV`, so the built game contains none of it.
 - **Names over the places** (press L) while the world is grey, and the place
   you're in at the top left.
 

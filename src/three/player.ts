@@ -44,6 +44,10 @@ export class Player {
   pitch = 0;
   /** West, east, north and south edges, in three.js's x and z. */
   bounds = { west: -95, east: 95, north: -95, south: 95 };
+  // For the debug panel: flying, walking through anything, and going faster.
+  fly = false;
+  ghost = false;
+  boost = 1;
 
   private keys = new Set<string>();
   private ground: Ground = () => 0;
@@ -105,8 +109,14 @@ export class Player {
   update(dt: number, reducedMotion: boolean) {
     const forward = this.axis("KeyW", "ArrowUp") - this.axis("KeyS", "ArrowDown") - this.stick.y;
     const right = this.axis("KeyD", "ArrowRight") - this.axis("KeyA", "ArrowLeft") + this.stick.x;
-    const speed = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight") ? RUN : WALK;
+    const speed = (this.keys.has("ShiftLeft") || this.keys.has("ShiftRight") ? RUN : WALK) * this.boost;
     const length = Math.min(1, Math.hypot(forward, right));
+    if (this.fly) {
+      this.flyAbout(dt, speed, forward, right);
+      this.camera.position.set(this.position.x, this.position.y + EYE, this.position.z);
+      this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
+      return;
+    }
     if (length > 0.01) {
       const scale = (speed * dt * length) / Math.hypot(forward, right);
       const sin = Math.sin(this.yaw);
@@ -124,10 +134,27 @@ export class Player {
     this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
   }
 
+  // Flying: forward is wherever you look, Space goes up and C goes down.
+  private flyAbout(dt: number, speed: number, forward: number, right: number) {
+    const up = this.axis("Space") - this.axis("KeyC");
+    const look = new Vector3(0, 0, -1).applyEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
+    const side = new Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+    const move = look.multiplyScalar(forward).addScaledVector(side, right);
+    move.y += up;
+    if (move.lengthSq() > 0.0001) this.position.addScaledVector(move.normalize(), speed * 1.5 * dt);
+    const ground = this.groundAt(this.position.x, this.position.z) ?? 0;
+    this.position.y = Math.max(this.position.y, ground);
+    this.keepInside();
+  }
+
   // Moves you, unless it would take you into the forest or the water: then
   // you slide along the edge, as far as you can.
   private step(dx: number, dz: number) {
     const p = this.position;
+    if (this.ghost) {
+      p.set(p.x + dx, p.y, p.z + dz);
+      return;
+    }
     const fits = (x: number, z: number) =>
       this.walkable(x, z) &&
       this.walkable(x + BODY, z) &&
@@ -150,6 +177,7 @@ export class Player {
   // Pushes you out of anything solid you've walked into.
   private collide() {
     const p = this.position;
+    if (this.ghost) return this.keepInside();
     const near = this.near.get(`${Math.floor(p.x / CELL)},${Math.floor(p.z / CELL)}`) ?? { circles: [], boxes: [] };
     for (const c of near.circles) {
       const dx = p.x - c.x;
@@ -171,6 +199,12 @@ export class Player {
         else p.z += Math.sign(dz) * oz;
       }
     }
+    this.keepInside();
+  }
+
+  // The edge of the world.
+  private keepInside() {
+    const p = this.position;
     p.x = Math.max(this.bounds.west, Math.min(this.bounds.east, p.x));
     p.z = Math.max(this.bounds.north, Math.min(this.bounds.south, p.z));
   }

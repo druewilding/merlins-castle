@@ -111,12 +111,15 @@ player.standOn(ground, walkable);
 // Solid things, and the obstacles (all closed, until the game can open them).
 const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
-for (const obstacle of Object.values(land.obstacles) as { box?: number[]; circle?: number[] }[]) {
-  if (obstacle.box)
-    boxes.push({ x: obstacle.box[0], z: obstacle.box[1], halfX: obstacle.box[2], halfZ: obstacle.box[3] });
-  if (obstacle.circle) circles.push({ x: obstacle.circle[0], z: obstacle.circle[1], r: obstacle.circle[2] });
+const obstacles = land.obstacles as Record<string, { box?: number[]; circle?: number[] }>;
+function openObstacles(open: boolean) {
+  const closed = open ? [] : Object.values(obstacles);
+  player.solid(
+    [...circles, ...closed.flatMap(({ circle }) => (circle ? [{ x: circle[0], z: circle[1], r: circle[2] }] : []))],
+    [...boxes, ...closed.flatMap(({ box }) => (box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3] }] : []))]
+  );
 }
-player.solid(circles, boxes);
+openObstacles(false);
 const [west, east, south, north] = land.bounds;
 player.bounds = { west, east, north: -north, south: -south };
 
@@ -163,14 +166,31 @@ addEventListener("keydown", (event) => {
   if (event.code === "KeyL") labels.visible = !labels.visible;
 });
 
-// For checking by script while developing.
-if (import.meta.env.DEV) Object.assign(window, { world: { player, scene, ground, walkable } });
-
 const start = PLACES.get("grassy-bank")!;
 const at = new URLSearchParams(location.search).get("at")?.split(",").map(Number);
 if (at && at.length >= 2) player.place(at[0], at[1], ((at[2] ?? 0) * Math.PI) / 180);
 else player.place(start.x, start.z + 12, 0);
 let room = placeAt(player.position.x, player.position.z, "grassy-bank");
+
+// While developing: the debug panel (the 0 key), and a handle for test scripts.
+// The built game leaves all of this out.
+if (import.meta.env.DEV) {
+  Object.assign(window, { world: { player, scene, ground, walkable } });
+  const { debug } = await import("./debug");
+  debug(
+    {
+      player,
+      walkable,
+      heights: { values: heights, ...land.ground },
+      grid: land.walkable,
+      obstacles,
+      openObstacles,
+      room: () => room,
+      name,
+    },
+    () => (overlay.hidden = true)
+  );
+}
 
 overlay.innerHTML = `
   <h1>Merlin's Castle</h1>
@@ -183,8 +203,13 @@ overlay.addEventListener("click", () => {
   overlay.hidden = true;
 });
 overlay.addEventListener("touchend", () => (overlay.hidden = true));
+// With the debug panel open, clicking the world looks around again.
+renderer.domElement.addEventListener("click", () => {
+  if (document.body.classList.contains("debugging")) void renderer.domElement.requestPointerLock?.();
+});
 document.addEventListener("pointerlockchange", () => {
-  if (!player.locked && !matchMedia("(pointer: coarse)").matches) overlay.hidden = false;
+  const debugging = document.body.classList.contains("debugging");
+  if (!player.locked && !debugging && !matchMedia("(pointer: coarse)").matches) overlay.hidden = false;
 });
 
 function resize() {
