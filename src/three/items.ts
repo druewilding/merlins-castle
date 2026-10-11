@@ -19,6 +19,9 @@ const SLOTS = 5;
 const REACH = 8;
 // A thin object is easier to point at with a little room round it.
 const AIM_SLACK = 0.25;
+// The ground you walk on is a little smoother than the ground you see; an
+// object lies this far above it, so it never sinks in.
+const LIFT = 0.04;
 
 interface Lying {
   room: RoomId;
@@ -53,26 +56,59 @@ export function items(options: {
   /** How long an object is, end to end, so it lies on the slope under it. */
   const lengthOf = (model: Object3D) => new Box3().setFromObject(model).getSize(new Vector3()).z;
 
-  /** Lays an object down at x, z, turned to yaw, on the ground or a floor. */
+  /**
+   * Lays an object down at x, z, turned to yaw, on a floor or on the ground.
+   * On the ground it rests as a stiff thing would: on the highest bumps under
+   * it, tipped towards the side its middle is over (over a mound, it balances
+   * on top with its ends in the air; over a hollow, it bridges it).
+   */
   function lay(id: ItemId, room: RoomId, x: number, z: number, yaw: number, floor?: number) {
     const model = models.getObjectByName(id)!.clone();
-    const half = lengthOf(model) / 2;
-    const ax = x - Math.sin(yaw) * half;
-    const az = z - Math.cos(yaw) * half;
-    const bx = x + Math.sin(yaw) * half;
-    const bz = z + Math.cos(yaw) * half;
-    const ya = floor ?? ground(ax, az) ?? 0;
-    const yb = floor ?? ground(bx, bz) ?? 0;
-    model.position.set(x, (ya + yb) / 2, z);
-    // Along its length, tipped to lie on the slope.
+    const size = new Box3().setFromObject(model).getSize(new Vector3());
+    const half = size.z / 2;
+    const { y, slope } = floor === undefined ? resting(x, z, yaw, half, size.x / 2) : { y: floor, slope: 0 };
+    model.position.set(x, y, z);
     model.rotation.set(0, yaw, 0, "YXZ");
-    model.rotateX(-Math.atan2(yb - ya, half * 2));
+    model.rotateX(-Math.atan(slope));
     model.traverse((node) => {
       node.castShadow = true;
       node.receiveShadow = true;
     });
     scene.add(model);
     lying.set(id, { room, model, box: new Box3().setFromObject(model).expandByScalar(AIM_SLACK) });
+  }
+
+  /** The line an object rests on, along its length: the ground's upper hull, under its middle. */
+  function resting(x: number, z: number, yaw: number, half: number, wide: number) {
+    const along = [Math.sin(yaw), Math.cos(yaw)];
+    const across = [along[1], -along[0]];
+    const n = Math.max(2, Math.ceil((half * 2) / 0.25));
+    const profile: [number, number][] = [];
+    for (let k = 0; k <= n; k++) {
+      const s = -half + (k / n) * half * 2;
+      let h = -Infinity;
+      for (const w of [-wide, 0, wide]) {
+        const g = ground(x + along[0] * s + across[0] * w, z + along[1] * s + across[1] * w);
+        if (g !== undefined) h = Math.max(h, g);
+      }
+      if (h > -Infinity) profile.push([s, h + LIFT]);
+    }
+    if (profile.length < 2) return { y: (ground(x, z) ?? 0) + LIFT, slope: 0 };
+    // The upper hull: the bumps a straight edge would touch.
+    const hull: [number, number][] = [];
+    for (const p of profile) {
+      while (hull.length >= 2) {
+        const [a, b] = [hull[hull.length - 2], hull[hull.length - 1]];
+        if ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) < 0) break;
+        hull.pop();
+      }
+      hull.push(p);
+    }
+    let k = 0;
+    while (k < hull.length - 2 && hull[k + 1][0] < 0) k++;
+    const [[s0, h0], [s1, h1]] = [hull[k], hull[k + 1]];
+    const slope = (h1 - h0) / (s1 - s0);
+    return { y: h0 - s0 * slope, slope };
   }
 
   /** Where an object starts in a place: near its middle, all of it on ground you can walk on. */
