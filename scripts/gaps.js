@@ -5,6 +5,9 @@
 //   npm run gaps                       the whole land
 //   npm run gaps -- --near=x,z,r       only within r metres of a spot (x, z as
 //                                      in the debug panel), to check a fix
+//   npm run gaps -- --look=x,z,eye,yaw,pitch
+//                                      just a picture of one view (yaw 0 is
+//                                      north, π/2 west), in gaps/look.png
 //
 // It starts its own dev server, opens the land in a browser with no window,
 // paints the sky magenta and looks round from every few metres along every
@@ -27,6 +30,11 @@ const near = process.argv
   ?.slice(7)
   .split(",")
   .map(Number);
+const look = process.argv
+  .find((arg) => arg.startsWith("--look="))
+  ?.slice(7)
+  .split(",")
+  .map(Number);
 const land = JSON.parse(readFileSync("src/three/models/land.json", "utf8"));
 const OUT = "gaps";
 const SCAN = { width: 400, height: 250 }; // small, to look from thousands of spots quickly
@@ -42,6 +50,20 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}3d.html?at=0,0,0`);
   await page.waitForFunction(() => window.world?.renderer, null, { timeout: 60_000 });
   await page.evaluate(install, { ways: land.ways, halls: land.halls });
+
+  if (look) {
+    const [x, z, eye, yaw, pitch] = look;
+    const inside = await page.evaluate(([x, eye, z]) => window.gaps.inside(x, eye, z), [x, eye, z]);
+    const view = { name: "look", x, z, eye, yaw, pitch, inside };
+    await page.setViewportSize(PICTURE);
+    const { png, through } = await page.evaluate(([view, size]) => window.gaps.picture(view, size), [view, PICTURE]);
+    mkdirSync(OUT, { recursive: true });
+    writeFileSync(`${OUT}/look.png`, Buffer.from(png.split(",")[1], "base64"));
+    console.log(`${OUT}/look.png${through ? `: a gap through x ${through[0]}, y ${through[1]}, z ${through[2]}` : ""}`);
+    await browser.close();
+    await server.close();
+    process.exit(0);
+  }
 
   let spots = await page.evaluate(() => window.gaps.spots());
   if (near) spots = spots.filter(({ x, z }) => Math.hypot(x - near[0], z - near[1]) <= near[2]);
@@ -71,7 +93,7 @@ try {
   mkdirSync(OUT, { recursive: true });
   await page.setViewportSize(PICTURE);
   for (const [n, view] of worst.slice(0, 60).entries()) {
-    const png = await page.evaluate(([view, size]) => window.gaps.picture(view, size), [view, PICTURE]);
+    const { png } = await page.evaluate(([view, size]) => window.gaps.picture(view, size), [view, PICTURE]);
     writeFileSync(`${OUT}/${n + 1}.png`, Buffer.from(png.split(",")[1], "base64"));
   }
   writeFileSync(`${OUT}/index.html`, report(worst.slice(0, 60), worst.length));
@@ -87,11 +109,12 @@ try {
   await server.close();
 }
 
-function describe({ name, x, z, eye, yaw, pitch }) {
+function describe({ name, x, z, eye, yaw, pitch, through }) {
   const compass = ["north", "north-west", "west", "south-west", "south", "south-east", "east", "north-east"];
   const facing = compass[Math.round(((((yaw / (Math.PI * 2)) % 1) + 1) % 1) * 8) % 8];
   const look = pitch < -0.2 ? ", looking down" : pitch > 0.2 ? ", looking up" : "";
-  return `${name} · x ${x.toFixed(1)} · z ${z.toFixed(1)} · eye ${eye.toFixed(1)} · facing ${facing}${look}`;
+  const where = through ? ` · through x ${through[0]}, y ${through[1]}, z ${through[2]}` : "";
+  return `${name} · x ${x.toFixed(1)} · z ${z.toFixed(1)} · eye ${eye.toFixed(1)} · facing ${facing}${look}${where}`;
 }
 
 function report(views, total) {
@@ -192,7 +215,7 @@ function install({ ways, halls }) {
       return n.beyond && n.d <= way.half + 0.3;
     });
 
-  // Whether the sky seen along a ray is through something solid. Through
+  // Where the sky seen along a ray went through something solid, if it did. Through
   // the earth, always; and from indoors or underground, out through a wall
   // or a roof (not out of a door, a mouth or the open top of a ramp: from
   // there on, you're outdoors).
@@ -208,9 +231,9 @@ function install({ ways, halls }) {
         roofed = open.roofed;
         continue;
       }
-      if (y < g - 0.3) return true;
+      if (y < g - 0.3) return [x, y, z];
       if (indoors) {
-        if (roofed && !outOfAnEnd(x, z)) return true;
+        if (roofed && !outOfAnEnd(x, z)) return [x, y, z];
         indoors = false;
       }
     }
@@ -277,6 +300,7 @@ function install({ ways, halls }) {
     const [cp, sp, cy, sy] = [Math.cos(pitch), Math.sin(pitch), Math.cos(yaw), Math.sin(yaw)];
     const kinds = keep ? new Uint8Array(width * height) : undefined; // 1 sky, 2 gap
     let gaps = 0;
+    let through; // where (one of) the gaps is
     for (let j = 0; j < height; j++) {
       for (let i = 0; i < width; i++) {
         const k = (j * width + i) * 4;
@@ -291,15 +315,19 @@ function install({ ways, halls }) {
         [dx, dy, dz] = [dx / length, dy / length, dz / length];
         // (Outdoors, only rays going down can have passed through the ground.)
         const gap = (spot.inside || dy < 0.02) && throughSolid(spot, dx, dy, dz);
-        if (gap) gaps++;
+        if (gap) {
+          gaps++;
+          if (gaps % 7 === 1) through = gap.map((v) => Math.round(v * 10) / 10);
+        }
         if (kinds) kinds[j * width + i] = gap ? 2 : 1;
       }
     }
-    return { gaps, pixels, kinds };
+    return { gaps, through, pixels, kinds };
   }
 
   window.gaps = {
     spots,
+    inside: (x, y, z) => openAt(x, y, z, ground(x, z) ?? 0)?.roofed ?? false,
     scan(chunk, size) {
       const found = [];
       for (const spot of chunk) {
@@ -307,8 +335,8 @@ function install({ ways, halls }) {
         for (let a = 0; a < 8; a++) {
           for (const pitch of pitches) {
             const yaw = (a * Math.PI) / 4;
-            const { gaps } = look(spot, yaw, pitch, size, false);
-            if (gaps) found.push({ ...spot, yaw, pitch, gaps });
+            const { gaps, through } = look(spot, yaw, pitch, size, false);
+            if (gaps) found.push({ ...spot, yaw, pitch, gaps, through });
           }
         }
       }
@@ -316,7 +344,7 @@ function install({ ways, halls }) {
     },
     // A picture of one view: the gaps magenta, the sky that should be there blue.
     picture(view, size) {
-      const { pixels, kinds } = look(view, view.yaw, view.pitch, size, true);
+      const { pixels, kinds, through } = look(view, view.yaw, view.pitch, size, true);
       const canvas = document.createElement("canvas");
       canvas.width = size.width;
       canvas.height = size.height;
@@ -337,7 +365,7 @@ function install({ ways, halls }) {
         }
       }
       pen.putImageData(image, 0, 0);
-      return canvas.toDataURL("image/png");
+      return { png: canvas.toDataURL("image/png"), through };
     },
   };
 }

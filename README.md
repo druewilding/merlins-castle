@@ -89,12 +89,20 @@ npm run models -- land --preview  # …and render a picture of it
 npm run build && npm run preview  # try the built version at http://localhost:4173/3d.html
 ```
 
-Mouse to look, WASD or the arrow keys to walk, Shift to run, L to show the
-places' names. On the dev server only, **0** opens the debug panel: fly
-(F), walk through anything (N), open every obstacle (O), show the
-obstacles and how far they reach, red where they kill you (R), go faster or
-slower (. and ,), copy a picture of what you see to the clipboard (P), and
-a map to jump anywhere. The build leaves the debug panel out entirely, so
+Mouse to look, WASD or the arrow keys to walk, Shift to run, Space to jump
+(how high is `JUMP_HEIGHT` in `src/three/player.ts`), Ctrl or C to crouch.
+Look at an object and press E to take it; 1 to 5 picks which of your five
+slots is in your hand, a click uses it and G drops it. (Only the ladder and
+the key are in the world so far: their models are made by
+`art/blender/items.py`. Use the ladder by the old stone wall and walk into
+it to climb over; use the key by the rusty gate.)
+On the dev server only, **0** opens the debug panel: fly (F takes you 35 m
+up, and F again drops you back down), walk through anything (N), open every
+obstacle (O), show the obstacles and how far they reach, red where they kill
+you (R), turn the sky magenta to spot gaps you can see it through (M), float
+the places' names over them (L), go faster or slower (. and ,), copy a
+picture of what you see to the clipboard (P), and a map to jump anywhere.
+The letter keys work with the panel closed, too. The build leaves the debug panel out entirely, so
 check with `npm run build && npm run preview` that something works without
 it.
 
@@ -116,8 +124,11 @@ land in a browser with no window (Playwright's WebKit), paints the sky
 magenta and looks round from hundreds of spots, along every tunnel, in every
 room and round every building. It takes a few minutes and writes
 `gaps/index.html`, the worst first, with a picture of each (the gaps in
-magenta). `npm run gaps -- --near=x,z,r` checks just round one spot, after a
-fix. The first time, `npx playwright install webkit` fetches the browser.
+magenta), and where the ray went through. `npm run gaps -- --near=x,z,r`
+checks just round one spot, after a fix, and
+`npm run gaps -- --look=x,z,eye,yaw,pitch` takes one picture from anywhere,
+to see what's wrong. The first time, `npx playwright install webkit` fetches
+the browser.
 
 ## How it's made
 

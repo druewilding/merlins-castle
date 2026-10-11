@@ -114,6 +114,9 @@ RIVER = chaikin([(x * K, y * K) for x, y in [(-215, -40), (-150, -41), (-120, -4
                                              (-44, -46), (-20, -60), (20, -60), (60, -61), (94, -60)]])
 river = Lines()
 river.add(RIVER)
+BANK = 8.5  # from the river's middle to where its banks come up out of the water
+SHORE = 10  # and to where you can walk: back from the edge, where the bank levels out
+BRIDGE_HALF = SHORE + 0.5  # half the forest bridge's length, so it reaches the shore
 BRIDGE = P["old-wall"][0], -40 * K  # where the path south from the old wall crosses
 TOWER = (P["tower"][0], P["tower"][1] + 6)  # on its knoll, north of the mossy steps
 TOWER_R = 6
@@ -202,9 +205,35 @@ class Way:
         self.box = (min(xs), max(xs), min(ys), max(ys))
 
     def settle(self):
-        """Puts the mouths on the ground, once its shape is known."""
+        """Puts the mouths on the ground, once its shape is known; and finds
+        how far in from each end it's open to the sky (until it first goes
+        under cover: from there on it's roofed, even where the ground dips
+        close over it, as under the river)."""
         self.points = [(x, y, height(x, y) if f is None else f) for x, y, f in self.points]
         self.segments = list(zip(self.points, self.points[1:]))
+        along, covered, so_far = [], [], 0.0
+        samples = self.samples()
+        for k, (x, y, f) in enumerate(samples):
+            if k:
+                so_far += math.dist(samples[k - 1][:2], (x, y))
+            along.append(so_far)
+            covered.append(f + TUNNEL_TALL <= height(x, y) - 0.4)
+        under = [a for a, c in zip(along, covered) if c]
+        self.roofed = (under[0], under[-1]) if under and not self.indoor else None
+        self.length = so_far
+
+    def along(self, x, y):
+        """How far along the way the spot nearest x, y is."""
+        best, so_far = None, 0.0
+        for (ax, ay, _), (bx, by, _) in self.segments:
+            dx, dy = bx - ax, by - ay
+            length = math.hypot(dx, dy)
+            t = max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / (length * length)))
+            d = math.hypot(x - ax - t * dx, y - ay - t * dy)
+            if best is None or d < best[0]:
+                best = (d, so_far + t * length)
+            so_far += length
+        return best[1]
 
     def near(self, x, y, margin):
         w, e, s, n = self.box
@@ -251,6 +280,14 @@ class Hall:
         self.r = math.hypot(w, d) if self.room else r  # how far it reaches, at most
         self.ground, self.wall = ground, wall  # colours
         self.light, self.glow = light, glow  # its own light, if it has one
+
+    @property
+    def doorway(self):
+        """How far past its wall a way's walls stop, and its door frame
+        stands: just outside a room's wall, and half a metre on into a cave
+        (in front of its lumpy wall, so there's nothing to see behind the
+        frame)."""
+        return 0.3 if self.indoor else -0.5
 
     def inside(self, x, y, margin=0.0):
         if self.room:
@@ -470,7 +507,7 @@ for place, door in (("tower", "tower-door"), ("charcoal-hut", "hut-door")):
 
 def deck(x, y):
     """The bridge and drawbridge, for walking on."""
-    if abs(x - BRIDGE[0]) <= 2.2 and abs(y - BRIDGE[1]) <= 9:
+    if abs(x - BRIDGE[0]) <= 2.2 and abs(y - BRIDGE[1]) <= BRIDGE_HALF:
         return 0.9
     if abs(x) <= 3 and -143 * K <= y <= -127 * K:
         return 0.6
@@ -485,8 +522,30 @@ def open_to_the_sky(x, y, margin):
             continue  # (a building's floor is cut out of the land already)
         d, floor, beyond = way.nearest(x, y)
         if not beyond and d < way.half + margin and floor + TUNNEL_TALL > height(x, y) - 0.4:
+            if way.roofed and way.roofed[0] <= way.along(x, y) <= way.roofed[1]:
+                continue  # (between its mouths, under its roof)
             return floor
     return None
+
+
+def over_an_opening(x, y):
+    """Whether a spot is over (or nearly) the open part of a ramp, or just
+    past its lintel, where the earth over the roof still lies under the
+    ground's hole."""
+    for way in WAYS.values():
+        if way.indoor or not way.near(x, y, way.half + 0.3):
+            continue
+        d, _, beyond = way.nearest(x, y)
+        if beyond or d >= way.half + 0.3:
+            continue
+        if way.roofed is None:
+            return True
+        # (Past the lintel at a mouth: an end deep underground has none.)
+        start, end = way.roofed
+        a = way.along(x, y)
+        if (start > 0 and a < start + 0.3) or (end < way.length and a > end - 0.3):
+            return True
+    return False
 
 
 # ---------------------------------------------------------------- where the forest isn't
@@ -511,27 +570,38 @@ def open_ground(x, y):
     for spot in LOST.values():
         if math.hypot(x - spot[0], y - spot[1]) < 11:
             return True
-    return path_lines.distance(x, y) < 5.5 or river.distance(x, y) < 6.5 or in_moat(x, y)
+    return path_lines.distance(x, y) < 5.5 or river.distance(x, y) < BANK or in_moat(x, y)
+
+
+def under_a_tree(x, y):
+    """Within a tree's spreading branches (with room for you): a tree at the
+    forest's edge reaches out over the open ground."""
+    i, j = int(x // 10), int(y // 10)
+    return any(math.hypot(x - tx, y - ty) < r + 0.4
+               for di in (-1, 0, 1) for dj in (-1, 0, 1) for tx, ty, r in TREES.get((i + di, j + dj), ()))
 
 
 def walkable(x, y):
-    """Where you can stand: open ground that isn't water, or a bridge."""
+    """Where you can stand: open ground that isn't water, or a bridge, and
+    not under a tree."""
     if deck(x, y) is not None:
         return True
-    if river.distance(x, y) < 6.5 or in_moat(x, y):
+    if river.distance(x, y) < SHORE or in_moat(x, y):
         return False
     floor = open_to_the_sky(x, y, 2.0)
     if floor is not None and floor < height(x, y) - 0.35:
         return False  # over the ramp: you go in at the top
-    return open_ground(x, y) and not rocky(x, y) and not in_building(x, y)
+    return open_ground(x, y) and not rocky(x, y) and not in_building(x, y) and not under_a_tree(x, y)
 
 
 # ---------------------------------------------------------------- the ground
 
 
-def drawn_height(x, y):
+def drawn_height(x, y, exactly=False):
     """The ground's height as drawn: flat triangles between the grid's points
-    (whichever way each square is split), so a little under height()."""
+    (whichever way each square is split, so it's never above it), so a little
+    under height(). Exactly: as Blender splits them (from each square's first
+    corner to its third), for laying something right on it."""
     fi, fj = (x - X0) / STEP, (y - Y0) / STEP
     i, j = math.floor(fi), math.floor(fj)
     fx, fy = fi - i, fj - j
@@ -542,6 +612,8 @@ def drawn_height(x, y):
         a = h00 + fx * (h10 - h00) + fy * (h11 - h10)
     else:
         a = h00 + fy * (h01 - h00) + fx * (h11 - h01)
+    if exactly:
+        return a
     if fx + fy < 1:
         b = h00 + fx * (h10 - h00) + fy * (h01 - h00)
     else:
@@ -549,8 +621,23 @@ def drawn_height(x, y):
     return min(a, b)
 
 
+def ground_colour(x, y, z):
+    if river.distance(x, y) < 7 or in_moat(x, y):
+        col = RIVERBED
+    elif CASTLE[0] <= x <= CASTLE[1] and CASTLE[2] <= y <= CASTLE[3]:
+        col = FLAGS
+    elif open_ground(x, y):
+        col = GRASS
+    else:
+        col = FOREST_FLOOR
+    if z > 8:
+        col = c.mix(col, ROCK, smooth((z - 8) / 10))
+    return col
+
+
 nx, ny = int((X1 - X0) / STEP) + 1, int((Y1 - Y0) / STEP) + 1
 verts, colours, faces, walk = [], [], [], []
+CUT = set()  # the squares cut out of the ground
 for j in range(ny):
     for i in range(nx):
         x, y = X0 + i * STEP, Y0 + j * STEP
@@ -558,35 +645,37 @@ for j in range(ny):
         verts.append((x, y, z))
         d = deck(x, y)
         walk.append(d if d is not None else z)
-        if river.distance(x, y) < 7 or in_moat(x, y):
-            col = RIVERBED
-        elif CASTLE[0] <= x <= CASTLE[1] and CASTLE[2] <= y <= CASTLE[3]:
-            col = FLAGS
-        elif open_ground(x, y):
-            col = GRASS
-        else:
-            col = FOREST_FLOOR
-        if z > 8:
-            col = c.mix(col, ROCK, smooth((z - 8) / 10))
-        colours.append(c.vary(col, 0.12, Vector((x / 6, y / 6, 5.0))))
+        colours.append(c.vary(ground_colour(x, y, z), 0.12, Vector((x / 6, y / 6, 5.0))))
 for j in range(ny - 1):
     for i in range(nx - 1):
         qx, qy = X0 + (i + 0.5) * STEP, Y0 + (j + 0.5) * STEP
-        if open_to_the_sky(qx, qy, 1.0) is not None or in_building(qx, qy, whole=True):
-            continue  # the hole over a ramp, or the floor of a building
+        # The hole over a ramp (a square with its middle by the ramp, or any
+        # of it over the opening: by the lintel, a square can reach back
+        # over it from beyond), or the floor of a building.
+        if open_to_the_sky(qx, qy, 1.0) is not None or in_building(qx, qy, whole=True) \
+                or any(over_an_opening(qx + STEP * u / 8, qy + STEP * v / 8)
+                       for u in range(-4, 5) for v in range(-4, 5)):
+            CUT.add((i, j))
+            continue
         a = j * nx + i
         faces.append((a, a + 1, a + nx + 1, a + nx))
 c.mesh_object("ground", verts, faces, colours)
 
-# Paths: strips of earth on the ground.
+# Paths: strips of earth on the ground, lying on it as it's drawn (flat
+# triangles, a little under height() on a rise), in pieces small enough to
+# bend with it, so they neither float over a mound nor sink into a hollow.
+ACROSS = [-1.5, -0.75, 0.0, 0.75, 1.5]
 strips = c.Builder()
 for k, line in enumerate(paths):
     samples = []
     for (ax, ay), (bx, by) in zip(line, line[1:]):
-        n = max(1, int(math.hypot(bx - ax, by - ay) / 1.0))
+        n = max(1, int(math.hypot(bx - ax, by - ay) / 0.5))
         samples += [(ax + (bx - ax) * f / n, ay + (by - ay) * f / n) for f in range(n)]
     samples.append(line[-1])
-    lift = 0.05 + 0.004 * (k % 10)
+    # (A few centimetres above the grass, so the two don't flicker into each
+    # other far off, nor the grass come up through it on a slope; and a
+    # little apart from each other, where they cross.)
+    lift = 0.04 + 0.003 * (k % 10)
     verts, colours, faces = [], [], []
     for i, (x, y) in enumerate(samples):
         nx_, ny_ = samples[min(i + 1, len(samples) - 1)]
@@ -594,17 +683,28 @@ for k, line in enumerate(paths):
         tx, ty = nx_ - px_, ny_ - py_
         dd = math.hypot(tx, ty) or 1
         ox, oy = -ty / dd, tx / dd
-        for side in (-1.5, 1.5):
+        for side in ACROSS:
             vx, vy = x + ox * side, y + oy * side
             d = deck(vx, vy)
-            verts.append((vx, vy, (d if d is not None else height(vx, vy)) + lift))
+            verts.append((vx, vy, (d if d is not None else drawn_height(vx, vy, exactly=True)) + lift))
             colours.append(c.vary(DIRT, 0.12, Vector((vx, vy, 2.0))))
         if i:
             # (Wound to face up: facing down, the sun's shadows fall on the
             # path in stripes.)
-            a = (i - 1) * 2
-            faces.append((a, a + 2, a + 3, a + 1))
+            m = len(ACROSS)
+            for j in range(m - 1):
+                a = (i - 1) * m + j
+                faces.append((a, a + m, a + m + 1, a + 1))
     strips.add(verts, faces, colours)
+    # Its sides, down into the ground, so you never see under its edge (not
+    # across its ends, which mostly meet another path, and would stand up
+    # through it).
+    m = len(ACROSS)
+    for edge in (0, m - 1):
+        tops = verts[edge::m]
+        for p0, p1 in zip(tops, tops[1:]):
+            side = [p0, p1, (*p1[:2], p1[2] - lift - 0.25), (*p0[:2], p0[2] - lift - 0.25)]
+            strips.add(side, [(0, 1, 2, 3)], [c.vary(DIRT, 0.12, Vector(p0))] * 4)
 strips.build("paths")
 
 # ---------------------------------------------------------------- what's solid
@@ -650,6 +750,7 @@ def tower(builder, x, y, radius, tall, colour, roof=None, roof_tall=None, sides=
 
 # Trees: on a jittered grid wherever the ground isn't open.
 trees = c.Builder()
+TREES = {}  # each tree's spot and how far its branches spread, by 10 m square
 for gx in range(X0 + 3, X1 - 2, 5):
     for gy in range(Y0 + 3, Y1 - 2, 5):
         x, y = gx + random.uniform(-2, 2), gy + random.uniform(-2, 2)
@@ -657,7 +758,16 @@ for gx in range(X0 + 3, X1 - 2, 5):
             continue
         z = height(x, y)
         tall = random.uniform(9, 14)
-        trees.cone((x, y, z - 0.3), tall, random.uniform(2.2, 3.0), c.vary(TREE, 0.2, Vector((x, y, 0))), sides=7, droop=0.3)
+        r = random.uniform(2.2, 3.0)
+        trees.cone((x, y, z - 0.3), tall, r, c.vary(TREE, 0.2, Vector((x, y, 0))), sides=7, droop=0.3)
+        TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
+# Trees close in on both sides of the dragon's mouth, so the only way on is
+# down into it (not round its side, past the leaves).
+for dx, dy, r in ((1.5, 6.2, 1.7), (2.0, 7.5, 2.6), (5.0, 9.5, 2.8), (-1.5, 9.0, 2.4), (-0.5, 12.0, 2.6)):
+    for side in (1, -1):
+        x, y = DRAGON_LIP[0] + dx, DRAGON_LIP[1] + side * dy
+        trees.cone((x, y, height(x, y) - 0.3), random.uniform(10, 13), r, c.vary(TREE, 0.2, Vector((x, y, 0))), sides=7, droop=0.3)
+        TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
 # The dense trees across the mountain path, which only the axe will clear.
 w, e, s, n = AXE_TREES
 obstacle(["mountain-path north"], "box", (w + e) / 2, -(s + n) / 2, (e - w) / 2 + 2, (n - s) / 2)
@@ -670,12 +780,13 @@ trees.build("trees", smooth=False)
 # Water: the river, and the moat round the castle.
 water = c.Builder()
 # The river: one ribbon, its sides joined round the bends (separate pieces
-# leave wedges of riverbed showing between them).
+# leave wedges of riverbed showing between them), reaching in under the
+# banks (which come up out of the water at BANK).
 verts, faces = [], []
 for k, (x, y) in enumerate(RIVER):
     (ax, ay), (bx, by) = RIVER[max(k - 1, 0)], RIVER[min(k + 1, len(RIVER) - 1)]
     dd = math.hypot(bx - ax, by - ay) or 1
-    ox, oy = -(by - ay) / dd * 7, (bx - ax) / dd * 7
+    ox, oy = -(by - ay) / dd * 9.5, (bx - ax) / dd * 9.5
     verts += [(x + ox, y + oy, -1), (x - ox, y - oy, -1)]
     if k:
         a = (k - 1) * 2
@@ -693,9 +804,11 @@ water.build("water", smooth=False)
 built = c.Builder()
 
 # The forest bridge and the drawbridge.
-block(built, BRIDGE[0] - 2.4, BRIDGE[1] - 9, 0.5, BRIDGE[0] + 2.4, BRIDGE[1] + 9, 0.9, c.linear("#8a5a33"), solid=False)
+block(built, BRIDGE[0] - 2.4, BRIDGE[1] - BRIDGE_HALF, 0.5, BRIDGE[0] + 2.4, BRIDGE[1] + BRIDGE_HALF, 0.9,
+      c.linear("#8a5a33"), solid=False)
 for side in (-1, 1):
-    block(built, BRIDGE[0] + side * 2.4 - 0.15, BRIDGE[1] - 9, 0.9, BRIDGE[0] + side * 2.4 + 0.15, BRIDGE[1] + 9, 1.9,
+    block(built, BRIDGE[0] + side * 2.4 - 0.15, BRIDGE[1] - BRIDGE_HALF, 0.9, BRIDGE[0] + side * 2.4 + 0.15,
+          BRIDGE[1] + BRIDGE_HALF, 1.9,
           c.linear("#6b4426"))
 block(built, -3, -143 * K, 0.2, 3, -127 * K, 0.6, c.linear("#7a5230"), solid=False)
 # The drawbridge is up: over the middle of the water, so its far half (where
@@ -719,7 +832,28 @@ for start, end in ((WW - 0.6, GATE[0]), (GATE[1], WX + 0.6)):
     while x < end - 0.01:
         block(built, x, WY - 0.6, height(x, WY) - 0.5, min(x + 2, end), WY + 0.6, height(x, WY) + WALL, STONE)
         x += 2
-block(built, GATE[0], WY - 0.3, 0.0, GATE[1], WY + 0.3, 3.6, c.linear("#a5532c"), solid=False)  # the rusty gate, locked
+# The rusty gate, locked: two halves, each on its hinge at the wall, which
+# the game swings open (north, away from the rusty gate) while the key's in use.
+RUST = c.linear("#a5532c")
+GATE_FOOT = height((GATE[0] + GATE[1]) / 2, WY) - 0.1
+for name, hinge, way in (("gate-west", GATE[0], 1), ("gate-east", GATE[1], -1)):
+    leaf = c.Builder()
+    wide = (GATE[1] - GATE[0]) / 2 - 0.02
+
+    def bar(a0, a1, z0, z1, t=0.05):
+        """A piece of the gate, from a0 to a1 out from its hinge."""
+        lo, hi = sorted((a0 * way, a1 * way))
+        block(leaf, lo, -t, z0, hi, t, z1, RUST, solid=False)
+
+    bar(0, 0.12, 0, 3.6)  # the stile on the hinge
+    bar(wide - 0.1, wide, 0, 3.6)  # and where the two halves meet
+    for z in (0.15, 1.8, 3.35):
+        bar(0, wide, z, z + 0.12)  # the rails
+    for k in range(1, 8):
+        a = k * wide / 8
+        bar(a - 0.025, a + 0.025, 0, 3.8, t=0.025)  # the bars, poking up above the top rail
+    obj = leaf.build(name, smooth=False)
+    obj.location = (hinge, WY, GATE_FOOT)
 obstacle(["rusty-gate north", "yellow-flowers south"], "box", (GATE[0] + GATE[1]) / 2, -WY, (GATE[1] - GATE[0]) / 2, 0.6)
 y = WY
 while y < 118 * K:
@@ -732,7 +866,7 @@ while y < 118 * K:
 # roof line the gap), and its flat top and roof.
 SIDES = 24
 tz0, tz1 = height(*TOWER) - 0.5, height(*TOWER) - 0.5 + 20
-door_top = HALLS["tower"].floor + TUNNEL_TALL - 0.1  # just under the doorway's roof, so there's no gap
+door_top = HALLS["tower"].floor + TUNNEL_TALL - 0.3  # under the doorway's roof (which slopes down a little), so there's no gap
 ring = [(TOWER[0] + math.cos(-math.pi / 2 + 2 * math.pi * k / SIDES) * TOWER_R,
          TOWER[1] + math.sin(-math.pi / 2 + 2 * math.pi * k / SIDES) * TOWER_R) for k in range(SIDES)]
 for k in range(SIDES):
@@ -774,7 +908,7 @@ block(built, hx - 4, hy - 3, hz0, hx - 3.5, hy + 3, hz1, HUT_WALL, solid=False)
 block(built, hx + 3.5, hy - 3, hz0, hx + 4, hy + 3, hz1, HUT_WALL, solid=False)
 block(built, hx - 4, hy + 2.5, hz0, hx - gap, hy + 3, hz1, HUT_WALL, solid=False)
 block(built, hx + gap, hy + 2.5, hz0, hx + 4, hy + 3, hz1, HUT_WALL, solid=False)
-block(built, hx - gap, hy + 2.5, HALLS["charcoal-hut"].floor + TUNNEL_TALL - 0.1, hx + gap, hy + 3, hz1, HUT_WALL,
+block(built, hx - gap, hy + 2.5, HALLS["charcoal-hut"].floor + TUNNEL_TALL - 0.3, hx + gap, hy + 3, hz1, HUT_WALL,
       solid=False)  # over the door, down to the doorway's roof
 built.cone((hx, hy, hz1), 3, 5.5, c.linear("#5d4630"), sides=4, droop=0)
 # A sill under the door, where the doorway's floor meets the room's (over
@@ -783,11 +917,7 @@ fl = HALLS["charcoal-hut"].floor
 block(built, hx - gap, hy + 2.3, fl - 0.6, hx + gap, hy + 3.2, fl - 0.02, STONE, solid=False)
 solid_box(hx, hy, 4, 3)
 
-# The cave entrance's mound, and the pile of leaves filling the mouth of the
-# dragon's cave, just inside.
-ce = P["cave-entrance"]
-built.blob((ce[0] + 3, ce[1] + 8, height(*ce)), 7, ROCK, squash=0.55, lumpy=0.25, seed=1)
-solid_circle(ce[0] + 3, ce[1] + 8, 6)
+# The pile of leaves filling the mouth of the dragon's cave, just inside.
 lx, ly = DRAGON_LIP[0] + 3, DRAGON_LIP[1]
 built.blob((lx, ly, WAYS["dragon-mouth"].nearest(lx, ly)[1] + 0.2), 2.6, LEAVES, squash=0.55, lumpy=0.35, seed=2)
 
@@ -929,12 +1059,14 @@ CORRIDOR_WALL = c.linear("#8f8878")
 under_circles, under_boxes = [], []
 
 
-def under_circle(x, y, r):
-    under_circles.append([round(x, 2), round(-y, 2), round(r, 2)])
+# (Given its top, a thing low enough to climb onto: you can stand on it.)
+def under_circle(x, y, r, top=None):
+    under_circles.append([round(x, 2), round(-y, 2), round(r, 2)] + ([round(top, 2)] if top is not None else []))
 
 
-def under_box(x, y, half_x, half_y):
-    under_boxes.append([round(x, 2), round(-y, 2), round(half_x, 2), round(half_y, 2)])
+def under_box(x, y, half_x, half_y, top=None):
+    under_boxes.append([round(x, 2), round(-y, 2), round(half_x, 2), round(half_y, 2)]
+                       + ([round(top, 2)] if top is not None else []))
 
 
 def in_a_hall(x, y, floor, margin=0.0):
@@ -957,6 +1089,44 @@ def earth_wall(e0, e1, bottom0, bottom1):
         t0, t1 = drawn_height(*p0) - 0.05, drawn_height(*p1) - 0.05
         if t0 > b0 or t1 > b1:
             quad(tunnel, [(*p0, b0), (*p1, b1), (*p1, max(t1, b1)), (*p0, max(t0, b0))], EARTH)
+
+
+def clip(polygon, px, py, tx, ty):
+    """The part of a polygon on the near side of the line through px, py
+    across the direction tx, ty."""
+    side = [(x - px) * tx + (y - py) * ty for x, y in polygon]
+    out = []
+    for k, (p, s0) in enumerate(zip(polygon, side)):
+        q, s1 = polygon[(k + 1) % len(polygon)], side[(k + 1) % len(polygon)]
+        if s0 <= 0:
+            out.append(p)
+        if (s0 < 0) != (s1 < 0) and s0 != s1:
+            t = s0 / (s0 - s1)
+            out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+    return out
+
+
+def lid_over(row, back, wide):
+    """The ground's cut squares between a lintel's row and the back of the
+    earth behind it, clipped to the part behind the lintel."""
+    x, y, (ux, uy) = row[0], row[1], (row[3], row[4])
+    inward = 1 if ux * (back[1] - y) - uy * (back[0] - x) > 0 else -1
+    reach = wide + STEP
+    xs = [row[0] + ux * d for d in (-reach, reach)] + [back[0] + back[3] * d for d in (-reach, reach)]
+    ys = [row[1] + uy * d for d in (-reach, reach)] + [back[1] + back[4] * d for d in (-reach, reach)]
+    for i in range(int((min(xs) - X0) // STEP), int((max(xs) - X0) // STEP) + 1):
+        for j in range(int((min(ys) - Y0) // STEP), int((max(ys) - Y0) // STEP) + 1):
+            if (i, j) not in CUT:
+                continue
+            x0, y0 = X0 + i * STEP, Y0 + j * STEP
+            c00, c10, c11, c01 = (x0, y0), (x0 + STEP, y0), (x0 + STEP, y0 + STEP), (x0, y0 + STEP)
+            for tri in ((c00, c10, c11), (c00, c11, c01)):
+                pts = clip(list(tri), x, y, inward * uy, -inward * ux)
+                if len(pts) < 3:
+                    continue
+                verts = [(px, py, drawn_height(px, py, exactly=True)) for px, py in pts]
+                colour = ground_colour(*pts[0], height(*pts[0]))
+                tunnel.add(verts, [tuple(range(len(verts)))], [c.vary(colour, 0.12, Vector(v)) for v in verts])
 
 
 def quad(builder, pts, colour, vary=0.12):
@@ -1004,6 +1174,7 @@ def in_pit(x, y):
 # round the hole, and a lintel where the roof begins. Inside a hall, the
 # hall's own floor and walls take over, with a door frame where they meet.
 tunnel = c.Builder()
+DROPS = []  # (cave, and the two sides of where a way drops away out of it)
 for way in WAYS.values():
     half = way.half
     # The way's two edges, as lines meeting exactly at every bend (mitred,
@@ -1026,18 +1197,30 @@ for way in WAYS.values():
     for si, ((ax, ay, af), (bx, by, bf)) in enumerate(zip(pts, pts[1:])):
         n = max(1, int(math.hypot(bx - ax, by - ay) / 0.5))
         last = si == len(pts) - 2
+        length = math.hypot(bx - ax, by - ay)
+        bend = min(2 * half, length)  # how far from a bend its mitre reaches
         for k in range(n + 1 if last else n):
             t = k / n
             x, y, floor = ax + (bx - ax) * t, ay + (by - ay) * t, af + (bf - af) * t
             (c0x, c0y), (c1x, c1y) = corners[si], corners[si + 1]
+            sx, sy = seg_normals[si]
+            # (Square across the way, but for a bend's mitre, eased in over
+            # the last few metres to it: straight on, everything placed
+            # across the way meets the walls.)
+            w0, w1 = max(0.0, 1 - t * length / bend), max(0.0, 1 - (1 - t) * length / bend)
             for edge, off in ((edge_left, -half), (edge_right, half)):
-                e0 = (ax + c0x * off, ay + c0y * off)
-                e1 = (bx + c1x * off, by + c1y * off)
-                edge.append((e0[0] + (e1[0] - e0[0]) * t, e0[1] + (e1[1] - e0[1]) * t))
+                edge.append((x + sx * off + ((c0x - sx) * w0 + (c1x - sx) * w1) * off,
+                             y + sy * off + ((c0y - sy) * w0 + (c1y - sy) * w1) * off))
             ground = height(x, y)
             covered = way.indoor or floor + TUNNEL_TALL <= ground - 0.4
             nx_, ny_ = seg_normals[si]
             rows.append((x, y, floor, nx_, ny_, covered))
+    # Across the way at each row, as its walls go: after a bend, the mitred
+    # edges are skewed (one side runs on ahead of the other) all along to the
+    # next bend, so everything placed across the way (the lip, the lintel,
+    # the earth behind it, door frames) follows the same skew, not the square.
+    rows = [(x, y, floor, (rx - x) / half, (ry - y) / half, covered)
+            for (x, y, floor, _, _, covered), (rx, ry) in zip(rows, edge_right)]
     # Open to the sky from each mouth until it first goes under cover, and
     # covered from then on (on bumpy ground it would flip back and forth near
     # the lintel, leaving holes in the roof).
@@ -1053,33 +1236,17 @@ for way in WAYS.values():
         x, y, _, nx_, ny_, _ = row
         return x + nx_ * offset, y + ny_ * offset
 
-    def under_floor(a, b):
-        # (The floor stops where a cave's floor, reaching out under its walls,
-        # takes over. A room's floor only reaches just under its walls, so as
-        # not to overlap the room next door: there, the way's floor goes on a
-        # little into the room, a doorstep over the seam.)
-        mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
-        hall = in_a_hall(*mid, 1.3)
-        if hall and hall.indoor and not hall.inside(mid[0], mid[1], -0.3):
-            return None
-        return hall
-
-    covered_by = [under_floor(a, b) for a, b in zip(rows, rows[1:])]
     for k, (a, b) in enumerate(zip(rows, rows[1:])):
         mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
-        if in_a_hall(*mid, 0.3):
+        # (Floor, walls and roof go on as far as the doorway: just past a
+        # room's wall, or on into a cave, past its lumpy wall. The floor
+        # overlaps the hall's own, a doorstep over the seam.)
+        hall = in_a_hall(*mid, 0.3)
+        if hall and hall.inside(mid[0], mid[1], hall.doorway):
             continue
         (alx, aly), (arx, ary) = edge_left[k], edge_right[k]
         (blx, bly), (brx, bry) = edge_left[k + 1], edge_right[k + 1]
-        # Where a ramp leaves a cave going down, it's lower than the cave's
-        # floor by the time the cave's floor stops: a face of earth across,
-        # from the ramp up to the cave's floor, so there's no slot under it.
-        for other, row, (el, er) in ((k - 1, a, (edge_left[k], edge_right[k])),
-                                     (k + 1, b, (edge_left[k + 1], edge_right[k + 1]))):
-            hall = covered_by[other] if 0 <= other < len(covered_by) else None
-            if hall and not covered_by[k] and row[2] < hall.floor - 0.1:
-                quad(tunnel, [(*el, row[2]), (*er, row[2]), (*er, hall.floor - 0.06), (*el, hall.floor - 0.06)], EARTH)
-        if not covered_by[k] and not in_pit(mid[0], mid[1]):
+        if not in_pit(mid[0], mid[1]):
             # (Indoors, a shade up: off the ground, out of the door, and the
             # same all the way in, so there's no step at the wall.)
             lift = 0.04 if way.indoor else 0.0
@@ -1092,7 +1259,7 @@ for way in WAYS.values():
                 bottom = near.floor - 0.12
                 for p0, p1, z0, z1 in (((alx, aly), (blx, bly), a[2], b[2]), ((arx, ary), (brx, bry), a[2], b[2]),
                                        ((alx, aly), (arx, ary), a[2], a[2]), ((blx, bly), (brx, bry), b[2], b[2])):
-                    quad(tunnel, [(*p0, z0), (*p1, z1), (*p1, min(z1 - 0.12, bottom)), (*p0, min(z0 - 0.12, bottom))],
+                    quad(tunnel, [(*p0, z0 + lift), (*p1, z1 + lift), (*p1, min(z1 - 0.12, bottom)), (*p0, min(z0 - 0.12, bottom))],
                          floor_colour)
         # (Up the ramps, the walls stop exactly under the stone lip on top of them.)
         for (ax_, ay_), (bx_, by_) in (((alx, aly), (blx, bly)), ((arx, ary), (brx, bry))):
@@ -1101,22 +1268,25 @@ for way in WAYS.values():
             roofed = a[5] and b[5]
             top_a = a[2] + TUNNEL_TALL if roofed else max(height(ax_, ay_) + 0.32, a[2] + 0.6)
             top_b = b[2] + TUNNEL_TALL if roofed else max(height(bx_, by_) + 0.32, b[2] + 0.6)
-            quad(tunnel, [(ax_, ay_, a[2]), (bx_, by_, b[2]), (bx_, by_, top_b), (ax_, ay_, top_a)], wall_colour)
+            quad(tunnel, [(ax_, ay_, a[2] - 0.1), (bx_, by_, b[2] - 0.1), (bx_, by_, top_b), (ax_, ay_, top_a)], wall_colour)
         if a[5] and b[5]:
             quad(tunnel, [(alx, aly, a[2] + TUNNEL_TALL), (arx, ary, a[2] + TUNNEL_TALL), (brx, bry, b[2] + TUNNEL_TALL),
                           (blx, bly, b[2] + TUNNEL_TALL)], roof_colour)
         if not (a[5] and b[5]):
-            # A lip of stone round the hole, hiding its ragged edge.
-            for inner, outer in ((half, half + 2.4), (-half, -half - 2.4)):
-                pa = [side(a, inner), side(a, outer)]
-                pb = [side(b, outer), side(b, inner)]
-                quad(tunnel, [(*p, height(*p) + 0.32) for p in pa + pb], STONE)
-                # Solid down into the ground at its outer edge and its ends,
-                # so there's nothing to see under it.
-                (ia, oa), (ob, ib) = pa, pb
-                for p0, p1 in ((oa, ob), (ia, oa), (ib, ob)):
-                    quad(tunnel, [(*p0, height(*p0) + 0.32), (*p1, height(*p1) + 0.32), (*p1, height(*p1) - 0.6),
-                                  (*p0, height(*p0) - 0.6)], STONE)
+            # A lip of stone round the hole, hiding its ragged edge (in strips,
+            # so it follows the ground even up the crags, never under it).
+            for sign in (1, -1):
+                across = [sign * (half + 2.4 * t / 4) for t in range(5)]
+                for inner, outer in zip(across, across[1:]):
+                    pa = [side(a, inner), side(a, outer)]
+                    pb = [side(b, outer), side(b, inner)]
+                    quad(tunnel, [(*p, height(*p) + 0.32) for p in pa + pb], STONE)
+                    # Solid down into the ground at its outer edge and its
+                    # ends, so there's nothing to see under it.
+                    (ia, oa), (ob, ib) = pa, pb
+                    for p0, p1 in ((oa, ob),) * (outer == across[-1]) + ((ia, oa), (ib, ob)):
+                        quad(tunnel, [(*p0, height(*p0) + 0.32), (*p1, height(*p1) + 0.32), (*p1, height(*p1) - 0.6),
+                                      (*p0, height(*p0) - 0.6)], STONE)
         if a[5] != b[5]:
             # Just behind the lintel, the earth over the roof: from the top of
             # a steep ramp you look down over the roof (it drops away faster
@@ -1124,7 +1294,7 @@ for way in WAYS.values():
             # A box of earth: the roof made wide, its sides, and a back.
             inward = 1 if b[5] else -1
             start = k + 1 if b[5] else k
-            span = [rows[i] for i in range(start, start + inward * 7, inward) if 0 <= i < len(rows)]
+            span = [rows[i] for i in range(start, start + inward * 9, inward) if 0 <= i < len(rows)]
             wide = half + 2.4
             for r0, r1 in zip(span, span[1:]):
                 l0, q0, l1_, q1 = side(r0, -wide), side(r0, wide), side(r1, -wide), side(r1, wide)
@@ -1140,16 +1310,45 @@ for way in WAYS.values():
             low = row[2] + TUNNEL_TALL
             high = max(height(*l1), height(*r1), height(row[0], row[1])) + 0.8
             quad(tunnel, [(*l1, low), (*r1, low), (*r1, high), (*l1, high)], STONE)
+            # And a lid over the box: the ground's hole reaches a square's
+            # width back past the lintel, and on a cliff the box's back would
+            # show through it. So the ground's cut squares are drawn again,
+            # just the part behind the lintel.
+            lid_over(row, back, wide)
     # Door frames, where the way goes into a hall.
-    for a, b in zip(rows, rows[1:]):
+    # (Hung on the walls' own edges: near a bend, they're mitred.)
+    for k, (a, b) in enumerate(zip(rows, rows[1:])):
         for hall in HALLS.values():
-            if abs(hall.floor - a[2]) > 1.5 or hall.inside(a[0], a[1], 0.3) == hall.inside(b[0], b[1], 0.3):
+            m = hall.doorway
+            if abs(hall.floor - a[2]) > 1.5 or hall.inside(a[0], a[1], m) == hall.inside(b[0], b[1], m):
                 continue
-            row = b if hall.inside(a[0], a[1], 0.3) else a
+            i = k + 1 if hall.inside(a[0], a[1], m) else k
+            row = rows[i]
             f = row[2]
-            for inner, outer in ((half, half + 1.8), (-half, -half - 1.8)):
-                p, q = side(row, inner), side(row, outer)
-                quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, f + TUNNEL_TALL + 0.1), (*p, f + TUNNEL_TALL + 0.1)], hall.wall)
+            nx_, ny_ = row[3], row[4]
+            # (In a cave, as high as its wall goes before the dome.)
+            top = f + TUNNEL_TALL + 0.1 if hall.indoor else hall.floor + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
+            for p, jut in ((edge_right[i], 1.8), (edge_left[i], -1.8)):
+                q = (p[0] + nx_ * jut, p[1] + ny_ * jut)
+                quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
+            if not hall.indoor:
+                p, q = edge_left[i], edge_right[i]
+                quad(tunnel, [(*p, f + TUNNEL_TALL), (*q, f + TUNNEL_TALL), (*q, top), (*p, top)], hall.wall)
+    # Where it drops away steeply out of a cave's doorway: the cave's floor
+    # is cut off there (it reaches out under the cave's lumpy wall, and would
+    # stick out over the drop, a ledge).
+    skipped = []
+    for a, b in zip(rows, rows[1:]):
+        mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
+        hall = in_a_hall(*mid, 0.3)
+        skipped.append(hall if hall and hall.inside(mid[0], mid[1], hall.doorway) else None)
+    for k in range(len(skipped) - 1):
+        for inner, outer, step in ((k, k + 1, 1), (k + 1, k, -1)):
+            hall = skipped[inner]
+            if hall and not hall.indoor and not skipped[outer]:
+                on = rows[min(max(k + 1 + step * 4, 0), len(rows) - 1)]  # 2 m on
+                if on[2] < hall.floor - 0.5:
+                    DROPS.append((hall, edge_left[k + 1], edge_right[k + 1]))
     # A dead end, deep under the land (off into the mist): a metre more of
     # tunnel, and earth across the end of it.
     for row, edges, outward in ((rows[0], (edge_left[0], edge_right[0]), -1), (rows[-1], (edge_left[-1], edge_right[-1]), 1)):
@@ -1222,11 +1421,26 @@ for hall in HALLS.values():
     step = 1.5
     reach = R + 1.4
     n = int(reach / step) + 1
+    drops = [(left, right) for cave, left, right in DROPS if cave is hall]
     for i in range(-n, n):
         for j in range(-n, n):
             x0, y0 = hx + i * step, hy + j * step
             nearest_x, nearest_y = max(x0, min(hx, x0 + step)), max(y0, min(hy, y0 + step))
             if math.hypot(nearest_x - hx, nearest_y - hy) > reach:
+                continue
+            # (Cut off where a way drops away out of the doorway, along the
+            # way's first row of floor, which goes on down from there.)
+            square = [(x0, y0), (x0 + step, y0), (x0 + step, y0 + step), (x0, y0 + step)]
+            for (lx_, ly_), (rx_, ry_) in drops:
+                mx, my = (lx_ + rx_) / 2, (ly_ + ry_) / 2
+                across = math.hypot(rx_ - lx_, ry_ - ly_)
+                ux, uy = (rx_ - lx_) / across, (ry_ - ly_) / across
+                tx, ty = -uy, ux  # out of the cave
+                if (hx - mx) * tx + (hy - my) * ty > 0:
+                    tx, ty = -tx, -ty
+                if abs((x0 + step / 2 - mx) * ux + (y0 + step / 2 - my) * uy) < across / 2 + 1.1:
+                    square = clip(square, mx, my, tx, ty)
+            if len(square) < 3:
                 continue
             colour, vary = hall.ground, 0.12
             if hall.place == "beautiful-chamber":
@@ -1237,7 +1451,8 @@ for hall in HALLS.values():
                 colour = c.linear("#2f3c44")  # puddles
             # (A shade lower than the ways' floors, where they overlap.)
             fl = f - 0.06
-            quad(caves, [(x0, y0, fl), (x0 + step, y0, fl), (x0 + step, y0 + step, fl), (x0, y0 + step, fl)], colour, vary)
+            caves.add([(x, y, fl) for x, y in square], [tuple(range(len(square)))],
+                      [c.vary(colour, vary, Vector((x0, y0, fl)))] * len(square))
 
     sides = max(28, int(2 * math.pi * R / 1.1))
     wall_top = f + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
@@ -1365,7 +1580,7 @@ def wall_panel(b, x, y, along, f, z0, z1, colour):
 def furniture(b, x0, y0, x1, y1, z0, z1, colour):
     """A solid thing standing on the floor."""
     block(b, x0, y0, z0, x1, y1, z1, colour, solid=False)
-    under_box((x0 + x1) / 2, (y0 + y1) / 2, abs(x1 - x0) / 2, abs(y1 - y0) / 2)
+    under_box((x0 + x1) / 2, (y0 + y1) / 2, abs(x1 - x0) / 2, abs(y1 - y0) / 2, top=z1)
 
 
 def flame(b, x, y, z, size=0.35):
@@ -1397,7 +1612,10 @@ def room(b, hall):
             p1 = (ax + (bx - ax) * (m + 1) / n, ay + (by - ay) * (m + 1) / n)
             mx, my = (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2
             if opening(hall, mx + ox * 0.6, my + oy * 0.6):
-                quad(b, [(*p0, f + TUNNEL_TALL), (*p1, f + TUNNEL_TALL), (*p1, f + tall), (*p0, f + tall)], hall.wall)
+                # (Down a little over the doorway's roof, which can slope down
+                # outward, as to the hut's door.)
+                low = f + TUNNEL_TALL - 0.3
+                quad(b, [(*p0, low), (*p1, low), (*p1, f + tall), (*p0, f + tall)], hall.wall)
                 continue
             quad(b, [(*p0, f - 0.3), (*p1, f - 0.3), (*p1, f + 1.0), (*p0, f + 1.0)], band)
             quad(b, [(*p0, f + 1.0), (*p1, f + 1.0), (*p1, f + tall), (*p0, f + tall)], hall.wall)
@@ -1573,12 +1791,15 @@ def room(b, hall):
 
 
 def round_room(b, hall):
-    """A round room: a floor of flagstones in rings, out just under the wall;
+    """A round room: a floor of flagstones in rings, out under the wall;
     the wall, with a doorway where a way comes in; and a flat ceiling."""
     hx, hy, f, R, tall = hall.x, hall.y, hall.floor, hall.r, hall.tall
     sides = 32
     at = lambda k, r: (hx + math.cos(2 * math.pi * k / sides) * r, hy + math.sin(2 * math.pi * k / sides) * r)
-    rings = [0.0, 1.4, 2.8, 4.2, R + 0.5]
+    # (In the tower, right out to its outer wall: by the doorway, where the
+    # room's own wall is open, you'd see the ground between them.)
+    out = TOWER_R * math.cos(math.pi / SIDES) - 0.02 if hall.place == "tower" else R + 0.5
+    rings = [0.0, 1.4, 2.8, 4.2, out]
     fl = f - 0.06  # (a shade under the doorway's floor, where they overlap)
     for i in range(len(rings) - 1):
         for k in range(sides):
@@ -1590,8 +1811,9 @@ def round_room(b, hall):
         p0, p1 = at(k, R + E), at(k + 1, R + E)
         mx, my = at(k + 0.5, R + E + 0.6)
         if opening(hall, mx, my):
-            # (Down a little over the door frame, which is straight where the wall curves.)
-            low = f + TUNNEL_TALL - 0.15
+            # (Down a little over the door frame, which is straight where the
+            # wall curves, and the doorway's roof, which slopes down outward.)
+            low = f + TUNNEL_TALL - 0.3
             quad(b, [(*p0, low), (*p1, low), (*p1, f + tall), (*p0, f + tall)], hall.wall)
             continue
         quad(b, [(*p0, f - 0.3), (*p1, f - 0.3), (*p1, f + 1.0), (*p0, f + 1.0)], band)
@@ -1599,11 +1821,9 @@ def round_room(b, hall):
     b.add([(*at(k, R + E), f + tall) for k in range(sides)], [tuple(range(sides))],
           [c.mix(hall.wall, c.linear("#000000"), 0.35)] * sides)
     if hall.place == "tower":
-        # A table in the middle, with a candle; a chest against the north wall;
-        # and stone steps curling up the wall from the west towards the north,
-        # to the floor above.
-        furniture(b, hx - 0.8, hy - 0.6, hx + 0.8, hy + 0.6, f, f + 0.8, WOOD)
-        flame(b, hx, hy, f + 0.8, 0.2)
+        # A chest against the north wall, and stone steps curling up the wall
+        # from the west towards the north, to the floor above. (Nothing in the
+        # middle: you'd stop there, in the reach of the stone that shuts you in.)
         furniture(b, hx - 0.9, hy + R - 1.0, hx + 0.9, hy + R - 0.3, f, f + 0.7, DARK_WOOD)
         for k in range(6):
             a0, a1 = math.pi - k * 0.2, math.pi - (k + 1) * 0.2
@@ -1615,7 +1835,7 @@ def round_room(b, hall):
             quad(b, [(*pts[1], f), (*pts[2], f), (*pts[2], top), (*pts[1], top)], STONE, 0.08)
             quad(b, [(*pts[3], f), (*pts[0], f), (*pts[0], top), (*pts[3], top)], STONE, 0.08)  # up from the step below
             mid = (a0 + a1) / 2
-            under_circle(hx + math.cos(mid) * (R - 0.5), hy + math.sin(mid) * (R - 0.5), 0.6)
+            under_circle(hx + math.cos(mid) * (R - 0.5), hy + math.sin(mid) * (R - 0.5), 0.6, top=top)
 
 
 for hall in HALLS.values():

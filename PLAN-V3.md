@@ -338,8 +338,9 @@ the weapon in Counter-Strike.
 - Five slots, keys **1–5**, like a weapon hotbar. The held object shows in your
   hand at the bottom right, Counter-Strike style.
 - Carrying a ladder, a plank and a harp at once is fine: it's a game.
-- Objects lie in the world where the engine puts them (the drop spots from
-  `layout.ts` become 3D spots per place), and dropped ones fall with physics.
+- Objects start in the place the engine puts them, at a random spot in it
+  you can walk to (a new one every game, so you go hunting for them), and
+  lie where you drop them, resting on the bumps of the ground.
 - The grassy bank's pile of treasure grows as you score, as now.
 
 ## Dying, getting lost, winning
@@ -434,15 +435,20 @@ and wings) may need a bought or free model.
      light.
    - **Indoors** ✅: the charcoal burner's hut (its door north to the
      crossroads; a hearth, a straw bed, sacks of charcoal) and the round room
-     in the tower (its door south at the top of the mossy steps; a table and
-     candle, a chest, and steps curling up the wall to the floor above), each cut out of the
-     land like the coach house. The snake guards the tower's door from
+     in the tower (its door south at the top of the mossy steps; a chest, and
+     steps curling up the wall to the floor above, which you can climb; no
+     table in the middle, where you'd stop in the stone's reach), each cut
+     out of the land like the coach house. The snake guards the tower's door from
      outside, and the stone (the ring) the way out, in the doorway.
    - **Obstacles speak** ✅: walk up to one and you bounce back 5 m before
      it (so you can see what's in your way), with the original's words for it
      at the bottom of the screen ("The trees are too dense."), in English or
      Danish, for the exit you're trying. One-way, as in the original.
-   - **The game**: objects to take and use, the obstacles opening, deaths,
+   - **The game**: objects to take and use (taking, using and dropping ✅,
+     with the ladder and the key, the first objects with models:
+     `art/blender/items.py`; the ladder leans on the old stone wall and you
+     climb over, `ladder.ts`; the key swings the rusty gate open), the
+     obstacles opening, deaths,
      the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and
    the ladder (where v2 began), fully modelled, textured and lit. **Then
@@ -529,16 +535,22 @@ and wings) may need a bought or free model.
   walks the ways and halls too, with every obstacle closed and every one open.
 - **Underground light**: as you go down, the sun and sky fade and a warm
   lamp glow round you takes over (one day only with the lamp lit). The land
-  casts shadows, so the sun can't shine into a tunnel from above.
+  casts shadows, so the sun can't shine into a tunnel from above. Indoors in
+  a building the sun stays out (the roof's shadow keeps it off you, and it's
+  still day outside the door); only the sky's light softens. Every lit cave
+  and room keeps its own light on (the four nearest you, a fixed number of
+  lights, so materials never rebuild), so a room seen through a doorway is
+  lit too.
 - **A debug panel** on the dev server only (the 0 key): fly (F), walk
   through anything (N), open every obstacle (O), show the obstacles and
-  their reach (R, red where they kill you), go up to 10× faster (, and .),
-  and a map to jump anywhere. The letter keys work with the panel closed
+  their reach (R, red where they kill you), show gaps with a magenta sky
+  (M), float the places' names (L), go up to 10× faster (, and .), copy a
+  picture (P), and a map to jump anywhere. The letter keys work with the panel closed
   too. `src/three/debug.ts` and `debug.css` are loaded behind
   `import.meta.env.DEV`, so the built game contains none of it.
-- **Names over the places** (press L) while the world is grey, and the place
-  you're in at the top left. The floating names may move into the debug panel
-  later. For now they're made from the code's names (so "Merlins lair",
+- **Names over the places** (L, in the debug panel only; off to start with)
+  while the world is grey, and the place you're in at the top left. For now
+  they're made from the code's names (so "Merlins lair",
   without its apostrophe); they should become the original's own names, in
   English and Danish, when the game is wired in.
 

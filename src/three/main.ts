@@ -1,27 +1,24 @@
 // Merlin's Castle in 3D: the whole land in grey boxes, built in Blender
 // (art/blender/land.py), to walk from place to place. See PLAN-V3.md.
 //
-// L shows or hides the places' names. For checking by eye: ?at=x,z,yaw (yaw
-// in degrees, 0 looks north) starts you somewhere else, already walking.
+// For checking by eye: ?at=x,z,yaw (yaw in degrees, 0 looks north) starts
+// you somewhere else, already walking.
 
 import "./style.css";
 
 import {
   ACESFilmicToneMapping,
-  CanvasTexture,
   Color,
   CylinderGeometry,
   DirectionalLight,
   Fog,
-  Group,
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
+  type Object3D,
   PCFShadowMap,
   PointLight,
   Scene,
-  Sprite,
-  SpriteMaterial,
   SRGBColorSpace,
   Timer,
   Vector3,
@@ -32,16 +29,22 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import daJson from "../../data/da.json";
 import worldJson from "../../data/world.json";
-import { messages } from "../engine/engine";
+import { effects, messages, score } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
-import type { Direction, World } from "../engine/types";
-import { LANGUAGE } from "../shared/strings";
+import { type Direction, EXIT_ORDER, type World } from "../engine/types";
+import { LANGUAGE, T } from "../shared/strings";
+import { items as setUpItems } from "./items";
+import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
+import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable } from "./player";
 import { sky } from "./sky";
+
+const english = worldJson as unknown as World;
+const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
 
 const HAZE = new Color("#d9dcc4");
 // Where the light comes from: low in the west, a little north, as in the paintings.
@@ -66,12 +69,17 @@ const skylight = new HemisphereLight("#cfe2ff", "#6d7a3c", 1.25);
 scene.add(skylight);
 
 // Underground, the daylight fades and a warm lamp glow takes over (one day,
-// only if you've lit the lamp).
-const lamp = new PointLight("#ffb866", 0, 16, 1.6);
+// only if you've lit the lamp). It falls off gently: a light this close
+// would otherwise blaze on any wall you walk up to.
+const lamp = new PointLight("#ffb866", 0, 14, 0.6);
 scene.add(lamp);
-// And some caves have their own light: torches, the dragon's fire, gold.
-const caveLight = new PointLight("#ffa24a", 0, 30, 1.2);
-scene.add(caveLight);
+// And caves and rooms have their own light (torches, the dragon's fire,
+// gold, a hearth), always on, so a lit room seen through a doorway is lit.
+// A few lights go to the lit halls nearest you (always the same number of
+// lights: changing it makes every material rebuild, a stutter).
+const ROOM_LIGHTS = 4;
+const roomLights = Array.from({ length: ROOM_LIGHTS }, () => new PointLight("#ffa24a", 0, 30, 1.2));
+scene.add(...roomLights);
 const DARK = new Color("#0b0806");
 
 const sunlight = new DirectionalLight("#ffdcae", 2.8);
@@ -86,14 +94,22 @@ const player = new Player(renderer.domElement);
 const overlay = document.createElement("div");
 overlay.className = "overlay";
 overlay.innerHTML = "<h1>Merlin's Castle</h1><p>Loading the land…</p>";
+// Top left: which place you're in, and your score (what's on the grassy bank).
+const corner = document.createElement("div");
+corner.className = "corner";
 const here = document.createElement("div");
 here.className = "here";
-root.append(overlay, here);
+const scored = document.createElement("div");
+scored.className = "score";
+corner.append(here, scored);
+root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
-const [model, file] = await Promise.all([
-  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).loadAsync(landModel),
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const [model, file, things] = await Promise.all([
+  loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
+  loader.loadAsync(itemModels),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 model.scene.traverse((node) => {
@@ -129,28 +145,67 @@ player.ways = Object.values(land.ways);
 const halls = land.halls as Record<string, Hall & { tall: number; light?: string; glow?: number }>;
 player.halls = new Map(Object.entries(halls));
 
-// Solid things, and the obstacles (all closed, until the game can open them).
+// Solid things, and the obstacles: closed, until an object in use opens one.
 const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
 type Obstacle = { box?: number[]; circle?: number[]; under?: boolean };
 const obstacles = land.obstacles as Record<string, Obstacle>;
-const underCircles: Circle[] = land.under.circles.map(([x, z, r]) => ({ x, z, r }));
-const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
+const underCircles: Circle[] = land.under.circles.map(([x, z, r, top]) => ({ x, z, r, top }));
+const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ, top]) => ({ x, z, halfX, halfZ, top }));
 // You bump into an obstacle in your way this far before it, so you can see
 // what it is (and know there's something to do here).
 const AHEAD = 5;
 // One shape for each obstacle, with the names of every exit it blocks (a gate
 // blocks the way through from both sides).
-const shapes = new Map<string, Obstacle & { names: string[] }>();
+type Shape = Obstacle & { names: string[] };
+const shapes = new Map<string, Shape>();
+const shapeOf = new Map<string, Shape>(); // by exit ("old-stone-wall west")
 for (const [exit, obstacle] of Object.entries(obstacles)) {
   const key = JSON.stringify(obstacle);
   const shape = shapes.get(key) ?? { ...obstacle, names: [] };
   shape.names.push(exit);
   shapes.set(key, shape);
+  shapeOf.set(exit, shape);
 }
-function openObstacles(open: boolean) {
+// The walls you climb with the ladder: walls, open or not (the obstacle is
+// only the reach that bounces you back), so you climb over, not through.
+const exitOf = (name: string) => {
+  const [id, direction] = name.split(" ");
+  return english.rooms[id]?.exits[direction as Direction];
+};
+const walls = new Set(
+  [...shapes.values()].filter(
+    (shape) =>
+      shape.box &&
+      shape.names.some((name) => {
+        const exit = exitOf(name);
+        return exit?.obstacle?.needs === "ladder" && !exit.fatal && !exit.obstacle.fatal;
+      })
+  )
+);
+// Gates that swing open: the rusty gate's two halves (on their hinges, each
+// turning the way that swings it north), open while the key's in use there.
+const gates = new Map<Shape, { leaves: [Object3D, number][]; open: number; wants: number }>();
+const rusty = shapeOf.get("rusty-gate north");
+const leaves = (["gate-west", "gate-east"] as const).map((name) => model.scene.getObjectByName(name));
+if (rusty && leaves[0] && leaves[1]) {
+  gates.set(rusty, {
+    leaves: [
+      [leaves[0], 1],
+      [leaves[1], -1],
+    ],
+    open: 0,
+    wants: 0,
+  });
+}
+const SWING = 1.75; // radians, open
+let allOpen = false; // (the debug panel's "open every obstacle")
+let opened = new Set<Shape>(); // by an object in use
+function solidify() {
   for (const under of [false, true]) {
-    const closed = open ? [] : [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
+    const here = [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
+    const closed = allOpen ? [] : here.filter((shape) => !opened.has(shape));
+    const plain = allOpen ? [] : here.filter((shape) => walls.has(shape));
     // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
@@ -163,13 +218,19 @@ function openObstacles(open: boolean) {
         ...closed.flatMap(({ box, names }) =>
           box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names, ahead: AHEAD }] : []
         ),
+        ...plain.map(({ box }) => ({ x: box![0], z: box![1], halfX: box![2], halfZ: box![3] })),
         ...(under ? underBoxes : boxes),
       ],
       under
     );
   }
+  player.throughHere();
 }
-openObstacles(false);
+function openObstacles(open: boolean) {
+  allOpen = open;
+  solidify();
+}
+solidify();
 const [west, east, south, north] = land.bounds;
 player.bounds = { west, east, north: -north, south: -south };
 
@@ -195,35 +256,8 @@ for (const { x, z } of DEATHS) {
   scene.add(mark);
 }
 
-// The places' names, floating over them: for finding your way while the
-// world is grey.
+// A place's name, from its id (for now; PLAN-V3.md).
 const name = (id: string) => id.replace(/-/g, " ").replace(/^./, (letter) => letter.toUpperCase());
-const labels = new Group();
-for (const [id, { x, z }] of PLACES) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 96;
-  const pen = canvas.getContext("2d")!;
-  pen.font = "600 48px Cinzel, Georgia, serif";
-  pen.textAlign = "center";
-  pen.textBaseline = "middle";
-  pen.lineWidth = 8;
-  pen.strokeStyle = "rgba(20, 14, 8, 0.85)";
-  pen.fillStyle = "#f6ecd2";
-  pen.strokeText(name(id), 256, 48);
-  pen.fillText(name(id), 256, 48);
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  const label = new Sprite(new SpriteMaterial({ map: texture, depthTest: false, fog: false }));
-  label.scale.set(12, 2.25, 1);
-  label.position.set(x, (ground(x, z) ?? 0) + 9, z);
-  labels.add(label);
-}
-scene.add(labels);
-let showLabels = true;
-addEventListener("keydown", (event) => {
-  if (event.code === "KeyL") showLabels = !showLabels;
-});
 
 const start = PLACES.get("grassy-bank")!;
 const at = new URLSearchParams(location.search).get("at")?.split(",").map(Number);
@@ -234,17 +268,12 @@ let room = player.under?.hall ?? placeAt(player.position.x, player.position.z, "
 // Walking into an obstacle, the original's words for it at the bottom of the
 // screen: what it says when you try that exit (the way you were going
 // through it: an obstacle only stops you going the way its exits go).
-const english = worldJson as unknown as World;
-const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
 const said = document.createElement("p");
 said.className = "said";
 said.setAttribute("aria-live", "polite");
 root.append(said);
 let quiet = 0;
-player.onBump = (exit) => {
-  const [id, direction] = exit.split(" ");
-  const way = world.rooms[id]?.exits[direction as Direction];
-  const words = way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo;
+function say(words: string) {
   // (A teletext colour code shows as a space.)
   said.textContent = words
     .replace(/\{\w+\}/g, " ")
@@ -253,12 +282,60 @@ player.onBump = (exit) => {
   said.classList.add("shown");
   clearTimeout(quiet);
   quiet = window.setTimeout(() => said.classList.remove("shown"), 3500);
+}
+player.onBump = (exit) => {
+  const [id, direction] = exit.split(" ");
+  const way = world.rooms[id]?.exits[direction as Direction];
+  say(way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo);
 };
+
+// The objects, lying where the game puts them, and the five slots you carry
+// them in. Using one opens the ways out of the place it's for: the ladder
+// leans against the wall, always in the same spot, where the path comes to
+// it (for now, the one object that does anything).
+const ladder = new Ladder(scene, things.scene.getObjectByName("ladder")!, ground, player, reducedMotion);
+let leaning: string | undefined; // the exit the ladder's up for
+const items = setUpItems({
+  world,
+  scene,
+  player,
+  models: things.scene,
+  ground,
+  walkable,
+  root,
+  say,
+  changed: inUse,
+  stays: (id) => {
+    if (id !== "ladder" || !ladder.shown) return undefined;
+    return { model: ladder.handOver()!, fallsTo: ladder.footing! };
+  },
+});
+function inUse() {
+  const { room: here, itemLocations } = items.state;
+  const using = effects(world, items.state);
+  // (Only the ways the 3D world can open so far: walls to climb, gates.)
+  const exits = EXIT_ORDER.flatMap((direction) => {
+    const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
+    const shape = shapeOf.get(`${here} ${direction}`);
+    return needs && using.includes(needs) && shape && (walls.has(shape) || gates.has(shape))
+      ? [`${here} ${direction}`]
+      : [];
+  });
+  opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
+  solidify();
+  for (const [shape, gate] of gates) gate.wants = opened.has(shape) ? 1 : 0;
+  const wall = exits.find((exit) => walls.has(shapeOf.get(exit)!));
+  if (wall !== leaning) {
+    ladder.away();
+    if (wall) ladder.lean(shapeOf.get(wall)!.box!, wall, PLACES.get(here)!, itemLocations.ladder === "carried");
+    leaning = wall;
+  } else if (wall && itemLocations.ladder === "carried") ladder.show();
+}
 
 // While developing: the debug panel (the 0 key), and a handle for test scripts.
 // The built game leaves all of this out.
 if (import.meta.env.DEV) {
-  Object.assign(window, { world: { player, scene, ground, walkable, renderer, places: PLACES } });
+  Object.assign(window, { world: { player, scene, ground, walkable, renderer, places: PLACES, items } });
   const { debug } = await import("./debug");
   debug(
     {
@@ -291,7 +368,7 @@ if (import.meta.env.DEV) {
 overlay.innerHTML = `
   <h1>Merlin's Castle</h1>
   <p class="start">Click to walk</p>
-  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · L for names · Esc to stop</p>
+  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · E to take · 1–5 to choose · click to use · G to drop · Esc to stop</p>
   <p class="keys touch">Left thumb to walk · right thumb to look</p>`;
 overlay.hidden = Boolean(at);
 overlay.addEventListener("click", () => {
@@ -316,28 +393,36 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-// From daylight (0) to lamplight (1) over the first few metres down, or as
-// you go in at a door; and in a lit cave or room, its own light comes up as
-// you walk in.
+// From daylight (0) to lamplight (1) over the first few metres down; and
+// in a building, the sky's light softens a little (the sun stays out: the
+// roof's shadow keeps it off you, and outside the door it's still day).
 let caveLit = 0;
 let indoors = 0;
+const litHalls = Object.values(halls).filter((hall) => hall.light);
 function lightFor(depth: number, time: number, dt: number) {
   indoors += ((player.under?.indoor ? 1 : 0) - indoors) * Math.min(1, dt * 4);
-  const under = Math.max(indoors, Math.min(1, Math.max(0, (depth - 0.5) / 3)));
+  const under = Math.min(1, Math.max(0, (depth - 0.5) / 3));
   sunlight.intensity = 2.8 * (1 - under);
-  skylight.intensity = 1.25 * (1 - under * 0.92);
+  skylight.intensity = 1.25 * (1 - Math.max(under * 0.92, indoors * 0.55));
   const flicker = reducedMotion ? 1 : 0.92 + 0.05 * Math.sin(time / 90) + 0.03 * Math.sin(time / 37);
-  lamp.intensity = 14 * under * flicker;
-  lamp.position.set(player.position.x + 0.3, player.position.y + 1.4, player.position.z);
+  lamp.intensity = 3.5 * Math.max(under, indoors * 0.4) * flicker;
+  lamp.position.set(player.position.x, player.position.y + 1.4, player.position.z);
+
+  // The lit halls nearest you, each with its own light.
+  const p = player.position;
+  const away = (hall: (typeof litHalls)[number]) => Math.hypot(hall.x - p.x, hall.floor - p.y, hall.z - p.z) - hall.r;
+  const nearest = litHalls.filter((hall) => away(hall) < 40).sort((a, b) => away(a) - away(b));
+  roomLights.forEach((light, k) => {
+    const hall = nearest[k];
+    light.intensity = hall ? (hall.glow ?? 0) * 4 * flicker : 0;
+    if (!hall) return;
+    light.color.set(hall.light!);
+    light.distance = hall.r * 1.8;
+    light.position.set(hall.x, hall.floor + hall.tall * 0.6, hall.z);
+  });
 
   const hall = player.under?.hall ? halls[player.under.hall] : undefined;
   caveLit += ((hall?.light ? 1 : 0) - caveLit) * Math.min(1, dt * 3);
-  if (hall?.light) {
-    caveLight.color.set(hall.light);
-    caveLight.distance = hall.r * 3;
-    caveLight.position.set(hall.x, hall.floor + hall.tall * 0.6, hall.z);
-  }
-  caveLight.intensity = (hall?.glow ?? 0) * 4 * caveLit * flicker;
   fog.color.copy(HAZE).lerp(DARK, under);
   fog.near = 40 - 38 * under;
   fog.far = 320 - 290 * under + 40 * caveLit;
@@ -350,11 +435,24 @@ renderer.setAnimationLoop((time) => {
   player.update(dt, reducedMotion);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
-  if (player.under?.hall) room = player.under.hall;
-  else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
+  // (Climbing over a wall, you're where you were until you're over.)
+  if (!player.busy) {
+    if (player.under?.hall) room = player.under.hall;
+    else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
+  }
+  for (const gate of gates.values()) {
+    gate.open += Math.sign(gate.wants - gate.open) * Math.min(Math.abs(gate.wants - gate.open), dt * 0.8);
+    // (Slow to start and to stop, like a heavy old gate.)
+    const swing = SWING * (gate.open * gate.open * (3 - 2 * gate.open));
+    for (const [leaf, way] of gate.leaves) leaf.rotation.y = way * swing;
+  }
+  ladder.update((exit) => {
+    if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
+  });
   lightFor(player.depth, time, dt);
-  labels.visible = showLabels && !player.inside; // they'd show through the tunnel's walls
+  items.update(room);
   here.textContent = name(room);
+  scored.textContent = T.score(score(world, items.state));
   // The sun's shadows follow you, so they're sharp wherever you are.
   sunlight.target.position.copy(player.position);
   sunlight.position.copy(player.position).addScaledVector(SUN, 200);

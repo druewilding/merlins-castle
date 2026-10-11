@@ -4,7 +4,10 @@
 // works whatever the keyboard's language). P copies what you're looking at
 // to the clipboard, for pasting into a chat. R shows the obstacles, and how
 // far each reaches out on the side it stops you from: red where trying it
-// kills you.
+// kills you. M shows the gaps: the sky turns magenta, and the mist and haze
+// go, so anywhere you can see through the land stands out (as in
+// npm run gaps, but from wherever you fly). L floats the places' names over
+// them, for finding your way while the world is grey.
 //
 // Only on the dev server: main.ts loads this behind import.meta.env.DEV, so
 // the built game doesn't contain it at all.
@@ -20,9 +23,11 @@ import {
   Group,
   LineBasicMaterial,
   LineSegments,
+  type Material,
   Mesh,
   MeshBasicMaterial,
   type Scene,
+  ShaderMaterial,
   Sprite,
   SpriteMaterial,
   SRGBColorSpace,
@@ -72,10 +77,12 @@ export function debug(world: DebugWorld, onOpen: () => void) {
   panel.innerHTML = `
     <header><strong>Debug</strong><span>0 to close</span></header>
     <p class="debug-where"></p>
-    <label><input type="checkbox" id="debug-fly" /> Fly <kbd>F</kbd> <small>Space up, C down</small></label>
+    <label><input type="checkbox" id="debug-fly" /> Fly <kbd>F</kbd> <small>35 m up; F again drops you</small></label>
     <label><input type="checkbox" id="debug-ghost" /> Walk through anything <kbd>N</kbd></label>
     <label><input type="checkbox" id="debug-open" /> Open every obstacle <kbd>O</kbd></label>
     <label><input type="checkbox" id="debug-reach" /> Show obstacles and their reach <kbd>R</kbd> <small>red: fatal</small></label>
+    <label><input type="checkbox" id="debug-gaps" /> Show gaps <kbd>M</kbd> <small>the sky in magenta</small></label>
+    <label><input type="checkbox" id="debug-names" /> Show places' names <kbd>L</kbd></label>
     <p class="debug-hint">Copy a picture of what you see <kbd>P</kbd></p>
     <label class="debug-speed">Speed <kbd>,</kbd><input type="range" id="debug-speed" min="1" max="10" step="1" value="1" /><kbd>.</kbd><output>1×</output></label>
     <canvas class="debug-map" aria-label="Map: click to jump there"></canvas>
@@ -87,6 +94,8 @@ export function debug(world: DebugWorld, onOpen: () => void) {
   const ghost = panel.querySelector<HTMLInputElement>("#debug-ghost")!;
   const open = panel.querySelector<HTMLInputElement>("#debug-open")!;
   const reach = panel.querySelector<HTMLInputElement>("#debug-reach")!;
+  const gaps = panel.querySelector<HTMLInputElement>("#debug-gaps")!;
+  const names = panel.querySelector<HTMLInputElement>("#debug-names")!;
   const speed = panel.querySelector<HTMLInputElement>("#debug-speed")!;
   const speedShown = panel.querySelector("output")!;
   fly.addEventListener("change", () => (player.fly = fly.checked));
@@ -97,12 +106,41 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     if (!marks) world.scene.add((marks = obstacleMarks()));
     marks.visible = reach.checked;
   });
+  // (The sky dome and the mist are hidden, and the fog lifted; the
+  // background, magenta, shows wherever nothing is drawn.)
+  const fog = world.scene.fog;
+  const hidden: Mesh[] = [];
+  gaps.addEventListener("change", () => {
+    if (gaps.checked) {
+      world.scene.traverse((thing) => {
+        if (!(thing instanceof Mesh) || !thing.visible || marks?.getObjectById(thing.id)) return;
+        const material = thing.material as Material;
+        if (material instanceof ShaderMaterial || (material instanceof MeshBasicMaterial && material.transparent))
+          hidden.push(thing);
+      });
+      for (const thing of hidden) thing.visible = false;
+    } else for (const thing of hidden.splice(0)) thing.visible = true;
+    world.scene.background = gaps.checked ? new Color("#ff00ff") : null;
+    world.scene.fog = gaps.checked ? null : fog;
+  });
+  let labels: Group | undefined;
+  names.addEventListener("change", () => {
+    if (!labels) world.scene.add((labels = placeNames()));
+    labels.visible = names.checked;
+    if (names.checked) requestAnimationFrame(underground);
+  });
+  // (Hidden underground: they'd show through the tunnel's walls.)
+  function underground() {
+    if (!labels || !names.checked) return;
+    labels.visible = !player.inside;
+    requestAnimationFrame(underground);
+  }
   speed.addEventListener("input", () => {
     player.boost = Number(speed.value);
     speedShown.textContent = `${speed.value}×`;
   });
   // Keys pressed in the panel move you, not its controls.
-  for (const input of [fly, ghost, open, reach, speed])
+  for (const input of [fly, ghost, open, reach, gaps, names, speed])
     input.addEventListener("keydown", (event) => event.preventDefault());
 
   // The same, from the keyboard, with the panel open or not (the mouse is
@@ -134,6 +172,8 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     else if (event.code === "KeyN") flip(ghost, "Walking through anything", "Bumping into things");
     else if (event.code === "KeyO") flip(open, "Every obstacle open", "Obstacles closed");
     else if (event.code === "KeyR") flip(reach, "Showing obstacles", "Obstacles hidden");
+    else if (event.code === "KeyM") flip(gaps, "Showing gaps in magenta", "Sky back");
+    else if (event.code === "KeyL") flip(names, "Showing places' names", "Names hidden");
     else if (event.code === "Comma") faster(-1);
     else if (event.code === "Period") faster(1);
     else if (event.code === "KeyP") copyPicture();
@@ -227,6 +267,32 @@ export function debug(world: DebugWorld, onOpen: () => void) {
   }
 
   // The floor underground at a spot: the hall's, or the nearest way's.
+  // The places' names, floating over them.
+  function placeNames() {
+    const group = new Group();
+    for (const [id, { x, z }] of PLACES) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 96;
+      const pen = canvas.getContext("2d")!;
+      pen.font = "600 48px Cinzel, Georgia, serif";
+      pen.textAlign = "center";
+      pen.textBaseline = "middle";
+      pen.lineWidth = 8;
+      pen.strokeStyle = "rgba(20, 14, 8, 0.85)";
+      pen.fillStyle = "#f6ecd2";
+      pen.strokeText(world.name(id), 256, 48);
+      pen.fillText(world.name(id), 256, 48);
+      const texture = new CanvasTexture(canvas);
+      texture.colorSpace = SRGBColorSpace;
+      const label = new Sprite(new SpriteMaterial({ map: texture, depthTest: false, fog: false }));
+      label.scale.set(12, 2.25, 1);
+      label.position.set(x, (world.ground(x, z) ?? 0) + 9, z);
+      group.add(label);
+    }
+    return group;
+  }
+
   function floorAt(x: number, z: number) {
     const hall = player.hallAt(x, z);
     if (hall) return hall.floor;

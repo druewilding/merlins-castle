@@ -29,6 +29,12 @@ export const DEATHS = entries(layout.deaths).map(([exit, cr]) => ({ exit, ...spo
 
 /** How near a place's middle you have to be to be in it. */
 const REACH = 17;
+/**
+ * Places that reach further, metres ahead of their neighbours: the grassy
+ * bank, where everything's brought back to count, so you needn't go right up
+ * to it (you're on it two thirds of the way from the places round it).
+ */
+const PULL: Record<RoomId, number> = { "grassy-bank": 12 };
 
 /**
  * The place you're in, on the land. Between places, along a path or a
@@ -40,7 +46,7 @@ export function placeAt(x: number, z: number, current: RoomId, inside: { has(id:
   let nearest = REACH;
   for (const [id, p] of PLACES) {
     if (inside.has(id)) continue;
-    const d = Math.hypot(x - p.x, z - p.z);
+    const d = Math.hypot(x - p.x, z - p.z) - (PULL[id] ?? 0);
     if (d < nearest) {
       nearest = d;
       best = id;
