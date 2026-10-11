@@ -23,11 +23,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # - name: Check code linting
-      #   run: npm run lint:check
+      - name: Check code linting
+        run: npm run lint:check
 
-      # - name: Check formatting
-      #   run: npm run format:check
+      - name: Check formatting
+        run: npm run format:check
 
       # Vitest writes a test report into the step's summary on GitHub. Keep a
       # copy (even if tests fail) so it can be posted on the pull request.
