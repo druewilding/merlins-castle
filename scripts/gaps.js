@@ -56,10 +56,10 @@ try {
     const inside = await page.evaluate(([x, eye, z]) => window.gaps.inside(x, eye, z), [x, eye, z]);
     const view = { name: "look", x, z, eye, yaw, pitch, inside };
     await page.setViewportSize(PICTURE);
-    const png = await page.evaluate(([view, size]) => window.gaps.picture(view, size), [view, PICTURE]);
+    const { png, through } = await page.evaluate(([view, size]) => window.gaps.picture(view, size), [view, PICTURE]);
     mkdirSync(OUT, { recursive: true });
     writeFileSync(`${OUT}/look.png`, Buffer.from(png.split(",")[1], "base64"));
-    console.log(`${OUT}/look.png`);
+    console.log(`${OUT}/look.png${through ? `: a gap through x ${through[0]}, y ${through[1]}, z ${through[2]}` : ""}`);
     await browser.close();
     await server.close();
     process.exit(0);
@@ -93,7 +93,7 @@ try {
   mkdirSync(OUT, { recursive: true });
   await page.setViewportSize(PICTURE);
   for (const [n, view] of worst.slice(0, 60).entries()) {
-    const png = await page.evaluate(([view, size]) => window.gaps.picture(view, size), [view, PICTURE]);
+    const { png } = await page.evaluate(([view, size]) => window.gaps.picture(view, size), [view, PICTURE]);
     writeFileSync(`${OUT}/${n + 1}.png`, Buffer.from(png.split(",")[1], "base64"));
   }
   writeFileSync(`${OUT}/index.html`, report(worst.slice(0, 60), worst.length));
@@ -344,7 +344,7 @@ function install({ ways, halls }) {
     },
     // A picture of one view: the gaps magenta, the sky that should be there blue.
     picture(view, size) {
-      const { pixels, kinds } = look(view, view.yaw, view.pitch, size, true);
+      const { pixels, kinds, through } = look(view, view.yaw, view.pitch, size, true);
       const canvas = document.createElement("canvas");
       canvas.width = size.width;
       canvas.height = size.height;
@@ -365,7 +365,7 @@ function install({ ways, halls }) {
         }
       }
       pen.putImageData(image, 0, 0);
-      return canvas.toDataURL("image/png");
+      return { png: canvas.toDataURL("image/png"), through };
     },
   };
 }

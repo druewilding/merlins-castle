@@ -1249,6 +1249,41 @@ for k in range(4):
 quad(pit, [(x, y, bottom) for x, y in corners], PIT_DARK)
 obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy, under=True)
 
+def doorways(hall):
+    """Where each way comes out of a cave, at its doorway (where its own
+    walls and floor begin): a point there, the way's direction outward, and
+    how far either side of it the way's floor reaches (with a square's width
+    to spare)."""
+    out = []
+    for way in WAYS.values():
+        pts = way.samples(0.1)
+        if not hall.inside(*pts[0][:2]):
+            pts = pts[::-1]
+        if not hall.inside(*pts[0][:2]) or abs(pts[0][2] - hall.floor) > 1.5:
+            continue
+        for (ax, ay, _), (bx, by, _) in zip(pts, pts[1:]):
+            if not hall.inside(bx, by, hall.doorway):
+                d = math.hypot(bx - ax, by - ay) or 1
+                out.append(((bx, by), ((bx - ax) / d, (by - ay) / d), way.half + 1.1))
+                break
+    return out
+
+
+def clip(polygon, px, py, tx, ty):
+    """The part of a polygon on the near side of the line through px, py
+    across the direction tx, ty."""
+    side = [(x - px) * tx + (y - py) * ty for x, y in polygon]
+    out = []
+    for k, (p, s0) in enumerate(zip(polygon, side)):
+        q, s1 = polygon[(k + 1) % len(polygon)], side[(k + 1) % len(polygon)]
+        if s0 <= 0:
+            out.append(p)
+        if (s0 < 0) != (s1 < 0) and s0 != s1:
+            t = s0 / (s0 - s1)
+            out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+    return out
+
+
 # The halls: a floor of squares out under the walls, a lumpy round wall with
 # openings where the ways come in, and a dome.
 caves = c.Builder()
@@ -1259,11 +1294,21 @@ for hall in HALLS.values():
     step = 1.5
     reach = R + 1.4
     n = int(reach / step) + 1
+    doors = doorways(hall)
     for i in range(-n, n):
         for j in range(-n, n):
             x0, y0 = hx + i * step, hy + j * step
             nearest_x, nearest_y = max(x0, min(hx, x0 + step)), max(y0, min(hy, y0 + step))
             if math.hypot(nearest_x - hx, nearest_y - hy) > reach:
+                continue
+            # (Cut off where a way goes out, at its doorway: its own floor
+            # goes on from there, and may drop away at once down a ramp.)
+            square = [(x0, y0), (x0 + step, y0), (x0 + step, y0 + step), (x0, y0 + step)]
+            for (dx, dy), (tx, ty), band in doors:
+                cx, cy = x0 + step / 2 - dx, y0 + step / 2 - dy
+                if abs(cx * -ty + cy * tx) < band:
+                    square = clip(square, dx, dy, tx, ty)
+            if len(square) < 3:
                 continue
             colour, vary = hall.ground, 0.12
             if hall.place == "beautiful-chamber":
@@ -1274,7 +1319,8 @@ for hall in HALLS.values():
                 colour = c.linear("#2f3c44")  # puddles
             # (A shade lower than the ways' floors, where they overlap.)
             fl = f - 0.06
-            quad(caves, [(x0, y0, fl), (x0 + step, y0, fl), (x0 + step, y0 + step, fl), (x0, y0 + step, fl)], colour, vary)
+            caves.add([(x, y, fl) for x, y in square], [tuple(range(len(square)))],
+                      [c.vary(colour, vary, Vector((x0, y0, fl)))] * len(square))
 
     sides = max(28, int(2 * math.pi * R / 1.1))
     wall_top = f + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
