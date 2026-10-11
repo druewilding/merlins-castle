@@ -237,15 +237,17 @@ class Way:
 class Hall:
     """A cavern underground, round with a domed roof; or (given half its
     width w and depth d) a room in a building, square-cornered with a flat
-    ceiling. Either way it has a flat floor, and being in it is being in its
-    place."""
+    ceiling; or (indoor, with no w and d) a round room, as in the tower.
+    Either way it has a flat floor, and being in it is being in its place."""
 
-    def __init__(self, place, floor, r, tall, ground, wall, light=None, glow=0.0, w=None, d=None, at=None):
+    def __init__(self, place, floor, r, tall, ground, wall, light=None, glow=0.0, w=None, d=None, at=None,
+                 indoor=False):
         self.place = place
         self.x, self.y = at or P[place]  # (a room can be off its place's spot, to sit against its neighbour)
         self.floor, self.tall = floor, tall
         self.w, self.d = w, d
-        self.room = w is not None
+        self.room = w is not None  # square-cornered
+        self.indoor = indoor or self.room  # in a building: walls, a ceiling, and the light of indoors
         self.r = math.hypot(w, d) if self.room else r  # how far it reaches, at most
         self.ground, self.wall = ground, wall  # colours
         self.light, self.glow = light, glow  # its own light, if it has one
@@ -277,9 +279,9 @@ HALLS = {h.place: h for h in [
     Hall("coach-house", 0.4, 0, 6, c.linear("#b89a5a"), c.linear("#8a6a44"), "#ffd28a", 9, w=8, d=6),
     # Out in the land, on the ground where they stand (their floors are set
     # once the land's shape is known): the charcoal burner's hut, lit by its
-    # fire, and the room in the tower, its corners just inside the round wall.
+    # fire, and the round room in the tower, just inside its wall.
     Hall("charcoal-hut", 0, 0, 3.8, c.linear("#5e4a36"), c.linear("#6e5236"), "#ffb878", 1.2, w=3.4, d=2.4),
-    Hall("tower", 0, 0, 6, c.linear("#8d8a80"), c.linear("#807d76"), "#ffd9a0", 3, w=3.8, d=3.8, at=TOWER),
+    Hall("tower", 0, TOWER_R - 0.8, 6, c.linear("#8d8a80"), c.linear("#807d76"), "#ffd9a0", 3, at=TOWER, indoor=True),
 ]}
 
 T, O, G, DM = P["trolls"], P["oak-door"], P["giant"], P["damp-tunnels"]
@@ -1058,7 +1060,7 @@ for way in WAYS.values():
         # not to overlap the room next door: there, the way's floor goes on a
         # little into the room, a doorstep over the seam.)
         under_floor = in_a_hall(*mid, 1.3)
-        if under_floor and under_floor.room and not under_floor.inside(mid[0], mid[1], -0.3):
+        if under_floor and under_floor.indoor and not under_floor.inside(mid[0], mid[1], -0.3):
             under_floor = None
         if not under_floor and not in_pit(mid[0], mid[1]):
             # (Indoors, a shade up: off the ground, out of the door, and the
@@ -1130,7 +1132,7 @@ for way in WAYS.values():
             f = row[2]
             for inner, outer in ((half, half + 1.8), (-half, -half - 1.8)):
                 p, q = side(row, inner), side(row, outer)
-                quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, f + TUNNEL_TALL), (*p, f + TUNNEL_TALL)], hall.wall)
+                quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, f + TUNNEL_TALL + 0.1), (*p, f + TUNNEL_TALL + 0.1)], hall.wall)
 # A stone threshold at every mouth onto the land, over the ragged edge of the
 # hole in the ground (which comes in whole squares, so it reaches a little
 # past where the ramp begins, and shows the sky through the gap).
@@ -1182,7 +1184,7 @@ obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy, under=
 # openings where the ways come in, and a dome.
 caves = c.Builder()
 for hall in HALLS.values():
-    if hall.room:
+    if hall.indoor:
         continue  # (below)
     hx, hy, f, R = hall.x, hall.y, hall.floor, hall.r
     step = 1.5
@@ -1522,11 +1524,6 @@ def room(b, hall):
         for k, (px, py) in enumerate(((hx + W - 0.6, hy - 0.4), (hx + W - 0.7, hy + 0.6))):
             b.blob((px, py, f + 0.35), 0.55, c.linear("#2a2622"), squash=0.8, lumpy=0.3, seed=40 + k)
             under_circle(px, py, 0.5)
-    elif hall.place == "tower":
-        # A table in the middle, with a candle; a chest against the north wall.
-        furniture(b, hx - 0.8, hy - 0.6, hx + 0.8, hy + 0.6, f, f + 0.8, WOOD)
-        flame(b, hx, hy, f + 0.8, 0.2)
-        furniture(b, hx - 0.9, hy + D - 0.7, hx + 0.9, hy + D, f, f + 0.7, DARK_WOOD)
     elif hall.place == "coach-house":
         # The red coach on its four wheels, and hay.
         cxx, cyy = hx + 1.5, hy
@@ -1543,9 +1540,57 @@ def room(b, hall):
             under_circle(px, hy - D + 0.8, 0.45)
 
 
+def round_room(b, hall):
+    """A round room: a floor of flagstones in rings, out just under the wall;
+    the wall, with a doorway where a way comes in; and a flat ceiling."""
+    hx, hy, f, R, tall = hall.x, hall.y, hall.floor, hall.r, hall.tall
+    sides = 32
+    at = lambda k, r: (hx + math.cos(2 * math.pi * k / sides) * r, hy + math.sin(2 * math.pi * k / sides) * r)
+    rings = [0.0, 1.4, 2.8, 4.2, R + 0.5]
+    fl = f - 0.06  # (a shade under the doorway's floor, where they overlap)
+    for i in range(len(rings) - 1):
+        for k in range(sides):
+            pts = [at(k, rings[i]), at(k + 1, rings[i]), at(k + 1, rings[i + 1]), at(k, rings[i + 1])]
+            quad(b, [(*p, fl) for p in pts], hall.ground, 0.12)
+    E = 0.35
+    band = c.mix(hall.wall, c.linear("#000000"), 0.3)
+    for k in range(sides):
+        p0, p1 = at(k, R + E), at(k + 1, R + E)
+        mx, my = at(k + 0.5, R + E + 0.6)
+        if opening(hall, mx, my):
+            # (Down a little over the door frame, which is straight where the wall curves.)
+            low = f + TUNNEL_TALL - 0.15
+            quad(b, [(*p0, low), (*p1, low), (*p1, f + tall), (*p0, f + tall)], hall.wall)
+            continue
+        quad(b, [(*p0, f - 0.3), (*p1, f - 0.3), (*p1, f + 1.0), (*p0, f + 1.0)], band)
+        quad(b, [(*p0, f + 1.0), (*p1, f + 1.0), (*p1, f + tall), (*p0, f + tall)], hall.wall)
+    b.add([(*at(k, R + E), f + tall) for k in range(sides)], [tuple(range(sides))],
+          [c.mix(hall.wall, c.linear("#000000"), 0.35)] * sides)
+    if hall.place == "tower":
+        # A table in the middle, with a candle; a chest against the north wall;
+        # and stone steps curling up the wall from the west towards the north,
+        # to the floor above.
+        furniture(b, hx - 0.8, hy - 0.6, hx + 0.8, hy + 0.6, f, f + 0.8, WOOD)
+        flame(b, hx, hy, f + 0.8, 0.2)
+        furniture(b, hx - 0.9, hy + R - 1.0, hx + 0.9, hy + R - 0.3, f, f + 0.7, DARK_WOOD)
+        for k in range(6):
+            a0, a1 = math.pi - k * 0.2, math.pi - (k + 1) * 0.2
+            inner, outer = R - 1.1, R + E + 0.2  # (into the wall, which is straight between its corners)
+            pts = [(hx + math.cos(a) * r, hy + math.sin(a) * r) for a, r in ((a0, inner), (a1, inner), (a1, outer), (a0, outer))]
+            top = f + 0.35 * (k + 1)
+            quad(b, [(*p, top) for p in pts], STONE, 0.08)
+            quad(b, [(*pts[0], f), (*pts[1], f), (*pts[1], top), (*pts[0], top)], STONE, 0.08)
+            quad(b, [(*pts[1], f), (*pts[2], f), (*pts[2], top), (*pts[1], top)], STONE, 0.08)
+            quad(b, [(*pts[3], f), (*pts[0], f), (*pts[0], top), (*pts[3], top)], STONE, 0.08)  # up from the step below
+            mid = (a0 + a1) / 2
+            under_circle(hx + math.cos(mid) * (R - 0.5), hy + math.sin(mid) * (R - 0.5), 0.6)
+
+
 for hall in HALLS.values():
     if hall.room:
         room(rooms, hall)
+    elif hall.indoor:
+        round_room(rooms, hall)
 
 # The castle's guards and doors, in its corridors.
 gh, wk, du, ml = HALLS["grand-hall"], HALLS["wizards-kitchen"], HALLS["dungeon"], HALLS["merlins-lair"]
@@ -1618,7 +1663,8 @@ if out:
                  for name, way in WAYS.items()},
         # The halls they join: being in one is being in its place.
         "halls": {place: {"x": hall.x, "z": -hall.y, "floor": hall.floor, "r": round(hall.r, 2), "tall": hall.tall,
-                          **({"w": hall.w, "d": hall.d, "indoor": True} if hall.room else {}),
+                          **({"w": hall.w, "d": hall.d} if hall.room else {}),
+                          **({"indoor": True} if hall.indoor else {}),
                           **({"light": hall.light, "glow": hall.glow} if hall.light else {})}
                   for place, hall in HALLS.items()},
         "under": {"circles": under_circles, "boxes": under_boxes},
