@@ -868,16 +868,38 @@ def in_pit(x, y):
 tunnel = c.Builder()
 for way in WAYS.values():
     half = way.half
-    points = way.samples()
-    rows = []
-    for k, (x, y, floor) in enumerate(points):
-        ax, ay, _ = points[max(k - 1, 0)]
-        bx, by, _ = points[min(k + 1, len(points) - 1)]
+    # The way's two edges, as lines meeting exactly at every bend (mitred,
+    # like the corner of a picture frame), so the floor never folds over
+    # itself on the inside of a bend (the fold flickers).
+    pts = way.points
+    seg_normals = []
+    for (ax, ay, _), (bx, by, _) in zip(pts, pts[1:]):
         d = math.hypot(bx - ax, by - ay) or 1
-        nx_, ny_ = -(by - ay) / d, (bx - ax) / d
-        ground = height(x, y)
-        covered = way.indoor or floor + TUNNEL_TALL <= ground - 0.4
-        rows.append((x, y, floor, nx_, ny_, covered))
+        seg_normals.append((-(by - ay) / d, (bx - ax) / d))
+    corners = []
+    for i, (x, y, _) in enumerate(pts):
+        n1 = seg_normals[max(i - 1, 0)]
+        n2 = seg_normals[min(i, len(seg_normals) - 1)]
+        mx_, my_ = n1[0] + n2[0], n1[1] + n2[1]
+        m = math.hypot(mx_, my_) or 1
+        stretch = 1 / max(0.5, (mx_ * n1[0] + my_ * n1[1]) / m)
+        corners.append((mx_ / m * stretch, my_ / m * stretch))
+    rows, edge_left, edge_right = [], [], []
+    for si, ((ax, ay, af), (bx, by, bf)) in enumerate(zip(pts, pts[1:])):
+        n = max(1, int(math.hypot(bx - ax, by - ay) / 0.5))
+        last = si == len(pts) - 2
+        for k in range(n + 1 if last else n):
+            t = k / n
+            x, y, floor = ax + (bx - ax) * t, ay + (by - ay) * t, af + (bf - af) * t
+            (c0x, c0y), (c1x, c1y) = corners[si], corners[si + 1]
+            for edge, off in ((edge_left, -half), (edge_right, half)):
+                e0 = (ax + c0x * off, ay + c0y * off)
+                e1 = (bx + c1x * off, by + c1y * off)
+                edge.append((e0[0] + (e1[0] - e0[0]) * t, e0[1] + (e1[1] - e0[1]) * t))
+            ground = height(x, y)
+            covered = way.indoor or floor + TUNNEL_TALL <= ground - 0.4
+            nx_, ny_ = seg_normals[si]
+            rows.append((x, y, floor, nx_, ny_, covered))
     # Earth and rough stone underground; flagstones, walls and beams indoors.
     floor_colour, wall_colour = (CORRIDOR_FLOOR, CORRIDOR_WALL) if way.indoor else (EARTH, TUNNEL_STONE)
     roof_colour = c.linear("#5b4632") if way.indoor else c.mix(TUNNEL_STONE, EARTH, 0.5)
@@ -886,12 +908,12 @@ for way in WAYS.values():
         x, y, _, nx_, ny_, _ = row
         return x + nx_ * offset, y + ny_ * offset
 
-    for (a, b) in zip(rows, rows[1:]):
+    for k, (a, b) in enumerate(zip(rows, rows[1:])):
         mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
         if in_a_hall(*mid, 0.3):
             continue
-        (alx, aly), (arx, ary) = side(a, -half), side(a, half)
-        (blx, bly), (brx, bry) = side(b, -half), side(b, half)
+        (alx, aly), (arx, ary) = edge_left[k], edge_right[k]
+        (blx, bly), (brx, bry) = edge_left[k + 1], edge_right[k + 1]
         # (The floor stops where a cave's floor, reaching out under its walls,
         # takes over. A room's floor only reaches just under its walls, so as
         # not to overlap the room next door: there, the way's floor goes on a
