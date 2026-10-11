@@ -442,8 +442,8 @@ def open_to_the_sky(x, y, margin):
     """Over a ramp or a mouth into a way, where there's no earth over it:
     the ground has a hole here. Gives the floor's height there, or None."""
     for way in WAYS.values():
-        if not way.near(x, y, way.half + margin):
-            continue
+        if way.indoor or not way.near(x, y, way.half + margin):
+            continue  # (a building's floor is cut out of the land already)
         d, floor, beyond = way.nearest(x, y)
         if not beyond and d < way.half + margin and floor + TUNNEL_TALL > height(x, y) - 0.4:
             return floor
@@ -571,7 +571,7 @@ def block(builder, x0, y0, z0, x1, y1, z1, colour, solid=True):
     """A box from one corner to the other."""
     v = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
     shade = [c.vary(colour, 0.1, Vector((x0 + k, y0, z0))) for k in range(8)]
-    builder.add(v, [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7)], shade)
+    builder.add(v, [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7), (0, 3, 2, 1)], shade)
     if solid:
         solid_box((x0 + x1) / 2, (y0 + y1) / 2, abs(x1 - x0) / 2, abs(y1 - y0) / 2)
 
@@ -883,8 +883,23 @@ for way in WAYS.values():
             continue
         (alx, aly), (arx, ary) = side(a, -half), side(a, half)
         (blx, bly), (brx, bry) = side(b, -half), side(b, half)
-        if not in_a_hall(*mid, 1.3) and not in_pit(mid[0], mid[1]):
-            quad(tunnel, [(alx, aly, a[2]), (arx, ary, a[2]), (brx, bry, b[2]), (blx, bly, b[2])], floor_colour)
+        # (The floor stops where a cave's floor, reaching out under its walls,
+        # takes over. A room's floor only reaches just under its walls, so as
+        # not to overlap the room next door: there, the way's floor goes on a
+        # little into the room, a doorstep over the seam.)
+        under_floor = in_a_hall(*mid, 1.3)
+        if under_floor and under_floor.room and not under_floor.inside(mid[0], mid[1], -0.3):
+            under_floor = None
+        if not under_floor and not in_pit(mid[0], mid[1]):
+            # (Out of the door, a step up off the ground, which is there under it.)
+            lift = 0.04 if way.indoor and not in_building(*mid[:2]) else 0.0
+            quad(tunnel, [(alx, aly, a[2] + lift), (arx, ary, a[2] + lift), (brx, bry, b[2] + lift), (blx, bly, b[2] + lift)],
+                 floor_colour)
+            if in_a_hall(*mid, 0.8):
+                # A doorstep: edges down to the room's floor, so there's no gap under it.
+                for p0, p1, z0, z1 in (((alx, aly), (blx, bly), a[2], b[2]), ((arx, ary), (brx, bry), a[2], b[2]),
+                                       ((alx, aly), (arx, ary), a[2], a[2]), ((blx, bly), (brx, bry), b[2], b[2])):
+                    quad(tunnel, [(*p0, z0), (*p1, z1), (*p1, z1 - 0.15), (*p0, z0 - 0.15)], floor_colour)
         for (ax_, ay_), (bx_, by_) in (((alx, aly), (blx, bly)), ((arx, ary), (brx, bry))):
             top_a = a[2] + TUNNEL_TALL if a[5] else max(height(ax_, ay_) + 0.3, a[2] + 0.6)
             top_b = b[2] + TUNNEL_TALL if b[5] else max(height(bx_, by_) + 0.3, b[2] + 0.6)
@@ -1091,12 +1106,16 @@ def flame(b, x, y, z, size=0.35):
 
 def room(b, hall):
     hx, hy, f, W, D, tall = hall.x, hall.y, hall.floor, hall.w, hall.d, hall.tall
-    for i in range(-math.ceil(W + 1.5), math.ceil(W + 1.5)):
-        for j in range(-math.ceil(D + 1.5), math.ceil(D + 1.5)):
-            x0, y0 = hx + i, hy + j
+    # The floor reaches just under the walls (and no further: the room next
+    # door may be right there).
+    fx0, fx1, fy0, fy1 = hx - W - 0.5, hx + W + 0.5, hy - D - 0.5, hy + D + 0.5
+    for i in range(-math.ceil(W + 0.5), math.ceil(W + 0.5)):
+        for j in range(-math.ceil(D + 0.5), math.ceil(D + 0.5)):
+            x0, y0 = max(hx + i, fx0), max(hy + j, fy0)
+            x1, y1 = min(hx + i + 1, fx1), min(hy + j + 1, fy1)
             colour, vary = floor_colour(hall, i, j, x0, y0)
             fl = f - 0.06  # (a shade lower than the corridors' floors, where they overlap)
-            quad(b, [(x0, y0, fl), (x0 + 1, y0, fl), (x0 + 1, y0 + 1, fl), (x0, y0 + 1, fl)], colour, vary)
+            quad(b, [(x0, y0, fl), (x1, y0, fl), (x1, y1, fl), (x0, y1, fl)], colour, vary)
     E = 0.35
     corners = [(hx - W - E, hy - D - E), (hx + W + E, hy - D - E), (hx + W + E, hy + D + E), (hx - W - E, hy + D + E)]
     band = c.mix(hall.wall, c.linear("#000000"), 0.3)
