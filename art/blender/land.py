@@ -621,8 +621,23 @@ def drawn_height(x, y, exactly=False):
     return min(a, b)
 
 
+def ground_colour(x, y, z):
+    if river.distance(x, y) < 7 or in_moat(x, y):
+        col = RIVERBED
+    elif CASTLE[0] <= x <= CASTLE[1] and CASTLE[2] <= y <= CASTLE[3]:
+        col = FLAGS
+    elif open_ground(x, y):
+        col = GRASS
+    else:
+        col = FOREST_FLOOR
+    if z > 8:
+        col = c.mix(col, ROCK, smooth((z - 8) / 10))
+    return col
+
+
 nx, ny = int((X1 - X0) / STEP) + 1, int((Y1 - Y0) / STEP) + 1
 verts, colours, faces, walk = [], [], [], []
+CUT = set()  # the squares cut out of the ground
 for j in range(ny):
     for i in range(nx):
         x, y = X0 + i * STEP, Y0 + j * STEP
@@ -630,17 +645,7 @@ for j in range(ny):
         verts.append((x, y, z))
         d = deck(x, y)
         walk.append(d if d is not None else z)
-        if river.distance(x, y) < 7 or in_moat(x, y):
-            col = RIVERBED
-        elif CASTLE[0] <= x <= CASTLE[1] and CASTLE[2] <= y <= CASTLE[3]:
-            col = FLAGS
-        elif open_ground(x, y):
-            col = GRASS
-        else:
-            col = FOREST_FLOOR
-        if z > 8:
-            col = c.mix(col, ROCK, smooth((z - 8) / 10))
-        colours.append(c.vary(col, 0.12, Vector((x / 6, y / 6, 5.0))))
+        colours.append(c.vary(ground_colour(x, y, z), 0.12, Vector((x / 6, y / 6, 5.0))))
 for j in range(ny - 1):
     for i in range(nx - 1):
         qx, qy = X0 + (i + 0.5) * STEP, Y0 + (j + 0.5) * STEP
@@ -650,6 +655,7 @@ for j in range(ny - 1):
         if open_to_the_sky(qx, qy, 1.0) is not None or in_building(qx, qy, whole=True) \
                 or any(over_an_opening(qx + STEP * u / 8, qy + STEP * v / 8)
                        for u in range(-4, 5) for v in range(-4, 5)):
+            CUT.add((i, j))
             continue
         a = j * nx + i
         faces.append((a, a + 1, a + nx + 1, a + nx))
@@ -1064,6 +1070,44 @@ def earth_wall(e0, e1, bottom0, bottom1):
             quad(tunnel, [(*p0, b0), (*p1, b1), (*p1, max(t1, b1)), (*p0, max(t0, b0))], EARTH)
 
 
+def clip(polygon, px, py, tx, ty):
+    """The part of a polygon on the near side of the line through px, py
+    across the direction tx, ty."""
+    side = [(x - px) * tx + (y - py) * ty for x, y in polygon]
+    out = []
+    for k, (p, s0) in enumerate(zip(polygon, side)):
+        q, s1 = polygon[(k + 1) % len(polygon)], side[(k + 1) % len(polygon)]
+        if s0 <= 0:
+            out.append(p)
+        if (s0 < 0) != (s1 < 0) and s0 != s1:
+            t = s0 / (s0 - s1)
+            out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+    return out
+
+
+def lid_over(row, back, wide):
+    """The ground's cut squares between a lintel's row and the back of the
+    earth behind it, clipped to the part behind the lintel."""
+    x, y, (ux, uy) = row[0], row[1], (row[3], row[4])
+    inward = 1 if ux * (back[1] - y) - uy * (back[0] - x) > 0 else -1
+    reach = wide + STEP
+    xs = [row[0] + ux * d for d in (-reach, reach)] + [back[0] + back[3] * d for d in (-reach, reach)]
+    ys = [row[1] + uy * d for d in (-reach, reach)] + [back[1] + back[4] * d for d in (-reach, reach)]
+    for i in range(int((min(xs) - X0) // STEP), int((max(xs) - X0) // STEP) + 1):
+        for j in range(int((min(ys) - Y0) // STEP), int((max(ys) - Y0) // STEP) + 1):
+            if (i, j) not in CUT:
+                continue
+            x0, y0 = X0 + i * STEP, Y0 + j * STEP
+            c00, c10, c11, c01 = (x0, y0), (x0 + STEP, y0), (x0 + STEP, y0 + STEP), (x0, y0 + STEP)
+            for tri in ((c00, c10, c11), (c00, c11, c01)):
+                pts = clip(list(tri), x, y, inward * uy, -inward * ux)
+                if len(pts) < 3:
+                    continue
+                verts = [(px, py, drawn_height(px, py, exactly=True)) for px, py in pts]
+                colour = ground_colour(*pts[0], height(*pts[0]))
+                tunnel.add(verts, [tuple(range(len(verts)))], [c.vary(colour, 0.12, Vector(v)) for v in verts])
+
+
 def quad(builder, pts, colour, vary=0.12):
     # Anything lying flat faces up: facing down, the sun's shadows fall on it
     # in stripes ("shadow acne").
@@ -1245,6 +1289,11 @@ for way in WAYS.values():
             low = row[2] + TUNNEL_TALL
             high = max(height(*l1), height(*r1), height(row[0], row[1])) + 0.8
             quad(tunnel, [(*l1, low), (*r1, low), (*r1, high), (*l1, high)], STONE)
+            # And a lid over the box: the ground's hole reaches a square's
+            # width back past the lintel, and on a cliff the box's back would
+            # show through it. So the ground's cut squares are drawn again,
+            # just the part behind the lintel.
+            lid_over(row, back, wide)
     # Door frames, where the way goes into a hall.
     # (Hung on the walls' own edges: near a bend, they're mitred.)
     for k, (a, b) in enumerate(zip(rows, rows[1:])):
@@ -1340,21 +1389,6 @@ for k in range(4):
     quad(pit, [(ax, ay, tops[k]), (bx, by, tops[(k + 1) % 4]), (bx, by, bottom), (ax, ay, bottom)], c.mix(EARTH, PIT_DARK, 0.6))
 quad(pit, [(x, y, bottom) for x, y in corners], PIT_DARK)
 obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy, under=True)
-
-def clip(polygon, px, py, tx, ty):
-    """The part of a polygon on the near side of the line through px, py
-    across the direction tx, ty."""
-    side = [(x - px) * tx + (y - py) * ty for x, y in polygon]
-    out = []
-    for k, (p, s0) in enumerate(zip(polygon, side)):
-        q, s1 = polygon[(k + 1) % len(polygon)], side[(k + 1) % len(polygon)]
-        if s0 <= 0:
-            out.append(p)
-        if (s0 < 0) != (s1 < 0) and s0 != s1:
-            t = s0 / (s0 - s1)
-            out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
-    return out
-
 
 # The halls: a floor of squares out under the walls, a lumpy round wall with
 # openings where the ways come in, and a dome.
