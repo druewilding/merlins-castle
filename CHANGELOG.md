@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/druewilding/merlins-castle/compare/v2.3.0...v2.4.0) (2026-10-11)
+
+
+### Features
+
+* Host at /3d and enable debug also in prod, with ?debug ([#50](https://github.com/druewilding/merlins-castle/issues/50)) ([04c3cce](https://github.com/druewilding/merlins-castle/commit/04c3cce225c1cb9d8cdb503d56244677f119cafa))
+
 ## [2.3.0](https://github.com/druewilding/merlins-castle/compare/v2.2.1...v2.3.0) (2026-10-11)
 
 
