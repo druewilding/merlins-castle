@@ -115,10 +115,18 @@ RIVER = chaikin([(x * K, y * K) for x, y in [(-215, -40), (-150, -41), (-120, -4
 river = Lines()
 river.add(RIVER)
 BRIDGE = P["old-wall"][0], -40 * K  # where the path south from the old wall crosses
+TOWER = (P["tower"][0], P["tower"][1] + 6)  # on its knoll, north of the mossy steps
+TOWER_R = 6
+HUT = P["charcoal-hut"]
+# Where you step in at their doors: the tower's faces south, down the mossy
+# steps; the hut's north, to the crossroads.
+TOWER_LIP = (TOWER[0], TOWER[1] - TOWER_R - 1.8)
+HUT_LIP = (HUT[0], HUT[1] + 3 + 1.8)
 
 # ---------------------------------------------------------------- the paths
 
 CASTLE_ROOMS = {"coach-house", "wizards-kitchen", "grand-hall", "dungeon", "merlins-lair", "small-room"}
+INDOORS = CASTLE_ROOMS | {"charcoal-hut", "tower"}  # places inside buildings
 
 # Exits that aren't walked along the land: across the river by plank, the
 # tunnels, and everything underground.
@@ -147,8 +155,8 @@ for place, room in world["rooms"].items():
             continue
         if KIND.get(place) == "cave" or KIND.get(to) == "cave":
             continue  # underground, or in at a cave's mouth (below)
-        if {place, to} & CASTLE_ROOMS:
-            continue  # indoors, along the castle's corridors
+        if {place, to} & INDOORS:
+            continue  # indoors, along the castle's corridors (or up to a door, below)
         done.add(pair)
         paths.append(SHAPES.get((place, to)) or SHAPES.get((to, place)) or [P[place], P[to]])
 # Into the mist, and to Merlin's trap.
@@ -165,6 +173,8 @@ EAST_LIP = (P["cave-entrance"][0], P["cave-entrance"][1] - 11)
 DC = P["dragon-cave"]
 DRAGON_LIP = (DC[0] - 22, DC[1])
 paths += [[P["old-wall"], WEST_LIP], [P["cave-entrance"], EAST_LIP], [P["cave-entrance"], DRAGON_LIP]]
+# And to the tower's and the hut's doors.
+paths += [[P["mossy-steps"], TOWER_LIP], [P["forest-crossroads"], HUT_LIP]]
 
 path_lines = Lines()
 for line in paths:
@@ -265,6 +275,11 @@ HALLS = {h.place: h for h in [
     Hall("merlins-lair", 0.4, 0, 8, c.linear("#6f6a62"), c.linear("#5d5868"), "#b8ff9a", 18, w=14.5, d=14,
          at=((P["grand-hall"][0] - 6 + P["small-room"][0] - 6 - 1) / 2, P["grand-hall"][1] - 8 - 1 - 14)),
     Hall("coach-house", 0.4, 0, 6, c.linear("#b89a5a"), c.linear("#8a6a44"), "#ffd28a", 9, w=8, d=6),
+    # Out in the land, on the ground where they stand (their floors are set
+    # once the land's shape is known): the charcoal burner's hut, lit by its
+    # fire, and the room in the tower, its corners just inside the round wall.
+    Hall("charcoal-hut", 0, 0, 3.8, c.linear("#5e4a36"), c.linear("#6e5236"), "#ffb878", 1.2, w=3.4, d=2.4),
+    Hall("tower", 0, 0, 6, c.linear("#8d8a80"), c.linear("#807d76"), "#ffd9a0", 3, w=3.8, d=3.8, at=TOWER),
 ]}
 
 T, O, G, DM = P["trolls"], P["oak-door"], P["giant"], P["damp-tunnels"]
@@ -337,12 +352,14 @@ WAYS = {
     "lair-hall": Way([(GH[0], HALLS["merlins-lair"].y, 0.4), (*GH, 0.4)], indoor=True),
     # And in through the coach house's wide doors.
     "coach-door": Way([(CH[0] - HALLS["coach-house"].w - 1.8, CH[1], None), (*CH, 0.4)], half=2.4, indoor=True),
+    # In at the tower's door, and the hut's.
+    "tower-door": Way([(*TOWER_LIP, None), (*TOWER, None)], half=1.3, indoor=True),
+    "hut-door": Way([(*HUT_LIP, None), (*HUT, None)], half=1.2, indoor=True),
 }
 
 # ---------------------------------------------------------------- the shape of the land
 
 MOUND = Vector((P["grassy-bank"][0] - 9, P["grassy-bank"][1] + 9))  # between the west and north paths
-TOWER = (P["tower"][0], P["tower"][1] + 6)
 CASTLE = (-62 * K, 62 * K, -262 * K, -142 * K)  # its walls: west, east, south, north
 MOAT = (-72 * K, 72 * K, -272 * K, -130 * K)
 KEEP = (CASTLE[0] + 1, CASTLE[1] - 1, CASTLE[2] + 1, KEEP_NORTH)  # west, east, south, north
@@ -354,7 +371,16 @@ def in_building(x, y):
     if w <= x <= e and s <= y <= n:
         return True
     coach = HALLS["coach-house"]
-    return abs(x - coach.x) <= coach.w + 0.6 and abs(y - coach.y) <= coach.d + 0.6
+    if abs(x - coach.x) <= coach.w + 0.6 and abs(y - coach.y) <= coach.d + 0.6:
+        return True
+    if abs(x - HUT[0]) <= 4 and abs(y - HUT[1]) <= 3:
+        return True
+    return math.hypot(x - TOWER[0], y - TOWER[1]) <= TOWER_R
+
+
+def by_a_building(x, y, margin=3.0):
+    """Too near a building for a tree: its branches would come through the walls."""
+    return any(in_building(x + dx, y + dy) for dx in (-margin, 0, margin) for dy in (-margin, 0, margin))
 
 
 def in_moat(x, y):
@@ -427,6 +453,13 @@ def rocky(x, y):
 
 for way in WAYS.values():
     way.settle()
+for place, door in (("tower", "tower-door"), ("charcoal-hut", "hut-door")):
+    # A step up from the ground in the middle (so the hillside never shows
+    # through the floor), with the doorway rising gently to it.
+    way = WAYS[door]
+    HALLS[place].floor = way.points[-1][2] + 0.2
+    way.points[-1] = (*way.points[-1][:2], HALLS[place].floor)
+    way.segments = list(zip(way.points, way.points[1:]))
 
 
 def deck(x, y):
@@ -614,7 +647,7 @@ trees = c.Builder()
 for gx in range(X0 + 3, X1 - 2, 5):
     for gy in range(Y0 + 3, Y1 - 2, 5):
         x, y = gx + random.uniform(-2, 2), gy + random.uniform(-2, 2)
-        if open_ground(x, y) or open_to_the_sky(x, y, 4.5) is not None or rocky(x, y):
+        if open_ground(x, y) or open_to_the_sky(x, y, 4.5) is not None or rocky(x, y) or by_a_building(x, y):
             continue
         z = height(x, y)
         tall = random.uniform(9, 14)
@@ -689,7 +722,24 @@ while y < 118 * K:
 
 # The tower on its knoll, with the balcony high on its east side, and the
 # mossy steps up to it.
-tower(built, TOWER[0], TOWER[1], 6, 20, GREY, ROOF, 9)
+# Its round wall, with a door in the south side (the doorway's own walls and
+# roof line the gap), and its flat top and roof.
+SIDES = 24
+tz0, tz1 = height(*TOWER) - 0.5, height(*TOWER) - 0.5 + 20
+door_top = HALLS["tower"].floor + TUNNEL_TALL - 0.1  # just under the doorway's roof, so there's no gap
+ring = [(TOWER[0] + math.cos(-math.pi / 2 + 2 * math.pi * k / SIDES) * TOWER_R,
+         TOWER[1] + math.sin(-math.pi / 2 + 2 * math.pi * k / SIDES) * TOWER_R) for k in range(SIDES)]
+for k in range(SIDES):
+    p0, p1 = ring[k], ring[(k + 1) % SIDES]
+    door = k in (0, SIDES - 1)  # the two sides either side of due south
+    built.add([(*p0, door_top if door else tz0), (*p1, door_top if door else tz0), (*p1, tz1), (*p0, tz1)],
+              [(0, 1, 2, 3)], [c.vary(GREY, 0.06, Vector((*p0, 1.0)))] * 4)
+built.add([(*p, tz1) for p in ring], [tuple(range(SIDES))], [GREY] * SIDES)
+built.cone((*TOWER, tz1), 9, TOWER_R * 1.15, ROOF, sides=SIDES, droop=0)
+solid_circle(*TOWER, TOWER_R)
+fl = HALLS["tower"].floor
+block(built, TOWER[0] - 1.6, TOWER[1] - TOWER_R - 0.2, fl - 0.6, TOWER[0] + 1.6, TOWER[1] - TOWER_R + 0.6, fl - 0.02,
+      STONE, solid=False)  # the sill under the door
 block(built, TOWER[0] + 6, TOWER[1] - 2, height(*TOWER) + 11, TOWER[0] + 8.5, TOWER[1] + 2, height(*TOWER) + 11.5, GREY, solid=False)
 for k in range(6):
     sy = P["mossy-steps"][1] + 18 + k * 1.4
@@ -697,17 +747,35 @@ for k in range(6):
           c.linear("#7f8f6a"), solid=False)
 # The snake, coiled at the top of the steps (and the stone that shuts you in,
 # from inside), and the balcony, too high to reach from the ground under it.
-obstacle(["mossy-steps north", "tower south"], "box", TOWER[0], -(TOWER[1] - 8), 3.0, 0.8)
+# (The snake reaches out from just inside the wall, so its far side is in the
+# tower, where you can't be on the land; the stone is in the doorway, so
+# indoors, for the way out.)
+obstacle(["mossy-steps north"], "box", TOWER[0], -(TOWER[1] - TOWER_R + 1), 3.0, 0.8)
+obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - TOWER_R - 0.6), 1.6, 0.5, under=True)
 obstacle(["mossy-steps east"], "box", TOWER[0] + 9.5, -TOWER[1], 0.6, 2.5)
 
 # The witches, on the way west to the crossroads.
 wx, wy = P["forest-witches"]
 obstacle(["forest-witches west"], "box", (wx + P["forest-crossroads"][0]) / 2, -wy, 1.0, 5.5)
 
-# The charcoal burner's hut.
-hx, hy = P["charcoal-hut"]
-block(built, hx - 4, hy - 3, height(hx, hy) - 0.3, hx + 4, hy + 3, height(hx, hy) + 3.2, c.linear("#7a5b3e"))
-built.cone((hx, hy, height(hx, hy) + 3.2), 3, 5.5, c.linear("#5d4630"), sides=4, droop=0)
+# The charcoal burner's hut, its door facing north to the crossroads.
+hx, hy = HUT
+HUT_WALL = c.linear("#7a5b3e")
+hz0, hz1 = height(hx, hy) - 0.3, HALLS["charcoal-hut"].floor + 4.2
+gap = 1.2 + 0.1
+block(built, hx - 4, hy - 3, hz0, hx + 4, hy - 2.5, hz1, HUT_WALL, solid=False)
+block(built, hx - 4, hy - 3, hz0, hx - 3.5, hy + 3, hz1, HUT_WALL, solid=False)
+block(built, hx + 3.5, hy - 3, hz0, hx + 4, hy + 3, hz1, HUT_WALL, solid=False)
+block(built, hx - 4, hy + 2.5, hz0, hx - gap, hy + 3, hz1, HUT_WALL, solid=False)
+block(built, hx + gap, hy + 2.5, hz0, hx + 4, hy + 3, hz1, HUT_WALL, solid=False)
+block(built, hx - gap, hy + 2.5, HALLS["charcoal-hut"].floor + TUNNEL_TALL - 0.1, hx + gap, hy + 3, hz1, HUT_WALL,
+      solid=False)  # over the door, down to the doorway's roof
+built.cone((hx, hy, hz1), 3, 5.5, c.linear("#5d4630"), sides=4, droop=0)
+# A sill under the door, where the doorway's floor meets the room's (over
+# the hole in the ground the hut stands in).
+fl = HALLS["charcoal-hut"].floor
+block(built, hx - gap, hy + 2.3, fl - 0.6, hx + gap, hy + 3.2, fl - 0.02, STONE, solid=False)
+solid_box(hx, hy, 4, 3)
 
 # The cave entrance's mound, and the pile of leaves filling the mouth of the
 # dragon's cave, just inside.
@@ -993,8 +1061,9 @@ for way in WAYS.values():
         if under_floor and under_floor.room and not under_floor.inside(mid[0], mid[1], -0.3):
             under_floor = None
         if not under_floor and not in_pit(mid[0], mid[1]):
-            # (Out of the door, a step up off the ground, which is there under it.)
-            lift = 0.04 if way.indoor and not in_building(*mid[:2]) else 0.0
+            # (Indoors, a shade up: off the ground, out of the door, and the
+            # same all the way in, so there's no step at the wall.)
+            lift = 0.04 if way.indoor else 0.0
             quad(tunnel, [(alx, aly, a[2] + lift), (arx, ary, a[2] + lift), (brx, bry, b[2] + lift), (blx, bly, b[2] + lift)],
                  floor_colour)
             near = in_a_hall(*mid, 2.0)
@@ -1444,6 +1513,20 @@ def room(b, hall):
             block(b, px - 0.08, py - 0.08, f, px + 0.08, py + 0.08, f + 1.6, BRASS, solid=False)
             flame(b, px, py, f + 1.6)
             under_circle(px, py, 0.25)
+    elif hall.place == "charcoal-hut":
+        # The hearth against the back wall, glowing; a straw bed; sacks of charcoal.
+        furniture(b, hx - 1.0, hy - D, hx + 1.0, hy - D + 0.9, f, f + 0.55, STONE)
+        for dx in (-0.4, 0.0, 0.4):
+            flame(b, hx + dx, hy - D + 0.45, f + 0.55, 0.3)
+        furniture(b, hx - W, hy - D + 0.3, hx - W + 1.1, hy + 0.9, f, f + 0.4, c.linear("#c9a85a"))
+        for k, (px, py) in enumerate(((hx + W - 0.6, hy - 0.4), (hx + W - 0.7, hy + 0.6))):
+            b.blob((px, py, f + 0.35), 0.55, c.linear("#2a2622"), squash=0.8, lumpy=0.3, seed=40 + k)
+            under_circle(px, py, 0.5)
+    elif hall.place == "tower":
+        # A table in the middle, with a candle; a chest against the north wall.
+        furniture(b, hx - 0.8, hy - 0.6, hx + 0.8, hy + 0.6, f, f + 0.8, WOOD)
+        flame(b, hx, hy, f + 0.8, 0.2)
+        furniture(b, hx - 0.9, hy + D - 0.7, hx + 0.9, hy + D, f, f + 0.7, DARK_WOOD)
     elif hall.place == "coach-house":
         # The red coach on its four wheels, and hay.
         cxx, cyy = hx + 1.5, hy

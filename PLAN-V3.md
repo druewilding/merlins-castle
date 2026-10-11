@@ -432,7 +432,11 @@ and wings) may need a bought or free model.
      the small room (the door that locks behind you) and the hall (the
      hidden door). Each room furnished after its painting, with its own
      light.
-   - **Indoors**: the tower and the hut.
+   - **Indoors** ✅: the charcoal burner's hut (its door north to the
+     crossroads; a hearth, a straw bed, sacks of charcoal) and the room in the
+     tower (its door south at the top of the mossy steps), each cut out of the
+     land like the coach house. The snake guards the tower's door from
+     outside, and the stone (the ring) the way out, in the doorway.
    - **Obstacles speak** ✅: walk up to one and you bounce back 5 m before
      it (so you can see what's in your way), with the original's words for it
      at the bottom of the screen ("The trees are too dense."), in English or

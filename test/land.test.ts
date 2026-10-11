@@ -105,6 +105,8 @@ function sorted(solids: Solid[]) {
 
 const solidOnLand = sorted([...land.circles.map((circle) => ({ circle })), ...land.boxes.map((box) => ({ box }))]);
 const free = (x: number, z: number) => walkable(x, z) && !solidOnLand(x, z);
+// (The places in buildings and caves you only get into along a way: below.)
+const outdoors = places.filter((place) => !(place.id in land.halls));
 const onLand = obstacles.filter((obstacle) => !obstacle.under);
 const crossOnLand = crossing(onLand);
 
@@ -127,7 +129,7 @@ function reachable(from: string) {
     const key = through * nx * nz + j * nx + i;
     if (seen.has(key)) continue;
     seen.add(key);
-    for (const place of places) if (Math.hypot(x - place.x, z - place.z) < 6) reached.add(place.id);
+    for (const place of outdoors) if (Math.hypot(x - place.x, z - place.z) < 6) reached.add(place.id);
     queue.push([i + 1, j, through], [i - 1, j, through], [i, j + 1, through], [i, j - 1, through]);
   }
   return [...reached].sort();
@@ -146,7 +148,6 @@ describe("the 3D land, with every obstacle closed", () => {
   });
 
   const fromTheOldWall = [
-    "charcoal-hut",
     "forest-crossroads",
     "forest-edge",
     "forest-witches",
@@ -161,7 +162,7 @@ describe("the 3D land, with every obstacle closed", () => {
   });
 
   it("keeps the yellow flowers, the mossy steps and the tower behind the locked gate", () => {
-    expect(reachable("yellow-flowers")).toEqual(["mossy-steps", "tower", "yellow-flowers"]);
+    expect(reachable("yellow-flowers")).toEqual(["mossy-steps", "yellow-flowers"]);
   });
 
   it("lets you down from the mountain top, but not up through the dense trees", () => {
@@ -308,6 +309,19 @@ describe("the long lamp tunnel", () => {
 
   it("joins the old wall and the cave entrance, with it", () => {
     expect(underground(middle, true)).toEqual(["cave-entrance", "old-wall"]);
+  });
+});
+
+describe("the tower and the charcoal burner's hut", () => {
+  it("lets you into the hut, and out again, by its door", () => {
+    expect(underground("charcoal-hut", false)).toEqual(["charcoal-hut", "forest-crossroads"]);
+  });
+
+  it("keeps the snake at the tower's door, and shuts you in without the ring", () => {
+    const outside = land.ways["tower-door"].points[0];
+    expect(crossOnLand(outside[0], outside[1] + 1, 0)).toBeUndefined();
+    expect(underground("tower", false)).toEqual(["tower"]);
+    expect(underground("tower", true)).toEqual(["mossy-steps", "tower"]);
   });
 });
 
