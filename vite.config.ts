@@ -56,6 +56,9 @@ function offline(): Plugin {
       for (const path of files(outDir).sort()) {
         const url = "./" + relative(outDir, path).split("\\").join("/");
         if (url === "./sw.js" || url === "./social.jpg") continue;
+        // The 3D version isn't stored for offline play: it's only fetched by
+        // those who open 3d.html, and changing it doesn't touch the game's version.
+        if (url === "./3d.html" || url.startsWith("./3d/")) continue;
         const fingerprint = hash(readFileSync(path));
         all += url + fingerprint;
         if (/^\.\/(art|music)\//.test(url)) media[url] = fingerprint;
@@ -70,6 +73,10 @@ function offline(): Plugin {
   };
 }
 
+// Everything that only the 3D version uses goes in dist/3d/, so it's easy to
+// keep apart (see offline() above).
+const for3d = (names: readonly string[] = []) => names.some((name) => /(^|\/)(src\/three\/|3d[.-])/.test(name));
+
 // Relative base: the same build works at merlinscastle.net and under a path
 // (as it once did at druewilding.com/merlins-castle/).
 export default defineConfig({
@@ -77,4 +84,20 @@ export default defineConfig({
   // The 3D land's heights and where you can stand (src/three/models/land.bin).
   assetsInclude: ["**/*.bin"],
   plugins: [artWatcher(), offline()],
+  build: {
+    // three.js is most of the 3D version's code.
+    chunkSizeWarningLimit: 1000,
+    rolldownOptions: {
+      // The game, and the 3D version in the making (not linked from anywhere yet).
+      input: { index: "index.html", "3d": "3d.html" },
+      output: {
+        entryFileNames: (chunk) => (chunk.name === "3d" ? "3d/[name]-[hash].js" : "assets/[name]-[hash].js"),
+        chunkFileNames: (chunk) => (for3d(chunk.moduleIds) ? "3d/[name]-[hash].js" : "assets/[name]-[hash].js"),
+        assetFileNames: (asset) =>
+          for3d([...asset.names, ...asset.originalFileNames])
+            ? "3d/[name]-[hash][extname]"
+            : "assets/[name]-[hash][extname]",
+      },
+    },
+  },
 });

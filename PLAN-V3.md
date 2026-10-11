@@ -18,8 +18,9 @@ Three things make v3 what it is:
 Classic and Illustrated stay as they are. v3 is a third way to play.
 
 Status: **step 2 begun.** The whole land above ground is built in grey boxes
-(`art/blender/land.py`) and you can walk it at `3d.html` on the dev server
-(not part of the built site yet). Next: underground and indoors.
+(`art/blender/land.py`) and you can walk it at `3d.html`. It's built and
+deployed with the site, but not linked from anywhere yet. Next: underground
+and indoors.
 
 ## Keep the engine
 
