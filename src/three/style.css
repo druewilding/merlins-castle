@@ -74,11 +74,20 @@ body {
   }
 }
 
-/* Which place you're in, while the world is grey. */
-.here {
+/* Top left: which place you're in (while the world is grey), and your score. */
+.corner {
   position: fixed;
   top: max(12px, env(safe-area-inset-top));
   left: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.here,
+.score {
   padding: 0.3rem 0.8rem;
   border-radius: 6px;
   background: rgba(10, 7, 4, 0.55);
@@ -86,6 +95,10 @@ body {
   font-family: Cinzel, Georgia, serif;
   font-size: 1rem;
   pointer-events: none;
+}
+
+.score {
+  font-size: 0.85rem;
 }
 
 /* What the original says when something's in your way. */

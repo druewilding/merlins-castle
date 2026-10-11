@@ -29,10 +29,10 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import daJson from "../../data/da.json";
 import worldJson from "../../data/world.json";
-import { effects, messages } from "../engine/engine";
+import { effects, messages, score } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
 import { type Direction, EXIT_ORDER, type World } from "../engine/types";
-import { LANGUAGE } from "../shared/strings";
+import { LANGUAGE, T } from "../shared/strings";
 import { items as setUpItems } from "./items";
 import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
@@ -94,9 +94,15 @@ const player = new Player(renderer.domElement);
 const overlay = document.createElement("div");
 overlay.className = "overlay";
 overlay.innerHTML = "<h1>Merlin's Castle</h1><p>Loading the land…</p>";
+// Top left: which place you're in, and your score (what's on the grassy bank).
+const corner = document.createElement("div");
+corner.className = "corner";
 const here = document.createElement("div");
 here.className = "here";
-root.append(overlay, here);
+const scored = document.createElement("div");
+scored.className = "score";
+corner.append(here, scored);
+root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
@@ -446,6 +452,7 @@ renderer.setAnimationLoop((time) => {
   lightFor(player.depth, time, dt);
   items.update(room);
   here.textContent = name(room);
+  scored.textContent = T.score(score(world, items.state));
   // The sun's shadows follow you, so they're sharp wherever you are.
   sunlight.target.position.copy(player.position);
   sunlight.position.copy(player.position).addScaledVector(SUN, 200);

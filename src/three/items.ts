@@ -28,10 +28,20 @@ const LIFT = 0.04;
 const FILL = 0.5;
 const WALL = 1;
 
+/** The ground an object covers: its middle, which way it lies, half its length and half its width. */
+interface Footprint {
+  x: number;
+  z: number;
+  yaw: number;
+  half: number;
+  wide: number;
+}
+
 interface Lying {
   room: RoomId;
   model: Object3D;
   box: Box3;
+  footprint?: Footprint;
   // Dropped where it was in use (the ladder against the wall): once you've
   // left, it's lying on the ground here.
   fallsTo?: Footing;
@@ -42,6 +52,44 @@ export interface Footing {
   x: number;
   z: number;
   yaw: number;
+}
+
+// Where a dropped object can go, nearest first: aside (to your right, or
+// left) and on, in metres, from just in front of you.
+const NUDGES = [[0, 0]];
+for (let r = 0.3; r <= 3; r += 0.3) NUDGES.push([r, 0], [-r, 0], [0, r], [r, r], [-r, r]);
+// How far apart objects lie, at least.
+const APART = 0.1;
+
+/** Whether two objects would lie on each other: any point of one under the other. */
+function overlap(a: Footprint, b: Footprint) {
+  return covered(a).some(([x, z]) => under(b, x, z)) || covered(b).some(([x, z]) => under(a, x, z));
+}
+
+function under(f: Footprint, x: number, z: number) {
+  const dx = x - f.x;
+  const dz = z - f.z;
+  const along = dx * Math.sin(f.yaw) + dz * Math.cos(f.yaw);
+  const across = dx * Math.cos(f.yaw) - dz * Math.sin(f.yaw);
+  return Math.abs(along) <= f.half + APART && Math.abs(across) <= f.wide + APART;
+}
+
+/** Points all over an object's footprint, every 20 cm or so. */
+function covered(f: Footprint) {
+  const points: [number, number][] = [];
+  const n = Math.max(1, Math.ceil((f.half * 2) / 0.2));
+  const m = Math.max(1, Math.ceil((f.wide * 2) / 0.2));
+  for (let i = 0; i <= n; i++) {
+    for (let j = 0; j <= m; j++) {
+      const along = -f.half + (i / n) * f.half * 2;
+      const across = -f.wide + (j / m) * f.wide * 2;
+      points.push([
+        f.x + Math.sin(f.yaw) * along + Math.cos(f.yaw) * across,
+        f.z + Math.cos(f.yaw) * along - Math.sin(f.yaw) * across,
+      ]);
+    }
+  }
+  return points;
 }
 
 export interface Items {
@@ -98,7 +146,12 @@ export function items(options: {
       node.receiveShadow = true;
     });
     scene.add(model);
-    lying.set(id, { room, model, box: new Box3().setFromObject(model).expandByScalar(AIM_SLACK) });
+    lying.set(id, {
+      room,
+      model,
+      box: new Box3().setFromObject(model).expandByScalar(AIM_SLACK),
+      footprint: { x, z, yaw, half, wide: size.x / 2 },
+    });
   }
 
   /** The line an object rests on, along its length: the ground's upper hull, under its middle. */
@@ -332,12 +385,22 @@ export function items(options: {
       });
       return;
     }
-    // Laid down just in front of you, pointing the way you're looking.
+    // Laid down just in front of you, pointing the way you're looking, or
+    // nudged aside (or on a little) off anything already lying there.
     const yaw = player.yaw + Math.PI;
-    const half = lengthOf(models.getObjectByName(id)!) / 2;
-    const ahead = 0.8 + half;
-    const x = player.position.x - Math.sin(player.yaw) * ahead;
-    const z = player.position.z - Math.cos(player.yaw) * ahead;
+    const size = new Box3().setFromObject(models.getObjectByName(id)!).getSize(new Vector3());
+    const forward = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
+    const side = [Math.cos(player.yaw), -Math.sin(player.yaw)];
+    const ahead = 0.8 + size.z / 2;
+    const spots = NUDGES.map(([aside, on]) => ({
+      x: player.position.x + forward[0] * (ahead + on) + side[0] * aside,
+      z: player.position.z + forward[1] * (ahead + on) + side[1] * aside,
+      yaw,
+      half: size.z / 2,
+      wide: size.x / 2,
+    }));
+    const taken = [...lying.values()].flatMap((thing) => (thing.footprint ? [thing.footprint] : []));
+    const { x, z } = spots.find((spot) => !taken.some((other) => overlap(spot, other))) ?? spots[0];
     lay(id, state.room, x, z, yaw, player.under ? player.under.floor : undefined);
   }
 
