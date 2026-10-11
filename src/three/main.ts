@@ -291,7 +291,7 @@ if (import.meta.env.DEV) {
 overlay.innerHTML = `
   <h1>Merlin's Castle</h1>
   <p class="start">Click to walk</p>
-  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · L for names · Esc to stop</p>
+  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · L for names · Esc to stop</p>
   <p class="keys touch">Left thumb to walk · right thumb to look</p>`;
 overlay.hidden = Boolean(at);
 overlay.addEventListener("click", () => {

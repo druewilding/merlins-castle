@@ -117,6 +117,11 @@ interface Near {
 }
 
 const EYE = 1.65; // metres above the ground
+const CROUCHED = 1.1; // the eye's height, crouching
+const CROUCHING = 0.5; // how much of your speed you have, crouching
+const GRAVITY = 9.8; // metres a second, each second
+export const JUMP_HEIGHT = 0.6; // metres, how high a jump lifts you (a game hop, more than a real one)
+const FLY_HEIGHT = 35; // metres above the ground, flying
 const WALK = 4.2; // metres a second
 const RUN = WALK * 3; // the land is big, and the tunnel long
 const BODY = 0.35; // your own radius, for bumping into things
@@ -131,8 +136,9 @@ export class Player {
   pitch = 0;
   /** West, east, north and south edges, in three.js's x and z. */
   bounds = { west: -95, east: 95, north: -95, south: 95 };
+  /** How high a jump lifts you, in metres. */
+  jumpHeight = JUMP_HEIGHT;
   // For the debug panel: flying, walking through anything, and going faster.
-  fly = false;
   ghost = false;
   boost = 1;
 
@@ -154,9 +160,16 @@ export class Player {
   // One-way obstacles you're going through the free way, until you're out of their reach.
   private passing = new Set<Circle | Box>();
   private wasInside = false;
+  private flying = false;
+  private lift = 0; // how high you are off the ground, jumping
+  private rise = 0; // and how fast you're going up (or down)
+  private eye = EYE; // lower, crouching
 
   constructor(private element: HTMLElement) {
-    addEventListener("keydown", (event) => this.keys.add(event.code));
+    addEventListener("keydown", (event) => {
+      this.keys.add(event.code);
+      if (event.code === "Space" && !event.repeat) this.jump();
+    });
     addEventListener("keyup", (event) => this.keys.delete(event.code));
     addEventListener("blur", () => this.keys.clear());
     addEventListener("mousemove", (event) => {
@@ -212,6 +225,31 @@ export class Player {
     this.pitch = 0;
   }
 
+  get fly() {
+    return this.flying;
+  }
+
+  /** Flying: straight up high over the land, and (flying no more) straight back down onto it. */
+  set fly(on: boolean) {
+    if (on === this.flying) return;
+    this.flying = on;
+    const { x, z } = this.position;
+    if (on) {
+      this.under = undefined;
+      this.position.y = (this.ground(x, z) ?? 0) + FLY_HEIGHT;
+    } else {
+      this.under = this.hallAt(x, z);
+      this.position.y = this.groundAt(x, z) ?? 0;
+    }
+    this.lift = this.rise = 0;
+  }
+
+  /** Up off the ground, if you're on it. */
+  jump() {
+    if (this.flying || this.lift > 0 || this.jumpHeight <= 0) return;
+    this.rise = Math.sqrt(2 * GRAVITY * this.jumpHeight);
+  }
+
   turn(dx: number, dy: number) {
     this.yaw -= dx;
     this.pitch = Math.max(-1.4, Math.min(1.4, this.pitch - dy));
@@ -220,13 +258,22 @@ export class Player {
   update(dt: number, reducedMotion: boolean) {
     const forward = this.axis("KeyW", "ArrowUp") - this.axis("KeyS", "ArrowDown") - this.stick.y;
     const right = this.axis("KeyD", "ArrowRight") - this.axis("KeyA", "ArrowLeft") + this.stick.x;
-    const speed = (this.keys.has("ShiftLeft") || this.keys.has("ShiftRight") ? RUN : WALK) * this.boost;
+    // (Crouching on Ctrl, or C: Ctrl and W together closes the browser's tab.)
+    const crouching = !this.flying && this.axis("ControlLeft", "ControlRight", "KeyC") > 0;
+    const pace = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight") ? RUN : WALK;
+    const speed = pace * this.boost * (crouching ? CROUCHING : 1);
     const length = Math.min(1, Math.hypot(forward, right));
-    if (this.fly) {
+    if (this.flying) {
       this.flyAbout(dt, speed, forward, right);
       this.camera.position.set(this.position.x, this.position.y + EYE, this.position.z);
       this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
       return;
+    }
+    this.eye += ((crouching ? CROUCHED : EYE) - this.eye) * Math.min(1, dt * 10);
+    if (this.rise !== 0 || this.lift > 0) {
+      this.lift += this.rise * dt;
+      this.rise -= GRAVITY * dt;
+      if (this.lift <= 0) this.lift = this.rise = 0;
     }
     const bouncing = Math.hypot(this.knock.x, this.knock.z) > 0.5;
     if (bouncing) {
@@ -246,18 +293,16 @@ export class Player {
     const ground = this.groundAt(this.position.x, this.position.z);
     if (ground !== undefined) this.position.y += (ground - this.position.y) * Math.min(1, dt * 12);
 
-    const bob = reducedMotion || length < 0.01 || bouncing ? 0 : Math.sin(this.bob) * 0.04;
-    this.camera.position.set(this.position.x, this.position.y + EYE + bob, this.position.z);
+    const bob = reducedMotion || length < 0.01 || bouncing || this.lift > 0 ? 0 : Math.sin(this.bob) * 0.04;
+    this.camera.position.set(this.position.x, this.position.y + this.lift + this.eye + bob, this.position.z);
     this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
   }
 
-  // Flying: forward is wherever you look, Space goes up and C goes down.
+  // Flying: forward is wherever you look (up or down, too).
   private flyAbout(dt: number, speed: number, forward: number, right: number) {
-    const up = this.axis("Space") - this.axis("KeyC");
     const look = new Vector3(0, 0, -1).applyEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
     const side = new Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     const move = look.multiplyScalar(forward).addScaledVector(side, right);
-    move.y += up;
     if (move.lengthSq() > 0.0001) this.position.addScaledVector(move.normalize(), speed * 1.5 * dt);
     // Flying is over the land, unless you're between a hall's floor and its
     // roof: then you're in it, with its light (and not under the sun).

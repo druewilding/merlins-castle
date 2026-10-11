@@ -76,7 +76,7 @@ export function debug(world: DebugWorld, onOpen: () => void) {
   panel.innerHTML = `
     <header><strong>Debug</strong><span>0 to close</span></header>
     <p class="debug-where"></p>
-    <label><input type="checkbox" id="debug-fly" /> Fly <kbd>F</kbd> <small>Space up, C down</small></label>
+    <label><input type="checkbox" id="debug-fly" /> Fly <kbd>F</kbd> <small>35 m up; F again drops you</small></label>
     <label><input type="checkbox" id="debug-ghost" /> Walk through anything <kbd>N</kbd></label>
     <label><input type="checkbox" id="debug-open" /> Open every obstacle <kbd>O</kbd></label>
     <label><input type="checkbox" id="debug-reach" /> Show obstacles and their reach <kbd>R</kbd> <small>red: fatal</small></label>
