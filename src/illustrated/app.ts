@@ -93,10 +93,11 @@ export class IllustratedApp {
   private readonly messages = h("div", { class: "messages", "aria-live": "polite" });
   private readonly slots = h("div", { class: "slots", "aria-label": T.carrying });
   private readonly handsActions = h("div", { class: "hands-actions" });
+  private readonly words = h("div", { class: "words" }, this.description, this.seeing, this.messages);
   private readonly panel = h(
     "section",
     { class: "panel" },
-    h("div", { class: "words" }, this.description, this.seeing, this.messages),
+    this.words,
     this.compass,
     h("div", { class: "hands" }, this.handsActions, this.slots)
   );
@@ -246,7 +247,7 @@ export class IllustratedApp {
       this.sounds.play("blocked");
       this.refused = direction; // its button flashes red
     }
-    if (moved || this.game!.status !== "playing") await this.transition(() => this.render(), moved ? 600 : 1200);
+    if (moved || this.game!.status !== "playing") await this.transition(() => this.render(), moved ? 600 : 1200, true);
     else this.render();
     this.busy = false;
   }
@@ -328,7 +329,7 @@ export class IllustratedApp {
     // The music steps aside so the victory fanfare rings out on its own.
     this.music.end(600);
     this.sounds.play("victory", 300);
-    await this.transition(() => this.render(), 1600);
+    await this.transition(() => this.render(), 1600, true);
   }
 
   private async use(id: ItemId) {
@@ -395,6 +396,9 @@ export class IllustratedApp {
     const game = this.game!;
     // The music fades with the falling curtain (after a win it has already gone).
     if (game.status !== "won") this.music.end(3000);
+    // Dying or getting lost: the text panel and your things fade away as the
+    // curtain falls, leaving only its words.
+    if (game.status !== "won") this.app.classList.add("mc--curtain");
     const last = game.status === "dead" ? this.events.at(-1) : undefined;
     // Lost: the clue you found, so it isn't hidden behind the curtain.
     const lost = game.status === "lost" ? splitClue(describe(this.world, game).description) : undefined;
@@ -693,12 +697,21 @@ export class IllustratedApp {
   }
 
   // Fade through black, change the scene while it's dark, fade back in.
-  private async transition(change: () => void, duration = 600) {
+  // During a game, what you carry stays in view: the black falls behind the
+  // text panel, and only the words and the ways out fade with the scene.
+  private async transition(change: () => void, duration = 600, keepHands = false) {
     const half = reducedMotion() ? 0 : duration / 2;
-    await this.fader.animate([{ opacity: 0 }, { opacity: 1 }], { duration: half * 0.8, fill: "forwards" }).finished;
+    this.fader.classList.toggle("under-panel", keepHands);
+    const fading = keepHands ? [this.words, this.compass] : [];
+    const out = { duration: half * 0.8, fill: "forwards" } as const;
+    const back = { duration: half * 1.2, fill: "forwards" } as const;
+    const hidden = fading.map((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], out));
+    await this.fader.animate([{ opacity: 0 }, { opacity: 1 }], out).finished;
     change();
     if (this.sceneUrl) await this.sceneImg.decode().catch(() => undefined);
-    await this.fader.animate([{ opacity: 1 }, { opacity: 0 }], { duration: half * 1.2, fill: "forwards" }).finished;
+    const shown = fading.map((el) => el.animate([{ opacity: 0 }, { opacity: 1 }], back));
+    await this.fader.animate([{ opacity: 1 }, { opacity: 0 }], back).finished;
+    for (const animation of [...hidden, ...shown]) animation.cancel();
   }
 
   // The first time an object is picked up in a game, it rises to the middle of

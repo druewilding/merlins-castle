@@ -99,6 +99,11 @@ button {
   z-index: 50;
 }
 
+/* Moving between rooms: behind the text panel, so what you carry stays. */
+.fader.under-panel {
+  z-index: 9;
+}
+
 /* Drifting motes of golden and violet light. */
 .motes {
   position: absolute;
@@ -775,6 +780,18 @@ button {
 
 .curtain.bright::before {
   display: none;
+}
+
+/* As the dark curtain falls, the text panel and your things fade away. */
+.mc--curtain .panel {
+  animation: fade-away 1.6s ease 1.4s both;
+}
+
+@keyframes fade-away {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
 }
 
 .curtain > * {
