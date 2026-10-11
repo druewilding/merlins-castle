@@ -170,7 +170,8 @@ for line in paths:
 TUNNEL_HALF = 1.7  # half a tunnel's width
 TUNNEL_TALL = 3.2  # floor to roof
 DEEP = -5.0  # the lamp tunnel's floor, under the meadows
-CAVE = 27.0  # the floor of the caves in the mountain
+TOP = 30 * K  # the mountain's height, where the maze is: lower when the places are closer, so it's no steeper
+CAVE = TOP - 3  # the floor of the caves in the mountain
 
 
 class Way:
@@ -254,10 +255,10 @@ MAZE_HALF = MAZE_CELLS * MAZE_CELL / 2  # to the maze's outer wall
 DRAGON_TUNNEL = Way([
     (*DC, 0.2),
     (DC[0], DC[1] + 9, 0.2),
-    (DC[0] + 2, DC[1] + 40, 5),
-    (DC[0] - 13, DC[1] + 72, 13),
-    (G[0] + 30, G[1] - 28, 20),
-    (G[0] + 20, G[1] - 10, 25.5),
+    (DC[0] + 2, DC[1] + 40, CAVE * 0.19),
+    (DC[0] - 13, DC[1] + 72, CAVE * 0.48),
+    (G[0] + 30, G[1] - 28, CAVE * 0.74),
+    (G[0] + 20, G[1] - 10, CAVE * 0.94),
     (G[0] + 11, G[1], CAVE),
     (*G, CAVE),
 ])
@@ -316,13 +317,13 @@ def in_moat(x, y):
 def mountain(x, y):
     x, y = x / K, y / K
     across = smooth((95 - abs(x)) / 45)
-    return 30 * smooth((y - 45) / 75) * across + 28 * smooth((y - 150) / 45) * smooth((80 - abs(x)) / 40)
+    return K * (30 * smooth((y - 45) / 75) * across + 28 * smooth((y - 150) / 45) * smooth((80 - abs(x)) / 40))
 
 
 def crags(x, y):
     """Rocks round the maze on the mountain top, which its caves are dug into.
     They leave the maze, and the way up to it from the south, open."""
-    top = smooth((mountain(x, y) - 18) / 8)
+    top = smooth((mountain(x, y) / TOP - 0.6) / 0.27)
     if top <= 0:
         return 0.0
     dx = max(0.0, abs(x - MZ[0]) - MAZE_HALF - 0.5)
