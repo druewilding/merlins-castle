@@ -60,6 +60,8 @@ const NUDGES = [[0, 0]];
 for (let r = 0.3; r <= 3; r += 0.3) NUDGES.push([r, 0], [-r, 0], [0, r], [r, r], [-r, r]);
 // How far apart objects lie, at least.
 const APART = 0.1;
+// How near you an object's middle lands, at least, dropped at your feet.
+const NEAREST = 0.7;
 
 /** Whether two objects would lie on each other: any point of one under the other. */
 function overlap(a: Footprint, b: Footprint) {
@@ -121,6 +123,8 @@ export function items(options: {
   const slots: ItemId[] = [];
   let held = 0; // the slot in your hand
   let aimed: ItemId | undefined;
+  const eye = new Vector3(); // where you're looking from, and which way
+  const look = new Vector3();
 
   // ---- In the world ---------------------------------------------------------
 
@@ -385,16 +389,16 @@ export function items(options: {
       });
       return;
     }
-    // Laid down just in front of you, pointing the way you're looking, or
+    // Its middle where you're pointing, lying the way you're looking, or
     // nudged aside (or on a little) off anything already lying there.
     const yaw = player.yaw + Math.PI;
     const size = new Box3().setFromObject(models.getObjectByName(id)!).getSize(new Vector3());
-    const forward = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
     const side = [Math.cos(player.yaw), -Math.sin(player.yaw)];
-    const ahead = 0.8 + size.z / 2;
+    const forward = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
+    const [px, pz] = pointedAt();
     const spots = NUDGES.map(([aside, on]) => ({
-      x: player.position.x + forward[0] * (ahead + on) + side[0] * aside,
-      z: player.position.z + forward[1] * (ahead + on) + side[1] * aside,
+      x: px + forward[0] * on + side[0] * aside,
+      z: pz + forward[1] * on + side[1] * aside,
       yaw,
       half: size.z / 2,
       wide: size.x / 2,
@@ -402,6 +406,40 @@ export function items(options: {
     const taken = [...lying.values()].flatMap((thing) => (thing.footprint ? [thing.footprint] : []));
     const { x, z } = spots.find((spot) => !taken.some((other) => overlap(spot, other))) ?? spots[0];
     lay(id, state.room, x, z, yaw, player.under ? player.under.floor : undefined);
+  }
+
+  /**
+   * Where you're pointing, on the ground (or the floor): along your gaze until
+   * it meets it, as far as you can reach, and not past anything you couldn't
+   * walk past (a wall, the forest, the water, an obstacle), nor right under you.
+   */
+  function pointedAt(): [number, number] {
+    player.camera.getWorldPosition(eye);
+    player.camera.getWorldDirection(look);
+    const { position: me, under } = player;
+    const open = under
+      ? (x: number, z: number) =>
+          Boolean(player.hallAt(x, z)) ||
+          player.ways.some((way) => {
+            const there = nearest(way, x, z);
+            return there.d < way.half - 0.2 && Math.abs(there.floor - under.floor) < 1;
+          })
+      : (x: number, z: number) => walkable(x, z) && player.clear(x, z, false, 0.05);
+    let spot: [number, number] = [me.x, me.z];
+    for (let d = 0.1; d <= REACH; d += 0.1) {
+      const x = eye.x + look.x * d;
+      const z = eye.z + look.z * d;
+      if (!open(x, z)) break;
+      spot = [x, z];
+      if (eye.y + look.y * d <= (under ? under.floor : (ground(x, z) ?? -Infinity))) break;
+    }
+    // (At least a little way in front of you.)
+    const away = Math.hypot(spot[0] - me.x, spot[1] - me.z);
+    if (away < NEAREST) {
+      const forward = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
+      spot = [me.x + forward[0] * NEAREST, me.z + forward[1] * NEAREST];
+    }
+    return spot;
   }
 
   /** Leaving a place, what was in use there falls where it stood. */
@@ -435,8 +473,6 @@ export function items(options: {
   // ---- Each frame -----------------------------------------------------------
 
   const ray = new Ray();
-  const eye = new Vector3();
-  const look = new Vector3();
   const hit = new Vector3();
 
   return {
