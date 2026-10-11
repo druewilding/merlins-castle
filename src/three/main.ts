@@ -222,6 +222,11 @@ if (import.meta.env.DEV) {
       openObstacles,
       room: () => room,
       name,
+      // A fresh frame, read straight away (before the browser clears it).
+      picture: () => {
+        renderer.render(scene, player.camera);
+        return renderer.domElement;
+      },
     },
     () => (overlay.hidden = true)
   );

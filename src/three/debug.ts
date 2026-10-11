@@ -1,7 +1,8 @@
 // The debug panel, for finding your way round while building: fly, walk
 // through anything, open every obstacle, go faster, and jump anywhere on a
 // map. Opened with the 0 key (on the number row or the number pad, so it
-// works whatever the keyboard's language).
+// works whatever the keyboard's language). P copies what you're looking at
+// to the clipboard, for pasting into a chat.
 //
 // Only on the dev server: main.ts loads this behind import.meta.env.DEV, so
 // the built game doesn't contain it at all.
@@ -23,6 +24,8 @@ export interface DebugWorld {
   openObstacles: (open: boolean) => void;
   room: () => RoomId;
   name: (id: RoomId) => string;
+  /** Draws what you're looking at, and gives back the canvas it's on. */
+  picture: () => HTMLCanvasElement;
 }
 
 export function debug(world: DebugWorld, onOpen: () => void) {
@@ -36,6 +39,7 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     <label><input type="checkbox" id="debug-fly" /> Fly <kbd>F</kbd> <small>Space up, C down</small></label>
     <label><input type="checkbox" id="debug-ghost" /> Walk through anything <kbd>N</kbd></label>
     <label><input type="checkbox" id="debug-open" /> Open every obstacle <kbd>O</kbd></label>
+    <p class="debug-hint">Copy a picture of what you see <kbd>P</kbd></p>
     <label class="debug-speed">Speed <kbd>,</kbd><input type="range" id="debug-speed" min="1" max="10" step="1" value="1" /><kbd>.</kbd><output>1×</output></label>
     <canvas class="debug-map" aria-label="Map: click to jump there"></canvas>
     <div class="debug-places"></div>`;
@@ -87,7 +91,43 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     else if (event.code === "KeyO") flip(open, "Every obstacle open", "Obstacles closed");
     else if (event.code === "Comma") faster(-1);
     else if (event.code === "Period") faster(1);
+    else if (event.code === "KeyP") copyPicture();
   });
+
+  // What you're looking at, to the clipboard: with where you are written in
+  // the corner, so whoever sees it knows where it was taken.
+  function caption() {
+    const p = player.position;
+    const compass = ["north", "north-west", "west", "south-west", "south", "south-east", "east", "north-east"];
+    const turn = (((player.yaw / (Math.PI * 2)) % 1) + 1) % 1;
+    const facing = compass[Math.round(turn * 8) % 8];
+    const under = player.inside ? (player.under?.indoor ? " (indoors)" : " (underground)") : "";
+    return `${world.name(world.room())}${under} · x ${p.x.toFixed(1)} · z ${p.z.toFixed(1)} · height ${p.y.toFixed(1)} · facing ${facing}`;
+  }
+  function copyPicture() {
+    const shot = world.picture();
+    const copy = document.createElement("canvas");
+    copy.width = shot.width;
+    copy.height = shot.height;
+    const pen = copy.getContext("2d")!;
+    pen.drawImage(shot, 0, 0);
+    const size = Math.round(copy.height / 40);
+    pen.font = `${size}px system-ui, sans-serif`;
+    const text = caption();
+    pen.fillStyle = "rgba(0, 0, 0, 0.6)";
+    pen.fillRect(0, copy.height - size * 1.8, pen.measureText(text).width + size * 1.2, size * 1.8);
+    pen.fillStyle = "#fff";
+    pen.fillText(text, size * 0.6, copy.height - size * 0.55);
+    // The picture is promised, not handed over, so Safari still counts the
+    // key press as what asked for the copy.
+    const png = new Promise<Blob>((resolve, reject) =>
+      copy.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("no picture"))), "image/png")
+    );
+    navigator.clipboard
+      .write([new ClipboardItem({ "image/png": png })])
+      .then(() => say("Picture copied: paste it anywhere"))
+      .catch((error: Error) => say(`Couldn't copy the picture (${error.message})`));
+  }
 
   // The map: a pixel for every square metre, north at the top.
   const { grid } = world;
