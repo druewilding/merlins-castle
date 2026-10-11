@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/druewilding/merlins-castle/compare/v2.2.1...v2.3.0) (2026-10-11)
+
+
+### Features
+
+* Make the 3D game initial stages basically playable, with a ladder and a key, and enabling their actions ([#48](https://github.com/druewilding/merlins-castle/issues/48)) ([97117e9](https://github.com/druewilding/merlins-castle/commit/97117e944fcb384a631186675c7437e033952d48))
+
 ## [2.2.1](https://github.com/druewilding/merlins-castle/compare/v2.2.0...v2.2.1) (2026-10-11)
 
 
