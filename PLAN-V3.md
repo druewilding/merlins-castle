@@ -34,6 +34,10 @@ treats the pictures as a view of the game's state, and v3 does the same in 3D:
 
 The world is divided into invisible **regions**, one per room. Crossing from
 one region into another sends the exit of the first that leads to the second.
+The paths and tunnels between places belong to no region: while you walk
+along one, you're still in the place you set off from, and the exit happens
+when you step out at the other end. Turn back halfway and nothing has
+happened.
 Each event that comes back plays something: an animation, a sound, a change in
 the world. So the 72 tests, the walkthrough to 100 points, saving and the
 score all carry over.
@@ -75,20 +79,27 @@ into its picture: the same layout, colours and time of day.
 ## One connected world
 
 Laid out from the grassy bank, with north at the top, the map nearly fits a
-grid as it is:
+grid as it is. The giant sits in the top row, where it's naturally found:
+next to the treasure room and above the damp tunnels, which all fit. The
+forest crossroads lies well south of the old wall, at the end of a long path,
+right beside the witches. A long path between the old stone wall and
+the grassy bank moves the whole north-east one step across, so the deep river
+lies straight north of its south bank, and the castle straight south of the
+grassy bank. The [picture map](https://claude.ai/artifact/9LzdktTaSaPtsdec2Qswq6) draws
+this with every exit and the object it needs.
 
 ```
-tower       oak-door    treasure    .           .           .
-mossy-steps trolls      maze        damp-tun    .           .
-yellow-fl   .           mountain    .           .           .
-rusty-gate  .           mtn-path    .           .           giant
-old-wall    old-stone   GRASSY BANK evergreen   cave-entr   dragon-cave
-forest-x    .           deep-river  .           .           dark-tunnels
-witches+hut forest-edge river-south .           .           beautiful
-.           .           moat        .           .           .
-.           .           courtyard   coach-house .           .
-.           wizards-kit grand-hall  dungeon     .           .
-.           .           merlins-lair small-room .           .
+tower        .            oak-door     treasure     giant        .            .
+mossy-steps  .            trolls       maze         damp-tun     .            .
+yellow-fl    .            .            mountain     .            .            .
+rusty-gate   .            .            mtn-path     .            .            .
+old-wall     old-stone    .            GRASSY BANK  evergreen    cave-entr    dragon-cave
+.            .            .            deep-river   .            .            dark-tunnels
+forest-x     witches      forest-edge  river-south  .            .            beautiful
+charcoal     .            .            moat         .            .            .
+.            .            .            courtyard    coach-house  .            .
+.            .            wizards-kit  grand-hall   dungeon      .            .
+.            .            .            merlins-lair small-room   .            .
 ```
 
 The places needn't be the same size or evenly spaced, and it's fine to walk
@@ -96,20 +107,18 @@ further between them: paths, banks, slopes and tunnel stretches fill the gaps.
 That makes almost every clash go away. Where the grid doesn't fit, the land
 does this:
 
-| Where                                                                | What the land does                                                                                                                                      |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| old-wall west → cave-entrance, cave-entrance south → old-wall (lamp) | **One long dark tunnel under the meadows.** Its west mouth is the old wall's small dark tunnel, its east end the cave entrance's steps. Lamp both ways. |
-| deep-river east → evergreen-glade (one-way)                          | A path along the river bending north-east, ending in a drop down a mossy bank into the glade. You can slide down, not climb back.                       |
-| forest-crossroads ↔ forest-witches, and the charcoal hut             | The forest paths wind: the witches' clearing lies east of the crossroads, the charcoal hut further south in its own clearing.                           |
-| treasure-room, giant, damp-tunnels                                   | **Tunnels at different depths**, passing over and under each other, with steps up and down. The knot under the mountain.                                |
-| dragon-cave north → giant (one-way)                                  | A tunnel that climbs to a ledge and drops into the giant's cave. No way back up.                                                                        |
-| small-room west → merlins-lair (one-way)                             | A door that slams and locks behind you.                                                                                                                 |
-| merlins-lair north → grand-hall (one-way)                            | A hidden door into the hall that closes into the wall behind you.                                                                                       |
-| grand-hall south → grand-hall                                        | **The one true portal.** Walk out of the south door and you walk back in through it, like an Escher staircase.                                          |
-| The six clue rooms                                                   | **The mist** (see below): the edges of the world where you get lost.                                                                                    |
+| Where                                                                | What the land does                                                                                                                                                                                                                |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| old-wall west → cave-entrance, cave-entrance south → old-wall (lamp) | **The long lamp tunnel**, right under the meadows (see below).                                                                                                                                                                    |
+| deep-river east → evergreen-glade (one-way)                          | A path along the river bends north-east, ending in a drop down a mossy bank into the glade. You can slide down, not climb back.                                                                                                   |
+| old-wall south → forest-crossroads                                   | A long path south from the old wall through the trees, **over the forest bridge** (see below), to the crossroads, which sits right beside the witches' clearing. The charcoal hut is south of the crossroads in its own clearing. |
+| dragon-cave north → giant (one-way)                                  | **A long tunnel** under the mountain that comes into the giant's cave through its east entrance. It looks like the way back, but the giant's east exit is a lost one: try it and you get lost in the dark.                        |
+| small-room west → merlins-lair (one-way)                             | A door that slams and locks behind you.                                                                                                                                                                                           |
+| merlins-lair north → grand-hall (one-way)                            | A hidden door into the hall that closes into the wall behind you. From the hall it won't open (the original's "You cannot pass.", which technically leads back into the hall).                                                    |
+| The six clue rooms                                                   | **The mist** (see below): the edges of the world where you get lost.                                                                                                                                                              |
 
-`scripts/map-check.js` (to write) draws this grid from `world.json` and lists
-the clashes, so the table stays true.
+`scripts/map-check.js` (to write) checks this grid against `world.json` and
+lists the clashes, so the table stays true.
 
 **Every missing exit needs a barrier** you believe: a cliff, thick hedge,
 bramble, river, castle wall or rock face. The original just says nothing
@@ -125,6 +134,68 @@ simple low-detail versions until you're close.
 **Loading**: the world is cut into areas (meadows, forest, mountain, tunnels,
 castle) that load in the background as you approach. 34 small places isn't a
 lot for a browser. There's one loading screen, at the start.
+
+### The river
+
+The river runs right across the land, west to east, as the paintings
+already show it: between the meadows to the north and the forest and castle
+to the south.
+
+- **It comes out of the mist** in the far west of the forest. Nobody knows
+  where it starts.
+- **The forest bridge**: the long path south from the old wall crosses it
+  halfway along, on an old wooden bridge among the trees. This is the
+  original's map, not an addition: the old wall's way south has no obstacle,
+  so there was always a free way across. You can reach the castle without the plank by going round
+  through the forest (old wall, crossroads, witches, forest edge, south bank).
+- **It bends north** between the bridge and the deep river, round the misty
+  wood north of the witches, so getting lost that way never reaches the
+  water and needs no second bridge.
+- **The deep river** is where it's narrowest and fastest, with rapids. The
+  plank is the short cut, straight across from the grassy bank's side.
+- **Without the plank**, from the north bank you're swept away downstream
+  (deadly). From the south bank you fall in, and the current pushes you back
+  out (not deadly), as in the original.
+- **It goes underground** in the east, past the evergreen glade, plunging
+  into a dark hole in the rocks. Somewhere in the tunnels below you can hear
+  it roaring. That's also where you'd be swept, if you crossed without the
+  plank.
+
+### The old stone wall
+
+One long wall, as in the paintings, with the rusty gate in it:
+
+- It comes out of the forest south of the old stone wall, where thick trees
+  stop you following it, so you never see where it starts.
+- It runs north between the old stone wall and the old wall (the ladder
+  crossing).
+- It turns west along the rusty gate, and the gate is set in it.
+- It turns north again, up the west side of the yellow flowers, and
+  disappears into the trees.
+- The lamp tunnel passes under its foundations.
+
+### The long lamp tunnel
+
+The old wall's small dark tunnel and the cave entrance's steps are the two
+ends of **one long tunnel, deep underground**, running east under the old
+stone wall, the grassy bank and the evergreen glade. It's a journey of its
+own, about a minute's walk, with only your lamp to see by:
+
+- **The lamp is the light.** Everywhere else the light is baked; here it's a
+  real flickering flame in your hand, throwing moving shadows on the walls.
+- **You pass under places you know.** The great foundation stones of the old
+  stone wall. A crack in the roof with a thin blade of daylight and a
+  glimpse of sky: you're under the grassy bank. Pine roots hanging through
+  the roof under the evergreen glade. Water dripping somewhere. Then steps
+  up, and daylight, and you come out under the cave entrance's mound.
+- **Without the lamp**, the mouth is black. A few steps in, you can't see
+  your hands, you stumble, and you find yourself back at the mouth. (The
+  original's "You can't see." and "It's too dark down there.")
+- **Both ends need the lamp**, as in the original: use it at the old wall to
+  go in from the west, or at the bottom of the cave entrance's steps to go in
+  from the east.
+- **You can turn back.** Halfway along, you're still in the place you set
+  off from, so walking back out the way you came is fine.
 
 ## No words
 
@@ -152,7 +223,7 @@ icons where they can be).
 ### Clues without words
 
 The six clue rooms are where you get lost: the mist at the edges of the world
-(the forest's west and south, the mountain's east, the tunnels' far ends).
+(the forest's west and south, the tunnels' far ends).
 The mist thickens, the world fades, and the clue appears **as a vision**: a
 ghostly little scene in the mist, then the game ends.
 
@@ -193,7 +264,21 @@ One rule covers all of it: **the way is open until you leave the place**,
 exactly as `using` already works. Each place has an "open" and a "closed"
 state per exit, the same list v2 painted (28 effects).
 
-## Carrying things
+## Your hands
+
+You never see yourself, as in the paintings: you're "you". Only your arm and
+hand show, at the bottom right, holding whatever is in the chosen slot, like
+the weapon in Counter-Strike.
+
+- **One arm, a few poses**: a sleeve and a gloved hand (no skin to choose),
+  holding out, raising, swinging (the axe), throwing (the water), playing (the
+  harp), and both hands on the rungs when climbing.
+- **It sways as you walk** and settles when you stop.
+- **Drawn on its own layer**, so it never pokes into walls.
+- **The lamp's flame is the light** in dark places, so the light moves with
+  your hand.
+- **The mirror** is the one place you might glimpse yourself. It shows the
+  old woman, not you: you hold it up to her, not to your face.
 
 - Five slots, keys **1–5**, like a weapon hotbar. The held object shows in your
   hand at the bottom right, Counter-Strike style.
@@ -226,7 +311,7 @@ state per exit, the same list v2 painted (28 effects).
 src/engine/        unchanged: the judge
 src/three/         the 3D version
   main.ts          boot, loading screen
-  world.ts         streams areas (.glb) in and out, the grand hall's portal
+  world.ts         streams areas (.glb) in and out
   regions.ts       which place you're standing in; crossing one sends `go`
   player.ts        Rapier character controller, mouse look, touch sticks
   places.ts        per place: open/closed states, object spots, barriers
@@ -243,7 +328,7 @@ The title screen gets a third choice next to Classic and Illustrated.
 
 **Claude** can do most of the building:
 
-- All the TypeScript: the 3D app, player, regions, streaming, the portal,
+- All the TypeScript: the 3D app, player, regions, streaming,
   touch controls, and wiring the engine in. Tested with Playwright and
   screenshots, as with v2.
 - **Blender through Python**: Claude writes scripts that build terrain,
@@ -279,9 +364,9 @@ and wings) may need a bought or free model.
    the ladder (where v2 began), fully modelled, textured and lit. **Then
    decide** whether the look works and how long a place takes.
 4. **The meadows and forest**: the trees growing back, the witches, the mist.
-5. **Underground**: the long lamp tunnel, the dragon, the giant, the maze, the
-   treasure room, the knot of tunnels.
-6. **The castle**: moat, courtyard, grand hall and its portal, goblins,
+5. **Underground**: the long lamp tunnel, the dragon, the long tunnel to the
+   giant, the maze, the treasure room.
+6. **The castle**: moat, courtyard, grand hall and its goblins,
    kitchen, dungeon, Merlin's lair.
 7. **Deaths, visions, winning, sound**: music and fx carry over, plus
    footsteps, chopping and creaks.
@@ -291,5 +376,4 @@ and wings) may need a bought or free model.
 
 - **How much action?** Puzzles only (the original), or a little danger: the
   dragon's fire, a goblin that chases you. Suggest: puzzles only at first.
-- **Is the player seen?** Hands only, like Counter-Strike (suggested).
 - **Name**: a third button on the title screen, or its own page (`/3d`).
