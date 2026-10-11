@@ -72,6 +72,21 @@ export interface Under {
   indoor?: boolean;
 }
 
+/**
+ * Which of an obstacle's exits you'd be going through it by, from a spot: its
+ * names say which way they go ("moat south" is from its north side). From a
+ * side with no name, it isn't in your way: a one-way exit.
+ */
+export function wayThrough(names: string[], ox: number, oz: number, x: number, z: number) {
+  return names.find((name) => {
+    const direction = name.split(" ")[1];
+    if (direction === "north") return z > oz;
+    if (direction === "south") return z < oz;
+    if (direction === "east") return x < ox;
+    return x > ox;
+  });
+}
+
 /** How far a spot is from the middle of a way, its floor there, and whether it's past an end. */
 export function nearest(way: Way, x: number, z: number) {
   let best = { d: Infinity, floor: 0, beyond: false };
@@ -125,10 +140,8 @@ export class Player {
   halls = new Map<string, Hall>();
   /** Where you are underground, if you are. */
   under: Under | undefined;
-  /** Whether an obstacle (by its names) is in the way out of where you are: only then does it reach out and bounce you back. */
-  inTheWay: (names: string[]) => boolean = () => true;
-  /** Called when you bounce off an obstacle that's in your way, with its names. */
-  onBump: (names: string[]) => void = () => {};
+  /** Called when you bounce off an obstacle, with the exit you were trying ("moat south"). */
+  onBump: (exit: string) => void = () => {};
 
   private keys = new Set<string>();
   private ground: Ground = () => 0;
@@ -138,6 +151,9 @@ export class Player {
   private stick = { x: 0, y: 0 }; // the thumb's walking stick, -1 to 1
   private bob = 0;
   private knock = { x: 0, z: 0 }; // bouncing back off an obstacle
+  // One-way obstacles you're going through the free way, until you're out of their reach.
+  private passing = new Set<Circle | Box>();
+  private wasInside = false;
 
   constructor(private element: HTMLElement) {
     addEventListener("keydown", (event) => this.keys.add(event.code));
@@ -167,6 +183,7 @@ export class Player {
   solid(circles: Circle[], boxes: Box[], under = false) {
     const near = under ? this.nearUnder : this.near;
     near.clear();
+    this.passing.clear();
     // Adds a thing to every square it (or you, touching it) could be in.
     const file = (x0: number, x1: number, z0: number, z1: number, add: (found: Near) => void) => {
       for (let i = Math.floor((x0 - 1) / CELL); i <= Math.floor((x1 + 1) / CELL); i++) {
@@ -352,41 +369,61 @@ export class Player {
     if (this.ghost) return this.keepInside();
     const square = `${Math.floor(p.x / CELL)},${Math.floor(p.z / CELL)}`;
     const near = (this.under ? this.nearUnder : this.near).get(square) ?? { circles: [], boxes: [] };
+    // Coming up out of a tunnel, you're going through its mouth the free way.
+    const cameOut = this.wasInside && !this.under;
+    this.wasInside = this.inside;
     for (const c of near.circles) {
-      const inTheWay = c.names !== undefined && this.inTheWay(c.names);
       const dx = p.x - c.x;
       const dz = p.z - c.z;
       const d = Math.hypot(dx, dz);
-      const min = c.r + (inTheWay ? (c.ahead ?? 0) : 0) + BODY;
+      const min = c.r + (c.ahead ?? 0) + BODY;
+      const exit = this.blocking(c, d < min, cameOut);
+      if (exit === null) continue;
       if (d < min && d > 0.0001) {
         p.x = c.x + (dx / d) * min;
         p.z = c.z + (dz / d) * min;
-        if (inTheWay) this.bounce(c.names!, dx / d, dz / d);
+        if (exit) this.bounce(exit, dx / d, dz / d);
       }
     }
     for (const b of near.boxes) {
-      const inTheWay = b.names !== undefined && this.inTheWay(b.names);
-      const reach = inTheWay ? (b.ahead ?? 0) : 0;
+      const reach = b.ahead ?? 0;
       const dx = p.x - b.x;
       const dz = p.z - b.z;
       const ox = b.halfX + (b.halfX < b.halfZ ? reach : 0) + BODY - Math.abs(dx);
       const oz = b.halfZ + (b.halfX < b.halfZ ? 0 : reach) + BODY - Math.abs(dz);
+      const exit = this.blocking(b, ox > 0 && oz > 0, cameOut);
+      if (exit === null) continue;
       if (ox > 0 && oz > 0) {
         // Out the side you came in by (so coming at an obstacle from the side, you slide off it).
         const alongX = ox < oz;
         if (alongX) p.x += Math.sign(dx) * ox;
         else p.z += Math.sign(dz) * oz;
-        if (inTheWay) this.bounce(b.names!, alongX ? Math.sign(dx) : 0, alongX ? 0 : Math.sign(dz));
+        if (exit) this.bounce(exit, alongX ? Math.sign(dx) : 0, alongX ? 0 : Math.sign(dz));
       }
     }
     this.keepInside();
   }
 
+  // What a solid thing does to you: an obstacle in your way blocks you (and
+  // says which exit you were trying); one you're going through the free way
+  // doesn't (null), all the way through, even past its middle; anything else
+  // just blocks you ("").
+  private blocking(thing: Circle | Box, within: boolean, cameOut: boolean): string | null {
+    if (!thing.names) return "";
+    if (!this.passing.has(thing) && !(cameOut && within)) {
+      const exit = wayThrough(thing.names, thing.x, thing.z, this.position.x, this.position.z);
+      if (exit) return exit;
+    }
+    if (within) this.passing.add(thing);
+    else this.passing.delete(thing);
+    return null;
+  }
+
   // Off an obstacle, the way you came (once, until you've stopped).
-  private bounce(names: string[], nx: number, nz: number) {
+  private bounce(exit: string, nx: number, nz: number) {
     if (Math.hypot(this.knock.x, this.knock.z) > 0.5) return;
     this.knock = { x: nx * BOUNCE, z: nz * BOUNCE };
-    this.onBump(names);
+    this.onBump(exit);
   }
 
   // The edge of the world.

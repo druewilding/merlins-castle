@@ -391,7 +391,7 @@ and wings) may need a bought or free model.
    - **Obstacles speak** ✅: walk up to one and you bounce back 5 m before
      it (so you can see what's in your way), with the original's words for it
      at the bottom of the screen ("The trees are too dense."), in English or
-     Danish, for the exit you're trying from the place you're in.
+     Danish, for the exit you're trying. One-way, as in the original.
    - **The game**: objects to take and use, the obstacles opening, deaths,
      the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and
@@ -458,12 +458,16 @@ and wings) may need a bought or free model.
 - **An obstacle is one shape with the names of every exit it blocks**: the
   gate is "rusty-gate north" and "yellow-flowers south", and the old stone
   wall between the old wall and the old stone wall is an obstacle too (for the
-  ladder). Only an obstacle in the way out of the place you're in reaches 5 m
-  out (front and back, not along the wall it's in), bounces you back and says
-  its blocked message, or the exit's own message, or "You can't go that way."
-  From the other side of a one-way door, it's only the doorway. The tunnels'
-  mouths (the leaves, the lamp tunnel's dark) are obstacles on the land, at
-  the top of the ramp, so you're stopped before you go down.
+  ladder). An obstacle only stops you going the way its exits go: "moat
+  south" is the drawbridge from the moat, and from the courtyard you walk
+  straight out over it (as the original's one-way exits). In your way, it
+  reaches 5 m out (front and back, not along the wall it's in), bounces you
+  back and says its blocked message, or the exit's own message, or "You can't
+  go that way." So a one-way obstacle's far side must only be reachable from
+  that side (the drawbridge's is over the middle of the water). The tunnels'
+  mouths (the leaves, the lamp tunnel's dark) are obstacles on the land, 3 m
+  down the ramp and reaching out over the top, so you're stopped before you go
+  down; coming up out of a tunnel, you're going through them the free way.
 - **Obstacles underground** block only the ways (`"under": true`), so the
   old stone wall over the lamp tunnel doesn't stop you down below. The test
   walks the ways and halls too, with every obstacle closed and every one open.

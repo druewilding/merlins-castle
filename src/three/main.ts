@@ -232,7 +232,8 @@ else player.place(start.x, start.z + 12, 0);
 let room = player.under?.hall ?? placeAt(player.position.x, player.position.z, "grassy-bank", player.halls);
 
 // Walking into an obstacle, the original's words for it at the bottom of the
-// screen: what it says when you try that exit from the place you're in.
+// screen: what it says when you try that exit (the way you were going
+// through it: an obstacle only stops you going the way its exits go).
 const english = worldJson as unknown as World;
 const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
 const said = document.createElement("p");
@@ -240,13 +241,7 @@ said.className = "said";
 said.setAttribute("aria-live", "polite");
 root.append(said);
 let quiet = 0;
-// Only an obstacle in the way out of the place you're in reaches out, bounces
-// you back and says what's wrong: from the other side of a one-way door, it's
-// just the doorway.
-const inTheWay = (names: string[]) => names.find((name) => name.startsWith(`${room} `));
-player.inTheWay = (names) => inTheWay(names) !== undefined;
-player.onBump = (names) => {
-  const exit = inTheWay(names)!;
+player.onBump = (exit) => {
   const [id, direction] = exit.split(" ");
   const way = world.rooms[id]?.exits[direction as Direction];
   const words = way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo;

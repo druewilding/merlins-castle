@@ -659,7 +659,9 @@ for side in (-1, 1):
     block(built, BRIDGE[0] + side * 2.4 - 0.15, BRIDGE[1] - 9, 0.9, BRIDGE[0] + side * 2.4 + 0.15, BRIDGE[1] + 9, 1.9,
           c.linear("#6b4426"))
 block(built, -3, -143 * K, 0.2, 3, -127 * K, 0.6, c.linear("#7a5230"), solid=False)
-obstacle(["moat south"], "box", 0, 129 * K, 3.2, 1.5)  # the drawbridge is up
+# The drawbridge is up: over the middle of the water, so its far half (where
+# you can walk out of the courtyard) is only on the bridge.
+obstacle(["moat south"], "box", 0, -(MOAT[3] + CASTLE[3] + 2) / 2, 3.2, 1.5)
 
 # The old stone wall: north from the forest, west along the gate, north again.
 WALL = 4.5

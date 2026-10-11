@@ -2,13 +2,16 @@
 // obstacle closed (no ladder, no key, no axe…), you walk the land from a place
 // and see which places you reach: a gap in the forest or the walls shows up
 // here as a place you shouldn't be able to get to. The same underground, along
-// the ways and through the halls.
+// the ways and through the halls. Obstacles only stop you going the way their
+// exits go, as in the game: the drawbridge is up from the moat, but you can
+// walk out of the courtyard.
 
 import { describe, expect, it } from "vitest";
 
 import layout from "../art/blender/layout.json";
 import landBin from "../src/three/models/land.bin?inline";
 import land from "../src/three/models/land.json";
+import { wayThrough } from "../src/three/player";
 
 const BODY = 0.35; // as in src/three/player.ts
 const STEP = 0.5;
@@ -36,13 +39,54 @@ const walkable = (x: number, z: number) => {
 };
 
 type Solid = { circle: number[] } | { box: number[] };
-type Obstacle = Solid & { under?: boolean };
-const obstacles = (Object.values(land.obstacles) as Obstacle[]).map((obstacle): Obstacle => {
-  if ("circle" in obstacle)
-    return { ...obstacle, circle: [...obstacle.circle.slice(0, 2), obstacle.circle[2] + AHEAD] };
-  const [x, z, hx, hz] = obstacle.box;
-  return { ...obstacle, box: hx < hz ? [x, z, hx + AHEAD, hz] : [x, z, hx, hz + AHEAD] };
-});
+type Obstacle = Solid & { under?: boolean; names: string[] };
+// One shape for each obstacle, with the names of every exit it blocks, and
+// how far it reaches out.
+const obstacles: Obstacle[] = [];
+for (const [exit, obstacle] of Object.entries(land.obstacles) as [string, Solid & { under?: boolean }][]) {
+  const same = obstacles.find(
+    (other) =>
+      JSON.stringify("box" in other ? other.box : other.circle) ===
+      JSON.stringify(
+        "box" in obstacle ? reaching(obstacle.box) : [...obstacle.circle.slice(0, 2), obstacle.circle[2] + AHEAD]
+      )
+  );
+  if (same) same.names.push(exit);
+  else if ("circle" in obstacle)
+    obstacles.push({
+      ...obstacle,
+      circle: [...obstacle.circle.slice(0, 2), obstacle.circle[2] + AHEAD],
+      names: [exit],
+    });
+  else obstacles.push({ ...obstacle, box: reaching(obstacle.box), names: [exit] });
+}
+function reaching([x, z, hx, hz]: number[]) {
+  return hx < hz ? [x, z, hx + AHEAD, hz] : [x, z, hx, hz + AHEAD];
+}
+const within = (solid: Solid, x: number, z: number) => {
+  if ("circle" in solid) return Math.hypot(x - solid.circle[0], z - solid.circle[1]) < solid.circle[2] + BODY;
+  const [bx, bz, hx, hz] = solid.box;
+  return Math.abs(x - bx) < hx + BODY && Math.abs(z - bz) < hz + BODY;
+};
+
+/**
+ * Stepping to a spot among obstacles, going through some of them already (a
+ * bit for each): those you're now going through, or undefined if one stops
+ * you. Going into an obstacle's reach from a side its exits go from stops
+ * you; from any other side, you go all the way through it.
+ */
+function crossing(shapes: Obstacle[]) {
+  return (x: number, z: number, through: number) => {
+    let next = 0;
+    for (const [k, shape] of shapes.entries()) {
+      if (!within(shape, x, z)) continue;
+      const [ox, oz] = "box" in shape ? shape.box : shape.circle;
+      if (!(through & (1 << k)) && wayThrough(shape.names, ox, oz, x, z)) return undefined;
+      next |= 1 << k;
+    }
+    return next;
+  };
+}
 
 function sorted(solids: Solid[]) {
   const buckets = new Map<string, Solid[]>();
@@ -56,37 +100,35 @@ function sorted(solids: Solid[]) {
     }
   }
   return (x: number, z: number) =>
-    (buckets.get(`${Math.floor(x / 8)},${Math.floor(z / 8)}`) ?? []).some((solid) => {
-      if ("circle" in solid) return Math.hypot(x - solid.circle[0], z - solid.circle[1]) < solid.circle[2] + BODY;
-      const [bx, bz, hx, hz] = solid.box;
-      return Math.abs(x - bx) < hx + BODY && Math.abs(z - bz) < hz + BODY;
-    });
+    (buckets.get(`${Math.floor(x / 8)},${Math.floor(z / 8)}`) ?? []).some((solid) => within(solid, x, z));
 }
 
-const solidOnLand = sorted([
-  ...land.circles.map((circle) => ({ circle })),
-  ...land.boxes.map((box) => ({ box })),
-  ...obstacles.filter((obstacle) => !obstacle.under),
-]);
+const solidOnLand = sorted([...land.circles.map((circle) => ({ circle })), ...land.boxes.map((box) => ({ box }))]);
 const free = (x: number, z: number) => walkable(x, z) && !solidOnLand(x, z);
+const onLand = obstacles.filter((obstacle) => !obstacle.under);
+const crossOnLand = crossing(onLand);
 
 function reachable(from: string) {
   const start = places.find((place) => place.id === from)!;
   const [west, east, south, north] = land.bounds;
   const nx = Math.round((east - west) / STEP);
   const nz = Math.round((north - south) / STEP);
-  const seen = new Uint8Array(nx * nz);
-  const queue = [[Math.round((start.x - west) / STEP), Math.round((start.z + north) / STEP)]];
+  const seen = new Set<number>();
+  const queue = [[Math.round((start.x - west) / STEP), Math.round((start.z + north) / STEP), 0]];
   const reached = new Set<string>();
   while (queue.length) {
-    const [i, j] = queue.pop()!;
-    if (i < 0 || j < 0 || i >= nx || j >= nz || seen[j * nx + i]) continue;
-    seen[j * nx + i] = 1;
+    const [i, j, before] = queue.pop()!;
+    if (i < 0 || j < 0 || i >= nx || j >= nz) continue;
     const x = west + i * STEP;
     const z = -north + j * STEP;
     if (!free(x, z)) continue;
+    const through = crossOnLand(x, z, before);
+    if (through === undefined) continue;
+    const key = through * nx * nz + j * nx + i;
+    if (seen.has(key)) continue;
+    seen.add(key);
     for (const place of places) if (Math.hypot(x - place.x, z - place.z) < 6) reached.add(place.id);
-    queue.push([i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]);
+    queue.push([i + 1, j, through], [i - 1, j, through], [i, j + 1, through], [i, j - 1, through]);
   }
   return [...reached].sort();
 }
@@ -103,29 +145,33 @@ describe("the 3D land, with every obstacle closed", () => {
     ]);
   });
 
+  const fromTheOldWall = [
+    "charcoal-hut",
+    "forest-crossroads",
+    "forest-edge",
+    "forest-witches",
+    "moat",
+    "old-wall",
+    "river-south-bank",
+    "rusty-gate",
+  ];
+
   it("joins the old wall to the forest and the moat, over the bridge", () => {
-    expect(reachable("old-wall")).toEqual([
-      "charcoal-hut",
-      "forest-crossroads",
-      "forest-edge",
-      "forest-witches",
-      "moat",
-      "old-wall",
-      "river-south-bank",
-      "rusty-gate",
-    ]);
+    expect(reachable("old-wall")).toEqual(fromTheOldWall);
   });
 
   it("keeps the yellow flowers, the mossy steps and the tower behind the locked gate", () => {
     expect(reachable("yellow-flowers")).toEqual(["mossy-steps", "tower", "yellow-flowers"]);
   });
 
-  it("keeps the mountain top above the dense trees", () => {
-    expect(reachable("mountain")).not.toContain("mountain-path");
+  it("lets you down from the mountain top, but not up through the dense trees", () => {
+    expect(reachable("mountain")).toContain("mountain-path");
+    expect(reachable("mountain-path")).not.toContain("mountain");
   });
 
-  it("keeps the courtyard behind the drawbridge", () => {
-    expect(reachable("courtyard")).toEqual(["courtyard"]);
+  it("lets you out of the courtyard, but not back in over the drawbridge", () => {
+    expect(reachable("courtyard")).toEqual(["courtyard", ...fromTheOldWall].sort());
+    expect(reachable("old-wall")).not.toContain("courtyard");
   });
 });
 
@@ -157,9 +203,8 @@ const inHall = (hall: Hall, x: number, z: number) =>
 
 /** From a hall, or from a spot along a way: [x, z, floor]. */
 function underground(from: string | number[], open: boolean) {
-  const blocked = sorted(
-    open ? [] : [...obstacles.filter((obstacle) => obstacle.under), ...land.under.circles.map((circle) => ({ circle }))]
-  );
+  const blocked = sorted(land.under.circles.map((circle) => ({ circle })));
+  const cross = crossing(open ? [] : obstacles.filter((obstacle) => obstacle.under));
   // Every spot you could stand on, on every floor: x, z and the floor's height.
   const floorsAt = (x: number, z: number) => {
     const floors: { floor: number; hall?: string }[] = [];
@@ -172,7 +217,8 @@ function underground(from: string | number[], open: boolean) {
     }
     return blocked(x, z) ? [] : floors;
   };
-  // From the hall's middle, or beside it if something stands there (the dungeon's well).
+  // From the hall's middle, or beside it if something stands there (the dungeon's
+  // well) or it's in an obstacle's reach.
   const [x0, z0, floor0] =
     typeof from === "string" ? [land.halls[from as keyof typeof land.halls]].map((h) => [h.x, h.z, h.floor])[0] : from;
   const [dx, dz] = [
@@ -181,17 +227,19 @@ function underground(from: string | number[], open: boolean) {
     [2.5, 0],
     [0, -2.5],
     [-2.5, 0],
-  ].find(([dx, dz]) => floorsAt(x0 + dx, z0 + dz).length > 0)!;
-  const queue = [[Math.round((x0 + dx) / STEP), Math.round((z0 + dz) / STEP), floor0]];
+  ].find(([dx, dz]) => floorsAt(x0 + dx, z0 + dz).length > 0 && cross(x0 + dx, z0 + dz, 0) === 0)!;
+  const queue = [[Math.round((x0 + dx) / STEP), Math.round((z0 + dz) / STEP), floor0, 0]];
   const seen = new Set<string>();
   const reached = new Set<string>();
   while (queue.length) {
-    const [i, j, floor] = queue.pop()!;
+    const [i, j, floor, before] = queue.pop()!;
     const x = i * STEP;
     const z = j * STEP;
     const here = floorsAt(x, z).find((spot) => Math.abs(spot.floor - floor) < CLIMB);
     if (!here) continue;
-    const key = `${i},${j},${Math.round(here.floor)}`;
+    const through = cross(x, z, before);
+    if (through === undefined) continue;
+    const key = `${i},${j},${Math.round(here.floor)},${through}`;
     if (seen.has(key)) continue;
     seen.add(key);
     if (here.hall) reached.add(here.hall);
@@ -200,9 +248,8 @@ function underground(from: string | number[], open: boolean) {
       for (const end of [way.points[0], way.points.at(-1)!]) {
         const mouth =
           Math.abs(groundAt(end[0], end[1]) - end[2]) < 0.6 && !halls.some(([, hall]) => inHall(hall, end[0], end[1]));
-        // (Unless an obstacle on the land stands in the mouth: the leaves, the dark.)
-        const shut = !open && solidOnLand(end[0], end[1]);
-        if (mouth && !shut && Math.hypot(x - end[0], z - end[1]) < 1 && Math.abs(end[2] - here.floor) < CLIMB) {
+        // (Coming out, you're going through an obstacle in the mouth the free way.)
+        if (mouth && Math.hypot(x - end[0], z - end[1]) < 1 && Math.abs(end[2] - here.floor) < CLIMB) {
           const outside = places.filter((place) => !(place.id in land.halls));
           reached.add(
             outside.reduce((a, b) => (Math.hypot(a.x - x, a.z - z) < Math.hypot(b.x - x, b.z - z) ? a : b)).id
@@ -210,25 +257,32 @@ function underground(from: string | number[], open: boolean) {
         }
       }
     }
-    queue.push([i + 1, j, here.floor], [i - 1, j, here.floor], [i, j + 1, here.floor], [i, j - 1, here.floor]);
+    queue.push(
+      [i + 1, j, here.floor, through],
+      [i - 1, j, here.floor, through],
+      [i, j + 1, here.floor, through],
+      [i, j - 1, here.floor, through]
+    );
   }
   return [...reached].sort();
 }
 
 describe("underground, with every obstacle closed", () => {
-  it("lets you into the caves from the maze, but no further than the trolls and the damp tunnels", () => {
+  // (Going north from the dark tunnels, the dragon's cave, the damp tunnels
+  // and the treasure room is free: only the other way needs the water, the
+  // broom, the key or the cake. And out of the dragon's cave past the leaves.)
+  const pastTheDragon = ["cave-entrance", "dragon-cave", "giant"];
+
+  it("keeps the trolls in their cave, and the deep hole between the treasure room and the maze", () => {
     expect(underground("trolls", false)).toEqual(["maze", "trolls"]);
-    expect(underground("damp-tunnels", false)).toEqual(["damp-tunnels", "maze"]);
+    expect(underground("damp-tunnels", false)).toEqual(["damp-tunnels", "maze", ...pastTheDragon].sort());
+    expect(underground("treasure-room", false)).toEqual(["oak-door", "treasure-room", ...pastTheDragon].sort());
   });
 
-  it("keeps the deep hole between the treasure room and the maze, and the giant in his cave", () => {
-    expect(underground("treasure-room", false)).toEqual(["oak-door", "treasure-room"]);
-    expect(underground("giant", false)).toEqual(["dragon-cave", "giant"]);
-  });
-
-  it("keeps the leaves in the dragon's way, and its fire, and the dark", () => {
-    expect(underground("dragon-cave", false)).toEqual(["dragon-cave", "giant"]);
-    expect(underground("dark-tunnels", false)).toEqual(["dark-tunnels"]);
+  it("keeps the giant's padlocked way south, and the leaves, the fire and the dark in your way", () => {
+    expect(underground("giant", false)).toEqual(pastTheDragon);
+    expect(underground("dragon-cave", false)).toEqual(pastTheDragon);
+    expect(underground("dark-tunnels", false)).toEqual(["dark-tunnels", ...pastTheDragon].sort());
   });
 });
 
@@ -237,7 +291,19 @@ describe("the long lamp tunnel", () => {
   const middle = points[Math.floor(points.length / 2)];
 
   it("is too dark to go into from either end without the lamp", () => {
-    expect(underground(middle, false)).toEqual([]);
+    // A step from the land on to the top of each ramp.
+    for (const [end, next] of [
+      [points[0], points[1]],
+      [points.at(-1)!, points.at(-2)!],
+    ]) {
+      const d = Math.hypot(next[0] - end[0], next[1] - end[1]);
+      const [x, z] = [end[0] - (next[0] - end[0]) / d, end[1] - (next[1] - end[1]) / d];
+      expect(crossOnLand(x, z, 0)).toBeUndefined();
+    }
+  });
+
+  it("lets you walk out of either end", () => {
+    expect(underground(middle, false)).toEqual(["cave-entrance", "old-wall"]);
   });
 
   it("joins the old wall and the cave entrance, with it", () => {
@@ -251,10 +317,13 @@ describe("in the castle, with every obstacle closed", () => {
     expect(underground("coach-house", false)).toEqual(["coach-house", "courtyard"]);
   });
 
-  it("keeps the goblins, Merlin, the old woman and the doors in the corridors", () => {
-    for (const room of ["wizards-kitchen", "dungeon", "small-room", "merlins-lair"]) {
-      expect(underground(room, false)).toEqual([room]);
-    }
+  it("keeps the goblins, Merlin, the old woman and the doors in the corridors, one way", () => {
+    expect(underground("wizards-kitchen", false)).toEqual(["wizards-kitchen"]);
+    expect(underground("merlins-lair", false)).toEqual(["merlins-lair"]);
+    // West from the dungeon to the hall, and north and west from the small room.
+    const outOfTheDungeon = ["courtyard", "dungeon", "grand-hall"];
+    expect(underground("dungeon", false)).toEqual(outOfTheDungeon);
+    expect(underground("small-room", false)).toEqual([...outOfTheDungeon, "merlins-lair", "small-room"].sort());
   });
 });
 
