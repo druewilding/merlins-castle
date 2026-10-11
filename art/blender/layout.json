@@ -1,6 +1,6 @@
 {
   "_": "Where every place is in the 3D world: [column, row] on the grid in PLAN-V3.md (row 0 is the north). Each step is `spacing` metres. Shared by the Blender scripts and the game.",
-  "spacing": 40,
+  "spacing": 30,
   "origin": [3, 4],
   "places": {
     "tower": [0, 0],

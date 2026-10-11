@@ -23,23 +23,23 @@ export const PLACES = new Map<RoomId, Spot>(entries(layout.places).map(([id, cr]
 const CAVES = new Set(layout.kinds.cave);
 const underground = (exit: string) => CAVES.has(exit.split(" ")[0]);
 
-/** Where you get lost in the mist above ground (underground comes later). */
-export const LOST = entries(layout.lost)
-  .filter(([exit]) => !underground(exit))
-  .map(([exit, cr]) => ({ exit, ...spot(cr) }));
+/** Where you get lost in the mist: above ground, or along a way underground. */
+export const LOST = entries(layout.lost).map(([exit, cr]) => ({ exit, under: underground(exit), ...spot(cr) }));
 export const DEATHS = entries(layout.deaths).map(([exit, cr]) => ({ exit, ...spot(cr) }));
 
 /** How near a place's middle you have to be to be in it. */
 const REACH = 17;
 
 /**
- * The place you're in. Between places, along a path or a tunnel, you're
- * still in the one you came from, as PLAN-V3.md says.
+ * The place you're in, on the land. Between places, along a path or a
+ * tunnel, you're still in the one you came from, as PLAN-V3.md says. Places
+ * you can only be in through a door or a cave's mouth (`inside`) don't count.
  */
-export function placeAt(x: number, z: number, current: RoomId): RoomId {
+export function placeAt(x: number, z: number, current: RoomId, inside: { has(id: string): boolean }): RoomId {
   let best = current;
   let nearest = REACH;
   for (const [id, p] of PLACES) {
+    if (inside.has(id)) continue;
     const d = Math.hypot(x - p.x, z - p.z);
     if (d < nearest) {
       nearest = d;

@@ -18,6 +18,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   PCFShadowMap,
+  PointLight,
   Scene,
   Sprite,
   SpriteMaterial,
@@ -29,11 +30,17 @@ import {
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
+import daJson from "../../data/da.json";
+import worldJson from "../../data/world.json";
+import { messages } from "../engine/engine";
+import { localise, type WorldText } from "../engine/localise";
+import type { Direction, World } from "../engine/types";
+import { LANGUAGE } from "../shared/strings";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
 import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
-import { type Box, type Circle, type Ground, Player, type Walkable } from "./player";
+import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable } from "./player";
 import { sky } from "./sky";
 
 const HAZE = new Color("#d9dcc4");
@@ -52,9 +59,20 @@ renderer.shadowMap.type = PCFShadowMap;
 root.append(renderer.domElement);
 
 const scene = new Scene();
-scene.fog = new Fog(HAZE, 40, 320);
+const fog = new Fog(HAZE, 40, 320);
+scene.fog = fog;
 scene.add(sky(SUN, HAZE));
-scene.add(new HemisphereLight("#cfe2ff", "#6d7a3c", 1.25));
+const skylight = new HemisphereLight("#cfe2ff", "#6d7a3c", 1.25);
+scene.add(skylight);
+
+// Underground, the daylight fades and a warm lamp glow takes over (one day,
+// only if you've lit the lamp).
+const lamp = new PointLight("#ffb866", 0, 16, 1.6);
+scene.add(lamp);
+// And some caves have their own light: torches, the dragon's fire, gold.
+const caveLight = new PointLight("#ffa24a", 0, 30, 1.2);
+scene.add(caveLight);
+const DARK = new Color("#0b0806");
 
 const sunlight = new DirectionalLight("#ffdcae", 2.8);
 sunlight.castShadow = true;
@@ -80,7 +98,7 @@ const [model, file] = await Promise.all([
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
-  node.castShadow = !["ground", "paths", "water"].includes(node.name);
+  node.castShadow = !["paths", "water"].includes(node.name);
   node.receiveShadow = node.name !== "water";
 });
 scene.add(model.scene);
@@ -107,17 +125,49 @@ const walkable: Walkable = (x, z) => {
   return i >= 0 && j >= 0 && i < mask.nx && j < mask.ny && standable[j * mask.nx + i] === 1;
 };
 player.standOn(ground, walkable);
+player.ways = Object.values(land.ways);
+const halls = land.halls as Record<string, Hall & { tall: number; light?: string; glow?: number }>;
+player.halls = new Map(Object.entries(halls));
 
 // Solid things, and the obstacles (all closed, until the game can open them).
 const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
-const obstacles = land.obstacles as Record<string, { box?: number[]; circle?: number[] }>;
+type Obstacle = { box?: number[]; circle?: number[]; under?: boolean };
+const obstacles = land.obstacles as Record<string, Obstacle>;
+const underCircles: Circle[] = land.under.circles.map(([x, z, r]) => ({ x, z, r }));
+const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
+// You bump into an obstacle in your way this far before it, so you can see
+// what it is (and know there's something to do here).
+const AHEAD = 5;
+// One shape for each obstacle, with the names of every exit it blocks (a gate
+// blocks the way through from both sides).
+const shapes = new Map<string, Obstacle & { names: string[] }>();
+for (const [exit, obstacle] of Object.entries(obstacles)) {
+  const key = JSON.stringify(obstacle);
+  const shape = shapes.get(key) ?? { ...obstacle, names: [] };
+  shape.names.push(exit);
+  shapes.set(key, shape);
+}
 function openObstacles(open: boolean) {
-  const closed = open ? [] : Object.values(obstacles);
-  player.solid(
-    [...circles, ...closed.flatMap(({ circle }) => (circle ? [{ x: circle[0], z: circle[1], r: circle[2] }] : []))],
-    [...boxes, ...closed.flatMap(({ box }) => (box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3] }] : []))]
-  );
+  for (const under of [false, true]) {
+    const closed = open ? [] : [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
+    // The obstacles first, so you bump into them before any wall they stand in.
+    player.solid(
+      [
+        ...closed.flatMap(({ circle, names }) =>
+          circle ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: AHEAD }] : []
+        ),
+        ...(under ? underCircles : circles),
+      ],
+      [
+        ...closed.flatMap(({ box, names }) =>
+          box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names, ahead: AHEAD }] : []
+        ),
+        ...(under ? underBoxes : boxes),
+      ],
+      under
+    );
+  }
 }
 openObstacles(false);
 const [west, east, south, north] = land.bounds;
@@ -126,7 +176,15 @@ player.bounds = { west, east, north: -north, south: -south };
 // Mist where you'd get lost, and red where a way through kills you.
 const mist = new MeshBasicMaterial({ color: "#f4f6f8", transparent: true, opacity: 0.55, depthWrite: false });
 const danger = new MeshBasicMaterial({ color: "#d9503f", transparent: true, opacity: 0.5, depthWrite: false });
-for (const { x, z } of LOST) {
+for (const { x, z, under } of LOST) {
+  if (under) {
+    // In the tunnel, where it runs out into the dark.
+    const way = player.ways.reduce((a, b) => (nearest(a, x, z).d < nearest(b, x, z).d ? a : b));
+    const cloud = new Mesh(new CylinderGeometry(3, 3, 3.4, 24, 1, true), mist);
+    cloud.position.set(x, nearest(way, x, z).floor + 1.7, z);
+    scene.add(cloud);
+    continue;
+  }
   const cloud = new Mesh(new CylinderGeometry(10, 10, 10, 24, 1, true), mist);
   cloud.position.set(x, (ground(x, z) ?? 0) + 5, z);
   scene.add(cloud);
@@ -162,20 +220,45 @@ for (const [id, { x, z }] of PLACES) {
   labels.add(label);
 }
 scene.add(labels);
+let showLabels = true;
 addEventListener("keydown", (event) => {
-  if (event.code === "KeyL") labels.visible = !labels.visible;
+  if (event.code === "KeyL") showLabels = !showLabels;
 });
 
 const start = PLACES.get("grassy-bank")!;
 const at = new URLSearchParams(location.search).get("at")?.split(",").map(Number);
 if (at && at.length >= 2) player.place(at[0], at[1], ((at[2] ?? 0) * Math.PI) / 180);
 else player.place(start.x, start.z + 12, 0);
-let room = placeAt(player.position.x, player.position.z, "grassy-bank");
+let room = player.under?.hall ?? placeAt(player.position.x, player.position.z, "grassy-bank", player.halls);
+
+// Walking into an obstacle, the original's words for it at the bottom of the
+// screen: what it says when you try that exit (the way you were going
+// through it: an obstacle only stops you going the way its exits go).
+const english = worldJson as unknown as World;
+const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
+const said = document.createElement("p");
+said.className = "said";
+said.setAttribute("aria-live", "polite");
+root.append(said);
+let quiet = 0;
+player.onBump = (exit) => {
+  const [id, direction] = exit.split(" ");
+  const way = world.rooms[id]?.exits[direction as Direction];
+  const words = way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo;
+  // (A teletext colour code shows as a space.)
+  said.textContent = words
+    .replace(/\{\w+\}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  said.classList.add("shown");
+  clearTimeout(quiet);
+  quiet = window.setTimeout(() => said.classList.remove("shown"), 3500);
+};
 
 // While developing: the debug panel (the 0 key), and a handle for test scripts.
 // The built game leaves all of this out.
 if (import.meta.env.DEV) {
-  Object.assign(window, { world: { player, scene, ground, walkable } });
+  Object.assign(window, { world: { player, scene, ground, walkable, renderer, places: PLACES } });
   const { debug } = await import("./debug");
   debug(
     {
@@ -183,10 +266,23 @@ if (import.meta.env.DEV) {
       walkable,
       heights: { values: heights, ...land.ground },
       grid: land.walkable,
-      obstacles,
+      scene,
+      ground,
+      obstacles: [...shapes.values()],
+      ahead: AHEAD,
+      fatal: (exit) => {
+        const [id, direction] = exit.split(" ");
+        const way = english.rooms[id]?.exits[direction as Direction];
+        return Boolean(way?.fatal || way?.obstacle?.fatal);
+      },
       openObstacles,
       room: () => room,
       name,
+      // A fresh frame, read straight away (before the browser clears it).
+      picture: () => {
+        renderer.render(scene, player.camera);
+        return renderer.domElement;
+      },
     },
     () => (overlay.hidden = true)
   );
@@ -220,12 +316,44 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
+// From daylight (0) to lamplight (1) over the first few metres down, or as
+// you go in at a door; and in a lit cave or room, its own light comes up as
+// you walk in.
+let caveLit = 0;
+let indoors = 0;
+function lightFor(depth: number, time: number, dt: number) {
+  indoors += ((player.under?.indoor ? 1 : 0) - indoors) * Math.min(1, dt * 4);
+  const under = Math.max(indoors, Math.min(1, Math.max(0, (depth - 0.5) / 3)));
+  sunlight.intensity = 2.8 * (1 - under);
+  skylight.intensity = 1.25 * (1 - under * 0.92);
+  const flicker = reducedMotion ? 1 : 0.92 + 0.05 * Math.sin(time / 90) + 0.03 * Math.sin(time / 37);
+  lamp.intensity = 14 * under * flicker;
+  lamp.position.set(player.position.x + 0.3, player.position.y + 1.4, player.position.z);
+
+  const hall = player.under?.hall ? halls[player.under.hall] : undefined;
+  caveLit += ((hall?.light ? 1 : 0) - caveLit) * Math.min(1, dt * 3);
+  if (hall?.light) {
+    caveLight.color.set(hall.light);
+    caveLight.distance = hall.r * 3;
+    caveLight.position.set(hall.x, hall.floor + hall.tall * 0.6, hall.z);
+  }
+  caveLight.intensity = (hall?.glow ?? 0) * 4 * caveLit * flicker;
+  fog.color.copy(HAZE).lerp(DARK, under);
+  fog.near = 40 - 38 * under;
+  fog.far = 320 - 290 * under + 40 * caveLit;
+}
+
 const timer = new Timer();
 renderer.setAnimationLoop((time) => {
   timer.update(time);
   const dt = Math.min(timer.getDelta(), 0.1);
   player.update(dt, reducedMotion);
-  room = placeAt(player.position.x, player.position.z, room);
+  // Along a way underground, you're still where you set off from (PLAN-V3.md),
+  // until you come into a hall.
+  if (player.under?.hall) room = player.under.hall;
+  else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
+  lightFor(player.depth, time, dt);
+  labels.visible = showLabels && !player.inside; // they'd show through the tunnel's walls
   here.textContent = name(room);
   // The sun's shadows follow you, so they're sharp wherever you are.
   sunlight.target.position.copy(player.position);
