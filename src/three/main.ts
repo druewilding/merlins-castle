@@ -332,9 +332,10 @@ function inUse() {
   } else if (wall && itemLocations.ladder === "carried") ladder.show();
 }
 
-// While developing: the debug panel (the 0 key), and a handle for test scripts.
-// The built game leaves all of this out.
-if (import.meta.env.DEV) {
+// At /3d?debug (on the dev server too): the debug panel (the 0 key), and a
+// handle for test scripts. Otherwise none of it is even loaded.
+const debugMode = new URLSearchParams(location.search).has("debug");
+if (debugMode) {
   Object.assign(window, { world: { player, scene, ground, walkable, renderer, places: PLACES, items } });
   const { debug } = await import("./debug");
   debug(

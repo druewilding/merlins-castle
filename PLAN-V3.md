@@ -18,7 +18,7 @@ Three things make v3 what it is:
 Classic and Illustrated stay as they are. v3 is a third way to play.
 
 Status: **step 2 begun.** The whole land above ground and underground is
-built in grey boxes (`art/blender/land.py`) and you can walk it at `3d.html`.
+built in grey boxes (`art/blender/land.py`) and you can walk it at `/3d`.
 It's built and deployed with the site, but not linked from anywhere yet.
 The castle's rooms are built inside its keep. Next: the tower and the hut, then
 wiring in the game.
@@ -418,7 +418,7 @@ and wings) may need a bought or free model.
    layout, the distances and the sight lines (the spire!) before any art.
    - ~~**Above ground**~~ ✅ `npm run models` runs `art/blender/land.py` in
      Blender with no window (add `-- land --preview` for a picture in
-     `art/blender/previews/`). Open `http://localhost:5173/3d.html`.
+     `art/blender/previews/`). Open `http://localhost:5173/3d`.
    - **Underground** ✅: the lamp tunnel (dark at both mouths, until there's a lamp); the caves in
      the mountain, dug into crags round the maze (trolls, oak door, treasure
      room over a deep hole, giant, damp tunnels); the dragon's cave inside a
@@ -541,13 +541,13 @@ and wings) may need a bought or free model.
   and room keeps its own light on (the four nearest you, a fixed number of
   lights, so materials never rebuild), so a room seen through a doorway is
   lit too.
-- **A debug panel** on the dev server only (the 0 key): fly (F), walk
+- **A debug panel** at `/3d?debug`, built or not (the 0 key): fly (F), walk
   through anything (N), open every obstacle (O), show the obstacles and
   their reach (R, red where they kill you), show gaps with a magenta sky
   (M), float the places' names (L), go up to 10× faster (, and .), copy a
   picture (P), and a map to jump anywhere. The letter keys work with the panel closed
-  too. `src/three/debug.ts` and `debug.css` are loaded behind
-  `import.meta.env.DEV`, so the built game contains none of it.
+  too. `src/three/debug.ts` and `debug.css` are only loaded with `?debug`,
+  so nobody else downloads them.
 - **Names over the places** (L, in the debug panel only; off to start with)
   while the world is grey, and the place you're in at the top left. For now
   they're made from the code's names (so "Merlins lair",
