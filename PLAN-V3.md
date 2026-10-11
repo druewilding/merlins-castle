@@ -274,6 +274,51 @@ One rule covers all of it: **the way is open until you leave the place**,
 exactly as `using` already works. Each place has an "open" and a "closed"
 state per exit, the same list v2 painted (28 effects).
 
+## One way, as in the original
+
+Many of the original's obstacles only stand in one direction: the axe is
+for going up the mountain path, not down it; the penny lowers the
+drawbridge into the courtyard, but you can always walk out. **v3 keeps those
+rules exactly**, rather than making obstacles things with a state of their
+own (cut or not, down or up):
+
+- **The puzzle was built on them.** You can go up the mountain with the axe,
+  round under it past the dragon and the giant, and come back down the path
+  without the axe. With obstacles that remember, that player would be stuck,
+  in a game that could always be finished.
+- **People who know the original** expect what worked then to work now.
+- **State brings its own puzzles**: saving and loading, dying, coming at a
+  place another way. The one-way rules have none.
+
+So the rules stay the original's, and **state is only in what you see**:
+each one-way obstacle looks the way it works from where you stand, and has a
+reason you can see for letting you through one way and not the other. It
+explains the rule instead of just enforcing it:
+
+- **The thick trees** are an enchanted forest that keeps people out of the
+  mountain, not in. Coming up, they're a wall until you cut through with the
+  axe, and they grow back as soon as you're up the mountain. Coming down,
+  they part to let you out, and close again behind you. The same either
+  way round, axe or no axe.
+- **The drawbridge** is down from the courtyard side (it's your way out).
+  From the moat it's up until you pay the penny; then it lowers, and it rises
+  again behind you once you've crossed back.
+- **The giant's padlocked gate** has its bolt on your side when you come from
+  the damp tunnels: you draw it and go through. From the giant's side, the
+  padlock.
+- **The leaves** give way when you push out from inside the dragon's cave.
+  From outside, they fill the entrance.
+- **The dragon** faces south, breathing fire at the way down to the dark
+  tunnels; coming up from them, you're behind the flames.
+- **The lamp tunnel** is only too dark going in, from the daylight.
+- **The door to Merlin's lair** locks behind you, as the original says.
+
+In the code: an obstacle's names are the exits it blocks ("moat south"), and
+it only stops you going their way (`wayThrough` in `src/three/player.ts`).
+Going through it the free way, you go all the way through, even past its
+middle. So a one-way obstacle's far side must only be reachable from that
+side (the drawbridge's is over the middle of the water, not on the bank).
+
 ## Your hands
 
 You never see yourself, as in the paintings: you're "you". Only your arm and
