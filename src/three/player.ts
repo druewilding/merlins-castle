@@ -223,6 +223,25 @@ export class Player {
     }
   }
 
+  /**
+   * Whether nothing solid stands at a spot, on the land or underground, nor
+   * any obstacle's reach (where you'd be bounced back): somewhere you could be.
+   */
+  clear(x: number, z: number, under = false, margin = BODY) {
+    const near = (under ? this.nearUnder : this.near).get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
+    if (!near) return true;
+    for (const c of near.circles) {
+      if (Math.hypot(x - c.x, z - c.z) < c.r + (c.ahead ?? 0) + margin) return false;
+    }
+    for (const b of near.boxes) {
+      const reach = b.ahead ?? 0;
+      const ox = b.halfX + (b.halfX < b.halfZ ? reach : 0) + margin;
+      const oz = b.halfZ + (b.halfX < b.halfZ ? 0 : reach) + margin;
+      if (Math.abs(x - b.x) < ox && Math.abs(z - b.z) < oz) return false;
+    }
+    return true;
+  }
+
   /** Puts you somewhere: in a hall underground, if the spot's in one. */
   place(x: number, z: number, yaw = 0) {
     this.under = this.hallAt(x, z);

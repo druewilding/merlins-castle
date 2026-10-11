@@ -11,8 +11,8 @@ import { act, newGame } from "../engine/engine";
 import type { GameState, ItemId, RoomId, World } from "../engine/types";
 import { artUrl } from "../illustrated/art";
 import { T } from "../shared/strings";
-import { PLACES } from "./layout";
-import type { Ground, Player, Walkable } from "./player";
+import { placeAt, PLACES } from "./layout";
+import { type Ground, type Hall, nearest, type Player, type Walkable } from "./player";
 
 const SLOTS = 5;
 // How far you can reach to take something (from your eyes).
@@ -22,6 +22,10 @@ const AIM_SLACK = 0.25;
 // The ground you walk on is a little smoother than the ground you see; an
 // object lies this far above it, so it never sinks in.
 const LIFT = 0.04;
+// Where objects start: the ground's checked every half metre, and in a hall
+// they keep this far from its wall.
+const FILL = 0.5;
+const WALL = 1;
 
 interface Lying {
   room: RoomId;
@@ -111,26 +115,87 @@ export function items(options: {
     return { y: h0 - s0 * slope, slope };
   }
 
-  /** Where an object starts in a place: near its middle, all of it on ground you can walk on. */
+  /**
+   * Where an object starts: anywhere in its place you can get to, a new spot
+   * every game, so you have to go and look for it. On the land, the ground
+   * you can walk to from the place's middle without going through anything
+   * (nor into an obstacle's reach, nor down a tunnel's mouth); in a hall,
+   * anywhere on its floor, clear of its walls and what stands in it.
+   */
   function start(id: ItemId, room: RoomId) {
     const hall = player.halls.get(room);
-    const centre = hall ?? PLACES.get(room);
-    if (!centre) return;
     const half = lengthOf(models.getObjectByName(id)!) / 2;
-    // A turn and a distance from the object's name, so it's the same every time.
-    const seed = [...id].reduce((sum, letter) => sum * 31 + letter.charCodeAt(0), 7);
-    for (let k = 0; k < 24; k++) {
-      const angle = seed + k * 2.4;
-      const out = hall ? Math.min(3, hall.r * 0.4) : 4 + (k % 4) * 2;
-      const x = centre.x + Math.cos(angle) * out;
-      const z = centre.z + Math.sin(angle) * out;
-      const yaw = angle + Math.PI / 2;
-      const ends = [-half, 0, half].map((d) => [x + Math.sin(yaw) * d, z + Math.cos(yaw) * d]);
-      if (hall || ends.every(([ex, ez]) => walkable(ex, ez))) {
+    const area = hall
+      ? { has: (x: number, z: number) => inHall(hall, x, z), somewhere: () => somewhereIn(hall) }
+      : reachable(room);
+    if (!area) return;
+    const fits = area.has;
+    for (let tries = 0; tries < 400; tries++) {
+      const [x, z] = area.somewhere();
+      const yaw = Math.random() * Math.PI * 2;
+      const along = [Math.sin(yaw), Math.cos(yaw)];
+      // All of it, every half metre along it, on a spot that fits.
+      const n = Math.ceil((half * 2) / 0.5);
+      const all = Array.from({ length: n + 1 }, (_, k) => -half + (k / n) * half * 2);
+      if (all.every((d) => fits(x + along[0] * d, z + along[1] * d))) {
         lay(id, room, x, z, yaw, hall?.floor);
         return;
       }
     }
+  }
+
+  /** In a hall, a little way in from its wall, and clear of what stands in it. */
+  function inHall(hall: Hall, x: number, z: number) {
+    const inside =
+      hall.w !== undefined && hall.d !== undefined
+        ? Math.abs(x - hall.x) <= hall.w - WALL && Math.abs(z - hall.z) <= hall.d - WALL
+        : Math.hypot(x - hall.x, z - hall.z) <= hall.r - WALL;
+    return inside && player.clear(x, z, true, 0.3);
+  }
+
+  function somewhereIn(hall: Hall) {
+    if (hall.w !== undefined && hall.d !== undefined) {
+      return [hall.x + (Math.random() * 2 - 1) * hall.w, hall.z + (Math.random() * 2 - 1) * hall.d];
+    }
+    const angle = Math.random() * Math.PI * 2;
+    const out = Math.sqrt(Math.random()) * hall.r;
+    return [hall.x + Math.cos(angle) * out, hall.z + Math.sin(angle) * out];
+  }
+
+  /** The ground in a place you can walk to from its middle, half a metre at a time. */
+  function reachable(room: RoomId) {
+    const centre = PLACES.get(room);
+    if (!centre) return undefined;
+    const cell = (x: number, z: number) => `${Math.round(x / FILL)},${Math.round(z / FILL)}`;
+    const open = (x: number, z: number) =>
+      walkable(x, z) &&
+      player.clear(x, z, false, 0.3) &&
+      placeAt(x, z, "", player.halls) === room &&
+      !player.ways.some((way) => !way.indoor && nearest(way, x, z).d < way.half + 1.5);
+    // From the open spot nearest the middle.
+    let first: [number, number] | undefined;
+    for (let r = 0; r < 10 && !first; r += FILL) {
+      for (let a = 0; a < 16 && !first; a++) {
+        const x = centre.x + Math.cos((a * Math.PI) / 8) * r;
+        const z = centre.z + Math.sin((a * Math.PI) / 8) * r;
+        if (open(x, z)) first = [Math.round(x / FILL) * FILL, Math.round(z / FILL) * FILL];
+      }
+    }
+    if (!first) return undefined;
+    const reached = new Map<string, [number, number]>();
+    const queue = [first];
+    while (queue.length) {
+      const [x, z] = queue.pop()!;
+      const key = cell(x, z);
+      if (reached.has(key) || !open(x, z)) continue;
+      reached.set(key, [x, z]);
+      queue.push([x + FILL, z], [x - FILL, z], [x, z + FILL], [x, z - FILL]);
+    }
+    const spots = [...reached.values()];
+    return {
+      has: (x: number, z: number) => reached.has(cell(x, z)),
+      somewhere: () => spots[Math.floor(Math.random() * spots.length)],
+    };
   }
 
   for (const [id, where] of Object.entries(state.itemLocations)) {

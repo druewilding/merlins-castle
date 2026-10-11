@@ -338,8 +338,9 @@ the weapon in Counter-Strike.
 - Five slots, keys **1–5**, like a weapon hotbar. The held object shows in your
   hand at the bottom right, Counter-Strike style.
 - Carrying a ladder, a plank and a harp at once is fine: it's a game.
-- Objects lie in the world where the engine puts them (the drop spots from
-  `layout.ts` become 3D spots per place), and dropped ones fall with physics.
+- Objects start in the place the engine puts them, at a random spot in it
+  you can walk to (a new one every game, so you go hunting for them), and
+  lie where you drop them, resting on the bumps of the ground.
 - The grassy bank's pile of treasure grows as you score, as now.
 
 ## Dying, getting lost, winning
