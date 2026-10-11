@@ -76,6 +76,39 @@ changelog, and merging it publishes the release. Running **Deploy please**
 deploys it to GitHub Pages; give it an older version to roll back.
 Dependencies are updated monthly by `.github/workflows/update-please.yml`.
 
+## The 3D version (in the making)
+
+A first-person version you walk through, on the same game engine: see
+`PLAN-V3.md`. It's built and deployed with everything else, at `3d.html`, but
+nothing links to it yet.
+
+```sh
+npm run dev                       # walk it at http://localhost:5173/3d.html
+npm run models                    # rebuild the land in Blender (see below)
+npm run models -- land --preview  # …and render a picture of it
+npm run build && npm run preview  # try the built version at http://localhost:4173/3d.html
+```
+
+Mouse to look, WASD or the arrow keys to walk, Shift to run, L to show the
+places' names. On the dev server only, **0** opens the debug panel: fly
+(F), walk through anything (N), open every obstacle (O), go faster or
+slower (. and ,), and a map to jump anywhere. The build leaves the debug
+panel out entirely, so check with `npm run build && npm run preview` that
+something works without it.
+
+The land is made in [Blender](https://www.blender.org/) (free), driven by
+Python scripts in `art/blender/`: `npm run models` runs each one with no
+window and writes its files into `src/three/models/`. Those files are
+committed, so you only need Blender to change the land, not to run the game.
+Blender is found in `/Applications` on a Mac; elsewhere, set `BLENDER` to its
+path.
+
+Everything only the 3D version uses is built into `dist/3d/`, which the
+service worker leaves out, so players of the game never download it.
+`test/land.test.ts` walks the land with every obstacle closed and fails if
+you can reach somewhere the original doesn't allow, such as a gap in the
+forest.
+
 ## How it's made
 
 - `original/`: the tools that recovered the game from the original disk
@@ -103,8 +136,11 @@ Dependencies are updated monthly by `.github/workflows/update-please.yml`.
   room's own picture, so only the change moves when they crossfade in.
 - `scripts/service-worker.js`: what makes it work offline. The build fills
   in the list of files and writes `dist/sw.js`.
-- `PLAN.md`: the decisions behind the remake, and `PLAN-V2.md` for the
-  pictures that change.
+- `src/three/`: the 3D version. `art/blender/layout.json` says where every
+  place is, for both the game and Blender; `art/blender/land.py` builds the
+  land; `art/blender/studies/` keeps looks to aim for.
+- `PLAN.md`: the decisions behind the remake, `PLAN-V2.md` for the pictures
+  that change, and `PLAN-V3.md` for the 3D version.
 
 The game's map, text and puzzles are Anita Straker's. The code in this
 repository is ISC licensed.

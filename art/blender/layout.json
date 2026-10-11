@@ -1,0 +1,78 @@
+{
+  "_": "Where every place is in the 3D world: [column, row] on the grid in PLAN-V3.md (row 0 is the north). Each step is `spacing` metres. Shared by the Blender scripts and the game.",
+  "spacing": 40,
+  "origin": [3, 4],
+  "places": {
+    "tower": [0, 0],
+    "oak-door": [2, 0],
+    "treasure-room": [3, 0],
+    "giant": [4, 0],
+    "mossy-steps": [0, 1],
+    "trolls": [2, 1],
+    "maze": [3, 1],
+    "damp-tunnels": [4, 1],
+    "yellow-flowers": [0, 2],
+    "mountain": [3, 2],
+    "rusty-gate": [0, 3],
+    "mountain-path": [3, 3],
+    "old-wall": [0, 4],
+    "old-stone-wall": [1, 4],
+    "grassy-bank": [3, 4],
+    "evergreen-glade": [4, 4],
+    "cave-entrance": [5, 4],
+    "dragon-cave": [6, 4],
+    "deep-river": [3, 5],
+    "dark-tunnels": [6, 5],
+    "forest-crossroads": [0, 6],
+    "forest-witches": [1, 6],
+    "forest-edge": [2, 6],
+    "river-south-bank": [3, 6],
+    "beautiful-chamber": [6, 6],
+    "charcoal-hut": [0, 7],
+    "moat": [3, 7],
+    "courtyard": [3, 8],
+    "coach-house": [4, 8],
+    "wizards-kitchen": [2, 9],
+    "grand-hall": [3, 9],
+    "dungeon": [4, 9],
+    "merlins-lair": [3, 10],
+    "small-room": [4, 10]
+  },
+  "kinds": {
+    "_": "outside unless listed: buildings stand on the land, caves are in the mountain or under the ground",
+    "building": [
+      "tower",
+      "charcoal-hut",
+      "coach-house",
+      "wizards-kitchen",
+      "grand-hall",
+      "dungeon",
+      "merlins-lair",
+      "small-room"
+    ],
+    "cave": [
+      "oak-door",
+      "treasure-room",
+      "giant",
+      "trolls",
+      "damp-tunnels",
+      "dark-tunnels",
+      "beautiful-chamber",
+      "dragon-cave"
+    ]
+  },
+  "lost": {
+    "_": "Where you get lost: the exit that leads there, and where its mist is",
+    "forest-crossroads west": [-1, 6],
+    "forest-witches north": [1, 5],
+    "forest-witches south": [1, 7],
+    "dark-tunnels west": [5, 5],
+    "dark-tunnels east": [7, 5],
+    "giant east": [5, 1]
+  },
+  "deaths": {
+    "_": "Ways through that kill you",
+    "mossy-steps east": [1, 1],
+    "mountain east": [4, 2]
+  }
+}

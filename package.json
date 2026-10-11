@@ -20,14 +20,19 @@
     "art:status": "node scripts/art.js --list",
     "art": "node scripts/art.js",
     "art:build": "node scripts/build-art.js",
-    "sounds": "node scripts/make-sounds.js"
+    "sounds": "node scripts/make-sounds.js",
+    "models": "node scripts/models.js"
   },
   "prettier": "eslint-config-plus-prettier/prettier",
   "devDependencies": {
+    "@types/three": "^0.186.0",
     "eslint-config-plus-prettier": "4.3.3",
     "sharp": "0.35.5",
     "typescript": "6.0.3",
     "vite": "8.3.4",
     "vitest": "5.0.3"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
   }
 }
