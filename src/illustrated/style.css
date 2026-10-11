@@ -773,16 +773,31 @@ button {
   content: "";
   position: absolute;
   inset: 0 0 -20%;
-  background: linear-gradient(to bottom, rgba(5, 3, 2, 0.9), rgba(5, 3, 2, 0.62) 60%, rgba(5, 3, 2, 0.8));
+  background: linear-gradient(to bottom, rgba(5, 3, 2, 0.5), rgba(5, 3, 2, 0.32) 60%, rgba(5, 3, 2, 0.55));
   mask-image: linear-gradient(to bottom, #000 80%, transparent);
   animation: curtain-fall 1.6s cubic-bezier(0.45, 0, 0.6, 1) 1.4s both;
+}
+
+/* A soft shadow just behind the words, so they read over a light picture
+   while the rest of it stays easy to see. */
+.curtain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 34rem 14rem at 50% 50%, rgba(5, 3, 2, 0.6), transparent);
+  animation: fade-in 0.8s ease 2.8s both;
 }
 
 .curtain.bright::before {
   display: none;
 }
 
-/* As the dark curtain falls, the text panel and your things fade away. */
+.curtain.bright::after {
+  animation-delay: 1.4s;
+}
+
+/* As the curtain falls (or the victory shines), the text panel and your
+   things fade away. */
 .mc--curtain .panel {
   animation: fade-away 1.6s ease 1.4s both;
 }
@@ -796,6 +811,7 @@ button {
 
 .curtain > * {
   position: relative;
+  z-index: 1; /* above the curtain's shadow */
   pointer-events: auto;
   animation: fade-in 0.8s ease 2.8s both;
 }
@@ -822,6 +838,14 @@ button {
 
 .last-words.clue {
   color: var(--gold);
+}
+
+/* Winning: "You have solved the mystery of Merlin!" */
+.last-words.won {
+  color: var(--gold);
+  text-shadow:
+    0 0 18px rgba(255, 200, 90, 0.45),
+    0 2px 12px rgba(0, 0, 0, 0.8);
 }
 
 @keyframes curtain-fall {

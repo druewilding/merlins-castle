@@ -396,16 +396,18 @@ export class IllustratedApp {
     const game = this.game!;
     // The music fades with the falling curtain (after a win it has already gone).
     if (game.status !== "won") this.music.end(3000);
-    // Dying or getting lost: the text panel and your things fade away as the
-    // curtain falls, leaving only its words.
-    if (game.status !== "won") this.app.classList.add("mc--curtain");
+    // The text panel and your things fade away, leaving only the curtain's
+    // words: it's the end.
+    this.app.classList.add("mc--curtain");
     const last = game.status === "dead" ? this.events.at(-1) : undefined;
+    const won = game.status === "won" ? plainText(messages(this.world).victory) : undefined;
     // Lost: the clue you found, so it isn't hidden behind the curtain.
     const lost = game.status === "lost" ? splitClue(describe(this.world, game).description) : undefined;
     this.overlay.replaceChildren(
       h(
         "div",
         { class: game.status === "won" ? "curtain bright" : "curtain" },
+        won && h("p", { class: "last-words won" }, won),
         last && h("p", { class: "last-words" }, plainText(last.text)),
         lost?.intro && h("p", { class: "clue-intro" }, lost.intro),
         lost && h("p", { class: "last-words clue" }, lost.clue),
