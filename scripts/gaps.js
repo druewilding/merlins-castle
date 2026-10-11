@@ -175,9 +175,11 @@ function install({ ways, halls }) {
     for (const way of allWays) {
       if (!nearWay(way, x, z)) continue;
       const n = nearest(way, x, z);
-      if (n.beyond || n.d > way.half + 0.1) continue;
+      // (A little past its walls: a ray through a pixel at a wall's edge, out
+      // of a door, lands just outside it.)
+      if (n.beyond || n.d > way.half + 0.3) continue;
       const roofed = way.indoor || n.floor + TALL <= g - 0.4;
-      if (y >= n.floor - 0.1 && (!roofed || y <= n.floor + TALL + 0.1)) return { roofed };
+      if (y >= n.floor - 0.1 && (!roofed || y <= n.floor + TALL + 0.3)) return { roofed };
     }
     return undefined;
   }

@@ -367,17 +367,21 @@ MOAT = (-72 * K, 72 * K, -272 * K, -130 * K)
 KEEP = (CASTLE[0] + 1, CASTLE[1] - 1, CASTLE[2] + 1, KEEP_NORTH)  # west, east, south, north
 
 
-def in_building(x, y):
-    """Inside the keep or the coach house, where you only ever are along a way."""
+def in_building(x, y, whole=False):
+    """Inside the keep or the coach house, where you only ever are along a way.
+    (Or, whole, for the ground's square at x, y: the hut and the tower stand
+    on the land, so only squares wholly inside them are cut out, not ones
+    reaching out past their walls.)"""
     w, e, s, n = KEEP
     if w <= x <= e and s <= y <= n:
         return True
     coach = HALLS["coach-house"]
     if abs(x - coach.x) <= coach.w + 0.6 and abs(y - coach.y) <= coach.d + 0.6:
         return True
-    if abs(x - HUT[0]) <= 4 and abs(y - HUT[1]) <= 3:
+    reach = STEP / 2 if whole else 0.0
+    if abs(x - HUT[0]) <= 4 - reach and abs(y - HUT[1]) <= 3 - reach:
         return True
-    return math.hypot(x - TOWER[0], y - TOWER[1]) <= TOWER_R
+    return math.hypot(x - TOWER[0], y - TOWER[1]) <= TOWER_R - reach * math.sqrt(2)
 
 
 def by_a_building(x, y, margin=3.0):
@@ -568,7 +572,7 @@ for j in range(ny):
 for j in range(ny - 1):
     for i in range(nx - 1):
         qx, qy = X0 + (i + 0.5) * STEP, Y0 + (j + 0.5) * STEP
-        if open_to_the_sky(qx, qy, 1.0) is not None or in_building(qx, qy):
+        if open_to_the_sky(qx, qy, 1.0) is not None or in_building(qx, qy, whole=True):
             continue  # the hole over a ramp, or the floor of a building
         a = j * nx + i
         faces.append((a, a + 1, a + nx + 1, a + nx))
@@ -1049,20 +1053,33 @@ for way in WAYS.values():
         x, y, _, nx_, ny_, _ = row
         return x + nx_ * offset, y + ny_ * offset
 
+    def under_floor(a, b):
+        # (The floor stops where a cave's floor, reaching out under its walls,
+        # takes over. A room's floor only reaches just under its walls, so as
+        # not to overlap the room next door: there, the way's floor goes on a
+        # little into the room, a doorstep over the seam.)
+        mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
+        hall = in_a_hall(*mid, 1.3)
+        if hall and hall.indoor and not hall.inside(mid[0], mid[1], -0.3):
+            return None
+        return hall
+
+    covered_by = [under_floor(a, b) for a, b in zip(rows, rows[1:])]
     for k, (a, b) in enumerate(zip(rows, rows[1:])):
         mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
         if in_a_hall(*mid, 0.3):
             continue
         (alx, aly), (arx, ary) = edge_left[k], edge_right[k]
         (blx, bly), (brx, bry) = edge_left[k + 1], edge_right[k + 1]
-        # (The floor stops where a cave's floor, reaching out under its walls,
-        # takes over. A room's floor only reaches just under its walls, so as
-        # not to overlap the room next door: there, the way's floor goes on a
-        # little into the room, a doorstep over the seam.)
-        under_floor = in_a_hall(*mid, 1.3)
-        if under_floor and under_floor.indoor and not under_floor.inside(mid[0], mid[1], -0.3):
-            under_floor = None
-        if not under_floor and not in_pit(mid[0], mid[1]):
+        # Where a ramp leaves a cave going down, it's lower than the cave's
+        # floor by the time the cave's floor stops: a face of earth across,
+        # from the ramp up to the cave's floor, so there's no slot under it.
+        for other, row, (el, er) in ((k - 1, a, (edge_left[k], edge_right[k])),
+                                     (k + 1, b, (edge_left[k + 1], edge_right[k + 1]))):
+            hall = covered_by[other] if 0 <= other < len(covered_by) else None
+            if hall and not covered_by[k] and row[2] < hall.floor - 0.1:
+                quad(tunnel, [(*el, row[2]), (*er, row[2]), (*er, hall.floor - 0.06), (*el, hall.floor - 0.06)], EARTH)
+        if not covered_by[k] and not in_pit(mid[0], mid[1]):
             # (Indoors, a shade up: off the ground, out of the door, and the
             # same all the way in, so there's no step at the wall.)
             lift = 0.04 if way.indoor else 0.0
@@ -1133,6 +1150,21 @@ for way in WAYS.values():
             for inner, outer in ((half, half + 1.8), (-half, -half - 1.8)):
                 p, q = side(row, inner), side(row, outer)
                 quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, f + TUNNEL_TALL + 0.1), (*p, f + TUNNEL_TALL + 0.1)], hall.wall)
+    # A dead end, deep under the land (off into the mist): a metre more of
+    # tunnel, and earth across the end of it.
+    for row, edges, outward in ((rows[0], (edge_left[0], edge_right[0]), -1), (rows[-1], (edge_left[-1], edge_right[-1]), 1)):
+        x, y, f, nx_, ny_, roofed = row
+        if way.indoor or not roofed or in_a_hall(x, y, f, 1.3):
+            continue
+        ox, oy = ny_ * outward, -nx_ * outward
+        (lx_, ly_), (rx_, ry_) = edges
+        el, er = (lx_ + ox, ly_ + oy), (rx_ + ox, ry_ + oy)
+        quad(tunnel, [(lx_, ly_, f), (rx_, ry_, f), (*er, f), (*el, f)], EARTH)
+        quad(tunnel, [(lx_, ly_, f + TUNNEL_TALL), (rx_, ry_, f + TUNNEL_TALL), (*er, f + TUNNEL_TALL), (*el, f + TUNNEL_TALL)],
+             roof_colour)
+        for p, q in (((lx_, ly_), el), ((rx_, ry_), er)):
+            quad(tunnel, [(*p, f), (*q, f), (*q, f + TUNNEL_TALL), (*p, f + TUNNEL_TALL)], wall_colour)
+        quad(tunnel, [(*el, f), (*er, f), (*er, f + TUNNEL_TALL), (*el, f + TUNNEL_TALL)], EARTH)
 # A stone threshold at every mouth onto the land, over the ragged edge of the
 # hole in the ground (which comes in whole squares, so it reaches a little
 # past where the ramp begins, and shows the sky through the gap).
