@@ -230,6 +230,8 @@ export class Player {
     const p = this.position;
     if (this.ghost) {
       p.set(p.x + dx, p.y, p.z + dz);
+      // Off the land, still follow the floor (up and down stairs), where there is one.
+      if (this.under) this.under = this.underAt(p.x, p.z, this.under.floor) ?? this.under;
       return;
     }
     for (const [x, z] of [

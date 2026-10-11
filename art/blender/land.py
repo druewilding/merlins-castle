@@ -230,9 +230,9 @@ class Hall:
     ceiling. Either way it has a flat floor, and being in it is being in its
     place."""
 
-    def __init__(self, place, floor, r, tall, ground, wall, light=None, glow=0.0, w=None, d=None):
+    def __init__(self, place, floor, r, tall, ground, wall, light=None, glow=0.0, w=None, d=None, at=None):
         self.place = place
-        self.x, self.y = P[place]
+        self.x, self.y = at or P[place]  # (a room can be off its place's spot, to sit against its neighbour)
         self.floor, self.tall = floor, tall
         self.w, self.d = w, d
         self.room = w is not None
@@ -258,10 +258,12 @@ HALLS = {h.place: h for h in [
     Hall("beautiful-chamber", -10, 12, 8, c.linear("#f2eee2"), c.linear("#d9a640"), "#ffd98a", 26),
     # The castle's rooms, in the keep (and the coach house, in the courtyard).
     Hall("grand-hall", 0.4, 0, 9, c.linear("#c9bca0"), c.linear("#a89d88"), "#ffcf87", 16, w=10, d=8),
-    Hall("wizards-kitchen", 0.4, 0, 6, c.linear("#b3a58a"), c.linear("#9a8e78"), "#ff9a4a", 10, w=7, d=6),
+    Hall("wizards-kitchen", 0.4, 0, 6, c.linear("#b3a58a"), c.linear("#9a8e78"), "#ff9a4a", 10, w=7, d=6,
+         at=(P["grand-hall"][0] - 10 - 1 - 7, P["grand-hall"][1])),
     Hall("dungeon", -3, 0, 6, c.linear("#5c5850"), c.linear("#6c675c"), "#a9c6ff", 7, w=7, d=7),
     Hall("small-room", 0.4, 0, 4.5, c.linear("#7a4a2a"), c.linear("#8e2a26"), "#ffb070", 6, w=6, d=6),
-    Hall("merlins-lair", 0.4, 0, 7, c.linear("#6f6a62"), c.linear("#5d5868"), "#a8ff86", 10, w=8, d=7),
+    Hall("merlins-lair", 0.4, 0, 8, c.linear("#6f6a62"), c.linear("#5d5868"), "#b8ff9a", 18, w=14.5, d=14,
+         at=((P["grand-hall"][0] - 6 + P["small-room"][0] - 6 - 1) / 2, P["grand-hall"][1] - 8 - 1 - 14)),
     Hall("coach-house", 0.4, 0, 6, c.linear("#b89a5a"), c.linear("#8a6a44"), "#ffd28a", 9, w=8, d=6),
 ]}
 
@@ -321,16 +323,18 @@ WAYS = {
     "dark-west": Way([(*DK, -8), (DK[0] - 34, DK[1], -8)]),
     "dark-east": Way([(*DK, -8), (DK[0] + 34, DK[1], -8)]),
     "dark-beautiful": Way([(*DK, -8), (DK[0], DK[1] - 10, -8), (BC[0], BC[1] + 12, -10), (*BC, -10)]),
-    # The castle: in at the keep's door to the grand hall, and on along its
-    # corridors: west to the kitchen, east and down the steps to the dungeon,
-    # south and up again to the small room, west through the door that locks
-    # behind you into Merlin's lair, and north by the hidden way to the hall.
+    # The castle: in at the keep's door to the grand hall, and on: straight
+    # through into the kitchen, east along the corridor and down the steps to
+    # the dungeon, south and up again to the small room, through the door
+    # that locks behind you into Merlin's lair, and through the hidden door
+    # back into the hall. (Rooms side by side still have a short way between
+    # them: the doorway through the wall.)
     "keep-door": Way([(GH[0], KEEP_NORTH + 1.2, None), (*GH, 0.4)], indoor=True),
-    "hall-kitchen": Way([(*GH, 0.4), (*WK, 0.4)], indoor=True),
+    "hall-kitchen": Way([(*GH, 0.4), (HALLS["wizards-kitchen"].x, GH[1], 0.4)], indoor=True),
     "hall-dungeon": Way([(*GH, 0.4), (GH[0] + 13, GH[1], 0.4), (DU[0] - 9, DU[1], -3), (*DU, -3)], indoor=True),
     "dungeon-small": Way([(*DU, -3), (DU[0], DU[1] - 9, -3), (SR[0], SR[1] + 9, 0.4), (*SR, 0.4)], indoor=True),
-    "small-lair": Way([(*SR, 0.4), (*ML, 0.4)], indoor=True),
-    "lair-hall": Way([(*ML, 0.4), (*GH, 0.4)], indoor=True),
+    "small-lair": Way([(*SR, 0.4), (SR[0] - 14, SR[1], 0.4)], indoor=True),
+    "lair-hall": Way([(GH[0], HALLS["merlins-lair"].y, 0.4), (*GH, 0.4)], indoor=True),
     # And in through the coach house's wide doors.
     "coach-door": Way([(CH[0] - HALLS["coach-house"].w - 1.8, CH[1], None), (*CH, 0.4)], half=2.4, indoor=True),
 }
@@ -1197,29 +1201,63 @@ def room(b, hall):
             px = hx - W + 0.6 + k * (2 * W - 1.2) / 7
             wall_panel(b, px, hy - D - 0.3, (0.35, 0), f, f, f + 4.4, c.linear("#7e1f1d"))
     elif hall.place == "merlins-lair":
-        # The cauldron bubbling green on its round step, bookcases, and a desk.
+        # The cauldron bubbling green on its round step, on a purple rug;
+        # bookcases on every wall (but not across the doors), a table of
+        # potions, his desk with the crystal ball, a chart of the stars, and
+        # candles.
         dx, dy = hx - 3, hy - 2
+        verts = [(dx, dy, f + 0.02)] + [(dx + math.cos(2 * math.pi * k / 24) * 4.2, dy + math.sin(2 * math.pi * k / 24) * 3.4,
+                                         f + 0.02) for k in range(24)]
+        b.add(verts, [(0, 1 + k, 1 + (k + 1) % 24) for k in range(24)], [c.linear("#4a2a5e")] * 25)
         b.cylinder((dx, dy, f), (dx, dy, f + 0.3), 2.0, 2.0, STONE, sides=20)
         b.cylinder((dx, dy, f + 0.3), (dx, dy, f + 1.3), 1.0, 1.2, IRON, sides=16)
         verts = [(dx, dy, f + 1.25)] + [(dx + math.cos(2 * math.pi * k / 16) * 1.15, dy + math.sin(2 * math.pi * k / 16) * 1.15,
                                          f + 1.25) for k in range(16)]
         b.add(verts, [(0, 1 + k, 1 + (k + 1) % 16) for k in range(16)], [c.linear("#5cff6a")] * 17)
         under_circle(dx, dy, 2.0)
-        for x0, y0, x1, y1 in ((hx - W - 0.3, hy - 5, hx - W + 0.5, hy + 5), (hx - 6, hy - D - 0.3, hx + 6, hy - D + 0.5)):
+
+        def bookcase(x0, y0, x1, y1, face):
+            """Shelves of books, their spines facing into the room (+x, -x, +y or -y)."""
             furniture(b, x0, y0, x1, y1, f, f + 3.4, DARK_WOOD)
+            across = abs(x1 - x0) > abs(y1 - y0)
+            length = abs(x1 - x0) if across else abs(y1 - y0)
             for z in (f + 0.5, f + 1.3, f + 2.1, f + 2.9):
-                for k in range(int(max(abs(x1 - x0), abs(y1 - y0)) / 0.4)):
+                for k in range(int(length / 0.4)):
                     colour = c.linear(["#7a2a2a", "#2a4a7a", "#4a6a2a", "#8a6a2a", "#5a2a6a"][(k * 7 + int(z * 3)) % 5])
-                    if abs(x1 - x0) > abs(y1 - y0):
-                        bx_ = x0 + 0.2 + k * 0.4
-                        block(b, bx_, y1, z, bx_ + 0.3, y1 + 0.05, z + 0.6, colour, solid=False)
+                    if across:
+                        bx_, by_ = x0 + 0.2 + k * 0.4, (y1 if face == "+y" else y0 - 0.05)
+                        block(b, bx_, by_, z, bx_ + 0.3, by_ + 0.05, z + 0.6, colour, solid=False)
                     else:
-                        by_ = y0 + 0.2 + k * 0.4
-                        block(b, x1, by_, z, x1 + 0.05, by_ + 0.3, z + 0.6, colour, solid=False)
-        furniture(b, hx + 3, hy + D - 1.6, hx + 6, hy + D - 0.6, f + 0.8, f + 0.9, WOOD)
-        b.blob((hx + 4.5, hy + D - 1.1, f + 1.15), 0.25, c.linear("#bfe6ff"), squash=1, lumpy=0.05, seed=3)  # crystal ball
-        for px, py in ((hx + 3.2, hy + D - 0.8), (hx + 5.8, hy + D - 0.8)):
-            flame(b, px, py, f + 0.9, 0.2)
+                        bx_, by_ = (x1 if face == "+x" else x0 - 0.05), y0 + 0.2 + k * 0.4
+                        block(b, bx_, by_, z, bx_ + 0.05, by_ + 0.3, z + 0.6, colour, solid=False)
+
+        west, east, south, north = hx - W, hx + W, hy - D, hy + D
+        bookcase(west - 0.3, hy - 9, west + 0.5, hy + 9, "+x")
+        bookcase(west + 2, south - 0.3, east - 2, south + 0.5, "+y")
+        bookcase(east - 0.5, hy - 3, east + 0.3, north - 2, "-x")
+        bookcase(east - 10, north - 0.5, east - 2, north + 0.3, "-y")
+        bookcase(west + 2, north - 0.5, P["grand-hall"][0] - 2.5, north + 0.3, "-y")  # (up to the hidden door)
+        # The desk, and a table of potions.
+        furniture(b, hx + 1, north - 2.6, hx + 4, north - 1.6, f + 0.8, f + 0.9, WOOD)
+        b.blob((hx + 2.5, north - 2.1, f + 1.15), 0.25, c.linear("#bfe6ff"), squash=1, lumpy=0.05, seed=3)  # crystal ball
+        for px in (hx + 1.2, hx + 3.8):
+            flame(b, px, north - 1.8, f + 0.9, 0.2)
+        tx, ty = hx + 6, hy - 6
+        furniture(b, tx - 1.6, ty - 0.6, tx + 1.6, ty + 0.6, f + 0.8, f + 0.9, WOOD)
+        for k in range(9):
+            b.cylinder((tx - 1.3 + k * 0.32, ty + (k % 3 - 1) * 0.3, f + 0.9), (tx - 1.3 + k * 0.32, ty + (k % 3 - 1) * 0.3, f + 1.25),
+                       0.09, 0.05, c.linear(["#5cff6a", "#c45cff", "#5cc4ff", "#ffb35c"][k % 4]), sides=6)
+        # The chart of the stars, over the bookcase on the south wall.
+        wall_panel(b, hx, south - 0.3 + 0.01, (3, 0), f, f + 4.0, f + 6.8, c.linear("#1a2350"))
+        for k in range(30):
+            sx = hx - 2.7 + (k * 0.377) % 5.4
+            sz = f + 4.2 + (k * 0.613) % 2.4
+            wall_panel(b, sx, south - 0.28, (0.05, 0), f, sz, sz + 0.1, c.linear("#fff3b0"))
+        # Candles on stands.
+        for px, py in ((hx - 9, hy + 4), (hx - 9, hy - 8), (hx + 9, hy + 6), (hx + 2, hy - 10), (hx - 3, hy + 9)):
+            block(b, px - 0.08, py - 0.08, f, px + 0.08, py + 0.08, f + 1.6, BRASS, solid=False)
+            flame(b, px, py, f + 1.6)
+            under_circle(px, py, 0.25)
     elif hall.place == "coach-house":
         # The red coach on its four wheels, and hay.
         cxx, cyy = hx + 1.5, hy
@@ -1242,20 +1280,20 @@ for hall in HALLS.values():
 
 # The castle's guards and doors, in its corridors.
 gh, wk, du, ml = HALLS["grand-hall"], HALLS["wizards-kitchen"], HALLS["dungeon"], HALLS["merlins-lair"]
-obstacle(["grand-hall west"], "box", gh.x - gh.w - 1.5, -gh.y, 1.0, TUNNEL_HALF + 0.3, under=True)  # the goblins' trap
-obstacle(["wizards-kitchen east"], "box", wk.x + wk.w + 1.5, -wk.y, 1.0, TUNNEL_HALF + 0.3, under=True)  # Merlin
+obstacle(["grand-hall west"], "box", gh.x - gh.w - 0.5, -gh.y, 0.5, TUNNEL_HALF + 0.3, under=True)  # the goblins' trap
+obstacle(["wizards-kitchen east"], "box", wk.x + wk.w + 0.5, -gh.y, 0.5, TUNNEL_HALF + 0.3, under=True)  # Merlin
 obstacle(["grand-hall east"], "box", gh.x + gh.w + 1.5, -gh.y, 1.0, TUNNEL_HALF + 0.3, under=True)  # the goblins
 obstacle(["dungeon south"], "box", du.x, -(du.y - du.d - 1.5), TUNNEL_HALF + 0.3, 1.0, under=True)  # the old woman
-obstacle(["merlins-lair north"], "box", ml.x, -(ml.y + ml.d + 1.5), TUNNEL_HALF + 0.3, 1.0, under=True)  # Merlin
+obstacle(["merlins-lair north"], "box", gh.x, -(ml.y + ml.d + 0.5), TUNNEL_HALF + 0.3, 0.5, under=True)  # Merlin
 # The hidden door into the hall, which looks like wall from the hall's side
 # and won't open from there ("You cannot pass.").
 hy_ = gh.y - gh.d - 0.6
 block(rooms, gh.x - TUNNEL_HALF, hy_ - 0.15, gh.floor, gh.x + TUNNEL_HALF, hy_ + 0.15, gh.floor + TUNNEL_TALL, gh.wall, solid=False)
 obstacle(["grand-hall south"], "box", gh.x, -hy_, TUNNEL_HALF + 0.3, 0.5, under=True)
 # The lair's door, which slams and locks behind you.
-lx_ = ml.x + ml.w + 0.6
-block(rooms, lx_ - 0.15, ml.y - TUNNEL_HALF, ml.floor, lx_ + 0.15, ml.y + TUNNEL_HALF, ml.floor + TUNNEL_TALL, OAK, solid=False)
-obstacle(["merlins-lair east"], "box", lx_, -ml.y, 0.5, TUNNEL_HALF + 0.3, under=True)
+lx_, ly_ = ml.x + ml.w + 0.6, SR[1]
+block(rooms, lx_ - 0.15, ly_ - TUNNEL_HALF, ml.floor, lx_ + 0.15, ly_ + TUNNEL_HALF, ml.floor + TUNNEL_TALL, OAK, solid=False)
+obstacle(["merlins-lair east"], "box", lx_, -ly_, 0.5, TUNNEL_HALF + 0.3, under=True)
 rooms.build("rooms", smooth=False)
 
 # Doors and things that block the ways (until the game opens them).

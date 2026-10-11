@@ -251,7 +251,9 @@ export function debug(world: DebugWorld, onOpen: () => void) {
   for (const [id, { x, z }] of PLACES) {
     const button = document.createElement("button");
     button.textContent = world.name(id);
-    button.addEventListener("click", () => jump(x, z + 6, 0));
+    // Into the middle of a cave or a room; just south of anywhere else.
+    const hall = player.halls.get(id);
+    button.addEventListener("click", () => (hall ? jump(hall.x, hall.z, 0) : jump(x, z + 6, 0)));
     list.append(button);
   }
 

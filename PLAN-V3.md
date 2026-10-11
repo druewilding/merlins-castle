@@ -378,10 +378,12 @@ and wings) may need a bought or free model.
      west and east into the mist) and the beautiful chamber.
    - **The castle** ✅: the courtyard (well, flowers) with the coach house
      as a barn; the keep across its south, entered from the courtyard into
-     the grand hall, with corridors west to the kitchen, east and down steps
-     to the dungeon, south and up to the small room, west through the door
-     that locks behind you to Merlin's lair, and the hidden way north back
-     to the hall. Each room furnished after its painting, with its own light.
+     the grand hall. The kitchen opens straight off the hall's west side; a
+     corridor runs east and down steps to the dungeon, then south and up to
+     the small room. Merlin's lair is big enough to share a wall with both
+     the small room (the door that locks behind you) and the hall (the
+     hidden door). Each room furnished after its painting, with its own
+     light.
    - **Indoors**: the tower and the hut.
    - **The game**: objects to take and use, the obstacles opening, deaths,
      the mist's visions.

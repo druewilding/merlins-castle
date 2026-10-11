@@ -143,6 +143,12 @@ function nearest(points: number[][], x: number, z: number) {
   return best;
 }
 
+type Hall = (typeof land.halls)[keyof typeof land.halls];
+const inHall = (hall: Hall, x: number, z: number) =>
+  "w" in hall
+    ? Math.abs(x - hall.x) <= hall.w - BODY && Math.abs(z - hall.z) <= hall.d - BODY
+    : Math.hypot(x - hall.x, z - hall.z) <= hall.r - BODY;
+
 function underground(from: string, open: boolean) {
   const blocked = sorted(
     open ? [] : [...obstacles.filter((obstacle) => obstacle.under), ...land.under.circles.map((circle) => ({ circle }))]
@@ -151,11 +157,7 @@ function underground(from: string, open: boolean) {
   const floorsAt = (x: number, z: number) => {
     const floors: { floor: number; hall?: string }[] = [];
     for (const [place, hall] of halls) {
-      const inside =
-        "w" in hall
-          ? Math.abs(x - hall.x) <= hall.w - BODY && Math.abs(z - hall.z) <= hall.d - BODY
-          : Math.hypot(x - hall.x, z - hall.z) <= hall.r - BODY;
-      if (inside) floors.push({ floor: hall.floor, hall: place });
+      if (inHall(hall, x, z)) floors.push({ floor: hall.floor, hall: place });
     }
     for (const way of ways) {
       const n = nearest(way.points, x, z);
@@ -189,8 +191,7 @@ function underground(from: string, open: boolean) {
     for (const way of ways) {
       for (const end of [way.points[0], way.points.at(-1)!]) {
         const mouth =
-          Math.abs(groundAt(end[0], end[1]) - end[2]) < 0.6 &&
-          !halls.some(([, hall]) => Math.hypot(end[0] - hall.x, end[1] - hall.z) < 0.5);
+          Math.abs(groundAt(end[0], end[1]) - end[2]) < 0.6 && !halls.some(([, hall]) => inHall(hall, end[0], end[1]));
         if (mouth && Math.hypot(x - end[0], z - end[1]) < 1 && Math.abs(end[2] - here.floor) < CLIMB) {
           const outside = places.filter((place) => !(place.id in land.halls));
           reached.add(
