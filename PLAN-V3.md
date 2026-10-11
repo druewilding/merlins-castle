@@ -518,6 +518,12 @@ and wings) may need a bought or free model.
   mouths (the leaves, the lamp tunnel's dark) are obstacles on the land, 3 m
   down the ramp and reaching out over the top, so you're stopped before you go
   down; coming up out of a tunnel, you're going through them the free way.
+- **`npm run gaps` finds holes in the world** (`scripts/gaps.js`): with the
+  sky magenta, it looks round from every few metres along the ways, in the
+  halls and round the buildings, and follows every magenta pixel's ray back.
+  Sky seen through the earth, or (from inside) through a wall or a roof, is
+  a gap; out of a door, a mouth or an open ramp, it isn't. Run it after
+  changing the land.
 - **Obstacles underground** block only the ways (`"under": true`), so the
   old stone wall over the lamp tunnel doesn't stop you down below. The test
   walks the ways and halls too, with every obstacle closed and every one open.

@@ -14,8 +14,10 @@ test/walkthrough.test.ts
 # Full-size image originals (web versions go in public/art)
 art/originals/
 
-# Pictures from npm run models -- <place> --preview, for checking
+# Pictures from npm run models -- <place> --preview, and the report from
+# npm run gaps, for checking
 art/blender/previews/
+gaps/
 __pycache__/
 
 docs/notes.md

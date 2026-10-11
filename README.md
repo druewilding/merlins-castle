@@ -111,6 +111,14 @@ service worker leaves out, so players of the game never download it.
 you can reach somewhere the original doesn't allow, such as a gap in the
 forest.
 
+`npm run gaps` looks for holes you can see the sky through: it opens the
+land in a browser with no window (Playwright's WebKit), paints the sky
+magenta and looks round from hundreds of spots, along every tunnel, in every
+room and round every building. It takes a few minutes and writes
+`gaps/index.html`, the worst first, with a picture of each (the gaps in
+magenta). `npm run gaps -- --near=x,z,r` checks just round one spot, after a
+fix. The first time, `npx playwright install webkit` fetches the browser.
+
 ## How it's made
 
 - `original/`: the tools that recovered the game from the original disk

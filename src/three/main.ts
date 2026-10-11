@@ -258,7 +258,7 @@ player.onBump = (exit) => {
 // While developing: the debug panel (the 0 key), and a handle for test scripts.
 // The built game leaves all of this out.
 if (import.meta.env.DEV) {
-  Object.assign(window, { world: { player, scene, ground, walkable } });
+  Object.assign(window, { world: { player, scene, ground, walkable, renderer, places: PLACES } });
   const { debug } = await import("./debug");
   debug(
     {
