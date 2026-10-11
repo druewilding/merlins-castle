@@ -17,7 +17,9 @@ Three things make v3 what it is:
 
 Classic and Illustrated stay as they are. v3 is a third way to play.
 
-Status: **an idea.** Nothing is built yet. Start with the first slice (below).
+Status: **step 1 done.** The grassy bank is built in Blender and you can walk
+around it at `3d.html` on the dev server (not part of the built site yet).
+Next: the whole map in grey boxes.
 
 ## Keep the engine
 
@@ -356,9 +358,11 @@ and wings) may need a bought or free model.
 
 ## Order of work
 
-1. **Learn the pipeline on one place.** Install Blender. Claude writes a
-   script that builds the grassy bank roughly, bakes its light and exports it.
-   The game loads it and you can walk around. Proves Blender → glTF → Three.js.
+1. ~~**Learn the pipeline on one place.**~~ ✅ `art/blender/grassy-bank.py`
+   builds the grassy bank; `npm run models` runs Blender with no window and
+   writes `src/three/models/grassy-bank.glb` (add `-- grassy-bank --preview`
+   for a rendered picture in `art/blender/previews/`). Open
+   `http://localhost:5173/3d.html` to walk around it.
 2. **The whole map in grey boxes.** Every place as plain shapes at its spot,
    joined by paths and tunnels, with barriers, regions and the engine wired
    in. Playable from start to finish with stand-in objects. This settles the
@@ -374,6 +378,23 @@ and wings) may need a bought or free model.
 7. **Deaths, visions, winning, sound**: music and fx carry over, plus
    footsteps, chopping and creaks.
 8. **Phones and iPads**: performance pass, touch controls polished.
+
+## Decided along the way
+
+- **Vertex colours, not textures**, for now: every place is a handful of
+  meshes sharing one material, coloured per vertex with a little noise for a
+  painted look. Paths are strips laid on the ground, so their edges stay crisp.
+- **Real-time light for now**, not baked: a low warm sun from the west-north-
+  west, a sky-and-grass hemisphere light, and shadows that follow you. Baking
+  comes later if phones need it.
+- **Simple bumping for now**, not Rapier: the ground is found by a ray, and
+  trees, rocks and walls are circles and boxes (empties named `col-…` in
+  Blender). Rapier comes in when there are steps, ladders and slopes to climb.
+- **Names use hyphens**: three.js drops dots from names when it loads a file.
+- **Meshopt compression**: the grassy bank is 3 MB, decoded by three.js with
+  no extra files.
+- **Far things** (the mountain, the ring of forest beyond the edge) are named
+  `far-…` and painted into the haze themselves, so the fog doesn't hide them.
 
 ## Still to decide
 

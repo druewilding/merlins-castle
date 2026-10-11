@@ -13,3 +13,7 @@ test/walkthrough.test.ts
 
 # Full-size image originals (web versions go in public/art)
 art/originals/
+
+# Pictures from npm run models -- <place> --preview, for checking
+art/blender/previews/
+__pycache__/
