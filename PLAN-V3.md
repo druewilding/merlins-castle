@@ -444,8 +444,9 @@ and wings) may need a bought or free model.
      it (so you can see what's in your way), with the original's words for it
      at the bottom of the screen ("The trees are too dense."), in English or
      Danish, for the exit you're trying. One-way, as in the original.
-   - **The game**: objects to take and use (taking and dropping ✅, with the
-     ladder, the first object with a model: `art/blender/items.py`), the
+   - **The game**: objects to take and use (taking, using and dropping ✅,
+     with the ladder, the first object with a model: `art/blender/items.py`;
+     it leans on the old stone wall and you climb over, `ladder.ts`), the
      obstacles opening, deaths,
      the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and

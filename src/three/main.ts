@@ -28,11 +28,12 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import daJson from "../../data/da.json";
 import worldJson from "../../data/world.json";
-import { messages } from "../engine/engine";
+import { effects, messages } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
-import type { Direction, World } from "../engine/types";
+import { type Direction, EXIT_ORDER, type World } from "../engine/types";
 import { LANGUAGE } from "../shared/strings";
 import { items as setUpItems } from "./items";
+import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
@@ -40,6 +41,9 @@ import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable } from "./player";
 import { sky } from "./sky";
+
+const english = worldJson as unknown as World;
+const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
 
 const HAZE = new Color("#d9dcc4");
 // Where the light comes from: low in the west, a little north, as in the paintings.
@@ -134,7 +138,7 @@ player.ways = Object.values(land.ways);
 const halls = land.halls as Record<string, Hall & { tall: number; light?: string; glow?: number }>;
 player.halls = new Map(Object.entries(halls));
 
-// Solid things, and the obstacles (all closed, until the game can open them).
+// Solid things, and the obstacles: closed, until an object in use opens one.
 const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
 type Obstacle = { box?: number[]; circle?: number[]; under?: boolean };
@@ -146,16 +150,39 @@ const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ, top]) => ({
 const AHEAD = 5;
 // One shape for each obstacle, with the names of every exit it blocks (a gate
 // blocks the way through from both sides).
-const shapes = new Map<string, Obstacle & { names: string[] }>();
+type Shape = Obstacle & { names: string[] };
+const shapes = new Map<string, Shape>();
+const shapeOf = new Map<string, Shape>(); // by exit ("old-stone-wall west")
 for (const [exit, obstacle] of Object.entries(obstacles)) {
   const key = JSON.stringify(obstacle);
   const shape = shapes.get(key) ?? { ...obstacle, names: [] };
   shape.names.push(exit);
   shapes.set(key, shape);
+  shapeOf.set(exit, shape);
 }
-function openObstacles(open: boolean) {
+// The walls you climb with the ladder: walls, open or not (the obstacle is
+// only the reach that bounces you back), so you climb over, not through.
+const exitOf = (name: string) => {
+  const [id, direction] = name.split(" ");
+  return english.rooms[id]?.exits[direction as Direction];
+};
+const walls = new Set(
+  [...shapes.values()].filter(
+    (shape) =>
+      shape.box &&
+      shape.names.some((name) => {
+        const exit = exitOf(name);
+        return exit?.obstacle?.needs === "ladder" && !exit.fatal && !exit.obstacle.fatal;
+      })
+  )
+);
+let allOpen = false; // (the debug panel's "open every obstacle")
+let opened = new Set<Shape>(); // by an object in use
+function solidify() {
   for (const under of [false, true]) {
-    const closed = open ? [] : [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
+    const here = [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
+    const closed = allOpen ? [] : here.filter((shape) => !opened.has(shape));
+    const plain = allOpen ? [] : here.filter((shape) => walls.has(shape));
     // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
@@ -168,13 +195,18 @@ function openObstacles(open: boolean) {
         ...closed.flatMap(({ box, names }) =>
           box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names, ahead: AHEAD }] : []
         ),
+        ...plain.map(({ box }) => ({ x: box![0], z: box![1], halfX: box![2], halfZ: box![3] })),
         ...(under ? underBoxes : boxes),
       ],
       under
     );
   }
 }
-openObstacles(false);
+function openObstacles(open: boolean) {
+  allOpen = open;
+  solidify();
+}
+solidify();
 const [west, east, south, north] = land.bounds;
 player.bounds = { west, east, north: -north, south: -south };
 
@@ -212,17 +244,12 @@ let room = player.under?.hall ?? placeAt(player.position.x, player.position.z, "
 // Walking into an obstacle, the original's words for it at the bottom of the
 // screen: what it says when you try that exit (the way you were going
 // through it: an obstacle only stops you going the way its exits go).
-const english = worldJson as unknown as World;
-const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
 const said = document.createElement("p");
 said.className = "said";
 said.setAttribute("aria-live", "polite");
 root.append(said);
 let quiet = 0;
-player.onBump = (exit) => {
-  const [id, direction] = exit.split(" ");
-  const way = world.rooms[id]?.exits[direction as Direction];
-  const words = way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo;
+function say(words: string) {
   // (A teletext colour code shows as a space.)
   said.textContent = words
     .replace(/\{\w+\}/g, " ")
@@ -231,10 +258,51 @@ player.onBump = (exit) => {
   said.classList.add("shown");
   clearTimeout(quiet);
   quiet = window.setTimeout(() => said.classList.remove("shown"), 3500);
+}
+player.onBump = (exit) => {
+  const [id, direction] = exit.split(" ");
+  const way = world.rooms[id]?.exits[direction as Direction];
+  say(way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo);
 };
 
-// The objects, lying where the game puts them, and the five slots you carry them in.
-const items = setUpItems({ world, scene, player, models: things.scene, ground, walkable, root });
+// The objects, lying where the game puts them, and the five slots you carry
+// them in. Using one opens the ways out of the place it's for: the ladder
+// leans against the wall, always in the same spot, where the path comes to
+// it (for now, the one object that does anything).
+const ladder = new Ladder(scene, things.scene.getObjectByName("ladder")!, ground, player, reducedMotion);
+let leaning: string | undefined; // the exit the ladder's up for
+const items = setUpItems({
+  world,
+  scene,
+  player,
+  models: things.scene,
+  ground,
+  walkable,
+  root,
+  say,
+  changed: inUse,
+  stays: (id) => {
+    if (id !== "ladder" || !ladder.shown) return undefined;
+    return { model: ladder.handOver()!, fallsTo: ladder.footing! };
+  },
+});
+function inUse() {
+  const { room: here, itemLocations } = items.state;
+  const using = effects(world, items.state);
+  const exits = EXIT_ORDER.flatMap((direction) => {
+    const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
+    const shape = shapeOf.get(`${here} ${direction}`);
+    return needs && using.includes(needs) && shape && walls.has(shape) ? [`${here} ${direction}`] : [];
+  });
+  opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
+  solidify();
+  const wall = exits[0];
+  if (wall !== leaning) {
+    ladder.away();
+    if (wall) ladder.lean(shapeOf.get(wall)!.box!, wall, PLACES.get(here)!, itemLocations.ladder === "carried");
+    leaning = wall;
+  } else if (wall && itemLocations.ladder === "carried") ladder.show();
+}
 
 // While developing: the debug panel (the 0 key), and a handle for test scripts.
 // The built game leaves all of this out.
@@ -272,7 +340,7 @@ if (import.meta.env.DEV) {
 overlay.innerHTML = `
   <h1>Merlin's Castle</h1>
   <p class="start">Click to walk</p>
-  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · E to take · 1–5 to choose · G to drop · Esc to stop</p>
+  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · E to take · 1–5 to choose · click to use · G to drop · Esc to stop</p>
   <p class="keys touch">Left thumb to walk · right thumb to look</p>`;
 overlay.hidden = Boolean(at);
 overlay.addEventListener("click", () => {
@@ -339,8 +407,14 @@ renderer.setAnimationLoop((time) => {
   player.update(dt, reducedMotion);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
-  if (player.under?.hall) room = player.under.hall;
-  else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
+  // (Climbing over a wall, you're where you were until you're over.)
+  if (!player.busy) {
+    if (player.under?.hall) room = player.under.hall;
+    else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
+  }
+  ladder.update((exit) => {
+    if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
+  });
   lightFor(player.depth, time, dt);
   items.update(room);
   here.textContent = name(room);

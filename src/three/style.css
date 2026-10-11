@@ -241,6 +241,35 @@ kbd {
   }
 }
 
+/* In use: opening a way out of this place. */
+.slot.in-use::after {
+  content: "✓";
+  position: absolute;
+  right: 4px;
+  bottom: 1px;
+  color: var(--gold);
+  font:
+    700 15px Georgia,
+    serif;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+/* Nothing happens: the slot in your hand gives a little shake. */
+.slot.shake {
+  animation: shake 0.4s ease-out;
+}
+
+@keyframes shake {
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
 /* Carrying too much: the slots flash. */
 .slots.full .slot {
   animation: full 0.5s ease-out;
@@ -254,7 +283,8 @@ kbd {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .slot.arriving img {
+  .slot.arriving img,
+  .slot.shake {
     animation: none;
   }
 }

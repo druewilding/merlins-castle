@@ -90,6 +90,15 @@ export function wayThrough(names: string[], ox: number, oz: number, x: number, z
   });
 }
 
+/** Whether a spot is in a solid thing, or an obstacle's reach (and so far round it). */
+function touching(thing: Circle | Box, x: number, z: number, margin: number) {
+  const reach = thing.ahead ?? 0;
+  if ("r" in thing) return Math.hypot(x - thing.x, z - thing.z) < thing.r + reach + margin;
+  const ox = thing.halfX + (thing.halfX < thing.halfZ ? reach : 0) + margin;
+  const oz = thing.halfZ + (thing.halfX < thing.halfZ ? 0 : reach) + margin;
+  return Math.abs(x - thing.x) < ox && Math.abs(z - thing.z) < oz;
+}
+
 /** How far a spot is from the middle of a way, its floor there, and whether it's past an end. */
 export function nearest(way: Way, x: number, z: number) {
   let best = { d: Infinity, floor: 0, beyond: false };
@@ -170,6 +179,8 @@ export class Player {
   private lift = 0; // how high you are off the ground, jumping
   private rise = 0; // and how fast you're going up (or down)
   private eye = EYE; // lower, crouching
+  // Being taken along a path (climbing a ladder), your feet at path(0 to 1).
+  private following: { path: (t: number) => Vector3; seconds: number; t: number; done: () => void } | undefined;
 
   constructor(private element: HTMLElement) {
     addEventListener("keydown", (event) => {
@@ -229,17 +240,7 @@ export class Player {
    */
   clear(x: number, z: number, under = false, margin = BODY) {
     const near = (under ? this.nearUnder : this.near).get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
-    if (!near) return true;
-    for (const c of near.circles) {
-      if (Math.hypot(x - c.x, z - c.z) < c.r + (c.ahead ?? 0) + margin) return false;
-    }
-    for (const b of near.boxes) {
-      const reach = b.ahead ?? 0;
-      const ox = b.halfX + (b.halfX < b.halfZ ? reach : 0) + margin;
-      const oz = b.halfZ + (b.halfX < b.halfZ ? 0 : reach) + margin;
-      if (Math.abs(x - b.x) < ox && Math.abs(z - b.z) < oz) return false;
-    }
-    return true;
+    return !near || ![...near.circles, ...near.boxes].some((thing) => touching(thing, x, z, margin));
   }
 
   /** Puts you somewhere: in a hall underground, if the spot's in one. */
@@ -272,7 +273,7 @@ export class Player {
 
   /** Up off the ground, if you're on it. */
   jump() {
-    if (this.flying || this.lift > 0 || this.jumpHeight <= 0) return;
+    if (this.following || this.flying || this.lift > 0 || this.jumpHeight <= 0) return;
     this.rise = Math.sqrt(2 * GRAVITY * this.jumpHeight);
   }
 
@@ -281,7 +282,20 @@ export class Player {
     this.pitch = Math.max(-1.4, Math.min(1.4, this.pitch - dy));
   }
 
+  /** Takes you along a path (up a ladder and over), your feet at path(0 to 1), then calls done. */
+  follow(path: (t: number) => Vector3, seconds: number, done: () => void) {
+    this.following = { path, seconds, t: 0, done };
+    this.lift = this.rise = 0;
+    this.knock = { x: 0, z: 0 };
+  }
+
+  /** Whether you're being taken along a path, not walking. */
+  get busy() {
+    return Boolean(this.following);
+  }
+
   update(dt: number, reducedMotion: boolean) {
+    if (this.following) return this.along(dt);
     const forward = this.axis("KeyW", "ArrowUp") - this.axis("KeyS", "ArrowDown") - this.stick.y;
     const right = this.axis("KeyD", "ArrowRight") - this.axis("KeyA", "ArrowLeft") + this.stick.x;
     // (Crouching on Ctrl, or C: Ctrl and W together closes the browser's tab.)
@@ -316,6 +330,23 @@ export class Player {
     const bob = reducedMotion || length < 0.01 || bouncing || this.lift > 0 ? 0 : Math.sin(this.bob) * 0.04;
     this.camera.position.set(this.position.x, this.position.y + this.lift + this.eye + bob, this.position.z);
     this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
+  }
+
+  private along(dt: number) {
+    const f = this.following!;
+    f.t = Math.min(1, f.t + dt / f.seconds);
+    this.position.copy(f.path(f.t));
+    this.camera.position.set(this.position.x, this.position.y + this.eye, this.position.z);
+    this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
+    if (f.t < 1) return;
+    this.following = undefined;
+    f.done();
+    // Landing in an obstacle's reach, you're going through it the free way.
+    // (After done(): that can close obstacles again, which starts them afresh.)
+    const near = this.near.get(`${Math.floor(this.position.x / CELL)},${Math.floor(this.position.z / CELL)}`);
+    for (const thing of [...(near?.circles ?? []), ...(near?.boxes ?? [])]) {
+      if (thing.names && touching(thing, this.position.x, this.position.z, BODY)) this.passing.add(thing);
+    }
   }
 
   // What you're standing on (the ground, a floor, or a table or a step you've

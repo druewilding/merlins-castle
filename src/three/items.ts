@@ -1,14 +1,15 @@
 // The objects: lying where the game puts them, taken by looking at one and
-// pressing E, carried in five slots (1–5 picks one), and dropped with G.
-// The engine stays the judge (PLAN-V3.md): taking and dropping are its
-// `take` and `drop`, and what it says decides what happens.
+// pressing E, carried in five slots (1–5 picks the one in your hand), used
+// with a click and dropped with G. The engine stays the judge (PLAN-V3.md):
+// these are its `take`, `use` and `drop`, and what it says decides what
+// happens. An object in use (opening a way out of the place) has a tick.
 //
 // Only objects with a model (art/blender/items.py) are in the world so far.
 
 import { Box3, type Object3D, Ray, type Scene, Vector3 } from "three";
 
-import { act, newGame } from "../engine/engine";
-import type { GameState, ItemId, RoomId, World } from "../engine/types";
+import { act, effects, newGame } from "../engine/engine";
+import type { Direction, GameState, ItemId, RoomId, World } from "../engine/types";
 import { artUrl } from "../illustrated/art";
 import { T } from "../shared/strings";
 import { placeAt, PLACES } from "./layout";
@@ -31,11 +32,23 @@ interface Lying {
   room: RoomId;
   model: Object3D;
   box: Box3;
+  // Dropped where it was in use (the ladder against the wall): once you've
+  // left, it's lying on the ground here.
+  fallsTo?: Footing;
+}
+
+/** Where an object stands, and which way it lies when it falls. */
+export interface Footing {
+  x: number;
+  z: number;
+  yaw: number;
 }
 
 export interface Items {
   /** Each frame: where you are, and what you're looking at. */
   update(room: RoomId): void;
+  /** Going through an exit (over the wall): whether the engine let you. */
+  go(direction: Direction): boolean;
   readonly state: GameState;
 }
 
@@ -47,8 +60,14 @@ export function items(options: {
   ground: Ground;
   walkable: Walkable;
   root: HTMLElement;
+  /** Words at the bottom of the screen ("Nothing happens."). */
+  say: (words: string) => void;
+  /** What's in use has changed: an object used, or the place left. */
+  changed: () => void;
+  /** Dropping an object where it's in use, it stays as it is (the ladder against the wall): its model, if so. */
+  stays: (id: ItemId) => { model: Object3D; fallsTo: Footing } | undefined;
 }): Items {
-  const { world, scene, player, models, ground, walkable, root } = options;
+  const { world, scene, player, models, ground, walkable, root, say, changed, stays } = options;
   let state = newGame(world);
   const lying = new Map<ItemId, Lying>();
   const slots: ItemId[] = [];
@@ -221,6 +240,7 @@ export function items(options: {
         const id = slots[k];
         const slot = document.createElement("div");
         slot.className = `slot${k === held ? " held" : ""}${id && id === arriving ? " arriving" : ""}`;
+        if (id && effects(world, state).includes(id)) slot.classList.add("in-use");
         const key = document.createElement("span");
         key.className = "key";
         key.textContent = String(k + 1);
@@ -249,6 +269,14 @@ export function items(options: {
     bar.classList.add("full");
   }
 
+  /** The slot in your hand shakes: nothing happens. */
+  function shake() {
+    const slot = bar.children[held];
+    slot?.classList.remove("shake");
+    void (slot as HTMLElement | undefined)?.offsetWidth;
+    slot?.classList.add("shake");
+  }
+
   // ---- Taking and dropping --------------------------------------------------
 
   function take(id: ItemId) {
@@ -267,15 +295,43 @@ export function items(options: {
     draw(id);
   }
 
+  function use() {
+    const id = slots[held];
+    if (!id) return;
+    const result = act(world, state, { type: "use", item: id });
+    state = result.state;
+    if (effects(world, state).includes(id)) {
+      draw();
+      changed();
+      return;
+    }
+    say(result.events.at(-1)?.text ?? "");
+    shake();
+  }
+
   function drop() {
     const id = slots[held];
     if (!id) return;
+    const inUse = effects(world, state).includes(id);
     const result = act(world, state, { type: "drop", item: id });
     if (result.state.itemLocations[id] === "carried") return;
     state = result.state;
     slots.splice(held, 1);
     held = Math.min(held, Math.max(0, slots.length - 1));
     draw();
+    // Still in use, it stays as it is (against the wall), lying in the place.
+    const staying = inUse ? stays(id) : undefined;
+    changed();
+    if (staying) {
+      const { model, fallsTo } = staying;
+      lying.set(id, {
+        room: state.room,
+        model,
+        box: new Box3().setFromObject(model).expandByScalar(AIM_SLACK),
+        fallsTo,
+      });
+      return;
+    }
     // Laid down just in front of you, pointing the way you're looking.
     const yaw = player.yaw + Math.PI;
     const half = lengthOf(models.getObjectByName(id)!) / 2;
@@ -285,8 +341,26 @@ export function items(options: {
     lay(id, state.room, x, z, yaw, player.under ? player.under.floor : undefined);
   }
 
+  /** Leaving a place, what was in use there falls where it stood. */
+  function settle() {
+    for (const [id, thing] of lying) {
+      if (!thing.fallsTo) continue;
+      scene.remove(thing.model);
+      lying.delete(id);
+      const { x, z, yaw } = thing.fallsTo;
+      lay(id, thing.room, x, z, yaw);
+    }
+  }
+
+  // A click uses the object in your hand (while you're looking about, not
+  // clicking to start).
+  addEventListener("mousedown", (event) => {
+    if (event.button === 0 && document.pointerLockElement && !player.busy) use();
+  });
+
   addEventListener("keydown", (event) => {
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (player.busy) return;
     if (event.code === "KeyE" && aimed) take(aimed);
     else if (event.code === "KeyG") drop();
     else if (/^Digit[1-5]$/.test(event.code)) {
@@ -306,9 +380,23 @@ export function items(options: {
     get state() {
       return state;
     },
+    go(direction) {
+      const result = act(world, state, { type: "go", direction });
+      const went = result.state.room !== state.room;
+      state = result.state;
+      if (went) settle();
+      draw();
+      changed();
+      return went;
+    },
     update(room) {
       // A new place: whatever was in use stays behind (as in the original).
-      if (room !== state.room) state = { ...state, room, using: [] };
+      if (room !== state.room) {
+        state = { ...state, room, using: [] };
+        settle();
+        draw();
+        changed();
+      }
 
       player.camera.getWorldPosition(eye);
       player.camera.getWorldDirection(look);
