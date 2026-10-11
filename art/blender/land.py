@@ -746,6 +746,13 @@ for gx in range(X0 + 3, X1 - 2, 5):
         r = random.uniform(2.2, 3.0)
         trees.cone((x, y, z - 0.3), tall, r, c.vary(TREE, 0.2, Vector((x, y, 0))), sides=7, droop=0.3)
         TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
+# Trees close in on both sides of the dragon's mouth, so the only way on is
+# down into it (not round its side, past the leaves).
+for dx, dy, r in ((1.5, 6.2, 1.7), (2.0, 7.5, 2.6), (5.0, 9.5, 2.8), (-1.5, 9.0, 2.4), (-0.5, 12.0, 2.6)):
+    for side in (1, -1):
+        x, y = DRAGON_LIP[0] + dx, DRAGON_LIP[1] + side * dy
+        trees.cone((x, y, height(x, y) - 0.3), random.uniform(10, 13), r, c.vary(TREE, 0.2, Vector((x, y, 0))), sides=7, droop=0.3)
+        TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
 # The dense trees across the mountain path, which only the axe will clear.
 w, e, s, n = AXE_TREES
 obstacle(["mountain-path north"], "box", (w + e) / 2, -(s + n) / 2, (e - w) / 2 + 2, (n - s) / 2)
