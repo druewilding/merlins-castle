@@ -220,6 +220,7 @@ class Way:
             covered.append(f + TUNNEL_TALL <= height(x, y) - 0.4)
         under = [a for a, c in zip(along, covered) if c]
         self.roofed = (under[0], under[-1]) if under and not self.indoor else None
+        self.length = so_far
 
     def along(self, x, y):
         """How far along the way the spot nearest x, y is."""
@@ -527,6 +528,26 @@ def open_to_the_sky(x, y, margin):
     return None
 
 
+def over_an_opening(x, y):
+    """Whether a spot is over (or nearly) the open part of a ramp, or just
+    past its lintel, where the earth over the roof still lies under the
+    ground's hole."""
+    for way in WAYS.values():
+        if way.indoor or not way.near(x, y, way.half + 0.3):
+            continue
+        d, _, beyond = way.nearest(x, y)
+        if beyond or d >= way.half + 0.3:
+            continue
+        if way.roofed is None:
+            return True
+        # (Past the lintel at a mouth: an end deep underground has none.)
+        start, end = way.roofed
+        a = way.along(x, y)
+        if (start > 0 and a < start + 0.3) or (end < way.length and a > end - 0.3):
+            return True
+    return False
+
+
 # ---------------------------------------------------------------- where the forest isn't
 
 CLEARING = {"grassy-bank": 17, "deep-river": 15, "river-south-bank": 15}
@@ -610,8 +631,13 @@ for j in range(ny):
 for j in range(ny - 1):
     for i in range(nx - 1):
         qx, qy = X0 + (i + 0.5) * STEP, Y0 + (j + 0.5) * STEP
-        if open_to_the_sky(qx, qy, 1.0) is not None or in_building(qx, qy, whole=True):
-            continue  # the hole over a ramp, or the floor of a building
+        # The hole over a ramp (a square with its middle by the ramp, or any
+        # of it over the opening: by the lintel, a square can reach back
+        # over it from beyond), or the floor of a building.
+        if open_to_the_sky(qx, qy, 1.0) is not None or in_building(qx, qy, whole=True) \
+                or any(over_an_opening(qx + STEP * u / 8, qy + STEP * v / 8)
+                       for u in range(-4, 5) for v in range(-4, 5)):
+            continue
         a = j * nx + i
         faces.append((a, a + 1, a + nx + 1, a + nx))
 c.mesh_object("ground", verts, faces, colours)
@@ -1165,7 +1191,7 @@ for way in WAYS.values():
             # A box of earth: the roof made wide, its sides, and a back.
             inward = 1 if b[5] else -1
             start = k + 1 if b[5] else k
-            span = [rows[i] for i in range(start, start + inward * 7, inward) if 0 <= i < len(rows)]
+            span = [rows[i] for i in range(start, start + inward * 9, inward) if 0 <= i < len(rows)]
             wide = half + 2.4
             for r0, r1 in zip(span, span[1:]):
                 l0, q0, l1_, q1 = side(r0, -wide), side(r0, wide), side(r1, -wide), side(r1, wide)
