@@ -907,6 +907,13 @@ for way in WAYS.values():
             covered = way.indoor or floor + TUNNEL_TALL <= ground - 0.4
             nx_, ny_ = seg_normals[si]
             rows.append((x, y, floor, nx_, ny_, covered))
+    # Open to the sky from each mouth until it first goes under cover, and
+    # covered from then on (on bumpy ground it would flip back and forth near
+    # the lintel, leaving holes in the roof).
+    under_cover = [k for k, row in enumerate(rows) if row[5]]
+    if under_cover:
+        first, last_ = under_cover[0], under_cover[-1]
+        rows = [(*row[:5], first <= k <= last_) for k, row in enumerate(rows)]
     # Earth and rough stone underground; flagstones, walls and beams indoors.
     floor_colour, wall_colour = (CORRIDOR_FLOOR, CORRIDOR_WALL) if way.indoor else (EARTH, TUNNEL_STONE)
     roof_colour = c.linear("#5b4632") if way.indoor else c.mix(TUNNEL_STONE, EARTH, 0.5)
@@ -944,13 +951,16 @@ for way in WAYS.values():
                          floor_colour)
         # (Up the ramps, the walls stop exactly under the stone lip on top of them.)
         for (ax_, ay_), (bx_, by_) in (((alx, aly), (blx, bly)), ((arx, ary), (brx, bry))):
-            top_a = a[2] + TUNNEL_TALL if a[5] else max(height(ax_, ay_) + 0.32, a[2] + 0.6)
-            top_b = b[2] + TUNNEL_TALL if b[5] else max(height(bx_, by_) + 0.32, b[2] + 0.6)
+            # (Where the ramp goes under the lintel, the walls stay up at the
+            # ground: sloping down to the roof, they'd leave a gap above them.)
+            roofed = a[5] and b[5]
+            top_a = a[2] + TUNNEL_TALL if roofed else max(height(ax_, ay_) + 0.32, a[2] + 0.6)
+            top_b = b[2] + TUNNEL_TALL if roofed else max(height(bx_, by_) + 0.32, b[2] + 0.6)
             quad(tunnel, [(ax_, ay_, a[2]), (bx_, by_, b[2]), (bx_, by_, top_b), (ax_, ay_, top_a)], wall_colour)
         if a[5] and b[5]:
             quad(tunnel, [(alx, aly, a[2] + TUNNEL_TALL), (arx, ary, a[2] + TUNNEL_TALL), (brx, bry, b[2] + TUNNEL_TALL),
                           (blx, bly, b[2] + TUNNEL_TALL)], roof_colour)
-        if not a[5] and not b[5]:
+        if not (a[5] and b[5]):
             # A lip of stone round the hole, hiding its ragged edge.
             for inner, outer in ((half, half + 2.4), (-half, -half - 2.4)):
                 pa = [side(a, inner), side(a, outer)]
@@ -963,6 +973,25 @@ for way in WAYS.values():
                     quad(tunnel, [(*p0, height(*p0) + 0.32), (*p1, height(*p1) + 0.32), (*p1, height(*p1) - 0.6),
                                   (*p0, height(*p0) - 0.6)], STONE)
         if a[5] != b[5]:
+            # Just behind the lintel, the earth over the roof: from the top of
+            # a steep ramp you look down over the roof (it drops away faster
+            # than you're looking), so there has to be something there to see.
+            # A box of earth: the roof made wide, its sides, and a back.
+            inward = 1 if b[5] else -1
+            start = k + 1 if b[5] else k
+            span = [rows[i] for i in range(start, start + inward * 7, inward) if 0 <= i < len(rows)]
+            wide = half + 2.4
+            for r0, r1 in zip(span, span[1:]):
+                l0, q0, l1_, q1 = side(r0, -wide), side(r0, wide), side(r1, -wide), side(r1, wide)
+                quad(tunnel, [(*l0, r0[2] + TUNNEL_TALL + 0.02), (*q0, r0[2] + TUNNEL_TALL + 0.02),
+                              (*q1, r1[2] + TUNNEL_TALL + 0.02), (*l1_, r1[2] + TUNNEL_TALL + 0.02)], EARTH)
+                for e0, e1 in ((l0, l1_), (q0, q1)):
+                    quad(tunnel, [(*e0, r0[2] + TUNNEL_TALL), (*e1, r1[2] + TUNNEL_TALL), (*e1, height(*e1) + 0.3),
+                                  (*e0, height(*e0) + 0.3)], EARTH)
+            back = span[-1]
+            l_, q_ = side(back, -wide), side(back, wide)
+            quad(tunnel, [(*l_, back[2] + TUNNEL_TALL), (*q_, back[2] + TUNNEL_TALL), (*q_, height(*q_) + 0.3),
+                          (*l_, height(*l_) + 0.3)], EARTH)
             # The lintel: the face of earth and stone over the opening.
             row = b if b[5] else a
             l1, r1 = side(row, -half - 2.4), side(row, half + 2.4)
