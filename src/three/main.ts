@@ -62,8 +62,9 @@ const skylight = new HemisphereLight("#cfe2ff", "#6d7a3c", 1.25);
 scene.add(skylight);
 
 // Underground, the daylight fades and a warm lamp glow takes over (one day,
-// only if you've lit the lamp).
-const lamp = new PointLight("#ffb866", 0, 16, 1.6);
+// only if you've lit the lamp). It falls off gently: a light this close
+// would otherwise blaze on any wall you walk up to.
+const lamp = new PointLight("#ffb866", 0, 14, 0.6);
 scene.add(lamp);
 // And caves and rooms have their own light (torches, the dragon's fire,
 // gold, a hearth), always on, so a lit room seen through a doorway is lit.
@@ -301,8 +302,8 @@ function lightFor(depth: number, time: number, dt: number) {
   sunlight.intensity = 2.8 * (1 - under);
   skylight.intensity = 1.25 * (1 - Math.max(under * 0.92, indoors * 0.55));
   const flicker = reducedMotion ? 1 : 0.92 + 0.05 * Math.sin(time / 90) + 0.03 * Math.sin(time / 37);
-  lamp.intensity = 14 * Math.max(under, indoors * 0.4) * flicker;
-  lamp.position.set(player.position.x + 0.3, player.position.y + 1.4, player.position.z);
+  lamp.intensity = 3.5 * Math.max(under, indoors * 0.4) * flicker;
+  lamp.position.set(player.position.x, player.position.y + 1.4, player.position.z);
 
   // The lit halls nearest you, each with its own light.
   const p = player.position;
