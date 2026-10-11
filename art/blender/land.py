@@ -731,7 +731,8 @@ for i in range(n):
             maze_wall(x + MAZE_CELL, y, x + MAZE_CELL, y + MAZE_CELL)
         if j < n - 1 and north_wall[i][j]:
             maze_wall(x, y + MAZE_CELL, x + MAZE_CELL, y + MAZE_CELL)
-built.blob((RIVER[-1][0] + 6, RIVER[-1][1], -2), 9, ROCK, squash=0.7, lumpy=0.3, seed=4)  # where the river goes under
+# Where the river goes under (clear of the beautiful chamber, down below).
+built.blob((RIVER[-1][0] + 5, RIVER[-1][1] + 3, -1.5), 9, ROCK, squash=0.7, lumpy=0.3, seed=4)
 
 # The castle: walls with a gate to the north, and corner towers.
 cw, ce_, cs, cn = CASTLE
@@ -903,11 +904,15 @@ for way in WAYS.values():
             lift = 0.04 if way.indoor and not in_building(*mid[:2]) else 0.0
             quad(tunnel, [(alx, aly, a[2] + lift), (arx, ary, a[2] + lift), (brx, bry, b[2] + lift), (blx, bly, b[2] + lift)],
                  floor_colour)
-            if in_a_hall(*mid, 0.8):
-                # A doorstep: edges down to the room's floor, so there's no gap under it.
+            near = in_a_hall(*mid, 2.0)
+            if near:
+                # A doorstep: edges down to the hall's floor, so there's no gap
+                # under it (a way can still be climbing as it comes in).
+                bottom = near.floor - 0.12
                 for p0, p1, z0, z1 in (((alx, aly), (blx, bly), a[2], b[2]), ((arx, ary), (brx, bry), a[2], b[2]),
                                        ((alx, aly), (arx, ary), a[2], a[2]), ((blx, bly), (brx, bry), b[2], b[2])):
-                    quad(tunnel, [(*p0, z0), (*p1, z1), (*p1, z1 - 0.15), (*p0, z0 - 0.15)], floor_colour)
+                    quad(tunnel, [(*p0, z0), (*p1, z1), (*p1, min(z1 - 0.12, bottom)), (*p0, min(z0 - 0.12, bottom))],
+                         floor_colour)
         for (ax_, ay_), (bx_, by_) in (((alx, aly), (blx, bly)), ((arx, ary), (brx, bry))):
             top_a = a[2] + TUNNEL_TALL if a[5] else max(height(ax_, ay_) + 0.3, a[2] + 0.6)
             top_b = b[2] + TUNNEL_TALL if b[5] else max(height(bx_, by_) + 0.3, b[2] + 0.6)
@@ -1347,10 +1352,11 @@ obstacle(["dark-tunnels south"], "box", DK[0], -ky, TUNNEL_HALF + 0.3, 1.0, unde
 caves.build("caves", smooth=False)
 pit.build("pit", smooth=False)
 
-# Rocks either side of the mouths.
+# Rocks either side of the mouths. (Their buried halves reach down a long
+# way, so they stand clear of where the tunnels run underground.)
 rocks = c.Builder()
 for x, y, r in ((WEST_LIP[0] - 6, WEST_LIP[1] + 6.5, 4.2), (WEST_LIP[0] - 6, WEST_LIP[1] - 6.5, 4.2),
-                (WEST_LIP[0] - 15, WEST_LIP[1], 6.5), (EAST_LIP[0] - 5, EAST_LIP[1] - 5, 2.8), (EAST_LIP[0] + 5, EAST_LIP[1] - 5, 2.8)):
+                (WEST_LIP[0] - 27, WEST_LIP[1] + 2, 6.5), (EAST_LIP[0] - 5, EAST_LIP[1] - 5, 2.8), (EAST_LIP[0] + 5, EAST_LIP[1] - 5, 2.8)):
     rocks.blob((x, y, height(x, y) - 0.5), r, ROCK, squash=0.7, lumpy=0.25, seed=x + y)
     solid_circle(x, y, r * 0.85)
 rocks.build("rocks", smooth=True)
