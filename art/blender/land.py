@@ -695,6 +695,14 @@ for k in range(6):
     sy = P["mossy-steps"][1] + 18 + k * 1.4
     block(built, TOWER[0] - 2, sy, height(TOWER[0], sy) - 0.4, TOWER[0] + 2, sy + 1.4, height(TOWER[0], sy) + 0.15,
           c.linear("#7f8f6a"), solid=False)
+# The snake, coiled at the top of the steps (and the stone that shuts you in,
+# from inside), and the balcony, too high to reach from the ground under it.
+obstacle(["mossy-steps north", "tower south"], "box", TOWER[0], -(TOWER[1] - 8), 3.0, 0.8)
+obstacle(["mossy-steps east"], "box", TOWER[0] + 9.5, -TOWER[1], 0.6, 2.5)
+
+# The witches, on the way west to the crossroads.
+wx, wy = P["forest-witches"]
+obstacle(["forest-witches west"], "box", (wx + P["forest-crossroads"][0]) / 2, -wy, 1.0, 5.5)
 
 # The charcoal burner's hut.
 hx, hy = P["charcoal-hut"]
@@ -907,8 +915,10 @@ def opening(hall, x, y):
 
 
 # The deep hole across the way from the maze to the treasure room: x, y, and
-# half its size across and along.
-PIT = (MZ[0], MZ[1] + MAZE_HALF + 5.4, TUNNEL_HALF + 0.4, 1.8)
+# half its size across and along. At the far end, by the treasure room, so
+# its reach doesn't come back into the maze: you only meet it once you've
+# gone into the tunnel, not while you're finding your way round.
+PIT = (MZ[0], MZ[1] + MAZE_HALF + 7.5, TUNNEL_HALF + 0.4, 1.5)
 
 
 def in_pit(x, y):

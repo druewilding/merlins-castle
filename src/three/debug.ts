@@ -55,7 +55,7 @@ export interface DebugWorld {
   obstacles: DebugObstacle[];
   /** How far an obstacle in your way reaches out to bounce you back. */
   ahead: number;
-  /** Whether trying an exit without the right object kills you. */
+  /** Whether trying an exit kills you: without the right object (the goblins), or with it (the balcony). */
   fatal: (exit: string) => boolean;
   openObstacles: (open: boolean) => void;
   room: () => RoomId;

@@ -272,7 +272,8 @@ if (import.meta.env.DEV) {
       ahead: AHEAD,
       fatal: (exit) => {
         const [id, direction] = exit.split(" ");
-        return Boolean(english.rooms[id]?.exits[direction as Direction]?.obstacle?.fatal);
+        const way = english.rooms[id]?.exits[direction as Direction];
+        return Boolean(way?.fatal || way?.obstacle?.fatal);
       },
       openObstacles,
       room: () => room,

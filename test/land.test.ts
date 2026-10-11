@@ -169,8 +169,8 @@ describe("the 3D land, with every obstacle closed", () => {
     expect(reachable("mountain-path")).not.toContain("mountain");
   });
 
-  it("lets you out of the courtyard, but not back in over the drawbridge", () => {
-    expect(reachable("courtyard")).toEqual(["courtyard", ...fromTheOldWall].sort());
+  it("lets you out of the courtyard, but not back in over the drawbridge, nor past the witches", () => {
+    expect(reachable("courtyard")).toEqual(["courtyard", "forest-edge", "forest-witches", "moat", "river-south-bank"]);
     expect(reachable("old-wall")).not.toContain("courtyard");
   });
 });
