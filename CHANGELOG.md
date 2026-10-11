@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/druewilding/merlins-castle/compare/v2.2.0...v2.2.1) (2026-10-11)
+
+
+### Bug Fixes
+
+* Add fidelity to 3d version ([#46](https://github.com/druewilding/merlins-castle/issues/46)) ([404a7d0](https://github.com/druewilding/merlins-castle/commit/404a7d07040a229e71320c213fa67d56f759a86f))
+
 ## [2.2.0](https://github.com/druewilding/merlins-castle/compare/v2.1.0...v2.2.0) (2026-10-11)
 
 
