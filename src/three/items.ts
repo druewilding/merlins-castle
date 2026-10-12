@@ -1,6 +1,6 @@
 // The objects: lying where the game puts them, taken by looking at one and
 // pressing E, carried in five slots (1–5 picks the one in your hand), used
-// with a click and dropped with G. The engine stays the judge (PLAN-V3.md):
+// with E when you're not looking at one (or a click) and dropped with G. The engine stays the judge (PLAN-V3.md):
 // these are its `take`, `use` and `drop`, and what it says decides what
 // happens. An object in use (opening a way out of the place) has a tick.
 //
@@ -466,8 +466,11 @@ export function items(options: {
       held = Number(event.code.slice(5)) - 1;
       draw();
     } else if (player.busy) return;
-    else if (event.code === "KeyE" && aimed) take(aimed);
-    else if (event.code === "KeyG") drop();
+    // E takes what you're looking at, or else uses what's in your hand.
+    else if (event.code === "KeyE") {
+      if (aimed) take(aimed);
+      else use();
+    } else if (event.code === "KeyG") drop();
   });
 
   // ---- Each frame -----------------------------------------------------------

@@ -33,7 +33,7 @@ treats the pictures as a view of the game's state, and v3 does the same in 3D:
 | ------------------------------------------ | ---------------- |
 | Walk from one place's ground into the next | `go north`       |
 | Look at an object and press E              | `take ladder`    |
-| Hold an object (keys 1–5) and click        | `use ladder`     |
+| Hold an object (keys 1–5) and press E      | `use ladder`     |
 | Press G, or throw it                       | `drop ladder`    |
 
 The world is divided into invisible **regions**, one per room. Crossing from
@@ -355,7 +355,7 @@ the weapon in Counter-Strike.
 
 ## Controls everywhere
 
-- **Laptop**: WASD or arrows, mouse look, E take, click use, G drop, 1–5 slots.
+- **Laptop**: WASD or arrows, mouse look, E take (or use, looking at nothing to take), click use too, G drop, 1–5 slots.
 - **iPad and phone**: a left thumb stick to walk, drag on the right to look,
   buttons for take, use and drop.
 - **Gamepad**: free with the Gamepad API.
