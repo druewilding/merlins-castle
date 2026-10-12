@@ -52,7 +52,7 @@ import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
-import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable } from "./player";
+import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable, wayThrough } from "./player";
 import { sky } from "./sky";
 import { Trees, type TreeSpots } from "./trees";
 
@@ -308,6 +308,17 @@ function say(words: string) {
   clearTimeout(quiet);
   quiet = window.setTimeout(() => said.classList.remove("shown"), 3500);
 }
+// Going through a way that says so ("You have climbed over."): said as you
+// commit to it (past the middle of what was in the way: at the top of the
+// wall, climbing over), not once you're through. (Not one that kills you: that's for when
+// dying is done.)
+let told: string | undefined; // the exit whose words were said, on the way through it
+function tell(exit: string) {
+  const [id, direction] = exit.split(" ");
+  const way = world.rooms[id]?.exits[direction as Direction];
+  if (way?.message && !way.fatal) say(way.message);
+  told = exit;
+}
 player.onBump = (exit) => {
   const [id, direction] = exit.split(" ");
   const way = world.rooms[id]?.exits[direction as Direction];
@@ -375,6 +386,8 @@ if (handoff && !at) {
 }
 inUse();
 instantly = false;
+let lastRoom = room; // (where you were last frame)
+const was = player.position.clone(); // (and just where)
 
 // At /3d?debug (on the dev server too): the debug panel (the 0 key), and a
 // handle for test scripts. Otherwise none of it is even loaded.
@@ -585,6 +598,30 @@ renderer.setAnimationLoop((time) => {
   ladder.update((exit) => {
     if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
   });
+  // Through what was in the way (over the wall, through the felled trees or
+  // an open gate): its words as you pass its middle (the top of the wall).
+  for (const shape of opened) {
+    const [x, z, halfX, halfZ] = shape.box ?? shape.circle!;
+    const p = player.position;
+    const near = shape.box
+      ? Math.abs(p.x - x) < halfX + 2 && Math.abs(p.z - z) < halfZ + 2
+      : Math.hypot(p.x - x, p.z - z) < halfX + 2;
+    for (const exit of shape.names) {
+      if (!exit.startsWith(`${room} `) || !near || exit === told) continue;
+      if (wayThrough([exit], x, z, was.x, was.z) && !wayThrough([exit], x, z, p.x, p.z)) tell(exit);
+    }
+  }
+  was.copy(player.position);
+  // Into a new place: the words for the way you came, if they weren't said
+  // as you went.
+  if (room !== lastRoom) {
+    const exit = EXIT_ORDER.map((direction) => `${lastRoom} ${direction}`).find(
+      (exit) => world.rooms[lastRoom].exits[exit.split(" ")[1] as Direction]?.to === room
+    );
+    if (exit && exit !== told) tell(exit);
+    told = undefined;
+    lastRoom = room;
+  }
   lightFor(player.depth, time, dt);
   items.update(room);
   here.textContent = name(room);
