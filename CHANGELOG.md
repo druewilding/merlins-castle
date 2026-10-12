@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.5.0](https://github.com/druewilding/merlins-castle/compare/v2.4.0...v2.5.0) (2026-10-12)
+
+
+### Features
+
+* Add texture to the tunnels ([#58](https://github.com/druewilding/merlins-castle/issues/58)) ([e8efa78](https://github.com/druewilding/merlins-castle/commit/e8efa78c3d000820e315a3c79cda6a91a7eda1db))
+* Add the axe and enable it to chop down trees ([#54](https://github.com/druewilding/merlins-castle/issues/54)) ([eef4ca2](https://github.com/druewilding/merlins-castle/commit/eef4ca2521a1bb16073c5916aeeb13aa6748ac53))
+* Enable bunny hopping (hold space to bounce!) ([#53](https://github.com/druewilding/merlins-castle/issues/53)) ([4d56db3](https://github.com/druewilding/merlins-castle/commit/4d56db3946f8a6a6ef2cea3ccbaaf3160cda61d2))
+* Improve the title screen actions to make it feel much more slick ([#57](https://github.com/druewilding/merlins-castle/issues/57)) ([f128257](https://github.com/druewilding/merlins-castle/commit/f12825708a374cd756f7e4dbf618617ad15691cc))
+* Press E to use what you hold when you're not pointing at anything ([#52](https://github.com/druewilding/merlins-castle/issues/52)) ([5aeac89](https://github.com/druewilding/merlins-castle/commit/5aeac892791c0fa177bee38172ff982b977dba00))
+* Show what using an object and going through a way says, as the original does ([92dc912](https://github.com/druewilding/merlins-castle/commit/92dc912b5c559edd08712fbd43f910462235c4b8))
+* Show what using an object and going through a way says, as the original does ([#56](https://github.com/druewilding/merlins-castle/issues/56)) ([92dc912](https://github.com/druewilding/merlins-castle/commit/92dc912b5c559edd08712fbd43f910462235c4b8))
+
+
+### Bug Fixes
+
+* Close the slits beside the keep's and the coach house's doorways ([#59](https://github.com/druewilding/merlins-castle/issues/59)) ([c532cb9](https://github.com/druewilding/merlins-castle/commit/c532cb95847f7c1f5b3c3eeb4714c397bb6c09c8))
+* Various fixes and improvements (see commit messages!) ([#55](https://github.com/druewilding/merlins-castle/issues/55)) ([4011473](https://github.com/druewilding/merlins-castle/commit/4011473f6d353b19cbe560f8113e89998ab8be4d))
+
 ## [2.4.0](https://github.com/druewilding/merlins-castle/compare/v2.3.0...v2.4.0) (2026-10-11)
 
 
