@@ -1,7 +1,9 @@
 // The dense trees across the mountain path (land.json's trees.dense), which
 // the axe fells: one blow (they all shudder), then over they all go together,
-// away from the path, leaving stumps. When the axe is no longer
-// in use there (you've gone on, as in the original), they spring back up.
+// away from the path, leaving stumps. When the axe is no longer in use there
+// (you've gone on, as in the original), they spring back up. And coming down
+// from the mountain, the ones round you slide aside to let you out, and close
+// again behind you (they keep people out of the mountain, not in: PLAN-V3.md).
 
 import { InstancedMesh, Matrix4, type Mesh, Quaternion, type Scene, Vector3 } from "three";
 
@@ -13,6 +15,10 @@ const RISE = 0.7; // seconds, springing back up
 const STUMP = 0.26; // a stump's size, for a tree's
 const STUMP_TALL = 0.62; // the stump model's height, at its own size
 const SUNK = 0.3; // the trees stand sunk this far into the ground (land.py)
+const CLEAR = 3.5; // metres: parting, they slide this far either side of you
+const NEAR = 3; // metres, ahead or behind: the ones this near you are right out of the way
+const FAR = 9; // and the ones this far, back in place
+const SLIDE = 9; // how quickly they slide (the larger, the quicker)
 
 interface Felled {
   at: Vector3;
@@ -23,6 +29,7 @@ interface Felled {
   slot: number;
   lag: number; // seconds after the first that it falls
   angle: number; // how far over, now
+  aside: number; // and how far it's slid aside (east, or west), parting
   from: number; // and when it began springing back up
 }
 
@@ -72,6 +79,7 @@ export class Felling {
         slot: mesh.count++,
         lag: (0.5 + 0.5 * Math.sin(i * 12.9898)) * LAG,
         angle: 0,
+        aside: 0,
         from: 0,
       });
     });
@@ -92,12 +100,31 @@ export class Felling {
     for (const tree of this.trees) tree.from = tree.angle;
   }
 
-  update(dt: number) {
-    if (this.still) return;
-    this.time += dt;
-    for (const tree of this.trees) tree.angle = this.down ? this.falling(tree) : this.rising(tree);
+  /** Each frame: falling or rising; and parting round you (at `me`), coming down from the mountain. */
+  update(dt: number, me: Vector3, parting: boolean) {
+    const slid = this.part(dt, me, parting && !this.down);
+    if (this.still && !slid) return;
+    if (!this.still) {
+      this.time += dt;
+      for (const tree of this.trees) tree.angle = this.down ? this.falling(tree) : this.rising(tree);
+      this.still = this.time > (this.down ? CHOP + LAG + FALL + 1.5 : RISE);
+    }
     this.draw();
-    this.still = this.time > (this.down ? CHOP + LAG + FALL + 1.5 : RISE);
+  }
+
+  // The ones near you slide out of your way, either side; the rest slide back.
+  // Whether any moved.
+  private part(dt: number, me: Vector3, parting: boolean) {
+    let moved = false;
+    for (const tree of this.trees) {
+      const dx = tree.at.x - me.x;
+      const near = Math.min(1, Math.max(0, (FAR - Math.abs(tree.at.z - me.z)) / (FAR - NEAR)));
+      const want = parting ? (Math.sign(dx) || 1) * Math.max(0, CLEAR - Math.abs(dx)) * near : 0;
+      if (Math.abs(want - tree.aside) < 0.001) continue;
+      tree.aside += (want - tree.aside) * Math.min(1, dt * SLIDE);
+      moved = true;
+    }
+    return moved;
   }
 
   // Shuddering at the blow, then falling faster and faster, and a little bounce.
@@ -132,6 +159,7 @@ export class Felling {
       this.turn.setFromAxisAngle(tree.axis, tree.angle);
       at.set(0, cut * (over - 1), 0).applyQuaternion(this.turn);
       at.add(tree.at).setY(at.y + cut);
+      at.x += tree.aside;
       this.turn.multiply(tree.yaw);
       this.matrix.compose(at, this.turn, size.setScalar(tree.scale));
       tree.mesh.setMatrixAt(tree.slot, this.matrix);

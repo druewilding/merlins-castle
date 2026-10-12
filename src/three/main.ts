@@ -336,6 +336,7 @@ const items = setUpItems({
   },
   begin: handoff ?? undefined,
 });
+let parting = false; // (the dense trees, for you coming down from the mountain)
 let instantly = true; // (loading, what's in use is as it was: no gate swinging open, no chopping)
 function inUse() {
   const { room: here, itemLocations } = items.state;
@@ -556,7 +557,16 @@ renderer.setAnimationLoop((time) => {
   const dt = Math.min(timer.getDelta(), 0.1);
   player.update(dt, reducedMotion);
   trees.update(player.position, player.yaw, player.camera);
-  felling.update(dt);
+  // Coming down from the mountain to the dense trees, they part for you
+  // (going up, they don't), until you're clear of them.
+  if (dense?.box) {
+    const [x, z, halfX, halfZ] = dense.box;
+    const { x: px, z: pz } = player.position;
+    const near = Math.abs(px - x) < halfX + 2 && pz > z - halfZ - 9 && pz < z + halfZ + 3;
+    if (!near) parting = false;
+    else if (room === "mountain") parting = true;
+  }
+  felling.update(dt, player.position, parting);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)

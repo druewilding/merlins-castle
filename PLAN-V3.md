@@ -449,7 +449,8 @@ and wings) may need a bought or free model.
      `art/blender/items.py`; the ladder leans on the old stone wall and you
      climb over, `ladder.ts`; the key swings the rusty gate open; the axe
      lies on the charcoal hut's floor, and fells the dense trees on the
-     mountain path, which spring back up once you're past, `felling.ts`;
+     mountain path, which spring back up once you're past, and part to
+     let you out coming down, `felling.ts`;
      the trees are Quaternius's, firs, oaks, birches and willows, a mix for
      each part of the land, `src/three/trees.ts`; saving and loading ✅,
      the same saves as the other versions, and switching between all three
