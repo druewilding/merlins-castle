@@ -74,8 +74,9 @@ scene.add(skylight);
 
 // Underground, the daylight fades and a warm lamp glow takes over (one day,
 // only if you've lit the lamp). It falls off gently: a light this close
-// would otherwise blaze on any wall you walk up to.
-const lamp = new PointLight("#ffb866", 0, 14, 0.6);
+// would otherwise blaze on any wall you walk up to. (Warm, but only a little:
+// any more and the grey rock of the tunnels looks like brown earth.)
+const lamp = new PointLight("#ffdcb4", 0, 14, 0.6);
 scene.add(lamp);
 // And caves and rooms have their own light (torches, the dragon's fire,
 // gold, a hearth), always on, so a lit room seen through a doorway is lit.

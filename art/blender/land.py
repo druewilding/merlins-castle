@@ -1187,7 +1187,8 @@ built.build("built", smooth=False)
 # ---------------------------------------------------------------- underground
 
 EARTH = c.linear("#5a4632")
-TUNNEL_STONE = c.linear("#7d7568")
+TUNNEL_STONE = c.linear("#76746f")  # grey rock
+TUNNEL_FLOOR = c.linear("#4d4a46")  # grey grit underfoot, a little warm
 FLAME = c.linear("#ffb347")
 IRON = c.linear("#2b2a2c")
 OAK = c.linear("#5e3b1f")
@@ -1329,7 +1330,8 @@ SPRING = 2.3  # where the roof springs from the walls (the middle of its curve)
 PROP_EVERY = 8  # rows (half a metre each) between the timber props
 PROP_TALL = 2.95  # up to its beam: over your head even jumping (its ends go into the rock)
 TIMBER = c.linear("#4a3420")
-LAYERS = (c.linear("#6f6556"), c.linear("#5a4632"), c.linear("#7a6a52"), c.linear("#4d4236"))
+# (Grey rock, in layers: one a little warmer, for a hint of iron in it.)
+LAYERS = (c.linear("#6e6d6a"), c.linear("#5a5957"), c.linear("#7c7a76"), c.linear("#4c4b4a"), c.linear("#6a6560"))
 
 
 def vault_point(row, u, h, half):
@@ -1357,7 +1359,7 @@ def rock_colour(x, y, z):
     """Layers of earth and stone, tilted a little, darker towards the floor."""
     t = noise.noise(Vector((x / 9, y / 9, 0.3))) * 1.5 + z * 0.9
     k = int(math.floor(t)) % len(LAYERS)
-    return c.mix(LAYERS[k], c.linear("#2a2018"), 0.25 * max(0.0, 1 - (z % 3.2) / 1.2) * 0.6)
+    return c.mix(LAYERS[k], c.linear("#1d1d1f"), 0.25 * max(0.0, 1 - (z % 3.2) / 1.2) * 0.6)
 
 
 def oriented_box(builder, corners, z0, z1, colour):
@@ -1423,8 +1425,8 @@ for way in WAYS.values():
         first, last_ = under_cover[0], under_cover[-1]
         rows = [(*row[:5], first <= k <= last_) for k, row in enumerate(rows)]
     # Earth and rough stone underground; flagstones, walls and beams indoors.
-    floor_colour, wall_colour = (CORRIDOR_FLOOR, CORRIDOR_WALL) if way.indoor else (EARTH, TUNNEL_STONE)
-    roof_colour = c.linear("#5b4632") if way.indoor else c.mix(TUNNEL_STONE, EARTH, 0.5)
+    floor_colour, wall_colour = (CORRIDOR_FLOOR, CORRIDOR_WALL) if way.indoor else (TUNNEL_FLOOR, TUNNEL_STONE)
+    roof_colour = c.linear("#5b4632") if way.indoor else LAYERS[1]
 
     def side(row, offset):
         x, y, _, nx_, ny_, _ = row
@@ -1518,7 +1520,7 @@ for way in WAYS.values():
                 sign = rubble.choice((1, -1))
                 rx3, ry3 = side(a, sign * (half - 0.08))
                 r = rubble.uniform(0.12, 0.28)
-                tunnel.blob((rx3, ry3, a[2] + r * 0.2), r, c.mix(TUNNEL_STONE, EARTH, rubble.random() * 0.6),
+                tunnel.blob((rx3, ry3, a[2] + r * 0.2), r, c.mix(LAYERS[2], LAYERS[3], rubble.random()),
                             squash=0.6, lumpy=0.35, seed=rubble.random() * 100, subdivisions=1)
             continue
         # (Up the ramps, the walls stop exactly under the stone lip on top of them.)
@@ -1628,12 +1630,12 @@ for way in WAYS.values():
         ox, oy = ny_ * outward, -nx_ * outward
         (lx_, ly_), (rx_, ry_) = edges
         el, er = (lx_ + ox, ly_ + oy), (rx_ + ox, ry_ + oy)
-        quad(tunnel, [(lx_, ly_, f), (rx_, ry_, f), (*er, f), (*el, f)], EARTH)
+        quad(tunnel, [(lx_, ly_, f), (rx_, ry_, f), (*er, f), (*el, f)], floor_colour)
         quad(tunnel, [(lx_, ly_, f + TUNNEL_TALL), (rx_, ry_, f + TUNNEL_TALL), (*er, f + TUNNEL_TALL), (*el, f + TUNNEL_TALL)],
              roof_colour)
         for p, q in (((lx_, ly_), el), ((rx_, ry_), er)):
             quad(tunnel, [(*p, f), (*q, f), (*q, f + TUNNEL_TALL), (*p, f + TUNNEL_TALL)], wall_colour)
-        quad(tunnel, [(*el, f), (*er, f), (*er, f + TUNNEL_TALL), (*el, f + TUNNEL_TALL)], EARTH)
+        quad(tunnel, [(*el, f), (*er, f), (*er, f + TUNNEL_TALL), (*el, f + TUNNEL_TALL)], LAYERS[3])
 # A stone threshold at every mouth onto the land, over the ragged edge of the
 # hole in the ground (which comes in whole squares, so it reaches a little
 # past where the ramp begins, and shows the sky through the gap).
@@ -1677,7 +1679,7 @@ tops = [WAYS["maze-treasure"].nearest(x, y)[1] for x, y in corners]
 bottom = min(tops) - 9
 for k in range(4):
     (ax, ay), (bx, by) = corners[k], corners[(k + 1) % 4]
-    quad(pit, [(ax, ay, tops[k]), (bx, by, tops[(k + 1) % 4]), (bx, by, bottom), (ax, ay, bottom)], c.mix(EARTH, PIT_DARK, 0.6))
+    quad(pit, [(ax, ay, tops[k]), (bx, by, tops[(k + 1) % 4]), (bx, by, bottom), (ax, ay, bottom)], c.mix(TUNNEL_STONE, PIT_DARK, 0.6))
 quad(pit, [(x, y, bottom) for x, y in corners], PIT_DARK)
 obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy, under=True)
 
