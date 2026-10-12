@@ -327,6 +327,7 @@ const items = setUpItems({
   models: things.scene,
   ground,
   walkable,
+  paths: land.paths,
   root,
   say,
   changed: inUse,

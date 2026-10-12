@@ -50,6 +50,13 @@ interface Lying {
   fallsTo?: Footing;
 }
 
+/** A path (land.json): its line [x, z], how far either side of it it goes, and how far up off the ground. */
+export interface Path {
+  points: number[][];
+  half: number;
+  lift: number;
+}
+
 /** Where an object stands, and which way it lies when it falls. */
 export interface Footing {
   x: number;
@@ -116,6 +123,8 @@ export function items(options: {
   models: Object3D;
   ground: Ground;
   walkable: Walkable;
+  /** The paths, a little above the ground (land.json): what lies on one lies on top of it. */
+  paths: Path[];
   root: HTMLElement;
   /** Words at the bottom of the screen ("Nothing happens."). */
   say: (words: string) => void;
@@ -183,6 +192,25 @@ export function items(options: {
     });
   }
 
+  /** The ground, or the top of a path lying on it. */
+  function surface(x: number, z: number) {
+    const g = ground(x, z);
+    if (g === undefined) return undefined;
+    let lift = 0;
+    for (const path of options.paths) {
+      for (let k = 0; k < path.points.length - 1; k++) {
+        const [ax, az] = path.points[k];
+        const [bx, bz] = path.points[k + 1];
+        const t = Math.max(
+          0,
+          Math.min(1, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / ((bx - ax) ** 2 + (bz - az) ** 2 || 1))
+        );
+        if (Math.hypot(x - ax - t * (bx - ax), z - az - t * (bz - az)) <= path.half) lift = Math.max(lift, path.lift);
+      }
+    }
+    return g + lift;
+  }
+
   /** The line an object rests on, along its length: the ground's upper hull, under its middle. */
   function resting(x: number, z: number, yaw: number, half: number, wide: number) {
     const along = [Math.sin(yaw), Math.cos(yaw)];
@@ -193,12 +221,12 @@ export function items(options: {
       const s = -half + (k / n) * half * 2;
       let h = -Infinity;
       for (const w of [-wide, 0, wide]) {
-        const g = ground(x + along[0] * s + across[0] * w, z + along[1] * s + across[1] * w);
+        const g = surface(x + along[0] * s + across[0] * w, z + along[1] * s + across[1] * w);
         if (g !== undefined) h = Math.max(h, g);
       }
       if (h > -Infinity) profile.push([s, h + LIFT]);
     }
-    if (profile.length < 2) return { y: (ground(x, z) ?? 0) + LIFT, slope: 0 };
+    if (profile.length < 2) return { y: (surface(x, z) ?? 0) + LIFT, slope: 0 };
     // The upper hull: the bumps a straight edge would touch.
     const hull: [number, number][] = [];
     for (const p of profile) {

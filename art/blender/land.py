@@ -2041,6 +2041,11 @@ if out:
         "circles": circles,
         "boxes": boxes,
         "trees": tree_spots,
+        # The paths, lying a little above the ground (so what's dropped on
+        # one lies on it, not in it): each its line [x, z], in three.js's
+        # axes, how far either side of it it goes, and how far up it is.
+        "paths": [{"half": ACROSS[-1], "lift": round(0.04 + 0.003 * (k % 10), 3),
+                   "points": [[round(x, 2), round(-y, 2)] for x, y in line]} for k, line in enumerate(paths)],
     }, separators=(",", ":")))
     print(f"Exported {out}: {len(circles)} solid circles, {len(boxes)} boxes, {len(obstacles)} obstacles")
 if preview:
