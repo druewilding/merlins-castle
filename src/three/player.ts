@@ -250,8 +250,9 @@ export class Player {
   }
 
   /** Puts you somewhere: in a hall underground, if the spot's in one. */
-  place(x: number, z: number, yaw = 0) {
-    this.under = this.hallAt(x, z);
+  place(x: number, z: number, yaw = 0, floor?: number) {
+    // (On a floor underground or indoors, if it says: a hall's, or a way's.)
+    this.under = floor === undefined ? this.hallAt(x, z) : (this.underAt(x, z, floor) ?? this.hallAt(x, z));
     this.position.set(x, this.groundAt(x, z) ?? 0, z);
     this.lift = this.rise = 0;
     // (Not climbing any more, or going through anything: somewhere new.)
