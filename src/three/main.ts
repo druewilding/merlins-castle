@@ -472,9 +472,14 @@ function showSave() {
     event.preventDefault();
     const name = input.value.trim();
     if (!name) return;
-    const ok = saveGame(name, items.state, where());
-    if (ok) saveName = name;
-    panel.replaceChildren(h("p", {}, ok ? T.savedAs(name) : T.cantSave));
+    if (!saveGame(name, items.state, where())) {
+      panel.replaceChildren(h("p", {}, T.cantSave));
+      return;
+    }
+    // Saved: straight back into the game, saying so there.
+    saveName = name;
+    resume();
+    say(T.savedAs(name));
   };
   panel.replaceChildren(
     h("h2", {}, T.saveTitle),
@@ -508,11 +513,13 @@ function showLoad() {
   panel.hidden = false;
 }
 
-overlay.addEventListener("click", () => {
-  void renderer.domElement.requestPointerLock?.();
+function resume() {
+  // (If the browser won't take the mouse after all, the menu's back, to click.)
+  Promise.resolve(renderer.domElement.requestPointerLock?.()).catch(() => (overlay.hidden = false));
   overlay.hidden = true;
   panel.hidden = true;
-});
+}
+overlay.addEventListener("click", resume);
 overlay.addEventListener("touchend", () => (overlay.hidden = true));
 // With the debug panel open, clicking the world looks around again.
 renderer.domElement.addEventListener("click", () => {
