@@ -1,10 +1,10 @@
 // The debug panel, for finding your way round while building: fly, walk
 // through anything, open every obstacle, go faster, and jump anywhere on a
 // map. Opened with the 0 key (on the number row or the number pad, so it
-// works whatever the keyboard's language). P copies what you're looking at
-// to the clipboard, for pasting into a chat. R shows the obstacles, and how
-// far each reaches out on the side it stops you from: red where trying it
-// kills you. M shows the gaps: the sky turns magenta, and the mist and haze
+// works whatever the keyboard's language). P copies what you see to the
+// clipboard (the place's name, the score, the slots and all), for pasting into
+// a chat. R shows the obstacles, and how far each reaches out on the side it
+// stops you from: red where trying it kills you. M shows the gaps: the sky turns magenta, and the mist and haze
 // go, so anywhere you can see through the land stands out (as in
 // npm run gaps, but from wherever you fly). L floats the places' names over
 // them, for finding your way while the world is grey.
@@ -36,6 +36,7 @@ import {
 import type { RoomId } from "../engine/types";
 import { DEATHS, LOST, PLACES } from "./layout";
 import { type Ground, nearest, type Player, type Walkable } from "./player";
+import { paintPage } from "./snapshot";
 
 /** An obstacle's shape, with the names of the exits it blocks ("rusty-gate north"). */
 export interface DebugObstacle {
@@ -179,8 +180,8 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     else if (event.code === "KeyP") copyPicture();
   });
 
-  // What you're looking at, to the clipboard: with where you are written in
-  // the corner, so whoever sees it knows where it was taken.
+  // What you see, to the clipboard: with where you are written in the
+  // corner, so whoever sees it knows where it was taken.
   function caption() {
     const p = player.position;
     const compass = ["north", "north-west", "west", "south-west", "south", "south-east", "east", "north-east"];
@@ -196,13 +197,17 @@ export function debug(world: DebugWorld, onOpen: () => void) {
     copy.height = shot.height;
     const pen = copy.getContext("2d")!;
     pen.drawImage(shot, 0, 0);
+    // And all that's on the page over it: what you see.
+    paintPage(pen, copy.width / innerWidth, [...document.querySelectorAll(".corner, .aim, .prompt, .slots, .said")]);
     const size = Math.round(copy.height / 40);
     pen.font = `${size}px system-ui, sans-serif`;
     const text = caption();
+    // (Top right: the only corner nothing else is in.)
+    const wide = pen.measureText(text).width + size * 1.2;
     pen.fillStyle = "rgba(0, 0, 0, 0.6)";
-    pen.fillRect(0, copy.height - size * 1.8, pen.measureText(text).width + size * 1.2, size * 1.8);
+    pen.fillRect(copy.width - wide, 0, wide, size * 1.8);
     pen.fillStyle = "#fff";
-    pen.fillText(text, size * 0.6, copy.height - size * 0.55);
+    pen.fillText(text, copy.width - wide + size * 0.6, size * 1.25);
     // The picture is promised, not handed over, so Safari still counts the
     // key press as what asked for the copy.
     const png = new Promise<Blob>((resolve, reject) =>

@@ -327,6 +327,7 @@ const items = setUpItems({
   models: things.scene,
   ground,
   walkable,
+  paths: land.paths,
   root,
   say,
   changed: inUse,
@@ -335,6 +336,7 @@ const items = setUpItems({
     return { model: ladder.handOver()!, fallsTo: ladder.footing! };
   },
   begin: handoff ?? undefined,
+  reducedMotion,
 });
 let parting = false; // (the dense trees, for you coming down from the mountain)
 let instantly = true; // (loading, what's in use is as it was: no gate swinging open, no chopping)

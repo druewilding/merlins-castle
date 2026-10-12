@@ -6,13 +6,14 @@
 //
 // Only objects with a model (art/blender/items.py) are in the world so far.
 
-import { Box3, type Object3D, Ray, type Scene, Vector3 } from "three";
+import { Box3, Matrix4, type Object3D, Ray, type Scene, Vector3 } from "three";
 
 import { act, effects, newGame } from "../engine/engine";
 import type { Direction, GameState, ItemId, RoomId, World } from "../engine/types";
 import { artUrl } from "../illustrated/art";
 import type { ThreeSave } from "../shared/storage";
 import { T } from "../shared/strings";
+import { Glow } from "./glow";
 import { placeAt, PLACES } from "./layout";
 import { type Ground, type Hall, nearest, type Player, type Walkable } from "./player";
 
@@ -41,12 +42,19 @@ interface Footprint {
 interface Lying {
   room: RoomId;
   model: Object3D;
-  box: Box3;
+  box: Box3; // its own size, turned and tilted with it (to point at)
   footprint?: Footprint;
   floor?: number; // (on a floor, underground or indoors, not the ground)
   // Dropped where it was in use (the ladder against the wall): once you've
   // left, it's lying on the ground here.
   fallsTo?: Footing;
+}
+
+/** A path (land.json): its line [x, z], how far either side of it it goes, and how far up off the ground. */
+export interface Path {
+  points: number[][];
+  half: number;
+  lift: number;
 }
 
 /** Where an object stands, and which way it lies when it falls. */
@@ -115,6 +123,8 @@ export function items(options: {
   models: Object3D;
   ground: Ground;
   walkable: Walkable;
+  /** The paths, a little above the ground (land.json): what lies on one lies on top of it. */
+  paths: Path[];
   root: HTMLElement;
   /** Words at the bottom of the screen ("Nothing happens."). */
   say: (words: string) => void;
@@ -124,8 +134,10 @@ export function items(options: {
   stays: (id: ItemId) => { model: Object3D; fallsTo: Footing } | undefined;
   /** A game loaded (or carried on from another version), and, saved in 3D, where things lie. */
   begin?: { state: GameState; three?: ThreeSave };
+  reducedMotion: boolean;
 }): Items {
   const { world, scene, player, models, ground, walkable, root, say, changed, stays, begin } = options;
+  const glow = new Glow(options.reducedMotion); // round what you're pointing at
   let state = begin?.state ?? newGame(world);
   const lying = new Map<ItemId, Lying>();
   // What you carry: in the order it was in your slots, if it's known.
@@ -138,6 +150,13 @@ export function items(options: {
   const look = new Vector3();
 
   // ---- In the world ---------------------------------------------------------
+
+  /**
+   * An object's box, as it comes (lying along z): to point at, turned and
+   * tilted with it. (A box squared to north and south round it, turned or
+   * tilted, would be bigger than it is, and in front of what's beside it.)
+   */
+  const boxOf = (id: ItemId) => new Box3().setFromObject(models.getObjectByName(id)!);
 
   /** How long an object is, end to end, so it lies on the slope under it. */
   const lengthOf = (model: Object3D) => new Box3().setFromObject(model).getSize(new Vector3()).z;
@@ -156,18 +175,40 @@ export function items(options: {
     model.position.set(x, y, z);
     model.rotation.set(0, yaw, 0, "YXZ");
     model.rotateX(-Math.atan(slope));
+    // (Lying flat, a few centimetres up, its shadow would be a sliver beside
+    // it, drawn in steps by the sun's shadow map: none, then. It still has
+    // the trees' shadows on it.)
     model.traverse((node) => {
-      node.castShadow = true;
+      node.castShadow = false;
       node.receiveShadow = true;
     });
     scene.add(model);
     lying.set(id, {
       room,
       model,
-      box: new Box3().setFromObject(model).expandByScalar(AIM_SLACK),
+      box: boxOf(id),
       footprint: { x, z, yaw, half, wide: size.x / 2 },
       floor,
     });
+  }
+
+  /** The ground, or the top of a path lying on it. */
+  function surface(x: number, z: number) {
+    const g = ground(x, z);
+    if (g === undefined) return undefined;
+    let lift = 0;
+    for (const path of options.paths) {
+      for (let k = 0; k < path.points.length - 1; k++) {
+        const [ax, az] = path.points[k];
+        const [bx, bz] = path.points[k + 1];
+        const t = Math.max(
+          0,
+          Math.min(1, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / ((bx - ax) ** 2 + (bz - az) ** 2 || 1))
+        );
+        if (Math.hypot(x - ax - t * (bx - ax), z - az - t * (bz - az)) <= path.half) lift = Math.max(lift, path.lift);
+      }
+    }
+    return g + lift;
   }
 
   /** The line an object rests on, along its length: the ground's upper hull, under its middle. */
@@ -180,12 +221,12 @@ export function items(options: {
       const s = -half + (k / n) * half * 2;
       let h = -Infinity;
       for (const w of [-wide, 0, wide]) {
-        const g = ground(x + along[0] * s + across[0] * w, z + along[1] * s + across[1] * w);
+        const g = surface(x + along[0] * s + across[0] * w, z + along[1] * s + across[1] * w);
         if (g !== undefined) h = Math.max(h, g);
       }
       if (h > -Infinity) profile.push([s, h + LIFT]);
     }
-    if (profile.length < 2) return { y: (ground(x, z) ?? 0) + LIFT, slope: 0 };
+    if (profile.length < 2) return { y: (surface(x, z) ?? 0) + LIFT, slope: 0 };
     // The upper hull: the bumps a straight edge would touch.
     const hull: [number, number][] = [];
     for (const p of profile) {
@@ -427,7 +468,7 @@ export function items(options: {
       lying.set(id, {
         room: state.room,
         model,
-        box: new Box3().setFromObject(model).expandByScalar(AIM_SLACK),
+        box: boxOf(id),
         fallsTo,
       });
       return;
@@ -520,6 +561,10 @@ export function items(options: {
   // ---- Each frame -----------------------------------------------------------
 
   const ray = new Ray();
+  const mine = new Ray();
+  const roomy = new Box3();
+  const on = new Vector3();
+  const inverse = new Matrix4();
   const hit = new Vector3();
 
   return {
@@ -558,16 +603,38 @@ export function items(options: {
       player.camera.getWorldPosition(eye);
       player.camera.getWorldDirection(look);
       ray.set(eye, look);
+      // What you're looking at: the nearest thing your gaze hits; or, if it
+      // hits none, the thing it passes closest to (within a little room round
+      // each). Not just the first room round something it comes to: lying
+      // side by side, the room round one would cover the next.
       aimed = undefined;
-      let nearest = REACH;
+      let best = { miss: AIM_SLACK, d: REACH };
       for (const [id, thing] of lying) {
-        if (!ray.intersectBox(thing.box, hit)) continue;
-        const d = hit.distanceTo(eye);
-        if (d < nearest) {
-          nearest = d;
+        // (Your gaze, as the object sees it: then its box is square to it.)
+        thing.model.updateMatrixWorld();
+        mine.copy(ray).applyMatrix4(inverse.copy(thing.model.matrixWorld).invert());
+        const room = roomy.copy(thing.box).expandByScalar(AIM_SLACK);
+        if (!mine.intersectBox(room, hit)) continue;
+        // On through the room round it, how near it comes to it (0: it hits it).
+        // (From where it comes into that room, or from your eye if you're in it.)
+        const from = room.containsPoint(mine.origin) ? 0 : mine.origin.distanceTo(hit);
+        let miss = Infinity;
+        let at = 0;
+        for (let s = 0; s < 8 && miss > 0; s += 0.02) {
+          mine.at(from + s, on);
+          if (s > 0 && !room.containsPoint(on)) break;
+          const m = thing.box.distanceToPoint(on);
+          if (m < miss) [miss, at] = [m, s];
+        }
+        const d = from + at;
+        if (d > REACH) continue;
+        if (miss < best.miss - 0.01 || (Math.abs(miss - best.miss) <= 0.01 && d < best.d)) {
+          best = { miss, d };
           aimed = id;
         }
       }
+      glow.show(aimed ? lying.get(aimed)?.model : undefined);
+      glow.update(performance.now() / 1000);
       aim.classList.toggle("on", Boolean(aimed));
       prompt.classList.toggle("shown", Boolean(aimed));
       if (aimed) {

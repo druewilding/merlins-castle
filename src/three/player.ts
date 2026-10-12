@@ -61,8 +61,13 @@ function inHall(hall: Hall, x: number, z: number) {
   if (hall.w !== undefined && hall.d !== undefined) {
     return Math.abs(x - hall.x) <= hall.w - BODY && Math.abs(z - hall.z) <= hall.d - BODY;
   }
-  return Math.hypot(x - hall.x, z - hall.z) <= hall.r - BODY;
+  return Math.hypot(x - hall.x, z - hall.z) <= hall.r - (hall.indoor ? 0 : CAVE_DOORWAY) - BODY;
 }
+
+// How far in from a cave's edge its door frames stand (in front of its lumpy
+// wall): you stay inside them, or at a doorway's corner you'd step round
+// behind its frame.
+const CAVE_DOORWAY = 0.5;
 
 /**
  * Where you are when you're off the land (underground, or indoors): the

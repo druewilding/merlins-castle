@@ -64,7 +64,7 @@
   "lost": {
     "_": "Where you get lost: the exit that leads there, and where its mist is",
     "forest-crossroads west": [-1, 6],
-    "forest-witches north": [1, 5],
+    "forest-witches north": [1, 5.35],
     "forest-witches south": [1, 7],
     "dark-tunnels west": [5, 5],
     "dark-tunnels east": [7, 5],
