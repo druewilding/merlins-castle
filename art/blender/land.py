@@ -897,6 +897,14 @@ for dx, dy, r in ((1.5, 6.2, 1.7), (2.0, 7.5, 2.6), (5.0, 9.5, 2.8), (-1.5, 9.0,
         x, y = DRAGON_LIP[0] + dx, DRAGON_LIP[1] + side * dy
         grow(x, y, here.uniform(10, 13), here.choice(FIRS), here)
         TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
+# A copse in the triangle of paths between the grassy bank, the deep river
+# and the evergreen glade: its forest is only a thin strip (between their
+# clearings and the paths), too thin for the grid to find more than one spot.
+here = random.Random("the triangle's copse")
+for x, y in ((8.0, -16.0), (14.5, -12.0), (17.0, -8.5)):
+    assert not open_ground(x, y), (x, y)
+    grow(x, y, here.uniform(9, 13), tree_kind(x, y, here), here)
+    TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, here.uniform(2.2, 3.0)))
 # The dense trees across the mountain path, which only the axe will clear:
 # firs, close together (on their own, so the game can fell them).
 here = random.Random("dense trees")
