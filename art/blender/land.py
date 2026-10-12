@@ -1485,6 +1485,8 @@ for way in WAYS.values():
                 quad(tunnel, [(*la, a[2] - 0.1), (*ra, a[2] - 0.1), (*rb, b[2] - 0.1), (*lb, b[2] - 0.1)], LAYERS[3], 0.0)
             # Where the rock stops (into a hall, out under the lintel, a dead
             # end): a ring of it, from the rock in to the square opening.
+            # (The door frames and lintels stand a shade out from it, or the
+            # two would flicker against each other.)
             for row, pts_, ends in ((a, pa, k == 0 or not rocky_[k - 1]), (b, pb, k == len(rocky_) - 1 or not rocky_[k + 1])):
                 if not ends:
                     continue
@@ -1563,7 +1565,12 @@ for way in WAYS.values():
             earth_wall(side(back, -wide), side(back, wide), back[2] + TUNNEL_TALL, back[2] + TUNNEL_TALL)
             # The lintel: the face of earth and stone over the opening.
             row = b if b[5] else a
+            # (A shade out from under cover, off the rock's end.)
+            outside = a if b[5] else b
+            run = math.hypot(outside[0] - row[0], outside[1] - row[1]) or 1
+            ox_, oy_ = (outside[0] - row[0]) / run * 0.03, (outside[1] - row[1]) / run * 0.03
             l1, r1 = side(row, -half - 2.4), side(row, half + 2.4)
+            l1, r1 = (l1[0] + ox_, l1[1] + oy_), (r1[0] + ox_, r1[1] + oy_)
             low = row[2] + TUNNEL_TALL
             high = max(height(*l1), height(*r1), height(row[0], row[1])) + 0.8
             quad(tunnel, [(*l1, low), (*r1, low), (*r1, high), (*l1, high)], STONE)
@@ -1583,13 +1590,18 @@ for way in WAYS.values():
             row = rows[i]
             f = row[2]
             nx_, ny_ = row[3], row[4]
+            # (In a cave, a shade out into it, off the rock's end.)
+            inner = a if i == k + 1 else b
+            run = math.hypot(inner[0] - row[0], inner[1] - row[1]) or 1
+            hx_, hy_ = ((inner[0] - row[0]) / run * 0.03, (inner[1] - row[1]) / run * 0.03) if not hall.indoor else (0, 0)
+            el_, er_ = (edge_left[i][0] + hx_, edge_left[i][1] + hy_), (edge_right[i][0] + hx_, edge_right[i][1] + hy_)
             # (In a cave, as high as its wall goes before the dome.)
             top = f + TUNNEL_TALL + 0.1 if hall.indoor else hall.floor + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
-            for p, jut in ((edge_right[i], 1.8), (edge_left[i], -1.8)):
+            for p, jut in ((er_, 1.8), (el_, -1.8)):
                 q = (p[0] + nx_ * jut, p[1] + ny_ * jut)
                 quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
             if not hall.indoor:
-                p, q = edge_left[i], edge_right[i]
+                p, q = el_, er_
                 quad(tunnel, [(*p, f + TUNNEL_TALL), (*q, f + TUNNEL_TALL), (*q, top), (*p, top)], hall.wall)
     # Where it drops away steeply out of a cave's doorway: the cave's floor
     # is cut off there (it reaches out under the cave's lumpy wall, and would
