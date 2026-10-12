@@ -558,7 +558,22 @@ OPEN_ZONES = [(w * K, e * K, s * K, n * K) for w, e, s, n in [
 AXE_TREES = (-14, 14, 49 * K, 58 * K)  # the dense trees across the mountain path
 
 
+def beyond_the_mist(x, y):
+    """On the far side of a mist from the place you go into it from: forest
+    again (its clearing is only on the near side), so from beyond (across the
+    river from the old stone wall) you only glimpse it through the trees."""
+    for key, spot in LOST.items():
+        px, py = P[key.split(" ")[0]]
+        ax, ay = spot[0] - px, spot[1] - py
+        ahead = ((x - spot[0]) * ax + (y - spot[1]) * ay) / (math.hypot(ax, ay) or 1)
+        if math.hypot(x - spot[0], y - spot[1]) < 11 and ahead > 2:
+            return True
+    return False
+
+
 def open_ground(x, y):
+    """Ground with no forest on it: round the places, along the paths and the
+    river, and round the mists (on the side you come into them from)."""
     for place, (px, py) in P.items():
         if KIND.get(place) == "cave":
             continue
@@ -568,7 +583,7 @@ def open_ground(x, y):
         if w <= x <= e and s <= y <= n:
             return True
     for spot in LOST.values():
-        if math.hypot(x - spot[0], y - spot[1]) < 11:
+        if math.hypot(x - spot[0], y - spot[1]) < 11 and not beyond_the_mist(x, y):
             return True
     return path_lines.distance(x, y) < 5.5 or river.distance(x, y) < BANK or in_moat(x, y)
 
@@ -821,19 +836,18 @@ GROVES = {
 }
 MIXED = [(OAKS, 3), (BIRCHES, 2), (FIRS, 2)]  # anywhere else
 GROVE_AT = [(P[place], mix) for place, mix in GROVES.items()]
-trees_rng = random.Random(41)  # (its own, so the rest of the land comes out as before)
 
 
-def tree_kind(x, y):
+def tree_kind(x, y, rng):
     """Which kind of tree grows here: the mix of the place nearest (give or
     take, so the groves blend), and willows down by the river."""
-    if river.distance(x, y) < BANK + 9 and trees_rng.random() < 0.7:
-        return trees_rng.choice(WILLOWS)
+    if river.distance(x, y) < BANK + 9 and rng.random() < 0.7:
+        return rng.choice(WILLOWS)
     jx, jy = noise.noise(Vector((x / 25, y / 25, 1))) * 18, noise.noise(Vector((x / 25, y / 25, 7))) * 18
     nearest = min(P.values(), key=lambda p: math.hypot(x + jx - p[0], y + jy - p[1]))
     mix = next((m for p, m in GROVE_AT if p == nearest), MIXED)
-    kinds, = trees_rng.choices([k for k, _ in mix], [w for _, w in mix])
-    return trees_rng.choice(kinds)
+    kinds, = rng.choices([k for k, _ in mix], [w for _, w in mix])
+    return rng.choice(kinds)
 
 
 KINDS = FIRS + OAKS + BIRCHES + WILLOWS + DEAD
@@ -854,45 +868,44 @@ TREES = {}  # each tree's spot and how far its branches spread, by 10 m square
 tree_spots = {"kinds": KINDS, "at": [], "dense": []}  # [kind, x, y, z, yaw, scale], in three.js's axes
 
 
-def grow(x, y, tall, kind, into="at", sink=0.3):
-    """A tree of a kind, `tall` metres high."""
-    top = TREE_MODEL[kind]
-    # (The cones these trees replaced drew 14 random numbers each, for their
-    # ragged skirts: drawing them still keeps the forest, and everything
-    # after it, where it was.)
-    for _ in range(14):
-        random.random()
-    scale = tall / top
+def grow(x, y, tall, kind, rng, into="at", sink=0.3):
+    """A tree of a kind, `tall` metres high, turned whichever way `rng` says."""
+    scale = tall / TREE_MODEL[kind]
     z = height(x, y) - sink
     tree_spots[into].append([KINDS.index(kind), round(x, 2), round(z, 2), round(-y, 2),
-                             round(trees_rng.uniform(0, 2 * math.pi), 2), round(scale, 2)])
+                             round(rng.uniform(0, 2 * math.pi), 2), round(scale, 2)])
 
 
-# On a jittered grid wherever the ground isn't open.
+# On a jittered grid wherever the ground isn't open. Each spot on the grid
+# has its own random numbers (from where it is), so a change anywhere (a
+# clearing, a path) only changes the trees there.
 for gx in range(X0 + 3, X1 - 2, 5):
     for gy in range(Y0 + 3, Y1 - 2, 5):
-        x, y = gx + random.uniform(-2, 2), gy + random.uniform(-2, 2)
+        here = random.Random(f"tree {gx} {gy}")
+        x, y = gx + here.uniform(-2, 2), gy + here.uniform(-2, 2)
         if open_ground(x, y) or open_to_the_sky(x, y, 4.5) is not None or rocky(x, y) or by_a_building(x, y):
             continue
-        tall = random.uniform(9, 14)
-        r = random.uniform(2.2, 3.0)
-        grow(x, y, tall, tree_kind(x, y))
+        tall = here.uniform(9, 14)
+        r = here.uniform(2.2, 3.0)
+        grow(x, y, tall, tree_kind(x, y, here), here)
         TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
 # Trees close in on both sides of the dragon's mouth, so the only way on is
 # down into it (not round its side, past the leaves).
+here = random.Random("dragon's trees")
 for dx, dy, r in ((1.5, 6.2, 1.7), (2.0, 7.5, 2.6), (5.0, 9.5, 2.8), (-1.5, 9.0, 2.4), (-0.5, 12.0, 2.6)):
     for side in (1, -1):
         x, y = DRAGON_LIP[0] + dx, DRAGON_LIP[1] + side * dy
-        grow(x, y, random.uniform(10, 13), trees_rng.choice(FIRS))
+        grow(x, y, here.uniform(10, 13), here.choice(FIRS), here)
         TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
 # The dense trees across the mountain path, which only the axe will clear:
 # firs, close together (on their own, so the game can fell them).
+here = random.Random("dense trees")
 w, e, s, n = AXE_TREES
 obstacle(["mountain-path north"], "box", (w + e) / 2, -(s + n) / 2, (e - w) / 2 + 2, (n - s) / 2)
 for x in range(w, e + 1, 3):
     for y in (s + 2, s + 5, n - 1):
-        xx, yy = x + random.uniform(-0.8, 0.8), y + random.uniform(-0.8, 0.8)
-        grow(xx, yy, random.uniform(8, 11), trees_rng.choice(FIRS), into="dense")
+        xx, yy = x + here.uniform(-0.8, 0.8), y + here.uniform(-0.8, 0.8)
+        grow(xx, yy, here.uniform(8, 11), here.choice(FIRS), here, into="dense")
 
 # Water: the river, and the moat round the castle.
 water = c.Builder()
@@ -1534,6 +1547,7 @@ caves = c.Builder()
 for hall in HALLS.values():
     if hall.indoor:
         continue  # (below)
+    random.seed(f"cave {hall.place}")  # (its rocks its own: a change anywhere else doesn't move them)
     hx, hy, f, R = hall.x, hall.y, hall.floor, hall.r
     step = 1.5
     reach = R + 1.4
