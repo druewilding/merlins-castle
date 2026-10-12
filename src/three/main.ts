@@ -74,8 +74,9 @@ scene.add(skylight);
 
 // Underground, the daylight fades and a warm lamp glow takes over (one day,
 // only if you've lit the lamp). It falls off gently: a light this close
-// would otherwise blaze on any wall you walk up to.
-const lamp = new PointLight("#ffb866", 0, 14, 0.6);
+// would otherwise blaze on any wall you walk up to. (Warm, but only a little:
+// any more and the grey rock of the tunnels looks like brown earth.)
+const lamp = new PointLight("#ffdcb4", 0, 14, 0.6);
 scene.add(lamp);
 // And caves and rooms have their own light (torches, the dragon's fire,
 // gold, a hearth), always on, so a lit room seen through a doorway is lit.
@@ -371,8 +372,8 @@ function inUse() {
 // A game loaded: you're where you were in it (or, saved in another version,
 // somewhere to stand in its place), and what was in use there still is.
 function arrive(game: { state: GameState; three?: ThreeSave }) {
-  const [x, z, yaw] = game.three?.at ?? [...(items.arrival(game.state.room) ?? [start.x, start.z]), 0];
-  player.place(x, z, yaw);
+  const [x, z, yaw, floor] = game.three?.at ?? [...(items.arrival(game.state.room) ?? [start.x, start.z]), 0];
+  player.place(x, z, yaw, floor);
   room = game.state.room;
 }
 if (handoff && !at) arrive(handoff);
@@ -443,7 +444,12 @@ overlay.append(menu, panel);
 function where(): ThreeSave {
   const round = (v: number) => Math.round(v * 100) / 100;
   const { x, z } = player.position;
-  return { at: [round(x), round(z), round(player.yaw)], ...items.saved() };
+  // (Underground, or indoors, the floor you're on too: or you'd come back up
+  // on the land over it.)
+  const floor = player.under?.floor;
+  const at: ThreeSave["at"] = [round(x), round(z), round(player.yaw)];
+  if (floor !== undefined) at.push(round(floor));
+  return { at, ...items.saved() };
 }
 
 function showSave() {

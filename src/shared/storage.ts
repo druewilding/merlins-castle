@@ -17,7 +17,7 @@ export interface SaveSlot {
 // Saved in the 3D version, also where you stood and where things lie (the
 // other versions only need the game's state, and leave this be).
 export interface ThreeSave {
-  at: [x: number, z: number, yaw: number];
+  at: [x: number, z: number, yaw: number, floor?: number]; // (floor: underground, or indoors, the floor you stood on)
   slots: string[]; // what you carry, in your slots' order
   lying: Record<string, [x: number, z: number, yaw: number, floor?: number]>;
 }
