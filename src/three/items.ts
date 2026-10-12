@@ -292,6 +292,7 @@ export function items(options: {
   const the = (id: ItemId) => T.theItem(world.items[id].name, world.items[id].definite);
 
   function draw(arriving?: ItemId) {
+    bar.classList.remove("shake"); // (or the new slots would shake again)
     bar.replaceChildren(
       ...Array.from({ length: SLOTS }, (_, k) => {
         const id = slots[k];
@@ -326,9 +327,10 @@ export function items(options: {
     bar.classList.add("full");
   }
 
-  /** The slot in your hand shakes: nothing happens. */
+  /** The slot in your hand shakes (or all of them, empty-handed): nothing happens. */
   function shake() {
-    const slot = bar.children[held];
+    const slot = slots.length ? bar.children[held] : bar;
+    bar.classList.remove("shake");
     slot?.classList.remove("shake");
     void (slot as HTMLElement | undefined)?.offsetWidth;
     slot?.classList.add("shake");
@@ -353,6 +355,11 @@ export function items(options: {
   }
 
   function use() {
+    if (!slots.length) {
+      say(T.carryingNothing);
+      shake();
+      return;
+    }
     const id = slots[held];
     if (!id) return;
     const result = act(world, state, { type: "use", item: id });

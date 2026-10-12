@@ -267,8 +267,10 @@ kbd {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
-/* Nothing happens: the slot in your hand gives a little shake. */
-.slot.shake {
+/* Nothing happens: the slot in your hand gives a little shake (all of them,
+   when you're not carrying anything). */
+.slot.shake,
+.slots.shake .slot {
   animation: shake 0.4s ease-out;
 }
 
@@ -297,7 +299,8 @@ kbd {
 
 @media (prefers-reduced-motion: reduce) {
   .slot.arriving img,
-  .slot.shake {
+  .slot.shake,
+  .slots.shake .slot {
     animation: none;
   }
 }
