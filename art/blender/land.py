@@ -338,7 +338,7 @@ DRAGON_TUNNEL = Way([
     (DC[0] - 13, DC[1] + 72, CAVE * 0.48),
     (G[0] + 30, G[1] - 28, CAVE * 0.74),
     (G[0] + 20, G[1] - 10, CAVE * 0.94),
-    (G[0] + 11, G[1], CAVE),
+    (G[0] + 14, G[1], CAVE),  # (out past its wall, so it comes in straight: a slant left a gap by the doorway)
     (*G, CAVE),
 ])
 
@@ -1132,11 +1132,14 @@ for tx in (-6, 6):
 # hall; the golden spire rises from the hall, through the roof. All of the
 # castle's other rooms are inside it.
 KEEP_TALL = 12
+LINTEL_DROP = 0.03  # how far over a door hangs below its doorway's roof
 kw, ke, ks, kn = KEEP
 door = TUNNEL_HALF + 0.1
 for x0, x1 in ((kw, GH[0] - door), (GH[0] + door, ke)):
     block(built, x0, kn - 1, 0, x1, kn, KEEP_TALL, GREY, solid=False)
-block(built, GH[0] - door, kn - 1, TUNNEL_TALL + 0.4, GH[0] + door, kn, KEEP_TALL, GREY, solid=False)
+# (Over the door: a shade below the doorway's roof, not level with it,
+# where the two would flicker against each other in blocky stripes.)
+block(built, GH[0] - door, kn - 1, TUNNEL_TALL + 0.4 - LINTEL_DROP, GH[0] + door, kn, KEEP_TALL, GREY, solid=False)
 block(built, kw, ks, 0, ke, ks + 1, KEEP_TALL, GREY, solid=False)
 block(built, kw, ks, 0, kw + 1, kn, KEEP_TALL, GREY, solid=False)
 block(built, ke - 1, ks, 0, ke, kn, KEEP_TALL, GREY, solid=False)
@@ -1162,7 +1165,7 @@ block(built, cw0, cd1 - 0.5, 0, cw1, cd1, 6.8, BARN, solid=False)
 block(built, cw1 - 0.5, cd0, 0, cw1, cd1, 6.8, BARN, solid=False)
 block(built, cw0, cd0, 0, cw0 + 0.5, coach.y - wide, 6.8, BARN, solid=False)
 block(built, cw0, coach.y + wide, 0, cw0 + 0.5, cd1, 6.8, BARN, solid=False)
-block(built, cw0, coach.y - wide, TUNNEL_TALL + 0.4, cw0 + 0.5, coach.y + wide, 6.8, BARN, solid=False)
+block(built, cw0, coach.y - wide, TUNNEL_TALL + 0.4 - LINTEL_DROP, cw0 + 0.5, coach.y + wide, 6.8, BARN, solid=False)  # (a shade low, as over the keep's door)
 built.cone((coach.x, coach.y, 6.8), 4.5, max(coach.w, coach.d) * 1.5, c.linear("#9a4c32"), sides=4, droop=0)
 
 # The well, and flowers along the walls.
