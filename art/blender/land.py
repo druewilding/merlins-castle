@@ -187,7 +187,7 @@ for line in paths:
 
 TUNNEL_HALF = 1.7  # half a tunnel's width
 TUNNEL_TALL = 3.2  # floor to roof
-DEEP = -5.0  # the lamp tunnel's floor, under the meadows
+DEEP = -6.2  # the lamp tunnel's floor, under the meadows (and the river: deep enough for its roof, and the timber props, under the riverbed)
 TOP = 30 * K  # the mountain's height, where the maze is: lower when the places are closer, so it's no steeper
 CAVE = TOP - 3  # the floor of the caves in the mountain
 
@@ -1327,6 +1327,7 @@ VAULT = [(-1, -0.1), (-1, 0.6), (-1, 1.3), (-1, 2.0), (-0.96, 2.45), (-0.8, 2.82
 VAULT += [(-u, h) for u, h in reversed(VAULT[:-1])]
 SPRING = 2.3  # where the roof springs from the walls (the middle of its curve)
 PROP_EVERY = 8  # rows (half a metre each) between the timber props
+PROP_TALL = 2.95  # up to its beam: over your head even jumping (its ends go into the rock)
 TIMBER = c.linear("#4a3420")
 LAYERS = (c.linear("#6f6556"), c.linear("#5a4632"), c.linear("#7a6a52"), c.linear("#4d4236"))
 
@@ -1506,12 +1507,12 @@ for way in WAYS.values():
                     px, py = side(a, sign * (half - 0.14))
                     post = [(px + ux * su * 0.13 + vx * sv * 0.13, py + uy * su * 0.13 + vy * sv * 0.13)
                             for su, sv in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
-                    oriented_box(tunnel, post, f - 0.05, f + SPRING + 0.15, TIMBER)
+                    oriented_box(tunnel, post, f - 0.05, f + PROP_TALL, TIMBER)
                 lx2, ly2 = side(a, -half - 0.2)
                 rx2, ry2 = side(a, half + 0.2)
                 beam = [(lx2 - ux * 0.15, ly2 - uy * 0.15), (rx2 - ux * 0.15, ry2 - uy * 0.15),
                         (rx2 + ux * 0.15, ry2 + uy * 0.15), (lx2 + ux * 0.15, ly2 + uy * 0.15)]
-                oriented_box(tunnel, beam, f + SPRING + 0.15, f + SPRING + 0.4, c.mix(TIMBER, c.linear("#000000"), 0.15))
+                oriented_box(tunnel, beam, f + PROP_TALL, f + PROP_TALL + 0.25, c.mix(TIMBER, c.linear("#000000"), 0.15))
             # Rubble along the foot of the walls.
             if rubble.random() < 0.22:
                 sign = rubble.choice((1, -1))

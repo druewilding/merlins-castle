@@ -140,6 +140,7 @@ const GRAVITY = 9.8; // metres a second, each second
 const STEP = 0.4; // metres: you walk up (and down) anything this high, like a stair
 const ROOF = 3.2; // a way's floor to its roof (TUNNEL_TALL in art/blender/land.py)
 const HEADROOM = 0.15; // how close your eye comes to a roof, jumping
+const PROPS = 2.95; // along a way, its timber props' beams (PROP_TALL in art/blender/land.py): a jump stops under them
 export const JUMP_HEIGHT = 0.6; // metres, how high a jump lifts you (a game hop, more than a real one)
 const FLY_HEIGHT = 35; // metres above the ground, flying
 const WALK = 4.2; // metres a second
@@ -385,16 +386,20 @@ export class Player {
       p.y = surface;
       this.lift = Math.max(0, next - surface);
       if (this.lift === 0) this.rise = 0; // landed
-    } else if (surface < p.y - STEP) {
-      this.lift = p.y - surface; // off the edge: falling
+    } else if (surface < p.y - STEP - Math.hypot(p.x - this.before.x, p.z - this.before.z)) {
+      // Off the edge (a drop steeper than you went along): falling. (Not
+      // down a slope, however fast: running down a steep ramp into a tunnel,
+      // you'd fly off it, up into its roof.)
+      this.lift = p.y - surface;
       p.y = surface;
     } else {
-      p.y += (surface - p.y) * Math.min(1, dt * 12); // up a slope or a step, or down one
+      // Up a slope or a step, or down one (not ever far behind it).
+      p.y = Math.min(p.y + (surface - p.y) * Math.min(1, dt * 12), surface + 0.1);
     }
     // Under a roof, a jump stops at it: jumping where a tunnel drops away
     // steeply, the roof drops with the floor, and would leave you behind.
     if (this.under && this.lift > 0) {
-      const tall = this.under.hall ? (this.halls.get(this.under.hall)?.tall ?? ROOF) : ROOF;
+      const tall = this.under.hall ? (this.halls.get(this.under.hall)?.tall ?? ROOF) : PROPS;
       const most = Math.max(0, this.under.floor + tall - HEADROOM - this.eye - p.y);
       if (this.lift > most) {
         this.lift = most;
