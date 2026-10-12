@@ -33,6 +33,7 @@ import { effects, messages, score } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
 import { type Direction, EXIT_ORDER, type World } from "../engine/types";
 import { LANGUAGE, T } from "../shared/strings";
+import { Felling } from "./felling";
 import { items as setUpItems } from "./items";
 import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
@@ -119,7 +120,11 @@ model.scene.traverse((node) => {
   node.receiveShadow = node.name !== "water";
 });
 scene.add(model.scene);
-const trees = new Trees(scene, model.scene, land.trees as TreeSpots);
+const spots = land.trees as TreeSpots;
+const trees = new Trees(scene, model.scene, spots);
+const stump = model.scene.getObjectByName("stump") as Mesh;
+stump.removeFromParent();
+const felling = new Felling(scene, trees.models, spots.kinds, spots.dense, stump, reducedMotion);
 
 // The heights are in Blender's axes (y is north), on a grid; in between, blend.
 const { x0, y0, step, nx, ny } = land.ground;
@@ -201,6 +206,8 @@ if (rusty && leaves[0] && leaves[1]) {
   });
 }
 const SWING = 1.75; // radians, open
+// The dense trees across the mountain path, which the axe fells (felling.ts).
+const dense = shapeOf.get("mountain-path north");
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 function solidify() {
@@ -315,17 +322,18 @@ const items = setUpItems({
 function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
-  // (Only the ways the 3D world can open so far: walls to climb, gates.)
+  // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
     const shape = shapeOf.get(`${here} ${direction}`);
-    return needs && using.includes(needs) && shape && (walls.has(shape) || gates.has(shape))
+    return needs && using.includes(needs) && shape && (walls.has(shape) || gates.has(shape) || shape === dense)
       ? [`${here} ${direction}`]
       : [];
   });
   opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
   solidify();
   for (const [shape, gate] of gates) gate.wants = opened.has(shape) ? 1 : 0;
+  if (dense) felling.fell(opened.has(dense), player.position);
   const wall = exits.find((exit) => walls.has(shapeOf.get(exit)!));
   if (wall !== leaning) {
     ladder.away();
@@ -437,6 +445,7 @@ renderer.setAnimationLoop((time) => {
   const dt = Math.min(timer.getDelta(), 0.1);
   player.update(dt, reducedMotion);
   trees.update(player.position, player.yaw, player.camera);
+  felling.update(dt);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)

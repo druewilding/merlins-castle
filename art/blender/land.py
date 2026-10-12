@@ -845,6 +845,10 @@ for kind in KINDS:
     vertex_coloured(obj, f"tree-{kind}-distant", top, ratio=0.04)
     TREE_MODEL[kind] = top
     bpy.data.objects.remove(obj)
+# And a stump, for where the axe fells one.
+obj, top = nature("TreeStump")
+vertex_coloured(obj, "stump", top)
+bpy.data.objects.remove(obj)
 
 TREES = {}  # each tree's spot and how far its branches spread, by 10 m square
 tree_spots = {"kinds": KINDS, "at": [], "dense": []}  # [kind, x, y, z, yaw, scale], in three.js's axes

@@ -17,7 +17,7 @@ import {
   Vector3,
 } from "three";
 
-/** Where they grow: [kind, x, y, z, yaw, scale] (the dense trees on their own, for the axe). */
+/** Where they grow: [kind, x, y, z, yaw, scale] (the dense trees on their own, for the axe: felling.ts). */
 export interface TreeSpots {
   kinds: string[];
   at: number[][];
@@ -38,6 +38,8 @@ interface Kind {
 }
 
 export class Trees {
+  /** Each kind, in full. */
+  readonly models = new Map<string, Mesh>();
   private kinds: Kind[] = [];
   private x: Float32Array;
   private z: Float32Array;
@@ -47,7 +49,7 @@ export class Trees {
   private sortedYaw = 0;
 
   constructor(scene: Scene, land: Object3D, spots: TreeSpots) {
-    const all = [...spots.at, ...spots.dense];
+    const all = spots.at;
     this.x = new Float32Array(all.length);
     this.z = new Float32Array(all.length);
     this.matrices = new Float32Array(all.length * 16);
@@ -72,6 +74,7 @@ export class Trees {
       const simple = land.getObjectByName(`tree-${kind}-far`) as Mesh;
       const simplest = land.getObjectByName(`tree-${kind}-distant`) as Mesh;
       for (const mesh of [full, simple, simplest]) mesh.removeFromParent();
+      this.models.set(kind, full);
       const count = trees[k].length;
       const made = (mesh: Mesh, shadows: boolean) => {
         const many = new InstancedMesh(mesh.geometry, mesh.material, count);
