@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 import bmesh
-from mathutils import Vector, noise
+from mathutils import Matrix, Vector, noise
 
 HERE = Path(__file__).parent
 sys.path.append(str(HERE))
@@ -66,9 +66,11 @@ for k in range(n):
     rung(ladder, -WIDTH / 2, WIDTH / 2, y, DEEP / 2, 0.022, RUNG)
 outward(ladder.build("ladder", smooth=False))
 
-# The key: a big old one (half a metre, so you can spot it in the grass),
-# rusty bronze as in its picture: a curly bow (two loops and a little crown),
-# a round shaft with collars, and a chunky bit with notches.
+# The key: a big old one (70 cm, so you can spot it in the grass: drawn half a
+# metre long, then made KEY_SIZE times bigger), rusty bronze as in its
+# picture: a curly bow (two loops and a little crown), a round shaft with
+# collars, and a chunky bit with notches.
+KEY_SIZE = 1.4
 RUST = c.linear("#a8692f")
 RUST_DARK = c.linear("#62371a")
 RUST_LIGHT = c.linear("#d6903f")
@@ -123,7 +125,9 @@ for x0, y0, x1, y1 in ((0.015, 0.13, 0.05, 0.225), (0.05, 0.13, 0.08, 0.155), (0
     for face in [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]:
         pts = [corners[i] for i in face]
         key.add(pts, [(0, 1, 2, 3)], [rusty(p) for p in pts])  # the bit, and its notches
-outward(key.build("key", smooth=False))
+key_object = key.build("key", smooth=False)
+key_object.data.transform(Matrix.Scale(KEY_SIZE, 4))
+outward(key_object)
 
 # The axe: as in its picture, a rusty iron head with a bearded blade (its
 # edge rubbed bright), on a curved wooden handle swelling to a knob at the
