@@ -327,6 +327,8 @@ export class Player {
       this.bob += dt * speed * 1.6;
     }
     this.collide();
+    // Holding Space, you hop again as soon as you land (a bunny hop).
+    if (this.keys.has("Space") && this.lift === 0 && this.rise === 0) this.jump();
     this.upAndDown(dt);
 
     const bob = reducedMotion || length < 0.01 || bouncing || this.lift > 0 ? 0 : Math.sin(this.bob) * 0.04;
