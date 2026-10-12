@@ -31,18 +31,9 @@ import daJson from "../../data/da.json";
 import worldJson from "../../data/world.json";
 import { effects, messages, score } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
-import { type Direction, EXIT_ORDER, type World } from "../engine/types";
+import { type Direction, EXIT_ORDER, type GameState, type World } from "../engine/types";
 import { h } from "../shared/dom";
-import {
-  find3d,
-  leave3d,
-  listSaves,
-  nextSaveName,
-  restart3d,
-  saveGame,
-  takeHandoff,
-  type ThreeSave,
-} from "../shared/storage";
+import { find3d, leave3d, listSaves, nextSaveName, saveGame, takeHandoff, type ThreeSave } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Felling } from "./felling";
 import { items as setUpItems } from "./items";
@@ -379,11 +370,12 @@ function inUse() {
 
 // A game loaded: you're where you were in it (or, saved in another version,
 // somewhere to stand in its place), and what was in use there still is.
-if (handoff && !at) {
-  const [x, z, yaw] = handoff.three?.at ?? [...(items.arrival(handoff.state.room) ?? [start.x, start.z]), 0];
+function arrive(game: { state: GameState; three?: ThreeSave }) {
+  const [x, z, yaw] = game.three?.at ?? [...(items.arrival(game.state.room) ?? [start.x, start.z]), 0];
   player.place(x, z, yaw);
-  room = handoff.state.room;
+  room = game.state.room;
 }
+if (handoff && !at) arrive(handoff);
 inUse();
 instantly = false;
 let lastRoom = room; // (where you were last frame)
@@ -426,7 +418,7 @@ if (debugMode) {
 overlay.innerHTML = `
   <h1>Merlin's Castle</h1>
   <p class="start">Click to walk</p>
-  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · E to take or use · 1–5 to choose · G to drop · Esc to stop</p>
+  <p class="keys">Mouse to look · WASD to walk · Shift to run · Space to jump · C to crouch · E to take or use · 1–5 to choose · G to drop · Esc to stop</p>
   <p class="keys touch">Left thumb to walk · right thumb to look</p>`;
 overlay.hidden = Boolean(at);
 
@@ -472,9 +464,14 @@ function showSave() {
     event.preventDefault();
     const name = input.value.trim();
     if (!name) return;
-    const ok = saveGame(name, items.state, where());
-    if (ok) saveName = name;
-    panel.replaceChildren(h("p", {}, ok ? T.savedAs(name) : T.cantSave));
+    if (!saveGame(name, items.state, where())) {
+      panel.replaceChildren(h("p", {}, T.cantSave));
+      return;
+    }
+    // Saved: straight back into the game, saying so there.
+    saveName = name;
+    resume();
+    say(T.savedAs(name));
   };
   panel.replaceChildren(
     h("h2", {}, T.saveTitle),
@@ -497,7 +494,7 @@ function showLoad() {
             h(
               "li",
               {},
-              h("button", { type: "button", onclick: () => restart3d(slot.state, slot.name, slot.three) }, slot.name),
+              h("button", { type: "button", onclick: () => load(slot) }, slot.name),
               h("span", { class: "when" }, `${savedDate(slot.savedAt)}, ${savedTime(slot.savedAt)}`)
             )
           )
@@ -508,11 +505,30 @@ function showLoad() {
   panel.hidden = false;
 }
 
-overlay.addEventListener("click", () => {
-  void renderer.domElement.requestPointerLock?.();
+// Loading: the game as it was, right here (no starting the page again, so
+// the click on its name hands the mouse straight back to the game).
+function load(slot: { name: string; state: GameState; three?: ThreeSave }) {
+  saveName = slot.name;
+  items.restart(slot);
+  arrive(slot);
+  instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
+  inUse();
+  instantly = false;
+  parting = false;
+  told = undefined;
+  lastRoom = room;
+  was.copy(player.position);
+  resume();
+  say(T.loadedAs(slot.name));
+}
+
+function resume() {
+  // (If the browser won't take the mouse after all, the menu's back, to click.)
+  Promise.resolve(renderer.domElement.requestPointerLock?.()).catch(() => (overlay.hidden = false));
   overlay.hidden = true;
   panel.hidden = true;
-});
+}
+overlay.addEventListener("click", resume);
 overlay.addEventListener("touchend", () => (overlay.hidden = true));
 // With the debug panel open, clicking the world looks around again.
 renderer.domElement.addEventListener("click", () => {

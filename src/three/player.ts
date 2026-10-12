@@ -254,6 +254,10 @@ export class Player {
     this.under = this.hallAt(x, z);
     this.position.set(x, this.groundAt(x, z) ?? 0, z);
     this.lift = this.rise = 0;
+    // (Not climbing any more, or going through anything: somewhere new.)
+    this.following = undefined;
+    this.knock = { x: 0, z: 0 };
+    this.passing.clear();
     this.yaw = yaw;
     this.pitch = 0;
   }

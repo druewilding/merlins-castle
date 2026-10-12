@@ -186,12 +186,6 @@ export function leave3d(mode: Mode, game?: GameState | null, saveName = ""): voi
   location.assign("./");
 }
 
-/** In the 3D version, a game loaded (or carried on): the page starts again with it. */
-export function restart3d(game: GameState, saveName = "", three?: ThreeSave): void {
-  handOver(game, saveName, three);
-  location.reload();
-}
-
 function reloadWith(game?: GameState | null, saveName = "") {
   handOver(game, saveName);
   location.reload();

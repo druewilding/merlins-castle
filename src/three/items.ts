@@ -114,6 +114,8 @@ export interface Items {
   saved(): Omit<ThreeSave, "at">;
   /** Somewhere to stand in a place (arriving in it from a save that doesn't say where). */
   arrival(room: RoomId): [number, number] | undefined;
+  /** A game loaded: what you carry, and where everything lies, as it was in it. */
+  restart(game: { state: GameState; three?: ThreeSave }): void;
 }
 
 export function items(options: {
@@ -140,10 +142,7 @@ export function items(options: {
   const glow = new Glow(options.reducedMotion); // round what you're pointing at
   let state = begin?.state ?? newGame(world);
   const lying = new Map<ItemId, Lying>();
-  // What you carry: in the order it was in your slots, if it's known.
-  const carried = (Object.keys(state.itemLocations) as ItemId[]).filter((id) => state.itemLocations[id] === "carried");
-  const slots: ItemId[] = [...(begin?.three?.slots ?? []).filter((id): id is ItemId => carried.includes(id as ItemId))];
-  slots.push(...carried.filter((id) => !slots.includes(id)));
+  const slots: ItemId[] = [];
   let held = 0; // the slot in your hand
   let aimed: ItemId | undefined;
   const eye = new Vector3(); // where you're looking from, and which way
@@ -343,14 +342,28 @@ export function items(options: {
     return [hall.x, hall.z];
   }
 
-  // Where they lie: where they lay when the game was saved, or anywhere in
-  // their places (as in a new game, or one saved in another version).
-  for (const [id, where] of Object.entries(state.itemLocations) as [ItemId, string][]) {
-    if (where === "carried" || !models.getObjectByName(id)) continue;
-    const spot = begin?.three?.lying[id];
-    if (spot) lay(id, where, spot[0], spot[1], spot[2], spot[3]);
-    else start(id, where);
+  /** A game, from the start or loaded: what you carry, and where everything lies. */
+  function layOut(three?: ThreeSave) {
+    for (const thing of lying.values()) scene.remove(thing.model);
+    lying.clear();
+    aimed = undefined;
+    // What you carry: in the order it was in your slots, if it's known.
+    const carried = (Object.keys(state.itemLocations) as ItemId[]).filter(
+      (id) => state.itemLocations[id] === "carried"
+    );
+    slots.splice(0, slots.length, ...(three?.slots ?? []).filter((id): id is ItemId => carried.includes(id as ItemId)));
+    slots.push(...carried.filter((id) => !slots.includes(id)));
+    held = 0;
+    // Where they lie: where they lay when the game was saved, or anywhere in
+    // their places (as in a new game, or one saved in another version).
+    for (const [id, where] of Object.entries(state.itemLocations) as [ItemId, string][]) {
+      if (where === "carried" || !models.getObjectByName(id)) continue;
+      const spot = three?.lying[id];
+      if (spot) lay(id, where, spot[0], spot[1], spot[2], spot[3]);
+      else start(id, where);
+    }
   }
+  layOut(begin?.three);
 
   // ---- On the screen --------------------------------------------------------
 
@@ -586,6 +599,12 @@ export function items(options: {
       return { slots: [...slots], lying: spots };
     },
     arrival,
+    restart(game) {
+      state = game.state;
+      layOut(game.three);
+      glow.show(undefined);
+      draw();
+    },
     go(direction) {
       const result = act(world, state, { type: "go", direction });
       const went = result.state.room !== state.room;
