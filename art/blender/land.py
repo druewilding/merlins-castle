@@ -1134,7 +1134,9 @@ for tx in (-6, 6):
 KEEP_TALL = 12
 LINTEL_DROP = 0.03  # how far over a door hangs below its doorway's roof
 kw, ke, ks, kn = KEEP
-door = TUNNEL_HALF + 0.1
+# (A shade narrower than the way in, so its walls meet the sides of the
+# doorway: any wider, and there's a slit between them, into the keep.)
+door = TUNNEL_HALF - 0.05
 for x0, x1 in ((kw, GH[0] - door), (GH[0] + door, ke)):
     block(built, x0, kn - 1, 0, x1, kn, KEEP_TALL, GREY, solid=False)
 # (Over the door: a shade below the doorway's roof, not level with it,
@@ -1159,7 +1161,7 @@ block(built, kitchen.x - kitchen.w, kitchen.y - 1, KEEP_TALL - 0.5, kitchen.x - 
 coach = HALLS["coach-house"]
 cw0, cw1, cd0, cd1 = coach.x - coach.w - 0.6, coach.x + coach.w + 0.6, coach.y - coach.d - 0.6, coach.y + coach.d + 0.6
 BARN = c.linear("#7a5634")
-wide = 2.4 + 0.1
+wide = 2.4 - 0.05  # (a shade narrower than the way in, as at the keep's door)
 block(built, cw0, cd0, 0, cw1, cd0 + 0.5, 6.8, BARN, solid=False)
 block(built, cw0, cd1 - 0.5, 0, cw1, cd1, 6.8, BARN, solid=False)
 block(built, cw1 - 0.5, cd0, 0, cw1, cd1, 6.8, BARN, solid=False)
