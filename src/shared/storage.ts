@@ -161,8 +161,20 @@ export function switchLanguage(language: Language, game?: GameState | null, save
 
 // ---- The 3D version ----------------------------------------------------------
 
-// The 3D version is its own page (/3d): going there, or back to the others
-// (as the version chosen), the game carries on just the same.
+// The 3D version is its own page (/3d), a secret while it's being made: the
+// other versions only show the way to it in a browser that has been there.
+const FOUND_3D = "merlins-castle:found-3d";
+
+export function found3d(): boolean {
+  return read<boolean>(FOUND_3D, false);
+}
+
+export function find3d(): void {
+  write(FOUND_3D, true);
+}
+
+// Going there, or back to the others (as the version chosen), the game
+// carries on just the same.
 export function goTo3d(game?: GameState | null, saveName = ""): void {
   handOver(game, saveName);
   location.assign("./3d");

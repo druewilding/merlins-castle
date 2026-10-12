@@ -104,7 +104,8 @@ trees on the mountain path.)
 Esc brings back the start screen, where you can save and load: the same
 saves as the other versions (a 3D save also knows where you stood and where
 everything lies), and Illustrated and Classic carry on the same game there,
-as 3D does from them.
+as 3D does from them. (While it's being made, 3D is a secret: the other
+versions only show their 3D link in a browser that has opened `/3d`.)
 With `?debug` (`/3d?debug`, on the dev server as in the build), **0** opens the debug panel: fly (F takes you 35 m
 up, and F again drops you back down), walk through anything (N), open every
 obstacle (O), show the obstacles and how far they reach, red where they kill

@@ -5,6 +5,7 @@ import { h } from "../shared/dom";
 import {
   bestScore,
   deleteSave,
+  found3d,
   goTo3d,
   type Handoff,
   listSaves,
@@ -362,7 +363,7 @@ export class App {
         button(T.save, "white", () => this.go({ name: "play", events: [], prompt: "save" })),
         button(T.quit, "white", () => this.go({ name: "play", events: [], prompt: "quit" })),
         button(T.illustrated, "white", () => switchMode("illustrated", this.game, this.saveName)),
-        button(T.threeD, "white", () => goTo3d(this.game, this.saveName))
+        found3d() && button(T.threeD, "white", () => goTo3d(this.game, this.saveName))
       )
     );
 

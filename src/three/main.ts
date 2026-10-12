@@ -33,7 +33,16 @@ import { effects, messages, score } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
 import { type Direction, EXIT_ORDER, type World } from "../engine/types";
 import { h } from "../shared/dom";
-import { leave3d, listSaves, nextSaveName, restart3d, saveGame, takeHandoff, type ThreeSave } from "../shared/storage";
+import {
+  find3d,
+  leave3d,
+  listSaves,
+  nextSaveName,
+  restart3d,
+  saveGame,
+  takeHandoff,
+  type ThreeSave,
+} from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Felling } from "./felling";
 import { items as setUpItems } from "./items";
@@ -272,6 +281,7 @@ const name = (id: string) => id.replace(/-/g, " ").replace(/^./, (letter) => let
 
 // A game loaded, or carried on from another version (or another language).
 const handoff = takeHandoff();
+find3d(); // (from now on, the other versions show the way back here)
 let saveName = handoff?.saveName ?? ""; // the position last saved or loaded
 
 const start = PLACES.get("grassy-bank")!;

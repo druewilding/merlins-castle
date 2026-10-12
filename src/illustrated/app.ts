@@ -18,6 +18,7 @@ import { h } from "../shared/dom";
 import {
   deleteSave,
   effectsOn,
+  found3d,
   goTo3d,
   type Handoff,
   listSaves,
@@ -159,7 +160,7 @@ export class IllustratedApp {
           link(T.about, () => this.showAbout()),
           link(T.language, () => this.showLanguage()),
           link(T.classicVersion, () => switchMode("classic")),
-          link(T.threeDVersion, () => goTo3d())
+          found3d() && link(T.threeDVersion, () => goTo3d())
         )
       )
     );
@@ -458,7 +459,7 @@ export class IllustratedApp {
       link(T.sound, () => this.showSound()),
       link(T.language, () => this.showLanguage()),
       link(T.classic, () => switchMode("classic", this.game, this.saveName)),
-      link(T.threeD, () => goTo3d(this.game, this.saveName))
+      ...(found3d() ? [link(T.threeD, () => goTo3d(this.game, this.saveName))] : [])
     );
   }
 
