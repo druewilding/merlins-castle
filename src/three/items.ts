@@ -1,6 +1,6 @@
 // The objects: lying where the game puts them, taken by looking at one and
 // pressing E, carried in five slots (1–5 picks the one in your hand), used
-// with a click and dropped with G. The engine stays the judge (PLAN-V3.md):
+// with E when you're not looking at one (or a click) and dropped with G. The engine stays the judge (PLAN-V3.md):
 // these are its `take`, `use` and `drop`, and what it says decides what
 // happens. An object in use (opening a way out of the place) has a tick.
 //
@@ -292,6 +292,7 @@ export function items(options: {
   const the = (id: ItemId) => T.theItem(world.items[id].name, world.items[id].definite);
 
   function draw(arriving?: ItemId) {
+    bar.classList.remove("shake"); // (or the new slots would shake again)
     bar.replaceChildren(
       ...Array.from({ length: SLOTS }, (_, k) => {
         const id = slots[k];
@@ -326,9 +327,10 @@ export function items(options: {
     bar.classList.add("full");
   }
 
-  /** The slot in your hand shakes: nothing happens. */
+  /** The slot in your hand shakes (or all of them, empty-handed): nothing happens. */
   function shake() {
-    const slot = bar.children[held];
+    const slot = slots.length ? bar.children[held] : bar;
+    bar.classList.remove("shake");
     slot?.classList.remove("shake");
     void (slot as HTMLElement | undefined)?.offsetWidth;
     slot?.classList.add("shake");
@@ -353,6 +355,11 @@ export function items(options: {
   }
 
   function use() {
+    if (!slots.length) {
+      say(T.carryingNothing);
+      shake();
+      return;
+    }
     const id = slots[held];
     if (!id) return;
     const result = act(world, state, { type: "use", item: id });
@@ -466,8 +473,11 @@ export function items(options: {
       held = Number(event.code.slice(5)) - 1;
       draw();
     } else if (player.busy) return;
-    else if (event.code === "KeyE" && aimed) take(aimed);
-    else if (event.code === "KeyG") drop();
+    // E takes what you're looking at, or else uses what's in your hand.
+    else if (event.code === "KeyE") {
+      if (aimed) take(aimed);
+      else use();
+    } else if (event.code === "KeyG") drop();
   });
 
   // ---- Each frame -----------------------------------------------------------

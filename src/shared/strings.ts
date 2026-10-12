@@ -23,6 +23,7 @@ const en = {
   dropAll: "Drop all",
   dropUnder: "drop",
   carrying: "What you are carrying",
+  carryingNothing: "You're not carrying anything.",
 
   // The top bar and the title screen.
   score: (points: number) => `Score ${points}`,
@@ -136,6 +137,7 @@ const da: Strings = {
   dropAll: "Læg alt",
   dropUnder: "læg",
   carrying: "Det, du bærer på",
+  carryingNothing: "Du bærer ingenting.",
 
   score: (points) => `${points} point`,
   save: "Gem",

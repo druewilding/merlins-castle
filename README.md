@@ -92,7 +92,8 @@ npm run build && npm run preview  # try the built version at http://localhost:41
 Mouse to look, WASD or the arrow keys to walk, Shift to run, Space to jump
 (how high is `JUMP_HEIGHT` in `src/three/player.ts`), Ctrl or C to crouch.
 Look at an object and press E to take it; 1 to 5 picks which of your five
-slots is in your hand, a click uses it and G drops it. (Only the ladder and
+slots is in your hand, E (when you're not looking at an object) or a click
+uses it and G drops it. (Only the ladder and
 the key are in the world so far: their models are made by
 `art/blender/items.py`. Use the ladder by the old stone wall and walk into
 it to climb over; use the key by the rusty gate.)
