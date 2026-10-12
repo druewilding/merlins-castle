@@ -354,7 +354,7 @@ function inUse() {
     gate.wants = opened.has(shape) ? 1 : 0;
     if (instantly) gate.open = gate.wants;
   }
-  if (dense) felling.fell(opened.has(dense), player.position, instantly);
+  if (dense) felling.fell(opened.has(dense), instantly);
   const wall = exits.find((exit) => walls.has(shapeOf.get(exit)!));
   if (wall !== leaning) {
     ladder.away();

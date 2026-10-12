@@ -1,13 +1,12 @@
 // The dense trees across the mountain path (land.json's trees.dense), which
-// the axe fells: a few blows (each tree shudders), then over they go, the
-// nearest first, away from the path, leaving stumps. When the axe is no longer
+// the axe fells: one blow (they all shudder), then over they all go together,
+// away from the path, leaving stumps. When the axe is no longer
 // in use there (you've gone on, as in the original), they spring back up.
 
 import { InstancedMesh, Matrix4, type Mesh, Quaternion, type Scene, Vector3 } from "three";
 
-const CHOPS = 3; // blows of the axe before the first one falls
-const CHOP = 0.3; // seconds between them
-const STAGGER = 0.1; // seconds between one tree falling and the next
+const CHOP = 0.3; // seconds, the blow of the axe (they shudder), before they fall
+const LAG = 0.15; // seconds: each falls up to this much after the first, not all in step
 const FALL = 1.1; // seconds, from standing to lying
 const DOWN = 1.4; // radians, lying (on the slope at the foot of the mountain)
 const RISE = 0.7; // seconds, springing back up
@@ -22,7 +21,7 @@ interface Felled {
   axis: Vector3; // it falls turning about this
   mesh: InstancedMesh;
   slot: number;
-  order: number; // which falls first (0), and next
+  lag: number; // seconds after the first that it falls
   angle: number; // how far over, now
   from: number; // and when it began springing back up
 }
@@ -71,7 +70,7 @@ export class Felling {
         axis: new Vector3().crossVectors(up, away).normalize(),
         mesh,
         slot: mesh.count++,
-        order: i,
+        lag: (0.5 + 0.5 * Math.sin(i * 12.9898)) * LAG,
         angle: 0,
         from: 0,
       });
@@ -84,17 +83,13 @@ export class Felling {
     this.draw();
   }
 
-  /** Felled (the axe in use there), the nearest to `by` first; or standing again (or `now`, as they'd end up). */
-  fell(down: boolean, by: Vector3, now = false) {
+  /** Felled (the axe in use there), or standing again (or `now`, as they'd end up). */
+  fell(down: boolean, now = false) {
     if (down === this.down) return;
     this.down = down;
     this.time = now ? 1000 : 0;
     this.still = false;
-    const near = [...this.trees].sort((a, b) => a.at.distanceTo(by) - b.at.distanceTo(by));
-    near.forEach((tree, k) => {
-      tree.order = k;
-      tree.from = tree.angle;
-    });
+    for (const tree of this.trees) tree.from = tree.angle;
   }
 
   update(dt: number) {
@@ -102,16 +97,15 @@ export class Felling {
     this.time += dt;
     for (const tree of this.trees) tree.angle = this.down ? this.falling(tree) : this.rising(tree);
     this.draw();
-    this.still = this.time > (this.down ? CHOPS * CHOP + this.trees.length * STAGGER + FALL + 1.5 : RISE);
+    this.still = this.time > (this.down ? CHOP + LAG + FALL + 1.5 : RISE);
   }
 
-  // Shuddering at each blow, then falling faster and faster, and a little bounce.
+  // Shuddering at the blow, then falling faster and faster, and a little bounce.
   private falling(tree: Felled) {
-    const t = this.time - CHOPS * CHOP - tree.order * STAGGER;
+    const t = this.time - CHOP - tree.lag;
     if (t < 0) {
-      if (this.reducedMotion || this.time > CHOPS * CHOP) return 0;
-      const since = this.time % CHOP;
-      return 0.035 * Math.exp(-since * 12) * Math.sin(since * 40);
+      if (this.reducedMotion || this.time > CHOP) return 0;
+      return 0.035 * Math.exp(-this.time * 12) * Math.sin(this.time * 40);
     }
     if (t < FALL) return DOWN * (t / FALL) ** 2;
     if (this.reducedMotion) return DOWN;
