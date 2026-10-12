@@ -6,7 +6,7 @@
 //
 // Only objects with a model (art/blender/items.py) are in the world so far.
 
-import { Box3, type Object3D, Ray, type Scene, Vector3 } from "three";
+import { Box3, Matrix4, type Object3D, Ray, type Scene, Vector3 } from "three";
 
 import { act, effects, newGame } from "../engine/engine";
 import type { Direction, GameState, ItemId, RoomId, World } from "../engine/types";
@@ -41,7 +41,7 @@ interface Footprint {
 interface Lying {
   room: RoomId;
   model: Object3D;
-  box: Box3;
+  box: Box3; // its own size, turned and tilted with it (to point at)
   footprint?: Footprint;
   floor?: number; // (on a floor, underground or indoors, not the ground)
   // Dropped where it was in use (the ladder against the wall): once you've
@@ -139,6 +139,13 @@ export function items(options: {
 
   // ---- In the world ---------------------------------------------------------
 
+  /**
+   * An object's box, as it comes (lying along z): to point at, turned and
+   * tilted with it. (A box squared to north and south round it, turned or
+   * tilted, would be bigger than it is, and in front of what's beside it.)
+   */
+  const boxOf = (id: ItemId) => new Box3().setFromObject(models.getObjectByName(id)!);
+
   /** How long an object is, end to end, so it lies on the slope under it. */
   const lengthOf = (model: Object3D) => new Box3().setFromObject(model).getSize(new Vector3()).z;
 
@@ -164,7 +171,7 @@ export function items(options: {
     lying.set(id, {
       room,
       model,
-      box: new Box3().setFromObject(model).expandByScalar(AIM_SLACK),
+      box: boxOf(id),
       footprint: { x, z, yaw, half, wide: size.x / 2 },
       floor,
     });
@@ -427,7 +434,7 @@ export function items(options: {
       lying.set(id, {
         room: state.room,
         model,
-        box: new Box3().setFromObject(model).expandByScalar(AIM_SLACK),
+        box: boxOf(id),
         fallsTo,
       });
       return;
@@ -520,6 +527,10 @@ export function items(options: {
   // ---- Each frame -----------------------------------------------------------
 
   const ray = new Ray();
+  const mine = new Ray();
+  const roomy = new Box3();
+  const on = new Vector3();
+  const inverse = new Matrix4();
   const hit = new Vector3();
 
   return {
@@ -558,13 +569,33 @@ export function items(options: {
       player.camera.getWorldPosition(eye);
       player.camera.getWorldDirection(look);
       ray.set(eye, look);
+      // What you're looking at: the nearest thing your gaze hits; or, if it
+      // hits none, the thing it passes closest to (within a little room round
+      // each). Not just the first room round something it comes to: lying
+      // side by side, the room round one would cover the next.
       aimed = undefined;
-      let nearest = REACH;
+      let best = { miss: AIM_SLACK, d: REACH };
       for (const [id, thing] of lying) {
-        if (!ray.intersectBox(thing.box, hit)) continue;
-        const d = hit.distanceTo(eye);
-        if (d < nearest) {
-          nearest = d;
+        // (Your gaze, as the object sees it: then its box is square to it.)
+        thing.model.updateMatrixWorld();
+        mine.copy(ray).applyMatrix4(inverse.copy(thing.model.matrixWorld).invert());
+        const room = roomy.copy(thing.box).expandByScalar(AIM_SLACK);
+        if (!mine.intersectBox(room, hit)) continue;
+        // On through the room round it, how near it comes to it (0: it hits it).
+        // (From where it comes into that room, or from your eye if you're in it.)
+        const from = room.containsPoint(mine.origin) ? 0 : mine.origin.distanceTo(hit);
+        let miss = Infinity;
+        let at = 0;
+        for (let s = 0; s < 8 && miss > 0; s += 0.02) {
+          mine.at(from + s, on);
+          if (s > 0 && !room.containsPoint(on)) break;
+          const m = thing.box.distanceToPoint(on);
+          if (m < miss) [miss, at] = [m, s];
+        }
+        const d = from + at;
+        if (d > REACH) continue;
+        if (miss < best.miss - 0.01 || (Math.abs(miss - best.miss) <= 0.01 && d < best.d)) {
+          best = { miss, d };
           aimed = id;
         }
       }
