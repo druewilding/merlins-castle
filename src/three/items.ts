@@ -166,8 +166,11 @@ export function items(options: {
     model.position.set(x, y, z);
     model.rotation.set(0, yaw, 0, "YXZ");
     model.rotateX(-Math.atan(slope));
+    // (Lying flat, a few centimetres up, its shadow would be a sliver beside
+    // it, drawn in steps by the sun's shadow map: none, then. It still has
+    // the trees' shadows on it.)
     model.traverse((node) => {
-      node.castShadow = true;
+      node.castShadow = false;
       node.receiveShadow = true;
     });
     scene.add(model);
