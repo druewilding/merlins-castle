@@ -31,18 +31,9 @@ import daJson from "../../data/da.json";
 import worldJson from "../../data/world.json";
 import { effects, messages, score } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
-import { type Direction, EXIT_ORDER, type World } from "../engine/types";
+import { type Direction, EXIT_ORDER, type GameState, type World } from "../engine/types";
 import { h } from "../shared/dom";
-import {
-  find3d,
-  leave3d,
-  listSaves,
-  nextSaveName,
-  restart3d,
-  saveGame,
-  takeHandoff,
-  type ThreeSave,
-} from "../shared/storage";
+import { find3d, leave3d, listSaves, nextSaveName, saveGame, takeHandoff, type ThreeSave } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Felling } from "./felling";
 import { items as setUpItems } from "./items";
@@ -379,11 +370,12 @@ function inUse() {
 
 // A game loaded: you're where you were in it (or, saved in another version,
 // somewhere to stand in its place), and what was in use there still is.
-if (handoff && !at) {
-  const [x, z, yaw] = handoff.three?.at ?? [...(items.arrival(handoff.state.room) ?? [start.x, start.z]), 0];
+function arrive(game: { state: GameState; three?: ThreeSave }) {
+  const [x, z, yaw] = game.three?.at ?? [...(items.arrival(game.state.room) ?? [start.x, start.z]), 0];
   player.place(x, z, yaw);
-  room = handoff.state.room;
+  room = game.state.room;
 }
+if (handoff && !at) arrive(handoff);
 inUse();
 instantly = false;
 let lastRoom = room; // (where you were last frame)
@@ -502,7 +494,7 @@ function showLoad() {
             h(
               "li",
               {},
-              h("button", { type: "button", onclick: () => restart3d(slot.state, slot.name, slot.three) }, slot.name),
+              h("button", { type: "button", onclick: () => load(slot) }, slot.name),
               h("span", { class: "when" }, `${savedDate(slot.savedAt)}, ${savedTime(slot.savedAt)}`)
             )
           )
@@ -511,6 +503,23 @@ function showLoad() {
     h("p", { class: "note" }, saves.length ? T.loadingEnds : "")
   );
   panel.hidden = false;
+}
+
+// Loading: the game as it was, right here (no starting the page again, so
+// the click on its name hands the mouse straight back to the game).
+function load(slot: { name: string; state: GameState; three?: ThreeSave }) {
+  saveName = slot.name;
+  items.restart(slot);
+  arrive(slot);
+  instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
+  inUse();
+  instantly = false;
+  parting = false;
+  told = undefined;
+  lastRoom = room;
+  was.copy(player.position);
+  resume();
+  say(T.loadedAs(slot.name));
 }
 
 function resume() {
