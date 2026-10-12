@@ -13,6 +13,7 @@ import type { Direction, GameState, ItemId, RoomId, World } from "../engine/type
 import { artUrl } from "../illustrated/art";
 import type { ThreeSave } from "../shared/storage";
 import { T } from "../shared/strings";
+import { Glow } from "./glow";
 import { placeAt, PLACES } from "./layout";
 import { type Ground, type Hall, nearest, type Player, type Walkable } from "./player";
 
@@ -124,8 +125,10 @@ export function items(options: {
   stays: (id: ItemId) => { model: Object3D; fallsTo: Footing } | undefined;
   /** A game loaded (or carried on from another version), and, saved in 3D, where things lie. */
   begin?: { state: GameState; three?: ThreeSave };
+  reducedMotion: boolean;
 }): Items {
   const { world, scene, player, models, ground, walkable, root, say, changed, stays, begin } = options;
+  const glow = new Glow(options.reducedMotion); // round what you're pointing at
   let state = begin?.state ?? newGame(world);
   const lying = new Map<ItemId, Lying>();
   // What you carry: in the order it was in your slots, if it's known.
@@ -599,6 +602,8 @@ export function items(options: {
           aimed = id;
         }
       }
+      glow.show(aimed ? lying.get(aimed)?.model : undefined);
+      glow.update(performance.now() / 1000);
       aim.classList.toggle("on", Boolean(aimed));
       prompt.classList.toggle("shown", Boolean(aimed));
       if (aimed) {

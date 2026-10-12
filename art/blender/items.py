@@ -8,6 +8,7 @@ import math
 import sys
 from pathlib import Path
 
+import bmesh
 from mathutils import Vector, noise
 
 HERE = Path(__file__).parent
@@ -16,6 +17,17 @@ import common as c  # noqa: E402
 
 out, preview = c.args()
 c.clear()
+
+
+def outward(obj):
+    """Every face facing out (the game's glow round what you point at grows
+    out along them)."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(obj.data)
+    bm.free()
+
 
 WOOD = c.linear("#8a5a33")
 RUNG = c.linear("#a2703f")
@@ -52,7 +64,7 @@ n = int(LENGTH / 0.3)
 for k in range(n):
     y = -LENGTH / 2 + (k + 0.5) * LENGTH / n
     rung(ladder, -WIDTH / 2, WIDTH / 2, y, DEEP / 2, 0.022, RUNG)
-ladder.build("ladder", smooth=False)
+outward(ladder.build("ladder", smooth=False))
 
 # The key: a big old one (half a metre, so you can spot it in the grass),
 # rusty bronze as in its picture: a curly bow (two loops and a little crown),
@@ -111,7 +123,7 @@ for x0, y0, x1, y1 in ((0.015, 0.13, 0.05, 0.225), (0.05, 0.13, 0.08, 0.155), (0
     for face in [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]:
         pts = [corners[i] for i in face]
         key.add(pts, [(0, 1, 2, 3)], [rusty(p) for p in pts])  # the bit, and its notches
-key.build("key", smooth=False)
+outward(key.build("key", smooth=False))
 
 # The axe: as in its picture, a rusty iron head with a bearded blade (its
 # edge rubbed bright), on a curved wooden handle swelling to a knob at the
@@ -198,7 +210,7 @@ for j in range(NV):
     faces.append((grid[True, 0, j], grid[True, 0, j + 1], grid[False, 0, j + 1], grid[False, 0, j]))
     faces.append((grid[True, NU, j + 1], grid[True, NU, j], grid[False, NU, j], grid[False, NU, j + 1]))
 axe.add(verts, faces, colours)
-axe.build("axe", smooth=False)
+outward(axe.build("axe", smooth=False))
 
 if out:
     c.export(out)
