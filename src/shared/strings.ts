@@ -39,6 +39,8 @@ const en = {
   notes: "Notes",
   about: "About",
   classicVersion: "Classic version",
+  threeD: "3D",
+  threeDVersion: "3D version",
 
   // Endings.
   solved: "You have solved the mystery of Merlin!",
@@ -152,6 +154,8 @@ const da: Strings = {
   notes: "Vejledning",
   about: "Om spillet",
   classicVersion: "Klassisk udgave",
+  threeD: "3D",
+  threeDVersion: "3D-udgave",
 
   solved: "Du har løst Merlins mysterium!",
   adventureOver: "Eventyret er slut",

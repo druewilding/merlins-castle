@@ -27,6 +27,7 @@ from mathutils import Vector, noise
 
 HERE = Path(__file__).parent
 sys.path.append(str(HERE))
+import bpy  # noqa: E402
 import common as c  # noqa: E402
 
 random.seed(40)
@@ -61,7 +62,6 @@ ROCK = c.linear("#8a8478")
 RIVERBED = c.linear("#55655c")
 FLAGS = c.linear("#a39d90")
 STONE = c.linear("#9a978a")
-TREE = c.linear("#2f5a32")
 WATER = c.linear("#3d7fa8")
 GREY = c.linear("#b9b4a8")
 ROOF = c.linear("#6d6a78")
@@ -748,34 +748,151 @@ def tower(builder, x, y, radius, tall, colour, roof=None, roof_tall=None, sides=
     solid_circle(x, y, radius)
 
 
-# Trees: on a jittered grid wherever the ground isn't open.
-trees = c.Builder()
+# Trees: Quaternius's (art/models/ultimate-nature), a few kinds, each kept
+# once in land.glb (as "tree-<kind>", and simpler "tree-<kind>-far" and
+# "tree-<kind>-distant" to draw further off); land.json says where each one
+# grows, and the game stamps them there (src/three/trees.ts).
+NATURE = HERE.parent / "models/ultimate-nature/Blends"
+LEAFY = {"Green", "DarkGreen"}  # (their materials, without Blender's .001)
+# Their colours, made ours: grey-brown bark (not the pack's reddish brown),
+# and sunnier leaves, as in the pictures.
+RECOLOUR = {"Wood": c.linear("#6b5846"), "Green": c.linear("#5f8c3a"), "DarkGreen": c.linear("#3f6930")}
+
+
+def nature(kind):
+    """A model from the pack, and how tall it is."""
+    with bpy.data.libraries.load(str(NATURE / f"{kind}.blend")) as (src, dst):
+        dst.objects = [name for name in src.objects if name == kind]
+    obj = dst.objects[0]
+    bpy.context.collection.objects.link(obj)
+    return obj, max(v.co.z for v in obj.data.vertices)
+
+
+def vertex_coloured(obj, name, top, ratio=None):
+    """A copy of a model as one vertex-coloured mesh, its leaves lighter at
+    the top (and simpler, given a ratio of its faces to keep)."""
+    mesh = obj.data
+    if ratio:
+        copy = obj.copy()
+        copy.data = mesh.copy()
+        bpy.context.collection.objects.link(copy)
+        mod = copy.modifiers.new("simpler", "DECIMATE")
+        mod.ratio = ratio
+        mesh = copy.evaluated_get(bpy.context.evaluated_depsgraph_get()).to_mesh().copy()
+        bpy.data.objects.remove(copy)
+    colours_of = []
+    for slot in obj.material_slots:
+        material = slot.material
+        node = material.node_tree.nodes.get("Principled BSDF") if material and material.use_nodes else None
+        base = material.name.split(".")[0] if material else ""
+        colour = RECOLOUR.get(base) or (node.inputs["Base Color"].default_value[:3] if node else (0.3, 0.3, 0.3))
+        colours_of.append((tuple(colour[:3]), base in LEAFY))
+    b = c.Builder()
+    for poly in mesh.polygons:
+        colour, leafy = colours_of[poly.material_index] if colours_of else ((0.3, 0.3, 0.3), False)
+        pts = [tuple(mesh.vertices[i].co) for i in poly.vertices]
+        shades = []
+        for p in pts:
+            v = c.vary(colour, 0.12, Vector(p) * 2)
+            light = 0.75 + 0.4 * max(0.0, p[2] / top) if leafy else 1.0
+            shades.append((v[0] * light, v[1] * light, v[2] * light, 1.0))
+        b.add(pts, [tuple(range(len(pts)))], shades)
+    return b.build(name, smooth=False)
+
+
+# Which trees grow where: round each place, its own mix (by the original's
+# words, and the illustrated version's pictures), blending into the next.
+FIRS = ["PineTree_1", "PineTree_2", "PineTree_3", "PineTree_4", "PineTree_5"]
+OAKS = ["CommonTree_1", "CommonTree_2", "CommonTree_3", "CommonTree_4", "CommonTree_5"]
+BIRCHES = ["BirchTree_1", "BirchTree_2", "BirchTree_3", "BirchTree_5"]
+WILLOWS = ["Willow_1", "Willow_2", "Willow_4"]
+DEAD = ["CommonTree_Dead_2", "BirchTree_Dead_5"]
+GROVES = {
+    # The forest in the south west: big old broadleaf trees.
+    **dict.fromkeys(["forest-crossroads", "forest-witches", "forest-edge", "charcoal-hut", "old-wall"],
+                    [(OAKS, 8), (BIRCHES, 1)]),
+    # The evergreen glade, and the mountain and the dense trees at its foot: firs.
+    **dict.fromkeys(["evergreen-glade", "mountain-path", "mountain", "cave-entrance", "dragon-cave", "maze",
+                     "trolls", "oak-door", "treasure-room", "giant", "damp-tunnels"], [(FIRS, 1)]),
+    # The mossy steps up to the tower: a little eerie.
+    **dict.fromkeys(["mossy-steps", "tower"], [(FIRS, 3), (BIRCHES, 2), (DEAD, 2)]),
+    # The meadows in the north west.
+    **dict.fromkeys(["yellow-flowers", "rusty-gate", "old-stone-wall"], [(BIRCHES, 3), (OAKS, 2), (FIRS, 1)]),
+}
+MIXED = [(OAKS, 3), (BIRCHES, 2), (FIRS, 2)]  # anywhere else
+GROVE_AT = [(P[place], mix) for place, mix in GROVES.items()]
+trees_rng = random.Random(41)  # (its own, so the rest of the land comes out as before)
+
+
+def tree_kind(x, y):
+    """Which kind of tree grows here: the mix of the place nearest (give or
+    take, so the groves blend), and willows down by the river."""
+    if river.distance(x, y) < BANK + 9 and trees_rng.random() < 0.7:
+        return trees_rng.choice(WILLOWS)
+    jx, jy = noise.noise(Vector((x / 25, y / 25, 1))) * 18, noise.noise(Vector((x / 25, y / 25, 7))) * 18
+    nearest = min(P.values(), key=lambda p: math.hypot(x + jx - p[0], y + jy - p[1]))
+    mix = next((m for p, m in GROVE_AT if p == nearest), MIXED)
+    kinds, = trees_rng.choices([k for k, _ in mix], [w for _, w in mix])
+    return trees_rng.choice(kinds)
+
+
+KINDS = FIRS + OAKS + BIRCHES + WILLOWS + DEAD
+TREE_MODEL = {}  # each kind's height, as it comes
+for kind in KINDS:
+    obj, top = nature(kind)
+    vertex_coloured(obj, f"tree-{kind}", top)
+    vertex_coloured(obj, f"tree-{kind}-far", top, ratio=0.15)
+    vertex_coloured(obj, f"tree-{kind}-distant", top, ratio=0.04)
+    TREE_MODEL[kind] = top
+    bpy.data.objects.remove(obj)
+# And a stump, for where the axe fells one.
+obj, top = nature("TreeStump")
+vertex_coloured(obj, "stump", top)
+bpy.data.objects.remove(obj)
+
 TREES = {}  # each tree's spot and how far its branches spread, by 10 m square
+tree_spots = {"kinds": KINDS, "at": [], "dense": []}  # [kind, x, y, z, yaw, scale], in three.js's axes
+
+
+def grow(x, y, tall, kind, into="at", sink=0.3):
+    """A tree of a kind, `tall` metres high."""
+    top = TREE_MODEL[kind]
+    # (The cones these trees replaced drew 14 random numbers each, for their
+    # ragged skirts: drawing them still keeps the forest, and everything
+    # after it, where it was.)
+    for _ in range(14):
+        random.random()
+    scale = tall / top
+    z = height(x, y) - sink
+    tree_spots[into].append([KINDS.index(kind), round(x, 2), round(z, 2), round(-y, 2),
+                             round(trees_rng.uniform(0, 2 * math.pi), 2), round(scale, 2)])
+
+
+# On a jittered grid wherever the ground isn't open.
 for gx in range(X0 + 3, X1 - 2, 5):
     for gy in range(Y0 + 3, Y1 - 2, 5):
         x, y = gx + random.uniform(-2, 2), gy + random.uniform(-2, 2)
         if open_ground(x, y) or open_to_the_sky(x, y, 4.5) is not None or rocky(x, y) or by_a_building(x, y):
             continue
-        z = height(x, y)
         tall = random.uniform(9, 14)
         r = random.uniform(2.2, 3.0)
-        trees.cone((x, y, z - 0.3), tall, r, c.vary(TREE, 0.2, Vector((x, y, 0))), sides=7, droop=0.3)
+        grow(x, y, tall, tree_kind(x, y))
         TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
 # Trees close in on both sides of the dragon's mouth, so the only way on is
 # down into it (not round its side, past the leaves).
 for dx, dy, r in ((1.5, 6.2, 1.7), (2.0, 7.5, 2.6), (5.0, 9.5, 2.8), (-1.5, 9.0, 2.4), (-0.5, 12.0, 2.6)):
     for side in (1, -1):
         x, y = DRAGON_LIP[0] + dx, DRAGON_LIP[1] + side * dy
-        trees.cone((x, y, height(x, y) - 0.3), random.uniform(10, 13), r, c.vary(TREE, 0.2, Vector((x, y, 0))), sides=7, droop=0.3)
+        grow(x, y, random.uniform(10, 13), trees_rng.choice(FIRS))
         TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
-# The dense trees across the mountain path, which only the axe will clear.
+# The dense trees across the mountain path, which only the axe will clear:
+# firs, close together (on their own, so the game can fell them).
 w, e, s, n = AXE_TREES
 obstacle(["mountain-path north"], "box", (w + e) / 2, -(s + n) / 2, (e - w) / 2 + 2, (n - s) / 2)
 for x in range(w, e + 1, 3):
     for y in (s + 2, s + 5, n - 1):
         xx, yy = x + random.uniform(-0.8, 0.8), y + random.uniform(-0.8, 0.8)
-        trees.cone((xx, yy, height(xx, yy) - 0.3), random.uniform(8, 11), 1.8, c.vary(TREE, 0.2, Vector((xx, yy, 1))), sides=7, droop=0.2)
-trees.build("trees", smooth=False)
+        grow(xx, yy, random.uniform(8, 11), trees_rng.choice(FIRS), into="dense")
 
 # Water: the river, and the moat round the castle.
 water = c.Builder()
@@ -1923,6 +2040,7 @@ if out:
         "bounds": [X0 + 4, X1 - 4, Y0 + 4, Y1 - 4],
         "circles": circles,
         "boxes": boxes,
+        "trees": tree_spots,
     }, separators=(",", ":")))
     print(f"Exported {out}: {len(circles)} solid circles, {len(boxes)} boxes, {len(obstacles)} obstacles")
 if preview:

@@ -592,6 +592,8 @@ export class Player {
     const exit = thing.names && wayThrough(thing.names, thing.x, thing.z, p.x, p.z);
     if (!exit) return;
     const b = this.before;
+    // (Not the step across its middle, going on: only one back, on this side.)
+    if (wayThrough(thing.names!, thing.x, thing.z, b.x, b.z) !== exit) return;
     if ("r" in thing) {
       if (Math.hypot(p.x - thing.x, p.z - thing.z) >= Math.hypot(b.x - thing.x, b.z - thing.z)) return;
       p.x = b.x;

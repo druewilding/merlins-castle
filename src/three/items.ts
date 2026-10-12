@@ -11,6 +11,7 @@ import { Box3, type Object3D, Ray, type Scene, Vector3 } from "three";
 import { act, effects, newGame } from "../engine/engine";
 import type { Direction, GameState, ItemId, RoomId, World } from "../engine/types";
 import { artUrl } from "../illustrated/art";
+import type { ThreeSave } from "../shared/storage";
 import { T } from "../shared/strings";
 import { placeAt, PLACES } from "./layout";
 import { type Ground, type Hall, nearest, type Player, type Walkable } from "./player";
@@ -42,6 +43,7 @@ interface Lying {
   model: Object3D;
   box: Box3;
   footprint?: Footprint;
+  floor?: number; // (on a floor, underground or indoors, not the ground)
   // Dropped where it was in use (the ladder against the wall): once you've
   // left, it's lying on the ground here.
   fallsTo?: Footing;
@@ -100,6 +102,10 @@ export interface Items {
   /** Going through an exit (over the wall): whether the engine let you. */
   go(direction: Direction): boolean;
   readonly state: GameState;
+  /** What a save needs besides the game's state: what you carry, and where everything lies. */
+  saved(): Omit<ThreeSave, "at">;
+  /** Somewhere to stand in a place (arriving in it from a save that doesn't say where). */
+  arrival(room: RoomId): [number, number] | undefined;
 }
 
 export function items(options: {
@@ -116,11 +122,16 @@ export function items(options: {
   changed: () => void;
   /** Dropping an object where it's in use, it stays as it is (the ladder against the wall): its model, if so. */
   stays: (id: ItemId) => { model: Object3D; fallsTo: Footing } | undefined;
+  /** A game loaded (or carried on from another version), and, saved in 3D, where things lie. */
+  begin?: { state: GameState; three?: ThreeSave };
 }): Items {
-  const { world, scene, player, models, ground, walkable, root, say, changed, stays } = options;
-  let state = newGame(world);
+  const { world, scene, player, models, ground, walkable, root, say, changed, stays, begin } = options;
+  let state = begin?.state ?? newGame(world);
   const lying = new Map<ItemId, Lying>();
-  const slots: ItemId[] = [];
+  // What you carry: in the order it was in your slots, if it's known.
+  const carried = (Object.keys(state.itemLocations) as ItemId[]).filter((id) => state.itemLocations[id] === "carried");
+  const slots: ItemId[] = [...(begin?.three?.slots ?? []).filter((id): id is ItemId => carried.includes(id as ItemId))];
+  slots.push(...carried.filter((id) => !slots.includes(id)));
   let held = 0; // the slot in your hand
   let aimed: ItemId | undefined;
   const eye = new Vector3(); // where you're looking from, and which way
@@ -155,6 +166,7 @@ export function items(options: {
       model,
       box: new Box3().setFromObject(model).expandByScalar(AIM_SLACK),
       footprint: { x, z, yaw, half, wide: size.x / 2 },
+      floor,
     });
   }
 
@@ -258,6 +270,7 @@ export function items(options: {
       }
     }
     if (!first) return undefined;
+    const from = first;
     const reached = new Map<string, [number, number]>();
     const queue = [first];
     while (queue.length) {
@@ -269,13 +282,33 @@ export function items(options: {
     }
     const spots = [...reached.values()];
     return {
+      first: from,
       has: (x: number, z: number) => reached.has(cell(x, z)),
       somewhere: () => spots[Math.floor(Math.random() * spots.length)],
     };
   }
 
-  for (const [id, where] of Object.entries(state.itemLocations)) {
-    if (where !== "carried" && models.getObjectByName(id)) start(id, where);
+  /** In a hall, the clear spot nearest its middle; on the land, the open ground nearest the place's middle. */
+  function arrival(room: RoomId): [number, number] | undefined {
+    const hall = player.halls.get(room);
+    if (!hall) return reachable(room)?.first;
+    for (let r = 0; r < hall.r; r += FILL) {
+      for (let a = 0; a < 16; a++) {
+        const x = hall.x + Math.cos((a * Math.PI) / 8) * r;
+        const z = hall.z + Math.sin((a * Math.PI) / 8) * r;
+        if (player.clear(x, z, true, 0.5)) return [x, z];
+      }
+    }
+    return [hall.x, hall.z];
+  }
+
+  // Where they lie: where they lay when the game was saved, or anywhere in
+  // their places (as in a new game, or one saved in another version).
+  for (const [id, where] of Object.entries(state.itemLocations) as [ItemId, string][]) {
+    if (where === "carried" || !models.getObjectByName(id)) continue;
+    const spot = begin?.three?.lying[id];
+    if (spot) lay(id, where, spot[0], spot[1], spot[2], spot[3]);
+    else start(id, where);
   }
 
   // ---- On the screen --------------------------------------------------------
@@ -383,6 +416,9 @@ export function items(options: {
     slots.splice(held, 1);
     held = Math.min(held, Math.max(0, slots.length - 1));
     draw();
+    // (Something with no model yet, carried over from another version, is
+    // just dropped, where you can't see it.)
+    if (!models.getObjectByName(id)) return;
     // Still in use, it stays as it is (against the wall), lying in the place.
     const staying = inUse ? stays(id) : undefined;
     changed();
@@ -396,9 +432,10 @@ export function items(options: {
       });
       return;
     }
-    // Its middle where you're pointing, lying the way you're looking, or
-    // nudged aside (or on a little) off anything already lying there.
-    const yaw = player.yaw + Math.PI;
+    // Its middle where you're pointing, lying the way you're looking (its
+    // handle towards you: the axe's, the key's bow), or nudged aside (or on a
+    // little) off anything already lying there.
+    const yaw = player.yaw;
     const size = new Box3().setFromObject(models.getObjectByName(id)!).getSize(new Vector3());
     const side = [Math.cos(player.yaw), -Math.sin(player.yaw)];
     const forward = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
@@ -489,6 +526,17 @@ export function items(options: {
     get state() {
       return state;
     },
+    saved() {
+      const spots: ThreeSave["lying"] = {};
+      for (const [id, thing] of lying) {
+        const { x, z, yaw } = thing.fallsTo ?? thing.footprint!;
+        const round = (v: number) => Math.round(v * 100) / 100;
+        const floor = thing.fallsTo ? undefined : thing.floor;
+        spots[id] = floor === undefined ? [round(x), round(z), round(yaw)] : [round(x), round(z), round(yaw), floor];
+      }
+      return { slots: [...slots], lying: spots };
+    },
+    arrival,
     go(direction) {
       const result = act(world, state, { type: "go", direction });
       const went = result.state.room !== state.room;

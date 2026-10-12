@@ -32,7 +32,19 @@ import worldJson from "../../data/world.json";
 import { effects, messages, score } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
 import { type Direction, EXIT_ORDER, type World } from "../engine/types";
-import { LANGUAGE, T } from "../shared/strings";
+import { h } from "../shared/dom";
+import {
+  find3d,
+  leave3d,
+  listSaves,
+  nextSaveName,
+  restart3d,
+  saveGame,
+  takeHandoff,
+  type ThreeSave,
+} from "../shared/storage";
+import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
+import { Felling } from "./felling";
 import { items as setUpItems } from "./items";
 import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
@@ -42,6 +54,7 @@ import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable } from "./player";
 import { sky } from "./sky";
+import { Trees, type TreeSpots } from "./trees";
 
 const english = worldJson as unknown as World;
 const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
@@ -118,6 +131,11 @@ model.scene.traverse((node) => {
   node.receiveShadow = node.name !== "water";
 });
 scene.add(model.scene);
+const spots = land.trees as TreeSpots;
+const trees = new Trees(scene, model.scene, spots);
+const stump = model.scene.getObjectByName("stump") as Mesh;
+stump.removeFromParent();
+const felling = new Felling(scene, trees.models, spots.kinds, spots.dense, stump, reducedMotion);
 
 // The heights are in Blender's axes (y is north), on a grid; in between, blend.
 const { x0, y0, step, nx, ny } = land.ground;
@@ -199,6 +217,8 @@ if (rusty && leaves[0] && leaves[1]) {
   });
 }
 const SWING = 1.75; // radians, open
+// The dense trees across the mountain path, which the axe fells (felling.ts).
+const dense = shapeOf.get("mountain-path north");
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 function solidify() {
@@ -259,6 +279,11 @@ for (const { x, z } of DEATHS) {
 // A place's name, from its id (for now; PLAN-V3.md).
 const name = (id: string) => id.replace(/-/g, " ").replace(/^./, (letter) => letter.toUpperCase());
 
+// A game loaded, or carried on from another version (or another language).
+const handoff = takeHandoff();
+find3d(); // (from now on, the other versions show the way back here)
+let saveName = handoff?.saveName ?? ""; // the position last saved or loaded
+
 const start = PLACES.get("grassy-bank")!;
 const at = new URLSearchParams(location.search).get("at")?.split(",").map(Number);
 if (at && at.length >= 2) player.place(at[0], at[1], ((at[2] ?? 0) * Math.PI) / 180);
@@ -309,21 +334,28 @@ const items = setUpItems({
     if (id !== "ladder" || !ladder.shown) return undefined;
     return { model: ladder.handOver()!, fallsTo: ladder.footing! };
   },
+  begin: handoff ?? undefined,
 });
+let parting = false; // (the dense trees, for you coming down from the mountain)
+let instantly = true; // (loading, what's in use is as it was: no gate swinging open, no chopping)
 function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
-  // (Only the ways the 3D world can open so far: walls to climb, gates.)
+  // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
     const shape = shapeOf.get(`${here} ${direction}`);
-    return needs && using.includes(needs) && shape && (walls.has(shape) || gates.has(shape))
+    return needs && using.includes(needs) && shape && (walls.has(shape) || gates.has(shape) || shape === dense)
       ? [`${here} ${direction}`]
       : [];
   });
   opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
   solidify();
-  for (const [shape, gate] of gates) gate.wants = opened.has(shape) ? 1 : 0;
+  for (const [shape, gate] of gates) {
+    gate.wants = opened.has(shape) ? 1 : 0;
+    if (instantly) gate.open = gate.wants;
+  }
+  if (dense) felling.fell(opened.has(dense), instantly);
   const wall = exits.find((exit) => walls.has(shapeOf.get(exit)!));
   if (wall !== leaning) {
     ladder.away();
@@ -331,6 +363,16 @@ function inUse() {
     leaning = wall;
   } else if (wall && itemLocations.ladder === "carried") ladder.show();
 }
+
+// A game loaded: you're where you were in it (or, saved in another version,
+// somewhere to stand in its place), and what was in use there still is.
+if (handoff && !at) {
+  const [x, z, yaw] = handoff.three?.at ?? [...(items.arrival(handoff.state.room) ?? [start.x, start.z]), 0];
+  player.place(x, z, yaw);
+  room = handoff.state.room;
+}
+inUse();
+instantly = false;
 
 // At /3d?debug (on the dev server too): the debug panel (the 0 key), and a
 // handle for test scripts. Otherwise none of it is even loaded.
@@ -372,9 +414,89 @@ overlay.innerHTML = `
   <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · E to take or use · 1–5 to choose · G to drop · Esc to stop</p>
   <p class="keys touch">Left thumb to walk · right thumb to look</p>`;
 overlay.hidden = Boolean(at);
+
+// Saving and loading (the same saves as the other versions, which they can
+// load too), and going over to them, carrying on the same game.
+const panel = h("div", { class: "panel", hidden: true });
+const choice = (label: string, onclick: () => void) => h("button", { type: "button", onclick }, label);
+const menu = h(
+  "nav",
+  { class: "menu" },
+  choice(T.save, showSave),
+  choice(T.load, showLoad),
+  choice(T.illustrated, () => leave3d("illustrated", items.state, saveName)),
+  choice(T.classic, () => leave3d("classic", items.state, saveName))
+);
+// (Clicking or typing here isn't walking: nor taking, using or dropping.)
+for (const part of [menu, panel]) {
+  for (const type of ["click", "touchend", "keydown", "keyup"]) part.addEventListener(type, (e) => e.stopPropagation());
+}
+overlay.append(menu, panel);
+
+function where(): ThreeSave {
+  const round = (v: number) => Math.round(v * 100) / 100;
+  const { x, z } = player.position;
+  return { at: [round(x), round(z), round(player.yaw)], ...items.saved() };
+}
+
+function showSave() {
+  const input = h("input", {
+    name: "save-name",
+    maxlength: "24",
+    autocomplete: "off",
+    placeholder: T.namePlaceholder,
+    "aria-label": T.nameLabel,
+  }) as HTMLInputElement;
+  // After a save (or a load), the next in the series, ready to type over.
+  if (saveName)
+    input.value = nextSaveName(
+      saveName,
+      listSaves().map((slot) => slot.name)
+    );
+  const save = (event: Event) => {
+    event.preventDefault();
+    const name = input.value.trim();
+    if (!name) return;
+    const ok = saveGame(name, items.state, where());
+    if (ok) saveName = name;
+    panel.replaceChildren(h("p", {}, ok ? T.savedAs(name) : T.cantSave));
+  };
+  panel.replaceChildren(
+    h("h2", {}, T.saveTitle),
+    h("form", { onsubmit: save }, input, h("button", { type: "submit" }, T.save))
+  );
+  panel.hidden = false;
+  input.focus();
+  input.select();
+}
+
+function showLoad() {
+  const saves = listSaves();
+  panel.replaceChildren(
+    h("h2", {}, T.oldPositions),
+    saves.length
+      ? h(
+          "ul",
+          { class: "saves" },
+          ...saves.map((slot) =>
+            h(
+              "li",
+              {},
+              h("button", { type: "button", onclick: () => restart3d(slot.state, slot.name, slot.three) }, slot.name),
+              h("span", { class: "when" }, `${savedDate(slot.savedAt)}, ${savedTime(slot.savedAt)}`)
+            )
+          )
+        )
+      : h("p", {}, T.noSaves),
+    h("p", { class: "note" }, saves.length ? T.loadingEnds : "")
+  );
+  panel.hidden = false;
+}
+
 overlay.addEventListener("click", () => {
   void renderer.domElement.requestPointerLock?.();
   overlay.hidden = true;
+  panel.hidden = true;
 });
 overlay.addEventListener("touchend", () => (overlay.hidden = true));
 // With the debug panel open, clicking the world looks around again.
@@ -434,6 +556,17 @@ renderer.setAnimationLoop((time) => {
   timer.update(time);
   const dt = Math.min(timer.getDelta(), 0.1);
   player.update(dt, reducedMotion);
+  trees.update(player.position, player.yaw, player.camera);
+  // Coming down from the mountain to the dense trees, they part for you
+  // (going up, they don't), until you're clear of them.
+  if (dense?.box) {
+    const [x, z, halfX, halfZ] = dense.box;
+    const { x: px, z: pz } = player.position;
+    const near = Math.abs(px - x) < halfX + 2 && pz > z - halfZ - 9 && pz < z + halfZ + 3;
+    if (!near) parting = false;
+    else if (room === "mountain") parting = true;
+  }
+  felling.update(dt, player.position, parting);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)

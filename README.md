@@ -55,6 +55,9 @@ downloads the whole world, so it works without a connection.
   composed in code by Claude, in `scripts/make-sounds.js`; the rest are from
   [Kenney](https://kenney.nl) (CC0).
 - **Pictures**: painted with ChatGPT from the prompts in `art/prompts`.
+- **Trees** (in 3D): Quaternius's
+  [Ultimate Nature Pack](https://quaternius.com/packs/ultimatenature.html)
+  (CC0), in `art/models/ultimate-nature`.
 - **Fonts**: IM Fell English and Cinzel, from Google Fonts.
 
 ## Running it locally
@@ -93,10 +96,16 @@ Mouse to look, WASD or the arrow keys to walk, Shift to run, Space to jump
 (how high is `JUMP_HEIGHT` in `src/three/player.ts`; hold it to keep hopping), Ctrl or C to crouch.
 Look at an object and press E to take it; 1 to 5 picks which of your five
 slots is in your hand, E (when you're not looking at an object) or a click
-uses it and G drops it. (Only the ladder and
-the key are in the world so far: their models are made by
+uses it and G drops it. (Only the ladder, the
+key and the axe are in the world so far: their models are made by
 `art/blender/items.py`. Use the ladder by the old stone wall and walk into
-it to climb over; use the key by the rusty gate.)
+it to climb over; use the key by the rusty gate, and the axe by the dense
+trees on the mountain path.)
+Esc brings back the start screen, where you can save and load: the same
+saves as the other versions (a 3D save also knows where you stood and where
+everything lies), and Illustrated and Classic carry on the same game there,
+as 3D does from them. (While it's being made, 3D is a secret: the other
+versions only show their 3D link in a browser that has opened `/3d`.)
 With `?debug` (`/3d?debug`, on the dev server as in the build), **0** opens the debug panel: fly (F takes you 35 m
 up, and F again drops you back down), walk through anything (N), open every
 obstacle (O), show the obstacles and how far they reach, red where they kill
