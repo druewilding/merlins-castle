@@ -432,9 +432,10 @@ export function items(options: {
       });
       return;
     }
-    // Its middle where you're pointing, lying the way you're looking, or
-    // nudged aside (or on a little) off anything already lying there.
-    const yaw = player.yaw + Math.PI;
+    // Its middle where you're pointing, lying the way you're looking (its
+    // handle towards you: the axe's, the key's bow), or nudged aside (or on a
+    // little) off anything already lying there.
+    const yaw = player.yaw;
     const size = new Box3().setFromObject(models.getObjectByName(id)!).getSize(new Vector3());
     const side = [Math.cos(player.yaw), -Math.sin(player.yaw)];
     const forward = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
