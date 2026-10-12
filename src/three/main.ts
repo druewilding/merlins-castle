@@ -309,8 +309,8 @@ function say(words: string) {
   quiet = window.setTimeout(() => said.classList.remove("shown"), 3500);
 }
 // Going through a way that says so ("You have climbed over."): said as you
-// commit to it (starting up the ladder, past the middle of what was in the
-// way), not once you're through. (Not one that kills you: that's for when
+// commit to it (past the middle of what was in the way: at the top of the
+// wall, climbing over), not once you're through. (Not one that kills you: that's for when
 // dying is done.)
 let told: string | undefined; // the exit whose words were said, on the way through it
 function tell(exit: string) {
@@ -595,14 +595,11 @@ renderer.setAnimationLoop((time) => {
     const swing = SWING * (gate.open * gate.open * (3 - 2 * gate.open));
     for (const [leaf, way] of gate.leaves) leaf.rotation.y = way * swing;
   }
-  ladder.update(
-    (exit) => {
-      if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
-    },
-    (exit) => tell(exit)
-  );
-  // Through what was in the way (the felled trees, an open gate): its words
-  // as you pass its middle.
+  ladder.update((exit) => {
+    if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
+  });
+  // Through what was in the way (over the wall, through the felled trees or
+  // an open gate): its words as you pass its middle (the top of the wall).
   for (const shape of opened) {
     const [x, z, halfX, halfZ] = shape.box ?? shape.circle!;
     const p = player.position;

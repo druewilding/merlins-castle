@@ -111,8 +111,8 @@ export class Ladder {
     return l && { x: l.foot.x, z: l.foot.z, yaw: Math.atan2(l.along[0], l.along[1]) };
   }
 
-  /** Each frame: walk into it and you climb over (starting(exit) as you set off), then over(exit) is called. */
-  update(over: (exit: string) => void, starting: (exit: string) => void = () => {}) {
+  /** Each frame: walk into it and you climb over, then over(exit) is called. */
+  update(over: (exit: string) => void) {
     const l = this.leaning;
     if (!l || this.player.busy) return;
     const p = this.player.position;
@@ -122,7 +122,6 @@ export class Ladder {
     const onIt = fromFace > 0 && fromFace < run + 0.3 && Math.abs(sideways) < 0.7;
     if (!onIt) l.armed = true;
     if (!onIt || !l.armed) return;
-    starting(l.exit);
     this.player.follow(this.climb(l), CLIMB, () => over(l.exit));
   }
 
