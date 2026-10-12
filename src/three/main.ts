@@ -426,7 +426,7 @@ if (debugMode) {
 overlay.innerHTML = `
   <h1>Merlin's Castle</h1>
   <p class="start">Click to walk</p>
-  <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · E to take or use · 1–5 to choose · G to drop · Esc to stop</p>
+  <p class="keys">Mouse to look · WASD to walk · Shift to run · Space to jump · C to crouch · E to take or use · 1–5 to choose · G to drop · Esc to stop</p>
   <p class="keys touch">Left thumb to walk · right thumb to look</p>`;
 overlay.hidden = Boolean(at);
 
