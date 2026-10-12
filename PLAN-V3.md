@@ -445,9 +445,10 @@ and wings) may need a bought or free model.
      at the bottom of the screen ("The trees are too dense."), in English or
      Danish, for the exit you're trying. One-way, as in the original.
    - **The game**: objects to take and use (taking, using and dropping ✅,
-     with the ladder and the key, the first objects with models:
+     with the ladder, the key and the axe, the first objects with models:
      `art/blender/items.py`; the ladder leans on the old stone wall and you
-     climb over, `ladder.ts`; the key swings the rusty gate open), the
+     climb over, `ladder.ts`; the key swings the rusty gate open; the axe
+     lies on the charcoal hut's floor, but can't cut the trees down yet), the
      obstacles opening, deaths,
      the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and
