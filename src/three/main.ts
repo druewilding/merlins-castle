@@ -42,6 +42,7 @@ import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable } from "./player";
 import { sky } from "./sky";
+import { Trees, type TreeSpots } from "./trees";
 
 const english = worldJson as unknown as World;
 const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
@@ -118,6 +119,7 @@ model.scene.traverse((node) => {
   node.receiveShadow = node.name !== "water";
 });
 scene.add(model.scene);
+const trees = new Trees(scene, model.scene, land.trees as TreeSpots);
 
 // The heights are in Blender's axes (y is north), on a grid; in between, blend.
 const { x0, y0, step, nx, ny } = land.ground;
@@ -434,6 +436,7 @@ renderer.setAnimationLoop((time) => {
   timer.update(time);
   const dt = Math.min(timer.getDelta(), 0.1);
   player.update(dt, reducedMotion);
+  trees.update(player.position, player.yaw, player.camera);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)
