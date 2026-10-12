@@ -9,7 +9,7 @@
 import { Box3, Matrix4, type Object3D, Ray, type Scene, Vector3 } from "three";
 
 import { act, effects, newGame } from "../engine/engine";
-import type { Direction, GameState, ItemId, RoomId, World } from "../engine/types";
+import { type Direction, EXIT_ORDER, type GameState, type ItemId, type RoomId, type World } from "../engine/types";
 import { artUrl } from "../illustrated/art";
 import type { ThreeSave } from "../shared/storage";
 import { T } from "../shared/strings";
@@ -439,6 +439,10 @@ export function items(options: {
     const result = act(world, state, { type: "use", item: id });
     state = result.state;
     if (effects(world, state).includes(id)) {
+      // (What it does here, if it opens a way: "The ladder leans against the wall.")
+      if (EXIT_ORDER.some((d) => world.rooms[state.room].exits[d]?.obstacle?.needs === id)) {
+        say(result.events.at(-1)?.text ?? "");
+      }
       draw();
       changed();
       return;
@@ -586,6 +590,9 @@ export function items(options: {
       const result = act(world, state, { type: "go", direction });
       const went = result.state.room !== state.room;
       state = result.state;
+      // ("You have climbed over.")
+      const passing = result.events.find((event) => event.tone === "pass");
+      if (went && passing) say(passing.text);
       if (went) settle();
       draw();
       changed();
@@ -594,6 +601,10 @@ export function items(options: {
     update(room) {
       // A new place: whatever was in use stays behind (as in the original).
       if (room !== state.room) {
+        // (Walked through a way that says so: "You cross over without any
+        // trouble." Not one that kills you: that's for when dying is done.)
+        const way = Object.values(world.rooms[state.room].exits).find((exit) => exit?.to === room && exit.message);
+        if (way?.message && !way.fatal) say(way.message);
         state = { ...state, room, using: [] };
         settle();
         draw();
