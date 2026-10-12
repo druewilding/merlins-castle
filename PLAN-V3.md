@@ -451,7 +451,9 @@ and wings) may need a bought or free model.
      lies on the charcoal hut's floor, and fells the dense trees on the
      mountain path, which spring back up once you're past, `felling.ts`;
      the trees are Quaternius's, firs, oaks, birches and willows, a mix for
-     each part of the land, `src/three/trees.ts`), the
+     each part of the land, `src/three/trees.ts`; saving and loading ✅,
+     the same saves as the other versions, and switching between all three
+     with the game carried over), the
      obstacles opening, deaths,
      the mist's visions.
 3. **The first beautiful corner**: grassy bank, old stone wall, old wall and

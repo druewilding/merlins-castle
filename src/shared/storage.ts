@@ -11,6 +11,15 @@ export interface SaveSlot {
   name: string;
   savedAt: string;
   state: GameState;
+  three?: ThreeSave;
+}
+
+// Saved in the 3D version, also where you stood and where things lie (the
+// other versions only need the game's state, and leave this be).
+export interface ThreeSave {
+  at: [x: number, z: number, yaw: number];
+  slots: string[]; // what you carry, in your slots' order
+  lying: Record<string, [x: number, z: number, yaw: number, floor?: number]>;
 }
 
 function read<T>(key: string, fallback: T): T {
@@ -35,9 +44,9 @@ export function listSaves(): SaveSlot[] {
   return read<SaveSlot[]>(SAVES, []);
 }
 
-export function saveGame(name: string, state: GameState): boolean {
+export function saveGame(name: string, state: GameState, three?: ThreeSave): boolean {
   const others = listSaves().filter((slot) => slot.name !== name);
-  return write(SAVES, [{ name, savedAt: new Date().toISOString(), state }, ...others]);
+  return write(SAVES, [{ name, savedAt: new Date().toISOString(), state, ...(three && { three }) }, ...others]);
 }
 
 // A name for the next save after `last`: "Tower" -> "Tower 2" -> "Tower 3",
@@ -98,11 +107,14 @@ export function setEffectsOn(on: boolean): void {
 const MODE = "merlins-castle:mode";
 const HANDOFF = "merlins-castle:handoff";
 const HANDOFF_NAME = "merlins-castle:handoff-save-name";
+const HANDOFF_3D = "merlins-castle:handoff-3d";
 
-// A game carried over a reload, with the name it was last saved or loaded as.
+// A game carried over a reload, with the name it was last saved or loaded as
+// (and, from the 3D version, where you were in it).
 export interface Handoff {
   state: GameState;
   saveName: string;
+  three?: ThreeSave;
 }
 
 export type Mode = "illustrated" | "classic";
@@ -147,25 +159,55 @@ export function switchLanguage(language: Language, game?: GameState | null, save
   reloadWith(game, saveName);
 }
 
+// ---- The 3D version ----------------------------------------------------------
+
+// The 3D version is its own page (/3d): going there, or back to the others
+// (as the version chosen), the game carries on just the same.
+export function goTo3d(game?: GameState | null, saveName = ""): void {
+  handOver(game, saveName);
+  location.assign("./3d");
+}
+
+export function leave3d(mode: Mode, game?: GameState | null, saveName = ""): void {
+  write(MODE, mode);
+  handOver(game, saveName);
+  location.assign("./");
+}
+
+/** In the 3D version, a game loaded (or carried on): the page starts again with it. */
+export function restart3d(game: GameState, saveName = "", three?: ThreeSave): void {
+  handOver(game, saveName, three);
+  location.reload();
+}
+
 function reloadWith(game?: GameState | null, saveName = "") {
+  handOver(game, saveName);
+  location.reload();
+}
+
+function handOver(game?: GameState | null, saveName = "", three?: ThreeSave) {
   try {
     if (game) {
       sessionStorage.setItem(HANDOFF, JSON.stringify(game));
       sessionStorage.setItem(HANDOFF_NAME, saveName);
+      if (three) sessionStorage.setItem(HANDOFF_3D, JSON.stringify(three));
     }
   } catch {
     // The game just won't carry over.
   }
-  location.reload();
 }
 
 export function takeHandoff(): Handoff | null {
   try {
     const raw = sessionStorage.getItem(HANDOFF);
     const saveName = sessionStorage.getItem(HANDOFF_NAME) ?? "";
+    const three = sessionStorage.getItem(HANDOFF_3D);
     sessionStorage.removeItem(HANDOFF);
     sessionStorage.removeItem(HANDOFF_NAME);
-    return raw ? { state: JSON.parse(raw) as GameState, saveName } : null;
+    sessionStorage.removeItem(HANDOFF_3D);
+    return raw
+      ? { state: JSON.parse(raw) as GameState, saveName, ...(three && { three: JSON.parse(three) as ThreeSave }) }
+      : null;
   } catch {
     return null;
   }

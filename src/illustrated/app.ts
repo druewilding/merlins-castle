@@ -18,6 +18,7 @@ import { h } from "../shared/dom";
 import {
   deleteSave,
   effectsOn,
+  goTo3d,
   type Handoff,
   listSaves,
   musicOn,
@@ -157,7 +158,8 @@ export class IllustratedApp {
           link(T.notes, () => this.showNotes()),
           link(T.about, () => this.showAbout()),
           link(T.language, () => this.showLanguage()),
-          link(T.classicVersion, () => switchMode("classic"))
+          link(T.classicVersion, () => switchMode("classic")),
+          link(T.threeDVersion, () => goTo3d())
         )
       )
     );
@@ -455,7 +457,8 @@ export class IllustratedApp {
       link(T.quit, () => this.showQuit()),
       link(T.sound, () => this.showSound()),
       link(T.language, () => this.showLanguage()),
-      link(T.classic, () => switchMode("classic", this.game, this.saveName))
+      link(T.classic, () => switchMode("classic", this.game, this.saveName)),
+      link(T.threeD, () => goTo3d(this.game, this.saveName))
     );
   }
 

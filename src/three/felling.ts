@@ -84,11 +84,11 @@ export class Felling {
     this.draw();
   }
 
-  /** Felled (the axe in use there), the nearest to `by` first; or standing again. */
-  fell(down: boolean, by: Vector3) {
+  /** Felled (the axe in use there), the nearest to `by` first; or standing again (or `now`, as they'd end up). */
+  fell(down: boolean, by: Vector3, now = false) {
     if (down === this.down) return;
     this.down = down;
-    this.time = 0;
+    this.time = now ? 1000 : 0;
     this.still = false;
     const near = [...this.trees].sort((a, b) => a.at.distanceTo(by) - b.at.distanceTo(by));
     near.forEach((tree, k) => {

@@ -5,6 +5,7 @@ import { h } from "../shared/dom";
 import {
   bestScore,
   deleteSave,
+  goTo3d,
   type Handoff,
   listSaves,
   nextSaveName,
@@ -360,7 +361,8 @@ export class App {
         h("span", { class: "yellow" }, T.score(view.score)),
         button(T.save, "white", () => this.go({ name: "play", events: [], prompt: "save" })),
         button(T.quit, "white", () => this.go({ name: "play", events: [], prompt: "quit" })),
-        button(T.illustrated, "white", () => switchMode("illustrated", this.game, this.saveName))
+        button(T.illustrated, "white", () => switchMode("illustrated", this.game, this.saveName)),
+        button(T.threeD, "white", () => goTo3d(this.game, this.saveName))
       )
     );
 

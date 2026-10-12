@@ -32,7 +32,9 @@ import worldJson from "../../data/world.json";
 import { effects, messages, score } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
 import { type Direction, EXIT_ORDER, type World } from "../engine/types";
-import { LANGUAGE, T } from "../shared/strings";
+import { h } from "../shared/dom";
+import { leave3d, listSaves, nextSaveName, restart3d, saveGame, takeHandoff, type ThreeSave } from "../shared/storage";
+import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Felling } from "./felling";
 import { items as setUpItems } from "./items";
 import { Ladder } from "./ladder";
@@ -268,6 +270,10 @@ for (const { x, z } of DEATHS) {
 // A place's name, from its id (for now; PLAN-V3.md).
 const name = (id: string) => id.replace(/-/g, " ").replace(/^./, (letter) => letter.toUpperCase());
 
+// A game loaded, or carried on from another version (or another language).
+const handoff = takeHandoff();
+let saveName = handoff?.saveName ?? ""; // the position last saved or loaded
+
 const start = PLACES.get("grassy-bank")!;
 const at = new URLSearchParams(location.search).get("at")?.split(",").map(Number);
 if (at && at.length >= 2) player.place(at[0], at[1], ((at[2] ?? 0) * Math.PI) / 180);
@@ -318,7 +324,9 @@ const items = setUpItems({
     if (id !== "ladder" || !ladder.shown) return undefined;
     return { model: ladder.handOver()!, fallsTo: ladder.footing! };
   },
+  begin: handoff ?? undefined,
 });
+let instantly = true; // (loading, what's in use is as it was: no gate swinging open, no chopping)
 function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
@@ -332,8 +340,11 @@ function inUse() {
   });
   opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
   solidify();
-  for (const [shape, gate] of gates) gate.wants = opened.has(shape) ? 1 : 0;
-  if (dense) felling.fell(opened.has(dense), player.position);
+  for (const [shape, gate] of gates) {
+    gate.wants = opened.has(shape) ? 1 : 0;
+    if (instantly) gate.open = gate.wants;
+  }
+  if (dense) felling.fell(opened.has(dense), player.position, instantly);
   const wall = exits.find((exit) => walls.has(shapeOf.get(exit)!));
   if (wall !== leaning) {
     ladder.away();
@@ -341,6 +352,16 @@ function inUse() {
     leaning = wall;
   } else if (wall && itemLocations.ladder === "carried") ladder.show();
 }
+
+// A game loaded: you're where you were in it (or, saved in another version,
+// somewhere to stand in its place), and what was in use there still is.
+if (handoff && !at) {
+  const [x, z, yaw] = handoff.three?.at ?? [...(items.arrival(handoff.state.room) ?? [start.x, start.z]), 0];
+  player.place(x, z, yaw);
+  room = handoff.state.room;
+}
+inUse();
+instantly = false;
 
 // At /3d?debug (on the dev server too): the debug panel (the 0 key), and a
 // handle for test scripts. Otherwise none of it is even loaded.
@@ -382,9 +403,89 @@ overlay.innerHTML = `
   <p class="keys">Mouse to look · WASD or arrows to walk · Shift to run · Space to jump · Ctrl or C to crouch · E to take or use · 1–5 to choose · G to drop · Esc to stop</p>
   <p class="keys touch">Left thumb to walk · right thumb to look</p>`;
 overlay.hidden = Boolean(at);
+
+// Saving and loading (the same saves as the other versions, which they can
+// load too), and going over to them, carrying on the same game.
+const panel = h("div", { class: "panel", hidden: true });
+const choice = (label: string, onclick: () => void) => h("button", { type: "button", onclick }, label);
+const menu = h(
+  "nav",
+  { class: "menu" },
+  choice(T.save, showSave),
+  choice(T.load, showLoad),
+  choice(T.illustrated, () => leave3d("illustrated", items.state, saveName)),
+  choice(T.classic, () => leave3d("classic", items.state, saveName))
+);
+// (Clicking or typing here isn't walking: nor taking, using or dropping.)
+for (const part of [menu, panel]) {
+  for (const type of ["click", "touchend", "keydown", "keyup"]) part.addEventListener(type, (e) => e.stopPropagation());
+}
+overlay.append(menu, panel);
+
+function where(): ThreeSave {
+  const round = (v: number) => Math.round(v * 100) / 100;
+  const { x, z } = player.position;
+  return { at: [round(x), round(z), round(player.yaw)], ...items.saved() };
+}
+
+function showSave() {
+  const input = h("input", {
+    name: "save-name",
+    maxlength: "24",
+    autocomplete: "off",
+    placeholder: T.namePlaceholder,
+    "aria-label": T.nameLabel,
+  }) as HTMLInputElement;
+  // After a save (or a load), the next in the series, ready to type over.
+  if (saveName)
+    input.value = nextSaveName(
+      saveName,
+      listSaves().map((slot) => slot.name)
+    );
+  const save = (event: Event) => {
+    event.preventDefault();
+    const name = input.value.trim();
+    if (!name) return;
+    const ok = saveGame(name, items.state, where());
+    if (ok) saveName = name;
+    panel.replaceChildren(h("p", {}, ok ? T.savedAs(name) : T.cantSave));
+  };
+  panel.replaceChildren(
+    h("h2", {}, T.saveTitle),
+    h("form", { onsubmit: save }, input, h("button", { type: "submit" }, T.save))
+  );
+  panel.hidden = false;
+  input.focus();
+  input.select();
+}
+
+function showLoad() {
+  const saves = listSaves();
+  panel.replaceChildren(
+    h("h2", {}, T.oldPositions),
+    saves.length
+      ? h(
+          "ul",
+          { class: "saves" },
+          ...saves.map((slot) =>
+            h(
+              "li",
+              {},
+              h("button", { type: "button", onclick: () => restart3d(slot.state, slot.name, slot.three) }, slot.name),
+              h("span", { class: "when" }, `${savedDate(slot.savedAt)}, ${savedTime(slot.savedAt)}`)
+            )
+          )
+        )
+      : h("p", {}, T.noSaves),
+    h("p", { class: "note" }, saves.length ? T.loadingEnds : "")
+  );
+  panel.hidden = false;
+}
+
 overlay.addEventListener("click", () => {
   void renderer.domElement.requestPointerLock?.();
   overlay.hidden = true;
+  panel.hidden = true;
 });
 overlay.addEventListener("touchend", () => (overlay.hidden = true));
 // With the debug panel open, clicking the world looks around again.

@@ -101,6 +101,10 @@ key and the axe are in the world so far: their models are made by
 `art/blender/items.py`. Use the ladder by the old stone wall and walk into
 it to climb over; use the key by the rusty gate, and the axe by the dense
 trees on the mountain path.)
+Esc brings back the start screen, where you can save and load: the same
+saves as the other versions (a 3D save also knows where you stood and where
+everything lies), and Illustrated and Classic carry on the same game there,
+as 3D does from them.
 With `?debug` (`/3d?debug`, on the dev server as in the build), **0** opens the debug panel: fly (F takes you 35 m
 up, and F again drops you back down), walk through anything (N), open every
 obstacle (O), show the obstacles and how far they reach, red where they kill
