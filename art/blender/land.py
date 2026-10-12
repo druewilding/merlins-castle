@@ -1316,6 +1316,58 @@ def in_pit(x, y):
 # hall's own floor and walls take over, with a door frame where they meet.
 tunnel = c.Builder()
 DROPS = []  # (cave, and the two sides of where a way drops away out of it)
+
+# Underground, under cover, a way is dug through rock: rough walls (pushed
+# out, never in, by noise, so they're the same from one stretch to the next
+# and never narrow the way), a rounded roof, in layers of earth and stone;
+# timber props across it every few metres, and rubble along the foot of its
+# walls. Across the way, from the left wall's foot over the roof to the right
+# wall's foot: (how far across, -1 to 1, and how high).
+VAULT = [(-1, -0.1), (-1, 0.6), (-1, 1.3), (-1, 2.0), (-0.96, 2.45), (-0.8, 2.82), (-0.45, 3.08), (0, TUNNEL_TALL)]
+VAULT += [(-u, h) for u, h in reversed(VAULT[:-1])]
+SPRING = 2.3  # where the roof springs from the walls (the middle of its curve)
+PROP_EVERY = 8  # rows (half a metre each) between the timber props
+TIMBER = c.linear("#4a3420")
+LAYERS = (c.linear("#6f6556"), c.linear("#5a4632"), c.linear("#7a6a52"), c.linear("#4d4236"))
+
+
+def vault_point(row, u, h, half):
+    """A point of the rock round a way: pushed out by up to 0.4 m (but not at
+    the foot of its walls, where they meet the floor)."""
+    x, y, f = row[0], row[1], row[2]
+    bx, by = x + row[3] * u * half, y + row[4] * u * half
+    if h < 0:
+        return bx, by, f + h
+    if h <= SPRING:
+        ox, oz = u, 0.0
+    else:
+        ox, oz = u * half, h - SPRING
+        m = math.hypot(ox, oz) or 1
+        ox, oz = ox / m, oz / m
+    push = 0.4 * max(0.0, min(1.0, 0.45 + noise.noise(Vector((bx / 1.4, by / 1.4, (f + h) / 1.1)))))
+    push *= min(1.0, h / 0.6)  # (easing out from the foot)
+    px, py = bx + row[3] * ox * push, by + row[4] * ox * push
+    # (Always under the ground: under the river, its bank comes down close
+    # over the roof.)
+    return px, py, min(f + h + oz * push, max(height(px, py) - 0.15, f + min(h, 2.0)))
+
+
+def rock_colour(x, y, z):
+    """Layers of earth and stone, tilted a little, darker towards the floor."""
+    t = noise.noise(Vector((x / 9, y / 9, 0.3))) * 1.5 + z * 0.9
+    k = int(math.floor(t)) % len(LAYERS)
+    return c.mix(LAYERS[k], c.linear("#2a2018"), 0.25 * max(0.0, 1 - (z % 3.2) / 1.2) * 0.6)
+
+
+def oriented_box(builder, corners, z0, z1, colour):
+    """A box standing on four corners (in order round it), from z0 up to z1."""
+    for i in range(4):
+        p, q = corners[i], corners[(i + 1) % 4]
+        quad(builder, [(*p, z0), (*q, z0), (*q, z1), (*p, z1)], colour, 0.06)
+    quad(builder, [(*p, z1) for p in corners], colour, 0.06)
+    quad(builder, [(*p, z0) for p in corners], colour, 0.06)
+
+
 for way in WAYS.values():
     half = way.half
     # The way's two edges, as lines meeting exactly at every bend (mitred,
@@ -1377,13 +1429,21 @@ for way in WAYS.values():
         x, y, _, nx_, ny_, _ = row
         return x + nx_ * offset, y + ny_ * offset
 
+    def drawn(a, b):
+        """Whether this stretch is drawn (as far as a hall's doorway)."""
+        mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
+        hall = in_a_hall(*mid, 0.3)
+        return not (hall and hall.inside(mid[0], mid[1], hall.doorway))
+
+    # The stretches dug through rock (under cover, underground).
+    rocky_ = [not way.indoor and a[5] and b[5] and drawn(a, b) for a, b in zip(rows, rows[1:])]
+    rubble = random.Random(f"rubble {way.points[0]}")
     for k, (a, b) in enumerate(zip(rows, rows[1:])):
         mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
         # (Floor, walls and roof go on as far as the doorway: just past a
         # room's wall, or on into a cave, past its lumpy wall. The floor
         # overlaps the hall's own, a doorstep over the seam.)
-        hall = in_a_hall(*mid, 0.3)
-        if hall and hall.inside(mid[0], mid[1], hall.doorway):
+        if not drawn(a, b):
             continue
         (alx, aly), (arx, ary) = edge_left[k], edge_right[k]
         (blx, bly), (brx, bry) = edge_left[k + 1], edge_right[k + 1]
@@ -1402,6 +1462,62 @@ for way in WAYS.values():
                                        ((alx, aly), (arx, ary), a[2], a[2]), ((blx, bly), (brx, bry), b[2], b[2])):
                     quad(tunnel, [(*p0, z0 + lift), (*p1, z1 + lift), (*p1, min(z1 - 0.12, bottom)), (*p0, min(z0 - 0.12, bottom))],
                          floor_colour)
+        if rocky_[k]:
+            # The rock round it, all the way over.
+            pa = [vault_point(a, u, h, half) for u, h in VAULT]
+            pb = [vault_point(b, u, h, half) for u, h in VAULT]
+            for i in range(len(VAULT) - 1):
+                face = [pa[i], pa[i + 1], pb[i + 1], pb[i]]
+                cx_, cy_, cz_ = (sum(p[j] for p in face) / 4 for j in range(3))
+                quad(tunnel, face, rock_colour(cx_, cy_, cz_ - a[2]), 0.1)
+            # (And a plain dark backing just beyond the rock, so where it
+            # folds over itself, round a tight bend, there's no slit to see
+            # through.)
+            back = half + 0.45
+            la, ra, lb, rb = side(a, -back), side(a, back), side(b, -back), side(b, back)
+            def top(row, p):
+                return min(row[2] + TUNNEL_TALL + 0.45, max(height(*p) - 0.08, row[2] + 2.0))
+
+            for p0, p1 in ((la, lb), (ra, rb)):
+                quad(tunnel, [(*p0, a[2] - 0.1), (*p1, b[2] - 0.1), (*p1, top(b, p1)), (*p0, top(a, p0))], LAYERS[3], 0.0)
+            quad(tunnel, [(*la, top(a, la)), (*ra, top(a, ra)), (*rb, top(b, rb)), (*lb, top(b, lb))], LAYERS[3], 0.0)
+            if not in_pit(mid[0], mid[1]):
+                quad(tunnel, [(*la, a[2] - 0.1), (*ra, a[2] - 0.1), (*rb, b[2] - 0.1), (*lb, b[2] - 0.1)], LAYERS[3], 0.0)
+            # Where the rock stops (into a hall, out under the lintel, a dead
+            # end): a ring of it, from the rock in to the square opening.
+            for row, pts_, ends in ((a, pa, k == 0 or not rocky_[k - 1]), (b, pb, k == len(rocky_) - 1 or not rocky_[k + 1])):
+                if not ends:
+                    continue
+                square = [(*side(row, u * half), row[2] + (h if h <= SPRING else TUNNEL_TALL)) for u, h in VAULT]
+                for i in range(len(VAULT) - 1):
+                    quad(tunnel, [pts_[i], pts_[i + 1], square[i + 1], square[i]], rock_colour(*pts_[i]), 0.1)
+            # Timber props, every few metres (not by a hall).
+            if k % PROP_EVERY == PROP_EVERY // 2 and not in_a_hall(*mid, 4):
+                dx, dy = b[0] - a[0], b[1] - a[1]
+                dd = math.hypot(dx, dy) or 1
+                ux, uy = dx / dd, dy / dd  # along the way
+                ax2, ay2 = a[3], a[4]
+                am = math.hypot(ax2, ay2) or 1
+                vx, vy = ax2 / am, ay2 / am  # across it
+                f = a[2]
+                for sign in (1, -1):
+                    px, py = side(a, sign * (half - 0.14))
+                    post = [(px + ux * su * 0.13 + vx * sv * 0.13, py + uy * su * 0.13 + vy * sv * 0.13)
+                            for su, sv in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+                    oriented_box(tunnel, post, f - 0.05, f + SPRING + 0.15, TIMBER)
+                lx2, ly2 = side(a, -half - 0.2)
+                rx2, ry2 = side(a, half + 0.2)
+                beam = [(lx2 - ux * 0.15, ly2 - uy * 0.15), (rx2 - ux * 0.15, ry2 - uy * 0.15),
+                        (rx2 + ux * 0.15, ry2 + uy * 0.15), (lx2 + ux * 0.15, ly2 + uy * 0.15)]
+                oriented_box(tunnel, beam, f + SPRING + 0.15, f + SPRING + 0.4, c.mix(TIMBER, c.linear("#000000"), 0.15))
+            # Rubble along the foot of the walls.
+            if rubble.random() < 0.22:
+                sign = rubble.choice((1, -1))
+                rx3, ry3 = side(a, sign * (half - 0.08))
+                r = rubble.uniform(0.12, 0.28)
+                tunnel.blob((rx3, ry3, a[2] + r * 0.2), r, c.mix(TUNNEL_STONE, EARTH, rubble.random() * 0.6),
+                            squash=0.6, lumpy=0.35, seed=rubble.random() * 100, subdivisions=1)
+            continue
         # (Up the ramps, the walls stop exactly under the stone lip on top of them.)
         for (ax_, ay_), (bx_, by_) in (((alx, aly), (blx, bly)), ((arx, ary), (brx, bry))):
             # (Where the ramp goes under the lintel, the walls stay up at the
