@@ -437,7 +437,6 @@ export function items(options: {
     scene.remove(thing.model);
     lying.delete(id);
     slots.push(id);
-    held = slots.length - 1;
     draw(id);
   }
 
