@@ -1,13 +1,12 @@
 // The dense trees across the mountain path (land.json's trees.dense), which
-// the axe fells: one blow (they all shudder), then over they all go together,
-// away from the path, leaving stumps. When the axe is no longer in use there
-// (you've gone on, as in the original), they spring back up. And coming down
+// the axe fells: over they all go together, away from the path, leaving
+// stumps. When the axe is no longer in use there (you've gone on, as in the
+// original), they spring back up. And coming down
 // from the mountain, the ones round you slide aside to let you out, and close
 // again behind you (they keep people out of the mountain, not in: PLAN-V3.md).
 
 import { InstancedMesh, Matrix4, type Mesh, Quaternion, type Scene, Vector3 } from "three";
 
-const CHOP = 0.3; // seconds, the blow of the axe (they shudder), before they fall
 const LAG = 0.15; // seconds: each falls up to this much after the first, not all in step
 const FALL = 1.1; // seconds, from standing to lying
 const DOWN = 1.4; // radians, lying (on the slope at the foot of the mountain)
@@ -15,9 +14,9 @@ const RISE = 0.7; // seconds, springing back up
 const STUMP = 0.26; // a stump's size, for a tree's
 const STUMP_TALL = 0.62; // the stump model's height, at its own size
 const SUNK = 0.3; // the trees stand sunk this far into the ground (land.py)
-const CLEAR = 3.5; // metres: parting, they slide this far either side of you
-const NEAR = 8; // metres, ahead or behind: the ones this near you slide right out of the way
-const FAR = 10; // and the ones this far stay (or slide back) in place
+const CLEAR = 5; // metres: parting, they slide this far either side of you
+const NEAR = 16; // metres, ahead or behind: the ones this near you slide right out of the way
+const FAR = 20; // and the ones this far stay (or slide back) in place
 const SLIDE = 16; // how quickly they slide (the larger, the quicker)
 
 interface Felled {
@@ -107,7 +106,7 @@ export class Felling {
     if (!this.still) {
       this.time += dt;
       for (const tree of this.trees) tree.angle = this.down ? this.falling(tree) : this.rising(tree);
-      this.still = this.time > (this.down ? CHOP + LAG + FALL + 1.5 : RISE);
+      this.still = this.time > (this.down ? LAG + FALL + 1.5 : RISE);
     }
     this.draw();
   }
@@ -127,13 +126,10 @@ export class Felling {
     return moved;
   }
 
-  // Shuddering at the blow, then falling faster and faster, and a little bounce.
+  // Falling faster and faster, and a little bounce.
   private falling(tree: Felled) {
-    const t = this.time - CHOP - tree.lag;
-    if (t < 0) {
-      if (this.reducedMotion || this.time > CHOP) return 0;
-      return 0.035 * Math.exp(-this.time * 12) * Math.sin(this.time * 40);
-    }
+    const t = this.time - tree.lag;
+    if (t < 0) return 0;
     if (t < FALL) return DOWN * (t / FALL) ** 2;
     if (this.reducedMotion) return DOWN;
     return DOWN - 0.08 * Math.exp(-(t - FALL) * 6) * Math.abs(Math.sin((t - FALL) * 14));

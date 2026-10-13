@@ -142,8 +142,10 @@ export function items(options: {
   const glow = new Glow(options.reducedMotion); // round what you're pointing at
   let state = begin?.state ?? newGame(world);
   const lying = new Map<ItemId, Lying>();
-  const slots: ItemId[] = [];
+  const slots: (ItemId | undefined)[] = []; // (with gaps: each stays in its slot)
   let held = 0; // the slot in your hand
+  const carrying = () => slots.some(Boolean);
+  const free = () => slots.findIndex((id) => !id); // (there's always one: you can only take five)
   let aimed: ItemId | undefined;
   const eye = new Vector3(); // where you're looking from, and which way
   const look = new Vector3();
@@ -347,12 +349,15 @@ export function items(options: {
     for (const thing of lying.values()) scene.remove(thing.model);
     lying.clear();
     aimed = undefined;
-    // What you carry: in the order it was in your slots, if it's known.
+    // What you carry: in the slots it was in, if it's known.
     const carried = (Object.keys(state.itemLocations) as ItemId[]).filter(
       (id) => state.itemLocations[id] === "carried"
     );
-    slots.splice(0, slots.length, ...(three?.slots ?? []).filter((id): id is ItemId => carried.includes(id as ItemId)));
-    slots.push(...carried.filter((id) => !slots.includes(id)));
+    slots.splice(0, slots.length, ...Array.from({ length: SLOTS }, () => undefined));
+    (three?.slots ?? []).forEach((id, k) => {
+      if (k < SLOTS && carried.includes(id as ItemId)) slots[k] = id as ItemId;
+    });
+    for (const id of carried) if (!slots.includes(id)) slots[free()] = id;
     held = 0;
     // Where they lie: where they lay when the game was saved, or anywhere in
     // their places (as in a new game, or one saved in another version).
@@ -416,7 +421,7 @@ export function items(options: {
 
   /** The slot in your hand shakes (or all of them, empty-handed): nothing happens. */
   function shake() {
-    const slot = slots.length ? bar.children[held] : bar;
+    const slot = carrying() ? bar.children[held] : bar;
     bar.classList.remove("shake");
     slot?.classList.remove("shake");
     void (slot as HTMLElement | undefined)?.offsetWidth;
@@ -436,19 +441,23 @@ export function items(options: {
     state = { ...result.state, room: state.room };
     scene.remove(thing.model);
     lying.delete(id);
-    slots.push(id);
-    held = slots.length - 1;
+    // Into the slot in your hand if it's empty (and it stays in your hand),
+    // or else the first empty one.
+    slots[slots[held] ? free() : held] = id;
     draw(id);
   }
 
   function use() {
-    if (!slots.length) {
+    if (!carrying()) {
       say(T.carryingNothing);
       shake();
       return;
     }
     const id = slots[held];
-    if (!id) return;
+    if (!id) {
+      shake(); // (an empty hand)
+      return;
+    }
     const result = act(world, state, { type: "use", item: id });
     state = result.state;
     if (effects(world, state).includes(id)) {
@@ -471,8 +480,10 @@ export function items(options: {
     const result = act(world, state, { type: "drop", item: id });
     if (result.state.itemLocations[id] === "carried") return;
     state = result.state;
-    slots.splice(held, 1);
-    held = Math.min(held, Math.max(0, slots.length - 1));
+    slots[held] = undefined;
+    // On to the next thing you carry (round from the last slot to the first),
+    // so G again drops that: or, carrying nothing now, back to the first slot.
+    held = Array.from({ length: SLOTS }, (_, k) => (held + k) % SLOTS).find((k) => slots[k]) ?? 0;
     draw();
     // (Something with no model yet, carried over from another version, is
     // just dropped, where you can't see it.)
@@ -596,7 +607,7 @@ export function items(options: {
         const floor = thing.fallsTo ? undefined : thing.floor;
         spots[id] = floor === undefined ? [round(x), round(z), round(yaw)] : [round(x), round(z), round(yaw), floor];
       }
-      return { slots: [...slots], lying: spots };
+      return { slots: slots.map((id) => id ?? null), lying: spots };
     },
     arrival,
     restart(game) {

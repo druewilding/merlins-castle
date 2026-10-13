@@ -18,7 +18,7 @@ export interface SaveSlot {
 // other versions only need the game's state, and leave this be).
 export interface ThreeSave {
   at: [x: number, z: number, yaw: number, floor?: number]; // (floor: underground, or indoors, the floor you stood on)
-  slots: string[]; // what you carry, in your slots' order
+  slots: (string | null)[]; // what you carry, in your slots (null: an empty one)
   lying: Record<string, [x: number, z: number, yaw: number, floor?: number]>;
 }
 

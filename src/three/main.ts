@@ -599,7 +599,7 @@ renderer.setAnimationLoop((time) => {
   if (dense?.box) {
     const [x, z, halfX, halfZ] = dense.box;
     const { x: px, z: pz } = player.position;
-    const near = Math.abs(px - x) < halfX + 2 && pz > z - halfZ - 9 && pz < z + halfZ + 3;
+    const near = Math.abs(px - x) < halfX + 2 && pz > z - halfZ - 18 && pz < z + halfZ + 15;
     if (!near) parting = false;
     else if (room === "mountain") parting = true;
   }
