@@ -1114,11 +1114,14 @@ for k in range(6):
 # in the tower, where you can't be on the land: it reaches out in front of
 # the door, and no further round the tower than you'd need to slip past it,
 # which leaves the way round to the balcony, whose reach is just past its
-# edge: you see it overhead. The stone is indoors, for the way
-# out, just inside the round room: in the doorway, you're still on the mossy
-# steps, and it would shut you in out there, past its middle.)
+# edge: you see it overhead. The stone is indoors, for the way out, its
+# middle just before you're far enough in to be in the tower (the round
+# room's edge, less your body's 0.35 m, player.ts): once you're in the
+# tower, you're past it, and shut in. Any further in, and you'd be in the
+# tower but not past it, and could still turn back and walk out.)
 obstacle(["mossy-steps north"], "circle", TOWER[0], -(TOWER[1] - TOWER_R), 0.8, reach=3.7)
-obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - TOWER_R + 1.5), 1.6, 0.5, under=True, reach=1.5)  # (so you can walk round the room)
+stone_at = HALLS["tower"].r - 0.35 + 0.15
+obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - stone_at), 1.6, 0.5, under=True, reach=1.5)  # (so you can walk round the room)
 bx, by = out_from_tower(7.6, 0)  # (under the balcony, and with its reach, all of it: right in to the wall, from either side)
 obstacle(["mossy-steps east"], "circle", bx, -by, 1.6, reach=0.6)
 
