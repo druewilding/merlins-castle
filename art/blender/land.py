@@ -127,11 +127,13 @@ TOWER_WINDOW = (0.9, 2.6)  # the window's sill and lintel, above the landing
 # mountain, with the castle's spire off to the right. (A whole number of the
 # round room's sides, so its wall opens at its corners.)
 TOWER_FACING = -3 * 2 * math.pi / 32
-# Under the balcony, a little rise in the ground, for the ladder to stand
-# on: from there, it reaches up to the balcony's underside (not quite: it's
-# not hooked over anything, so it slips). Narrow, so it never rises through
-# the tower's floor.
-BALCONY_RISE = (TOWER[0] + math.cos(TOWER_FACING) * 7.5, TOWER[1] + math.sin(TOWER_FACING) * 7.5)
+# By the balcony, on its side towards the mossy steps, a little rise in the
+# ground for the ladder to stand on: from there, it reaches up to the
+# balcony's underside (not quite: it's not hooked over anything, so it
+# slips). Not so wide it rises through the tower's floor, but wider than the
+# ground's grid (2 m), or there'd be nothing of it.
+BALCONY_RISE = (TOWER[0] + math.cos(TOWER_FACING) * 7.0 + math.sin(TOWER_FACING) * 3.6,
+                TOWER[1] + math.sin(TOWER_FACING) * 7.0 - math.cos(TOWER_FACING) * 3.6)
 # All its windows: which way each faces (round from due east), half its
 # width (as an angle), and its sill and lintel above the floor. The big one at
 # the top of the stairs, onto the balcony; and two narrow ones, letting a
@@ -536,7 +538,7 @@ def height(x, y):
     h = max(h, dragon_hill(x, y), ridge(x, y))
     t = math.hypot(x - TOWER[0], y - TOWER[1])
     h += 5 * smooth(1 - (t - 8) / 10)
-    h += 0.6 * smooth(1 - math.hypot(x - BALCONY_RISE[0], y - BALCONY_RISE[1]) / 1.8)
+    h += 0.9 * smooth(1 - math.hypot(x - BALCONY_RISE[0], y - BALCONY_RISE[1]) / 3)
     g = math.hypot(x - P["evergreen-glade"][0], y - P["evergreen-glade"][1])
     h -= 1.5 * smooth(1 - (g - 10) / 8)  # the glade lies a little low
     r = river.distance(x, y)
@@ -1137,9 +1139,9 @@ def balcony_block(u0, v0, u1, v1, z0, z1):
 # parapet round it, on two stone brackets.
 bz = fl + TOWER_LANDING
 bu0, bu1, bv = 5.5, 8.5, 2.0
-# (Where the ladder's top rests: under the balcony, by the tower's wall,
-# between its brackets.)
-LADDER_TOP = (*out_from_tower(6.3, 0), bz - 0.42)
+# (Where the ladder's top rests: under the edge of the balcony's side towards
+# the mossy steps, past its bracket, so it faces you coming up them.)
+LADDER_TOP = (*out_from_tower(7.0, -bv + 0.15), bz - 0.42)
 balcony_block(bu0, -bv, bu1, bv, bz - 0.4, bz)
 for u0, v0, u1, v1 in ((bu1 - 0.25, -bv, bu1, bv), (bu0, -bv, bu1 - 0.25, -bv + 0.25), (bu0, bv - 0.25, bu1 - 0.25, bv)):
     balcony_block(u0, v0, u1, v1, bz, bz + 0.9)
@@ -2609,7 +2611,7 @@ if out:
         "under": {"circles": under_circles, "boxes": under_boxes},
         # Where the ladder rests under the balcony, its top [x, y, z], and which way is out from it [x, z].
         "balcony": {"top": [round(LADDER_TOP[0], 2), round(LADDER_TOP[2], 2), round(-LADDER_TOP[1], 2)],
-                    "out": [round(math.cos(TOWER_FACING), 3), round(-math.sin(TOWER_FACING), 3)]},
+                    "out": [round(math.sin(TOWER_FACING), 3), round(math.cos(TOWER_FACING), 3)]},
         # The tower's stone: how big, and where its middle is [x, z, y], beside the door and across it.
         "stone": {"r": STONE_R, **{k: [round(x, 2), round(-y, 2), round(z, 2)] for k, (x, y, z) in STONE_SPOTS.items()}},
         # The chest in the tower, where the emerald starts: its middle [x, z], and its tray.
