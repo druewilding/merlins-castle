@@ -20,6 +20,7 @@ import {
   Color,
   CylinderGeometry,
   EdgesGeometry,
+  ExtrudeGeometry,
   Group,
   LineBasicMaterial,
   LineSegments,
@@ -28,6 +29,7 @@ import {
   MeshBasicMaterial,
   type Scene,
   ShaderMaterial,
+  Shape,
   Sprite,
   SpriteMaterial,
   SRGBColorSpace,
@@ -44,6 +46,8 @@ export interface DebugObstacle {
   circle?: number[];
   under?: boolean;
   names: string[];
+  /** How far it reaches out (else the usual). */
+  reach?: number;
 }
 
 const FATAL = "#e0412f";
@@ -59,7 +63,7 @@ export interface DebugWorld {
   scene: Scene;
   ground: Ground;
   obstacles: DebugObstacle[];
-  /** How far an obstacle in your way reaches out to bounce you back. */
+  /** How far an obstacle in your way reaches out to bounce you back (unless it says). */
   ahead: number;
   /** Whether trying an exit kills you: without the right object (the goblins), or with it (the balcony). */
   fatal: (exit: string) => boolean;
@@ -233,7 +237,7 @@ export function debug(world: DebugWorld, onOpen: () => void) {
       thing.position.set(x, y, z);
       group.add(thing);
     };
-    for (const { box, circle, under, names } of world.obstacles) {
+    for (const { box, circle, under, names, reach = world.ahead } of world.obstacles) {
       const [x, z] = box ?? circle!;
       const y = under ? floorAt(x, z) : standingAt(x, z);
       const core = box
@@ -247,24 +251,50 @@ export function debug(world: DebugWorld, onOpen: () => void) {
         const from = { north: [0, 1], south: [0, -1], east: [-1, 0], west: [1, 0] }[direction] ?? [0, 0];
         let zone;
         let middle;
+        let at = y + TALL / 2;
         if (box) {
+          // Its reach all round it, rounded at its corners: the half on the
+          // side it stops you from, from its middle out.
           const [, , hx, hz] = box;
-          // The reach is along the thinner side; the other way, just the obstacle's own half.
-          const deep = from[0] !== 0 ? hx + (hx < hz ? world.ahead : 0) : hz + (hx < hz ? 0 : world.ahead);
-          zone = from[0] !== 0 ? new BoxGeometry(deep, TALL, hz * 2) : new BoxGeometry(hx * 2, TALL, deep);
-          middle = [x + (from[0] * deep) / 2, z + (from[1] * deep) / 2];
+          const [deep, wide] = from[0] !== 0 ? [hx, hz] : [hz, hx];
+          // (Across, along: turned to the world's x and z, and z flipped for
+          // the shape, which is laid flat.)
+          const point = (across: number, along: number): [number, number] =>
+            from[0] !== 0 ? [from[0] * along, -across] : [across, -from[1] * along];
+          const shape = new Shape();
+          shape.moveTo(...point(-wide - reach, 0));
+          shape.lineTo(...point(-wide - reach, deep));
+          for (let k = 0; k <= 12; k++) {
+            const a = Math.PI - (k / 24) * Math.PI;
+            shape.lineTo(...point(-wide + Math.cos(a) * reach, deep + Math.sin(a) * reach));
+          }
+          for (let k = 12; k <= 24; k++) {
+            const a = Math.PI - (k / 24) * Math.PI;
+            shape.lineTo(...point(wide + Math.cos(a) * reach, deep + Math.sin(a) * reach));
+          }
+          shape.lineTo(...point(wide + reach, 0));
+          zone = new ExtrudeGeometry(shape, { depth: TALL, bevelEnabled: false }).rotateX(-Math.PI / 2);
+          middle = [x + (from[0] * (deep + reach)) / 2, z + (from[1] * (deep + reach)) / 2];
+          at = y;
+          add(new Mesh(zone, glass(fatal, 0.1)), x, at, z);
+          add(
+            new LineSegments(new EdgesGeometry(zone, 20), new LineBasicMaterial({ color: colourOf(fatal) })),
+            x,
+            at,
+            z
+          );
         } else {
-          const r = circle![2] + world.ahead;
+          const r = circle![2] + reach;
           zone = new CylinderGeometry(r, r, TALL, 32);
           middle = [x, z];
+          add(new Mesh(zone, glass(fatal, 0.1)), middle[0], at, middle[1]);
+          add(
+            new LineSegments(new EdgesGeometry(zone), new LineBasicMaterial({ color: colourOf(fatal) })),
+            middle[0],
+            at,
+            middle[1]
+          );
         }
-        add(new Mesh(zone, glass(fatal, 0.1)), middle[0], y + TALL / 2, middle[1]);
-        add(
-          new LineSegments(new EdgesGeometry(zone), new LineBasicMaterial({ color: colourOf(fatal) })),
-          middle[0],
-          y + TALL / 2,
-          middle[1]
-        );
         add(tag([`${world.name(id)} ${direction}${fatal ? " ☠" : ""}`]), middle[0], y + TALL + 0.9, middle[1]);
       }
     }

@@ -36,15 +36,17 @@ import { h } from "../shared/dom";
 import { find3d, leave3d, listSaves, nextSaveName, saveGame, takeHandoff, type ThreeSave } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Felling } from "./felling";
-import { items as setUpItems } from "./items";
+import { items as setUpItems, onPaths } from "./items";
 import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
+import snakeModel from "./models/snake.glb?url";
 import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable, wayThrough } from "./player";
 import { sky } from "./sky";
+import { Snake } from "./snake";
 import { Trees, type TreeSpots } from "./trees";
 
 const english = worldJson as unknown as World;
@@ -111,10 +113,11 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things] = await Promise.all([
+const [model, file, things, snaky] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
+  loader.loadAsync(snakeModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 model.scene.traverse((node) => {
@@ -158,12 +161,13 @@ player.halls = new Map(Object.entries(halls));
 // Solid things, and the obstacles: closed, until an object in use opens one.
 const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
-type Obstacle = { box?: number[]; circle?: number[]; under?: boolean };
+type Obstacle = { box?: number[]; circle?: number[]; under?: boolean; reach?: number };
 const obstacles = land.obstacles as Record<string, Obstacle>;
 const underCircles: Circle[] = land.under.circles.map(([x, z, r, top]) => ({ x, z, r, top }));
 const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ, top]) => ({ x, z, halfX, halfZ, top }));
-// You bump into an obstacle in your way this far before it, so you can see
-// what it is (and know there's something to do here).
+// You bump into an obstacle in your way this far before it (all round it), so
+// you can see what it is (and know there's something to do here): unless it
+// says how far itself (land.json), as the stone in the tower does.
 const AHEAD = 5;
 // One shape for each obstacle, with the names of every exit it blocks (a gate
 // blocks the way through from both sides).
@@ -211,6 +215,16 @@ if (rusty && leaves[0] && leaves[1]) {
 const SWING = 1.75; // radians, open
 // The dense trees across the mountain path, which the axe fells (felling.ts).
 const dense = shapeOf.get("mountain-path north");
+// The snake coiled at the top of the mossy steps, which takes the apple (snake.ts).
+const guarded = shapeOf.get("mossy-steps north");
+const snake = new Snake(
+  scene,
+  snaky.scene,
+  things.scene.getObjectByName("apple")!,
+  onPaths(ground, land.paths),
+  (guarded!.circle ?? guarded!.box)!,
+  reducedMotion
+);
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 function solidify() {
@@ -221,14 +235,14 @@ function solidify() {
     // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
-        ...closed.flatMap(({ circle, names }) =>
-          circle ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: AHEAD }] : []
+        ...closed.flatMap(({ circle, names, reach = AHEAD }) =>
+          circle ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: reach }] : []
         ),
         ...(under ? underCircles : circles),
       ],
       [
-        ...closed.flatMap(({ box, names }) =>
-          box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names, ahead: AHEAD }] : []
+        ...closed.flatMap(({ box, names, reach = AHEAD }) =>
+          box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names, ahead: reach }] : []
         ),
         ...plain.map(({ box }) => ({ x: box![0], z: box![1], halfX: box![2], halfZ: box![3] })),
         ...(under ? underBoxes : boxes),
@@ -346,11 +360,14 @@ let instantly = true; // (loading, what's in use is as it was: no gate swinging 
 function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
-  // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees.)
+  // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees, the snake.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
     const shape = shapeOf.get(`${here} ${direction}`);
-    return needs && using.includes(needs) && shape && (walls.has(shape) || gates.has(shape) || shape === dense)
+    return needs &&
+      using.includes(needs) &&
+      shape &&
+      (walls.has(shape) || gates.has(shape) || shape === dense || shape === guarded)
       ? [`${here} ${direction}`]
       : [];
   });
@@ -361,6 +378,12 @@ function inUse() {
     if (instantly) gate.open = gate.wants;
   }
   if (dense) felling.fell(opened.has(dense), instantly);
+  // The apple thrown to the snake, from your hand (or, loading, it's gone,
+  // or there).
+  if (guarded && opened.has(guarded)) {
+    if (instantly) snake.away();
+    else snake.feed(player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
+  } else if (instantly && here !== "tower") snake.back();
   const wall = exits.find((exit) => walls.has(shapeOf.get(exit)!));
   if (wall !== leaning) {
     ladder.away();
@@ -386,7 +409,7 @@ const was = player.position.clone(); // (and just where)
 // handle for test scripts. Otherwise none of it is even loaded.
 const debugMode = new URLSearchParams(location.search).has("debug");
 if (debugMode) {
-  Object.assign(window, { world: { player, scene, ground, walkable, renderer, places: PLACES, items } });
+  Object.assign(window, { world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake } });
   const { debug } = await import("./debug");
   debug(
     {
@@ -604,6 +627,9 @@ renderer.setAnimationLoop((time) => {
     else if (room === "mountain") parting = true;
   }
   felling.update(dt, player.position, parting);
+  // (The snake's back by the door once the apple's no longer in use there,
+  // but not while you're in the tower: you'd come out through it.)
+  snake.update(dt, player.camera.position, player.camera, room !== "tower" && !(guarded && opened.has(guarded)));
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)

@@ -22,7 +22,7 @@ export interface Box {
   halfX: number;
   halfZ: number;
   names?: string[];
-  /** Only on the sides you'd go through it from (along its thinner side), so not along a wall. */
+  /** All round it (rounded at its corners): you're this near it, at most, before you bump into it. */
   ahead?: number;
   top?: number;
 }
@@ -99,9 +99,27 @@ export function wayThrough(names: string[], ox: number, oz: number, x: number, z
 function touching(thing: Circle | Box, x: number, z: number, margin: number) {
   const reach = thing.ahead ?? 0;
   if ("r" in thing) return Math.hypot(x - thing.x, z - thing.z) < thing.r + reach + margin;
-  const ox = thing.halfX + (thing.halfX < thing.halfZ ? reach : 0) + margin;
-  const oz = thing.halfZ + (thing.halfX < thing.halfZ ? 0 : reach) + margin;
-  return Math.abs(x - thing.x) < ox && Math.abs(z - thing.z) < oz;
+  if (reach) return outside(thing, x, z).d < reach + margin;
+  return Math.abs(x - thing.x) < thing.halfX + margin && Math.abs(z - thing.z) < thing.halfZ + margin;
+}
+
+/**
+ * How far a spot is outside a box (less than 0 inside it), and which way is
+ * straight out of it from there: from the nearest point on it (or, inside,
+ * out through the nearest side).
+ */
+function outside(box: Box, x: number, z: number) {
+  const dx = x - box.x;
+  const dz = z - box.z;
+  const ex = Math.abs(dx) - box.halfX;
+  const ez = Math.abs(dz) - box.halfZ;
+  if (ex < 0 && ez < 0) {
+    return ex > ez ? { d: ex, nx: Math.sign(dx) || 1, nz: 0 } : { d: ez, nx: 0, nz: Math.sign(dz) || 1 };
+  }
+  const ox = Math.max(ex, 0) * Math.sign(dx);
+  const oz = Math.max(ez, 0) * Math.sign(dz);
+  const d = Math.hypot(ox, oz);
+  return { d, nx: ox / d, nz: oz / d };
 }
 
 /** How far a spot is from the middle of a way, its floor there, and whether it's past an end. */
@@ -566,10 +584,23 @@ export class Player {
     for (const b of near.boxes) {
       if (below(b)) continue;
       const reach = b.ahead ?? 0;
+      if (reach) {
+        // An obstacle: its reach all round it, rounded at its corners; out
+        // of it straight away from it.
+        const out = outside(b, p.x, p.z);
+        const min = reach + BODY;
+        const exit = this.blocking(b, out.d < min, cameOut);
+        if (exit === null && out.d < min) this.turnedBack(b);
+        if (exit === null || out.d >= min) continue;
+        p.x += out.nx * (min - out.d);
+        p.z += out.nz * (min - out.d);
+        if (exit) this.bounce(exit, out.nx, out.nz);
+        continue;
+      }
       const dx = p.x - b.x;
       const dz = p.z - b.z;
-      const ox = b.halfX + (b.halfX < b.halfZ ? reach : 0) + BODY - Math.abs(dx);
-      const oz = b.halfZ + (b.halfX < b.halfZ ? 0 : reach) + BODY - Math.abs(dz);
+      const ox = b.halfX + BODY - Math.abs(dx);
+      const oz = b.halfZ + BODY - Math.abs(dz);
       const exit = this.blocking(b, ox > 0 && oz > 0, cameOut);
       if (exit === null && ox > 0 && oz > 0) this.turnedBack(b);
       if (exit === null) continue;
