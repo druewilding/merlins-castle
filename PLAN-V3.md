@@ -445,12 +445,16 @@ and wings) may need a bought or free model.
      at the bottom of the screen ("The trees are too dense."), in English or
      Danish, for the exit you're trying. One-way, as in the original.
    - **The game**: objects to take and use (taking, using and dropping ✅,
-     with the ladder, the key and the axe, the first objects with models:
+     with the ladder, the key, the axe and the apple, the first objects with models:
      `art/blender/items.py`; the ladder leans on the old stone wall and you
      climb over, `ladder.ts`; the key swings the rusty gate open; the axe
      lies on the charcoal hut's floor, and fells the dense trees on the
      mountain path, which spring back up once you're past, and part to
      let you out coming down, `felling.ts`;
+     the apple, thrown to the snake on the mossy steps, which hisses as
+     you come near, catches it in its jaws and slithers away west with it,
+     back by the door (when you're not looking) once you've gone on,
+     `snake.ts`, its model `art/blender/snake.py`;
      the trees are Quaternius's, firs, oaks, birches and willows, a mix for
      each part of the land, `src/three/trees.ts`; saving and loading ✅,
      the same saves as the other versions, and switching between all three

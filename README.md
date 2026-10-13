@@ -100,8 +100,9 @@ uses it and G drops it. (Only the ladder, the
 key, the axe and the apple are in the world so far: their models are made by
 `art/blender/items.py`. Use the ladder by the old stone wall and walk into
 it to climb over; use the key by the rusty gate, and the axe by the dense
-trees on the mountain path. The apple is for the snake on the mossy steps,
-which isn't here yet.)
+trees on the mountain path, and throw the apple to the snake coiled at the
+top of the mossy steps (made by `art/blender/snake.py`), which catches it
+and slithers off with it.)
 Esc brings back the start screen, where you can save and load: the same
 saves as the other versions (a 3D save also knows where you stood and where
 everything lies), and Illustrated and Classic carry on the same game there,
