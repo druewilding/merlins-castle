@@ -2,7 +2,8 @@
 # data/world.json. Each lies as it would on the ground, its middle at the
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
-# The ladder, the key and the axe so far; the rest are to come (PLAN-V3.md).
+# The ladder, the key, the axe and the apple so far; the rest are to come
+# (PLAN-V3.md).
 
 import math
 import sys
@@ -215,6 +216,131 @@ for j in range(NV):
     faces.append((grid[True, NU, j + 1], grid[True, NU, j], grid[False, NU, j], grid[False, NU, j + 1]))
 axe.add(verts, faces, colours)
 outward(axe.build("axe", smooth=False))
+
+# The apple: as in its picture, a rosy red one, streaked with gold, yellower
+# round the dimple at the top, with a woody stalk and one leaf curling off
+# it. Standing on its five little bumps, stalk up; 27 cm across (big, like
+# the key, so you can spot it in the grass).
+R = 0.135  # its radius, round its middle
+APPLE_RED = c.linear("#cc1d1f")
+APPLE_DARK = c.linear("#7a0d12")
+APPLE_GOLD = c.linear("#e7a23a")
+APPLE_YELLOW = c.linear("#c9bd45")
+STALK = c.linear("#6b4424")
+STALK_LIGHT = c.linear("#9a7046")
+LEAF = c.linear("#5b8a2e")
+LEAF_DARK = c.linear("#2f5a1d")
+LEAF_LIGHT = c.linear("#a9c25a")
+
+
+def smooth_step(t):
+    t = min(1.0, max(0.0, t))
+    return t * t * (3 - 2 * t)
+
+
+def apple_point(phi, a):
+    """On its skin: phi from the bottom (0) to the top (pi), a round it."""
+    lobes = 1 + 0.025 * math.cos(5 * a) + 0.07 * math.cos(5 * a) * smooth_step((0.9 - phi) / 0.9)
+    wide = R * math.sin(phi) * (1 + 0.1 * (1 - math.cos(phi)) / 2) * lobes  # broader at the shoulders
+    z = -R * 0.92 * math.cos(phi)
+    z -= R * 0.38 * math.exp(-(((math.pi - phi) / 0.42) ** 2))  # the dimple round the stalk
+    z += R * 0.16 * math.exp(-((phi / 0.4) ** 2))  # and the little one underneath
+    return Vector((math.cos(a) * wide, math.sin(a) * wide, z))
+
+
+def apple_skin(p, phi, a):
+    """Red, darker underneath, streaked gold down from the top, and yellow round the stalk."""
+    up = 1 - phi / math.pi  # 0 at the top, 1 at the bottom
+    colour = c.mix(APPLE_RED, APPLE_DARK, 0.15 + 0.5 * up ** 2 + noise.noise(p * 14) * 0.15)
+    streak = noise.noise(Vector((math.cos(a) * 3.2, math.sin(a) * 3.2, phi * 0.6)) * 2.5)
+    colour = c.mix(colour, APPLE_GOLD, max(0.0, streak) * 0.9 * (1 - up) ** 1.5)
+    colour = c.mix(colour, APPLE_YELLOW, smooth_step((0.2 - up) / 0.2) * 0.85)
+    return c.vary(colour, 0.06, p * 20)
+
+
+apple = c.Builder()
+AROUND, UP = 40, 28
+rings = [[apple_point(math.pi * k / UP, 2 * math.pi * j / AROUND) for j in range(AROUND)] for k in range(1, UP)]
+bottom, top = apple_point(0, 0), apple_point(math.pi, 0)
+verts = [tuple(bottom)] + [tuple(v) for ring in rings for v in ring] + [tuple(top)]
+colours = [apple_skin(bottom, 0, 0)] + [
+    apple_skin(rings[k][j], math.pi * (k + 1) / UP, 2 * math.pi * j / AROUND)
+    for k in range(UP - 1) for j in range(AROUND)
+] + [apple_skin(top, math.pi, 0)]
+last = len(verts) - 1
+faces = [(0, 1 + (j + 1) % AROUND, 1 + j) for j in range(AROUND)]
+faces += [(1 + k * AROUND + j, 1 + k * AROUND + (j + 1) % AROUND, 1 + (k + 1) * AROUND + (j + 1) % AROUND,
+           1 + (k + 1) * AROUND + j) for k in range(UP - 2) for j in range(AROUND)]
+faces += [(1 + (UP - 2) * AROUND + j, 1 + (UP - 2) * AROUND + (j + 1) % AROUND, last) for j in range(AROUND)]
+apple.add(verts, faces, colours)
+
+# The stalk: from deep in the dimple, up and leaning a little, thinner at its tip.
+stalk = [top + Vector((-0.012 * t ** 2, 0.004 * t, 0.085 * t)) for t in (k / 8 for k in range(9))]
+STALK_SIDES = 6
+verts, colours = [], []
+for k, p in enumerate(stalk):
+    r = 0.009 - 0.002 * k / 8
+    for j in range(STALK_SIDES):
+        a = 2 * math.pi * j / STALK_SIDES
+        verts.append(tuple(p + Vector((math.cos(a) * r, math.sin(a) * r, 0))))
+        colours.append(c.vary(c.mix(STALK, STALK_LIGHT, 0.5 + 0.4 * math.cos(a - 1)), 0.1, p * 60))
+faces = [(k * STALK_SIDES + j, k * STALK_SIDES + (j + 1) % STALK_SIDES, (k + 1) * STALK_SIDES + (j + 1) % STALK_SIDES,
+          (k + 1) * STALK_SIDES + j) for k in range(len(stalk) - 1) for j in range(STALK_SIDES)]
+faces.append(tuple((len(stalk) - 1) * STALK_SIDES + j for j in range(STALK_SIDES)))
+apple.add(verts, faces, colours)
+
+# The leaf: from near the stalk's tip, out and up and drooping at its point,
+# folded a little along its middle, pointed, lighter along the vein. Thin,
+# but solid (so it shows from above and below).
+LEAF_LONG, LEAF_WIDE = 0.17, 0.05
+ALONG, ACROSS = 14, 6
+base = stalk[6]
+out_dir = Vector((1, -0.35, 0)).normalized()
+side_dir = Vector((0, 0, 1)).cross(out_dir).normalized()
+
+
+def leaf_point(s, t):
+    """s from its base (0) to its point (1), t from one edge (-1) to the other (1)."""
+    width = LEAF_WIDE * math.sin(math.pi * min(1.0, s * 1.15)) ** 0.7 * (1 - 0.25 * s) if s < 1 else 0
+    height = 0.05 * s - 0.09 * s ** 2 + abs(t) * width * 0.45  # rising, then drooping; its edges up
+    return base + out_dir * (LEAF_LONG * s) + side_dir * (t * width) + Vector((0, 0, height))
+
+
+def leaf_colour(p, s, t):
+    colour = c.mix(LEAF_DARK, LEAF, 0.55 + noise.noise(p * 50) * 0.3 + 0.2 * (1 - abs(t)))
+    if abs(t) < 0.2:
+        colour = c.mix(colour, LEAF_LIGHT, 0.6 * (1 - abs(t) / 0.2))  # the vein
+    return c.mix(colour, LEAF_LIGHT, 0.15 * s)
+
+
+grid, verts, colours = {}, [], []
+for under in (False, True):
+    for i in range(ALONG + 1):
+        for j in range(ACROSS + 1):
+            s, t = i / ALONG, -1 + 2 * j / ACROSS
+            p = leaf_point(s, t) - Vector((0, 0, 0.002 if under else 0))
+            grid[under, i, j] = len(verts)
+            verts.append(tuple(p))
+            colours.append(c.mix(leaf_colour(p, s, t), LEAF_DARK, 0.3 if under else 0))
+faces = []
+for i in range(ALONG):
+    for j in range(ACROSS):
+        q = [(i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1)]
+        faces.append(tuple(grid[False, *k] for k in q[::-1]))
+        faces.append(tuple(grid[True, *k] for k in q))
+# And round its edge, closing it up.
+edge = [(i, 0) for i in range(ALONG)] + [(ALONG, j) for j in range(ACROSS)]
+edge += [(i, ACROSS) for i in range(ALONG, 0, -1)] + [(0, j) for j in range(ACROSS, 0, -1)]
+for k, a in enumerate(edge):
+    b = edge[(k + 1) % len(edge)]
+    faces.append((grid[False, *a], grid[False, *b], grid[True, *b], grid[True, *a]))
+apple.add(verts, faces, colours)
+
+# Standing on the ground, its middle (across) at the origin.
+apple_object = apple.build("apple", smooth=True)
+low = min(v.co.z for v in apple_object.data.vertices)
+apple_object.data.transform(Matrix.Translation((0, 0, -low)))
+outward(apple_object)
 
 if out:
     c.export(out)

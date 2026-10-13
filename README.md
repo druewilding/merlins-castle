@@ -97,10 +97,11 @@ Mouse to look, WASD or the arrow keys to walk, Shift to run, Space to jump
 Look at an object and press E to take it; 1 to 5 picks which of your five
 slots is in your hand, E (when you're not looking at an object) or a click
 uses it and G drops it. (Only the ladder, the
-key and the axe are in the world so far: their models are made by
+key, the axe and the apple are in the world so far: their models are made by
 `art/blender/items.py`. Use the ladder by the old stone wall and walk into
 it to climb over; use the key by the rusty gate, and the axe by the dense
-trees on the mountain path.)
+trees on the mountain path. The apple is for the snake on the mossy steps,
+which isn't here yet.)
 Esc brings back the start screen, where you can save and load: the same
 saves as the other versions (a 3D save also knows where you stood and where
 everything lies), and Illustrated and Classic carry on the same game there,
