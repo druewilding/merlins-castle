@@ -213,6 +213,12 @@ if (rusty && leaves[0] && leaves[1]) {
   });
 }
 const SWING = 1.75; // radians, open
+// The chest in the tower, its lid opening as you come up to it (and the
+// emerald in it, items.ts), and shutting as you go.
+const lid = model.scene.getObjectByName("chest-lid");
+const [chestX, chestZ] = land.chest;
+let lidOpen = 0;
+const LID = 1.9; // radians, open (back against the wall)
 // The dense trees across the mountain path, which the axe fells (felling.ts).
 const dense = shapeOf.get("mountain-path north");
 // The snake coiled at the top of the mossy steps, which takes the apple (snake.ts).
@@ -358,6 +364,7 @@ const items = setUpItems({
     return { model: ladder.handOver()!, fallsTo: ladder.footing! };
   },
   begin: handoff ?? undefined,
+  starts: { emerald: { room: "tower", at: land.chest as [number, number, number] } },
   reducedMotion,
 });
 let parting = false; // (the dense trees, for you coming down from the mountain)
@@ -646,6 +653,12 @@ renderer.setAnimationLoop((time) => {
   if (!player.busy) {
     if (player.under?.hall) room = player.under.hall;
     else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
+  }
+  if (lid) {
+    const near =
+      player.under?.hall === "tower" && Math.hypot(player.position.x - chestX, player.position.z - chestZ) < 2.5;
+    lidOpen += Math.sign(Number(near) - lidOpen) * Math.min(Math.abs(Number(near) - lidOpen), dt * 1.5);
+    lid.rotation.z = LID * (lidOpen * lidOpen * (3 - 2 * lidOpen));
   }
   for (const gate of gates.values()) {
     gate.open += Math.sign(gate.wants - gate.open) * Math.min(Math.abs(gate.wants - gate.open), dt * 0.8);

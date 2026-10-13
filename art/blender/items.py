@@ -2,7 +2,7 @@
 # data/world.json. Each lies as it would on the ground, its middle at the
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
-# The ladder, the key, the axe and the apple so far; the rest are to come
+# The ladder, the key, the axe, the apple and the emerald so far; the rest are to come
 # (PLAN-V3.md).
 
 import math
@@ -341,6 +341,33 @@ apple_object = apple.build("apple", smooth=True)
 low = min(v.co.z for v in apple_object.data.vertices)
 apple_object.data.transform(Matrix.Translation((0, 0, -low)))
 outward(apple_object)
+
+# The emerald: as in its picture, a step-cut one, an octagon (a rectangle
+# with its corners cut) with a broad flat table on top, stepping down to its
+# girdle and in again underneath, to a little flat base it lies on. Each
+# facet its own shade of green, lighter on top; 30 cm long (big, like the
+# key, so you can spot it).
+emerald = c.Builder()
+EM_HALF, EM_WIDE, EM_CUT = 0.15, 0.12, 0.04  # half its length and width, at its girdle, and its corners cut
+
+
+def octagon(scale, z):
+    a, b, k = EM_HALF * scale, EM_WIDE * scale, EM_CUT * scale
+    return [(x, y, z) for x, y in ((b - k, a), (-b + k, a), (-b, a - k), (-b, -a + k),
+                                   (-b + k, -a), (b - k, -a), (b, -a + k), (b, a - k))]
+
+
+# From its base up: the base, the girdle (bottom and top), a step on the
+# crown, and the table.
+rings = [octagon(0.4, 0.0), octagon(1.0, 0.09), octagon(1.0, 0.11), octagon(0.85, 0.15), octagon(0.6, 0.18)]
+EM_COLOURS = [c.linear(h) for h in ("#0f5c2e", "#167a3c", "#2aa85a", "#3cc46e")]  # the pavilion, girdle, crown and step
+for ring_, (lo, hi) in enumerate(zip(rings, rings[1:])):
+    for k in range(8):
+        pts = [lo[k], lo[(k + 1) % 8], hi[(k + 1) % 8], hi[k]]
+        emerald.add(pts, [(0, 1, 2, 3)], [c.vary(EM_COLOURS[ring_], 0.18, Vector((k, ring_, 1.0)))] * 4)
+emerald.add(rings[0][::-1], [tuple(range(8))], [c.linear("#0b4a24")] * 8)
+emerald.add(rings[-1], [tuple(range(8))], [c.linear("#7fe8a4")] * 8)
+outward(emerald.build("emerald", smooth=False))
 
 if out:
     c.export(out)

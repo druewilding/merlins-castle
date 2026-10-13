@@ -121,6 +121,7 @@ BRIDGE = P["old-wall"][0], -40 * K  # where the path south from the old wall cro
 TOWER = (P["tower"][0], P["tower"][1] + 6)  # on its knoll, north of the mossy steps
 TOWER_R = 6
 TOWER_LANDING = 5.6  # the top of its stairs, at the window onto the balcony, above its floor
+CHEST = {}  # the chest in the tower: where its middle is, and its tray (round_room)
 TOWER_WINDOW = (0.9, 2.6)  # the window's sill and lintel, above the landing
 # Which way the window and the balcony face (round from due east): to the
 # mountain, with the castle's spire off to the right. (A whole number of the
@@ -2192,11 +2193,24 @@ def round_room(b, hall):
     b.add([(*at(k, R + E), f + tall) for k in range(sides)], [tuple(range(sides))],
           [c.mix(hall.wall, c.linear("#000000"), 0.35)] * sides)
     if hall.place == "tower":
-        # A chest against the west wall, south of the stairs; and stone steps
-        # curling up the wall from the west, round by the north, to a landing
-        # in the east, at the window onto the balcony. (Nothing in the middle:
-        # you'd stop there, in the reach of the stone that shuts you in.)
-        furniture(b, hx - 4.3, hy - 3.0, hx - 3.6, hy - 1.4, f, f + 0.7, DARK_WOOD)
+        # A chest against the west wall, south of the stairs, with the emerald
+        # in it: on a shallow tray (so you see it over the front), under a
+        # lid on its back edge, its own object, which the game opens as you
+        # come up to it. And stone steps curling up the wall from the west,
+        # round by the north, to a landing in the east, at the window onto
+        # the balcony. (Nothing in the middle: you'd stop there, in the reach
+        # of the stone that shuts you in.)
+        x0, y0, x1, y1, top, tray, t = hx - 4.3, hy - 2.6, hx - 3.6, hy - 1.0, f + 0.62, f + 0.4, 0.06
+        block(b, x0, y0, f, x1, y1, tray, DARK_WOOD, solid=False)
+        for wx0, wy0, wx1, wy1 in ((x0, y0, x1, y0 + t), (x0, y1 - t, x1, y1), (x0, y0, x0 + t, y1), (x1 - t, y0, x1, y1)):
+            block(b, wx0, wy0, tray, wx1, wy1, top, DARK_WOOD, solid=False)
+        under_box((x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2, top=top)
+        lid = c.Builder()
+        block(lid, 0, -(y1 - y0) / 2 - 0.02, 0, x1 - x0 + 0.02, (y1 - y0) / 2 + 0.02, 0.08, DARK_WOOD, solid=False)
+        for by in (-0.5, 0.5):
+            block(lid, -0.01, by - 0.04, -0.01, x1 - x0 + 0.03, by + 0.04, 0.09, IRON, solid=False)
+        lid.build("chest-lid", smooth=False).location = (x0, (y0 + y1) / 2, top)
+        CHEST.update(x=(x0 + x1) / 2, y=(y0 + y1) / 2, floor=tray)
         n, wide, ahead = 15, 0.25, TOWER_FACING  # steps, half the landing's angle, and its middle
         rise = TOWER_LANDING / (n + 1)
         turn = (math.pi - wide - ahead) / n
@@ -2294,6 +2308,8 @@ if out:
                           **({"light": hall.light, "glow": hall.glow} if hall.light else {})}
                   for place, hall in HALLS.items()},
         "under": {"circles": under_circles, "boxes": under_boxes},
+        # The chest in the tower, where the emerald starts: its middle [x, z], and its tray.
+        "chest": [round(CHEST["x"], 2), round(-CHEST["y"], 2), round(CHEST["floor"], 2)],
         "bounds": [X0 + 4, X1 - 4, Y0 + 4, Y1 - 4],
         "circles": circles,
         "boxes": boxes,

@@ -157,6 +157,8 @@ export function items(options: {
   stays: (id: ItemId) => { model: Object3D; fallsTo: Footing } | undefined;
   /** A game loaded (or carried on from another version), and, saved in 3D, where things lie. */
   begin?: { state: GameState; three?: ThreeSave };
+  /** Where an object always starts in a place, rather than anywhere in it (the emerald, in the tower's chest): [x, z, floor]. */
+  starts?: Partial<Record<ItemId, { room: RoomId; at: [number, number, number] }>>;
   reducedMotion: boolean;
 }): Items {
   const { world, scene, player, models, ground, walkable, root, say, changed, stays, begin } = options;
@@ -214,6 +216,21 @@ export function items(options: {
     });
   }
 
+  /** The hall (or room) a thing lies in, if any: on its floor, and within its walls. */
+  function hallOf(thing: Lying) {
+    if (thing.floor === undefined) return undefined;
+    const { x, z } = thing.model.position;
+    for (const [place, hall] of player.halls) {
+      if (Math.abs(hall.floor - thing.floor) > 1.5) continue;
+      const within =
+        hall.w !== undefined && hall.d !== undefined
+          ? Math.abs(x - hall.x) <= hall.w && Math.abs(z - hall.z) <= hall.d
+          : Math.hypot(x - hall.x, z - hall.z) <= hall.r;
+      if (within) return place;
+    }
+    return undefined;
+  }
+
   /** The ground, or the top of a path lying on it. */
   const surface = onPaths(ground, options.paths);
 
@@ -258,6 +275,8 @@ export function items(options: {
    * anywhere on its floor, clear of its walls and what stands in it.
    */
   function start(id: ItemId, room: RoomId) {
+    const fixed = options.starts?.[id];
+    if (fixed?.room === room) return lay(id, room, fixed.at[0], fixed.at[1], 0, fixed.at[2]);
     const hall = player.halls.get(room);
     const half = lengthOf(models.getObjectByName(id)!) / 2;
     const area = hall
@@ -649,6 +668,9 @@ export function items(options: {
       aimed = undefined;
       let best = { miss: AIM_SLACK, d: REACH };
       for (const [id, thing] of lying) {
+        // (Not through a wall: what's in a hall or a room only from in it,
+        // and from in one only what's in it.)
+        if (hallOf(thing) !== player.under?.hall) continue;
         // (Your gaze, as the object sees it: then its box is square to it.)
         thing.model.updateMatrixWorld();
         mine.copy(ray).applyMatrix4(inverse.copy(thing.model.matrixWorld).invert());
