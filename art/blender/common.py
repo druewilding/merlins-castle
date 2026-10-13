@@ -98,8 +98,9 @@ class Builder:
         self.faces += [tuple(i + base for i in f) for f in faces]
         self.colours += colours
 
-    def blob(self, centre, radius, colour, squash=1.0, lumpy=0.25, seed=0, subdivisions=2, shade=None):
-        """A lumpy sphere: a treetop, a bush or a rock."""
+    def blob(self, centre, radius, colour, squash=1.0, lumpy=0.25, seed=0, subdivisions=2, shade=None, lit=True):
+        """A lumpy sphere: a treetop, a bush or a rock. (Not lit, it isn't
+        darker underneath: it rolls, and its underside comes up.)"""
         bm = bmesh.new()
         bmesh.ops.create_icosphere(bm, subdivisions=subdivisions, radius=1.0)
         verts, colours = [], []
@@ -110,7 +111,7 @@ class Builder:
             p = Vector((d.x * r, d.y * r, d.z * r * squash)) + Vector(centre)
             verts.append(tuple(p))
             # Darker underneath and lighter on top, as if lit from above.
-            light = 0.72 + 0.4 * (d.z * 0.5 + 0.5)
+            light = 0.72 + 0.4 * (d.z * 0.5 + 0.5) if lit else 0.92
             c = vary(colour, 0.18, d * 3 + offset)
             if shade:
                 c = shade(p, d, c)

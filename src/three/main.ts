@@ -8,22 +8,29 @@ import "./style.css";
 
 import {
   ACESFilmicToneMapping,
+  AdditiveBlending,
   Color,
   CylinderGeometry,
   DirectionalLight,
+  DoubleSide,
   Fog,
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
+  MeshPhysicalMaterial,
   type Object3D,
   PCFShadowMap,
+  PMREMGenerator,
   PointLight,
   Scene,
+  Sprite,
+  SpriteMaterial,
   SRGBColorSpace,
   Timer,
   Vector3,
   WebGLRenderer,
 } from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
@@ -45,6 +52,7 @@ import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import snakeModel from "./models/snake.glb?url";
 import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable, wayThrough } from "./player";
+import { Shafts, speck, type Window } from "./shafts";
 import { sky } from "./sky";
 import { Snake } from "./snake";
 import { Trees, type TreeSpots } from "./trees";
@@ -71,7 +79,14 @@ const scene = new Scene();
 const fog = new Fog(HAZE, 40, 320);
 scene.fog = fog;
 scene.add(sky(SUN, HAZE));
-const skylight = new HemisphereLight("#cfe2ff", "#6d7a3c", 1.25);
+const SKY = new Color("#cfe2ff");
+const SKY_GROUND = new Color("#6d7a3c");
+const skylight = new HemisphereLight(SKY, SKY_GROUND, 1.25);
+// In the dark (the tower), what little of the sky's light there is is cold,
+// and a dark haze hangs in the air (thinning as you climb to the window).
+const COLD = new Color("#7d8fb8");
+const COLD_GROUND = new Color("#1c1d22");
+const GLOOM = new Color("#07080b");
 scene.add(skylight);
 
 // Underground, the daylight fades and a warm lamp glow takes over (one day,
@@ -120,6 +135,42 @@ const [model, file, things, snaky] = await Promise.all([
   loader.loadAsync(snakeModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
+// The tower's inside, its own material: dark seen from outside, as it is
+// once you're in (in there, the sky's light is dim: lightFor).
+const towerInside = model.scene.getObjectByName("tower-inside");
+const insideLook = towerInside instanceof Mesh ? (towerInside.material = towerInside.material.clone()) : undefined;
+// The tower's cobwebs: faint, and see-through (not lit: pale threads, even in the dark).
+const cobwebs = model.scene.getObjectByName("cobwebs");
+if (cobwebs instanceof Mesh) {
+  cobwebs.material = new MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.3,
+    side: DoubleSide,
+    depthWrite: false,
+  });
+  cobwebs.castShadow = false;
+  cobwebs.receiveShadow = false;
+}
+// The emerald, glassy: a little room's lights caught in its facets (its own,
+// not the scene's), and a glow from within, so it shines even in the tower.
+const emerald = things.scene.getObjectByName("emerald");
+if (emerald instanceof Mesh) {
+  const pmrem = new PMREMGenerator(renderer);
+  emerald.material = new MeshPhysicalMaterial({
+    vertexColors: true,
+    flatShading: true,
+    roughness: 0.12,
+    metalness: 0.9, // (its reflections green, as in its picture: white only in a thin coat over them)
+    clearcoat: 0.2,
+    clearcoatRoughness: 0.05,
+    envMap: pmrem.fromScene(new RoomEnvironment(), 0.02).texture,
+    envMapIntensity: 0.55,
+    emissive: new Color("#0f7a38"),
+    emissiveIntensity: 1.0,
+  });
+  pmrem.dispose();
+}
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
   node.castShadow = !["paths", "water"].includes(node.name);
@@ -155,15 +206,21 @@ const walkable: Walkable = (x, z) => {
 };
 player.standOn(ground, walkable);
 player.ways = Object.values(land.ways);
-const halls = land.halls as Record<string, Hall & { tall: number; light?: string; glow?: number }>;
+// (A lit hall has a light of its own; a dark one, only what comes in: lights
+// at its windows, and its windows' shafts of light.)
+type Fixture = { at: number[]; colour: string; glow: number; reach: number };
+const halls = land.halls as Record<
+  string,
+  Hall & { tall: number; light?: string; glow?: number; lights?: Fixture[]; dark?: boolean; windows?: Window[] }
+>;
 player.halls = new Map(Object.entries(halls));
 
 // Solid things, and the obstacles: closed, until an object in use opens one.
 const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
-type Obstacle = { box?: number[]; circle?: number[]; under?: boolean; reach?: number };
+type Obstacle = { box?: number[]; circle?: number[]; under?: boolean; reach?: number; allRound?: boolean };
 const obstacles = land.obstacles as Record<string, Obstacle>;
-const underCircles: Circle[] = land.under.circles.map(([x, z, r, top]) => ({ x, z, r, top }));
+const underCircles: Circle[] = land.under.circles.map(([x, z, r, top, bottom]) => ({ x, z, r, top, bottom }));
 const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ, top]) => ({ x, z, halfX, halfZ, top }));
 // You bump into an obstacle in your way this far before it (all round it), so
 // you can see what it is (and know there's something to do here): unless it
@@ -213,6 +270,31 @@ if (rusty && leaves[0] && leaves[1]) {
   });
 }
 const SWING = 1.75; // radians, open
+// The chest in the tower, its lid opening as you come up to it (and the
+// emerald in it, items.ts), and shutting as you go.
+const lid = model.scene.getObjectByName("chest-lid");
+const [chestX, chestZ] = land.chest;
+let lidOpen = 0;
+const LID = 1.9; // radians, open (back against the wall)
+const CRACK = 0.07; // and shut, it rests a crack open: the emerald's glow shows through
+// The emerald's own glow, wherever it lies: a little green light, breathing
+// (in the chest, mostly kept in by its lid, but through the crack), and a
+// soft halo round it, which the chest's sides and lid hide.
+const GEM = new Color("#46ff8c");
+const gemLight = new PointLight(GEM, 0, 2.6, 1.4);
+const halo = new Sprite(
+  new SpriteMaterial({ map: speck(), color: GEM, blending: AdditiveBlending, transparent: true, depthWrite: false })
+);
+halo.scale.setScalar(0.45);
+scene.add(gemLight, halo);
+const gemAt = new Vector3();
+let gemGlow = 0; // 1 lying there, 0 carried
+// The stone, rolling from beside the tower's door across it, once you're in,
+// and back with the ring: turning as it goes.
+const stone = model.scene.getObjectByName("stone");
+const { r: STONE_R, aside, door } = land.stone;
+let rolled: number | undefined; // 0 beside the door, 1 across it
+const ROLL = 0.45; // of the way, a second
 // The dense trees across the mountain path, which the axe fells (felling.ts).
 const dense = shapeOf.get("mountain-path north");
 // The snake coiled at the top of the mossy steps, which takes the apple (snake.ts).
@@ -221,12 +303,17 @@ const snake = new Snake(
   scene,
   snaky.scene,
   things.scene.getObjectByName("apple")!,
-  onPaths(ground, land.paths),
+  onPaths(ground, land.paths, land.steps),
   (guarded!.circle ?? guarded!.box)!,
   reducedMotion
 );
+// The enormous stone that shuts you in the tower, which the ring rolls away.
+const shut = shapeOf.get("tower south");
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
+// A way that kills you even with the object (the balcony) has no far side
+// you could have come from: it stops you from every side.
+const deadly = (names: string[]) => names.every((name) => exitOf(name)?.fatal);
 function solidify() {
   for (const under of [false, true]) {
     const here = [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
@@ -235,14 +322,28 @@ function solidify() {
     // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
-        ...closed.flatMap(({ circle, names, reach = AHEAD }) =>
-          circle ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: reach }] : []
+        ...closed.flatMap(({ circle, names, reach = AHEAD, allRound }) =>
+          circle
+            ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: reach, allRound: allRound || deadly(names) }]
+            : []
         ),
         ...(under ? underCircles : circles),
       ],
       [
-        ...closed.flatMap(({ box, names, reach = AHEAD }) =>
-          box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names, ahead: reach }] : []
+        ...closed.flatMap(({ box, names, reach = AHEAD, allRound }) =>
+          box
+            ? [
+                {
+                  x: box[0],
+                  z: box[1],
+                  halfX: box[2],
+                  halfZ: box[3],
+                  names,
+                  ahead: reach,
+                  allRound: allRound || deadly(names),
+                },
+              ]
+            : []
         ),
         ...plain.map(({ box }) => ({ x: box![0], z: box![1], halfX: box![2], halfZ: box![3] })),
         ...(under ? underBoxes : boxes),
@@ -345,6 +446,7 @@ const items = setUpItems({
   ground,
   walkable,
   paths: land.paths,
+  steps: land.steps,
   root,
   say,
   changed: inUse,
@@ -353,6 +455,7 @@ const items = setUpItems({
     return { model: ladder.handOver()!, fallsTo: ladder.footing! };
   },
   begin: handoff ?? undefined,
+  starts: { emerald: { room: "tower", at: land.chest as [number, number, number] } },
   reducedMotion,
 });
 let parting = false; // (the dense trees, for you coming down from the mountain)
@@ -367,7 +470,7 @@ function inUse() {
     return needs &&
       using.includes(needs) &&
       shape &&
-      (walls.has(shape) || gates.has(shape) || shape === dense || shape === guarded)
+      (walls.has(shape) || gates.has(shape) || shape === dense || shape === guarded || shape === shut)
       ? [`${here} ${direction}`]
       : [];
   });
@@ -385,11 +488,17 @@ function inUse() {
     else snake.feed(player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
   } else if (instantly && here !== "tower") snake.back();
   const wall = exits.find((exit) => walls.has(shapeOf.get(exit)!));
-  if (wall !== leaning) {
+  // (Or propped under the balcony, at the mossy steps: "propped up ready",
+  // but it slips, so it opens nothing.)
+  const balcony = here === "mossy-steps" && using.includes("ladder") ? "mossy-steps east" : undefined;
+  const up = wall ?? balcony;
+  if (up !== leaning) {
     ladder.away();
-    if (wall) ladder.lean(shapeOf.get(wall)!.box!, wall, PLACES.get(here)!, itemLocations.ladder === "carried");
-    leaning = wall;
-  } else if (wall && itemLocations.ladder === "carried") ladder.show();
+    const carried = itemLocations.ladder === "carried";
+    if (wall) ladder.lean(shapeOf.get(wall)!.box!, wall, PLACES.get(here)!, carried);
+    else if (balcony) ladder.prop(land.balcony.top, land.balcony.out, balcony, carried);
+    leaning = up;
+  } else if (up && itemLocations.ladder === "carried") ladder.show();
 }
 
 // A game loaded: you're where you were in it (or, saved in another version,
@@ -586,34 +695,68 @@ resize();
 // roof's shadow keeps it off you, and outside the door it's still day).
 let caveLit = 0;
 let indoors = 0;
-const litHalls = Object.values(halls).filter((hall) => hall.light);
+let gloom = 0; // in a dark hall: 1
+let murk = 0; // and down in it, where its haze is: 1
+let dark = 0; // how dark it is round you (in a dark hall, or deep underground): 1
+// The lights in the halls: a lit hall's own, in its middle, up towards its
+// roof, flickering (torches, fire); a dark one's, coming in at its windows
+// and cracks, steady (daylight).
+const fixtures = Object.values(halls).flatMap((hall) =>
+  hall.lights
+    ? hall.lights.map(({ at: [x, y, z], colour, glow, reach }) => ({ x, y, z, colour, glow, reach, flickers: false }))
+    : hall.light
+      ? [
+          {
+            x: hall.x,
+            y: hall.floor + hall.tall * 0.6,
+            z: hall.z,
+            colour: hall.light,
+            glow: hall.glow ?? 0,
+            reach: hall.r * 1.8,
+            flickers: true,
+          },
+        ]
+      : []
+);
+const darkHall = Object.values(halls).find((hall) => hall.dark);
+const shafts = darkHall?.windows && new Shafts(scene, darkHall, darkHall.windows, reducedMotion);
 function lightFor(depth: number, time: number, dt: number) {
   indoors += ((player.under?.indoor ? 1 : 0) - indoors) * Math.min(1, dt * 4);
+  const hall = player.under?.hall ? halls[player.under.hall] : undefined;
+  gloom += ((hall?.dark ? 1 : 0) - gloom) * Math.min(1, dt * 2);
+  const p = player.position;
+  // (Climbing towards the top window, out of the haze: the view from it clear.)
+  const climbed = hall?.dark ? Math.min(1, Math.max(0, (p.y - hall.floor) / (hall.tall * 0.6))) : 0;
+  murk += ((hall?.dark ? 1 - climbed * climbed * (3 - 2 * climbed) : 0) - murk) * Math.min(1, dt * 2);
   const under = Math.min(1, Math.max(0, (depth - 0.5) / 3));
+  dark = Math.max(gloom, under);
   sunlight.intensity = 2.8 * (1 - under);
-  skylight.intensity = 1.25 * (1 - Math.max(under * 0.92, indoors * 0.55));
+  skylight.intensity = 1.25 * (1 - Math.max(under * 0.92, indoors * 0.55, gloom * 0.8));
+  skylight.color.copy(SKY).lerp(COLD, gloom);
+  skylight.groundColor.copy(SKY_GROUND).lerp(COLD_GROUND, gloom);
   const flicker = reducedMotion ? 1 : 0.92 + 0.05 * Math.sin(time / 90) + 0.03 * Math.sin(time / 37);
-  lamp.intensity = 3.5 * Math.max(under, indoors * 0.4) * flicker;
+  lamp.intensity = 3.5 * Math.max(under, indoors * 0.4) * flicker * (1 - gloom);
   lamp.position.set(player.position.x, player.position.y + 1.4, player.position.z);
 
-  // The lit halls nearest you, each with its own light.
-  const p = player.position;
-  const away = (hall: (typeof litHalls)[number]) => Math.hypot(hall.x - p.x, hall.floor - p.y, hall.z - p.z) - hall.r;
-  const nearest = litHalls.filter((hall) => away(hall) < 40).sort((a, b) => away(a) - away(b));
+  // The halls' lights nearest you.
+  const away = (light: (typeof fixtures)[number]) =>
+    Math.hypot(light.x - p.x, light.y - p.y, light.z - p.z) - light.reach / 1.8;
+  const nearest = fixtures.filter((light) => away(light) < 40).sort((a, b) => away(a) - away(b));
   roomLights.forEach((light, k) => {
-    const hall = nearest[k];
-    light.intensity = hall ? (hall.glow ?? 0) * 4 * flicker : 0;
-    if (!hall) return;
-    light.color.set(hall.light!);
-    light.distance = hall.r * 1.8;
-    light.position.set(hall.x, hall.floor + hall.tall * 0.6, hall.z);
+    const fixture = nearest[k];
+    light.intensity = fixture ? fixture.glow * 4 * (fixture.flickers ? flicker : 1) : 0;
+    if (!fixture) return;
+    light.color.set(fixture.colour);
+    light.distance = fixture.reach;
+    light.position.set(fixture.x, fixture.y, fixture.z);
   });
 
-  const hall = player.under?.hall ? halls[player.under.hall] : undefined;
   caveLit += ((hall?.light ? 1 : 0) - caveLit) * Math.min(1, dt * 3);
-  fog.color.copy(HAZE).lerp(DARK, under);
-  fog.near = 40 - 38 * under;
-  fog.far = 320 - 290 * under + 40 * caveLit;
+  fog.color.copy(HAZE).lerp(DARK, under).lerp(GLOOM, murk);
+  fog.near = (40 - 38 * under) * (1 - murk) + 1.5 * murk;
+  fog.far = (320 - 290 * under + 40 * caveLit) * (1 - murk) + 22 * murk;
+  shafts?.update(dt, gloom, player.camera.position);
+  insideLook?.color.setScalar(0.25 + 0.75 * gloom);
 }
 
 const timer = new Timer();
@@ -641,6 +784,35 @@ renderer.setAnimationLoop((time) => {
   if (!player.busy) {
     if (player.under?.hall) room = player.under.hall;
     else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
+  }
+  if (stone) {
+    const wants = room === "tower" && shut && !opened.has(shut) && !allOpen ? 1 : 0;
+    rolled =
+      rolled === undefined ? wants : rolled + Math.sign(wants - rolled) * Math.min(Math.abs(wants - rolled), dt * ROLL);
+    const t = rolled * rolled * (3 - 2 * rolled);
+    stone.position.set(
+      ...(([0, 2, 1] as const).map((k) => aside[k] + (door[k] - aside[k]) * t) as [number, number, number])
+    );
+    stone.rotation.z = (-(door[0] - aside[0]) * t) / STONE_R;
+  }
+  // (Fading as you pick it up, and in as you put it down: where it was, meanwhile.)
+  const gem = items.lyingAt("emerald");
+  gemGlow += Math.sign(Number(Boolean(gem)) - gemGlow) * Math.min(Math.abs(Number(Boolean(gem)) - gemGlow), dt * 3);
+  if (gem) gem.getWorldPosition(gemAt).y += 0.1;
+  const breath = reducedMotion ? 1 : 0.85 + 0.15 * Math.sin(time / 700);
+  const kept = Math.hypot(gemAt.x - chestX, gemAt.z - chestZ) < 0.8 ? 0.18 + 0.82 * lidOpen : 1;
+  // (Only a glimmer in daylight: it shows in the dark.)
+  gemLight.position.copy(gemAt);
+  gemLight.intensity = gemGlow * breath * kept * (0.15 + 1.0 * dark);
+  // (The halo a little towards you, so the ground doesn't cut it off.)
+  halo.position.copy(gemAt).addScaledVector(player.camera.position.clone().sub(gemAt).normalize(), 0.15);
+  halo.visible = gemGlow > 0.01;
+  halo.material.opacity = gemGlow * breath * (0.05 + 0.3 * dark);
+  if (lid) {
+    const near =
+      player.under?.hall === "tower" && Math.hypot(player.position.x - chestX, player.position.z - chestZ) < 2.5;
+    lidOpen += Math.sign(Number(near) - lidOpen) * Math.min(Math.abs(Number(near) - lidOpen), dt * 1.5);
+    lid.rotation.x = -(CRACK + (LID - CRACK) * (lidOpen * lidOpen * (3 - 2 * lidOpen)));
   }
   for (const gate of gates.values()) {
     gate.open += Math.sign(gate.wants - gate.open) * Math.min(Math.abs(gate.wants - gate.open), dt * 0.8);

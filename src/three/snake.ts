@@ -2,7 +2,8 @@
 // (its model: art/blender/snake.py). It watches you, and comes near and it
 // rears up, its mouth wide, its tongue flickering: it hisses at you. Use the
 // apple and you throw it: the snake catches it in its jaws, lowers its head
-// and slithers away west with it, down the knoll and into the trees. Once
+// and slithers away south-west with it, round the stone waiting beside the
+// door (land.py), and west down the knoll into the trees. Once
 // the apple's no longer in use there (you've gone on, as in the original),
 // it's back, coiled by the door, the next time you're not looking.
 //
@@ -275,7 +276,7 @@ export class Snake {
     if (t > T + 0.5) this.slither();
   }
 
-  /** Off it goes, along its own body and then away west, down into the trees. */
+  /** Off it goes, along its own body and then away south-west, round the stone, and west into the trees. */
   private slither() {
     this.state = "leaving";
     this.gone = 0;
@@ -283,18 +284,20 @@ export class Snake {
     const lying = this.points.filter((_, k) => k * STEP < this.length).map((p) => p.clone());
     const nose = this.points[this.points.length - 1].clone();
     lying.push(nose);
-    // ...and on: ahead, round to the west, and down the knoll among the trees.
+    // ...and on: ahead, south-west, round the south of the stone that waits
+    // to the west of the door (well clear of it: it's lumpy), and west down
+    // the knoll among the trees.
     const ahead = this.down!.facing.clone().setY(0).normalize();
     const c = this.centre;
     const ways = [
       nose,
       nose.clone().addScaledVector(ahead, 0.7),
-      new Vector3(c.x - 2.8, 0, c.z + 1.9),
-      new Vector3(c.x - 5.5, 0, c.z + 1.8),
-      new Vector3(c.x - 9, 0, c.z + 2.4),
-      new Vector3(c.x - 13, 0, c.z + 2.8),
-      new Vector3(c.x - 18, 0, c.z + 3.6),
-      new Vector3(c.x - 24, 0, c.z + 4.2),
+      new Vector3(c.x - 1.5, 0, c.z + 3.5),
+      new Vector3(c.x - 4.7, 0, c.z + 6.3),
+      new Vector3(c.x - 8.7, 0, c.z + 6.5),
+      new Vector3(c.x - 13, 0, c.z + 6),
+      new Vector3(c.x - 18, 0, c.z + 6),
+      new Vector3(c.x - 24, 0, c.z + 6.5),
     ];
     const on: Vector3[] = [];
     for (let k = 0; k < ways.length - 1; k++) {

@@ -57,11 +57,18 @@ export interface Path {
   lift: number;
 }
 
-/** The ground, or the top of a path lying on it. */
-export function onPaths(ground: Ground, paths: Path[]): Ground {
+/** A step on the land (land.json): [x, z, half x, half z, top]. */
+export type Step = number[];
+
+/** The ground, or the top of a path lying on it (or of a step). */
+export function onPaths(ground: Ground, paths: Path[], steps: Step[] = []): Ground {
   return (x, z) => {
     const g = ground(x, z);
     if (g === undefined) return undefined;
+    let top = -Infinity;
+    for (const [sx, sz, halfX, halfZ, high] of steps) {
+      if (Math.abs(x - sx) <= halfX && Math.abs(z - sz) <= halfZ) top = Math.max(top, high);
+    }
     let lift = 0;
     for (const path of paths) {
       for (let k = 0; k < path.points.length - 1; k++) {
@@ -74,7 +81,7 @@ export function onPaths(ground: Ground, paths: Path[]): Ground {
         if (Math.hypot(x - ax - t * (bx - ax), z - az - t * (bz - az)) <= path.half) lift = Math.max(lift, path.lift);
       }
     }
-    return g + lift;
+    return Math.max(g + lift, top);
   };
 }
 
@@ -135,6 +142,8 @@ export interface Items {
   saved(): Omit<ThreeSave, "at">;
   /** Somewhere to stand in a place (arriving in it from a save that doesn't say where). */
   arrival(room: RoomId): [number, number] | undefined;
+  /** An object lying in the world (not carried): its model, where it lies. */
+  lyingAt(id: ItemId): Object3D | undefined;
   /** A game loaded: what you carry, and where everything lies, as it was in it. */
   restart(game: { state: GameState; three?: ThreeSave }): void;
 }
@@ -146,8 +155,9 @@ export function items(options: {
   models: Object3D;
   ground: Ground;
   walkable: Walkable;
-  /** The paths, a little above the ground (land.json): what lies on one lies on top of it. */
+  /** The paths, a little above the ground (land.json): what lies on one lies on top of it. And the steps. */
   paths: Path[];
+  steps: Step[];
   root: HTMLElement;
   /** Words at the bottom of the screen ("Nothing happens."). */
   say: (words: string) => void;
@@ -157,6 +167,8 @@ export function items(options: {
   stays: (id: ItemId) => { model: Object3D; fallsTo: Footing } | undefined;
   /** A game loaded (or carried on from another version), and, saved in 3D, where things lie. */
   begin?: { state: GameState; three?: ThreeSave };
+  /** Where an object always starts in a place, rather than anywhere in it (the emerald, in the tower's chest): [x, z, floor]. */
+  starts?: Partial<Record<ItemId, { room: RoomId; at: [number, number, number] }>>;
   reducedMotion: boolean;
 }): Items {
   const { world, scene, player, models, ground, walkable, root, say, changed, stays, begin } = options;
@@ -214,8 +226,23 @@ export function items(options: {
     });
   }
 
+  /** The hall (or room) a thing lies in, if any: on its floor (or a step), and within its walls. */
+  function hallOf(thing: Lying) {
+    if (thing.floor === undefined) return undefined;
+    const { x, z } = thing.model.position;
+    for (const [place, hall] of player.halls) {
+      if (thing.floor < hall.floor - 0.5 || thing.floor > hall.floor + hall.tall) continue;
+      const within =
+        hall.w !== undefined && hall.d !== undefined
+          ? Math.abs(x - hall.x) <= hall.w && Math.abs(z - hall.z) <= hall.d
+          : Math.hypot(x - hall.x, z - hall.z) <= hall.r;
+      if (within) return place;
+    }
+    return undefined;
+  }
+
   /** The ground, or the top of a path lying on it. */
-  const surface = onPaths(ground, options.paths);
+  const surface = onPaths(ground, options.paths, options.steps);
 
   /** The line an object rests on, along its length: the ground's upper hull, under its middle. */
   function resting(x: number, z: number, yaw: number, half: number, wide: number) {
@@ -258,6 +285,8 @@ export function items(options: {
    * anywhere on its floor, clear of its walls and what stands in it.
    */
   function start(id: ItemId, room: RoomId) {
+    const fixed = options.starts?.[id];
+    if (fixed?.room === room) return lay(id, room, fixed.at[0], fixed.at[1], 0, fixed.at[2]);
     const hall = player.halls.get(room);
     const half = lengthOf(models.getObjectByName(id)!) / 2;
     const area = hall
@@ -513,7 +542,7 @@ export function items(options: {
     const size = new Box3().setFromObject(models.getObjectByName(id)!).getSize(new Vector3());
     const side = [Math.cos(player.yaw), -Math.sin(player.yaw)];
     const forward = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
-    const [px, pz] = pointedAt();
+    const [px, pz, floor] = pointedAt();
     const spots = NUDGES.map(([aside, on]) => ({
       x: px + forward[0] * on + side[0] * aside,
       z: pz + forward[1] * on + side[1] * aside,
@@ -523,15 +552,17 @@ export function items(options: {
     }));
     const taken = [...lying.values()].flatMap((thing) => (thing.footprint ? [thing.footprint] : []));
     const { x, z } = spots.find((spot) => !taken.some((other) => overlap(spot, other))) ?? spots[0];
-    lay(id, state.room, x, z, yaw, player.under ? player.under.floor : undefined);
+    lay(id, state.room, x, z, yaw, floor);
   }
 
   /**
-   * Where you're pointing, on the ground (or the floor): along your gaze until
-   * it meets it, as far as you can reach, and not past anything you couldn't
-   * walk past (a wall, the forest, the water, an obstacle), nor right under you.
+   * Where you're pointing, on the ground (or the floor, or the top of a step
+   * or a table, or the chest's tray, coming down onto it): along your gaze
+   * until it meets it, as far as you can reach, and not past anything you
+   * couldn't walk past (a wall, the forest, the water, an obstacle), nor
+   * right under you. Off the land, how high that is.
    */
-  function pointedAt(): [number, number] {
+  function pointedAt(): [number, number, number | undefined] {
     player.camera.getWorldPosition(eye);
     player.camera.getWorldDirection(look);
     const { position: me, under } = player;
@@ -543,19 +574,27 @@ export function items(options: {
             return there.d < way.half - 0.2 && Math.abs(there.floor - under.floor) < 1;
           })
       : (x: number, z: number) => walkable(x, z) && player.clear(x, z, false, 0.05);
-    let spot: [number, number] = [me.x, me.z];
+    // (What your gaze was already over, a step before: not what it goes into
+    // the side of, or under.)
+    const floorAt = (x: number, z: number, over: number) =>
+      under ? Math.max(under.floor, player.topAt(x, z, over)) : undefined;
+    let spot: [number, number, number | undefined] = [me.x, me.z, under?.floor];
+    let was = eye.y;
     for (let d = 0.1; d <= REACH; d += 0.1) {
       const x = eye.x + look.x * d;
       const z = eye.z + look.z * d;
       if (!open(x, z)) break;
-      spot = [x, z];
-      if (eye.y + look.y * d <= (under ? under.floor : (ground(x, z) ?? -Infinity))) break;
+      const floor = floorAt(x, z, was);
+      spot = [x, z, floor];
+      was = eye.y + look.y * d;
+      if (was <= (floor ?? ground(x, z) ?? -Infinity)) break;
     }
     // (At least a little way in front of you.)
     const away = Math.hypot(spot[0] - me.x, spot[1] - me.z);
     if (away < NEAREST) {
       const forward = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
-      spot = [me.x + forward[0] * NEAREST, me.z + forward[1] * NEAREST];
+      const [x, z] = [me.x + forward[0] * NEAREST, me.z + forward[1] * NEAREST];
+      spot = [x, z, floorAt(x, z, me.y + 0.45)];
     }
     return spot;
   }
@@ -615,6 +654,7 @@ export function items(options: {
       return { slots: slots.map((id) => id ?? null), lying: spots };
     },
     arrival,
+    lyingAt: (id) => lying.get(id)?.model,
     restart(game) {
       state = game.state;
       layOut(game.three);
@@ -649,6 +689,9 @@ export function items(options: {
       aimed = undefined;
       let best = { miss: AIM_SLACK, d: REACH };
       for (const [id, thing] of lying) {
+        // (Not through a wall: what's in a hall or a room only from in it,
+        // and from in one only what's in it.)
+        if (hallOf(thing) !== player.under?.hall) continue;
         // (Your gaze, as the object sees it: then its box is square to it.)
         thing.model.updateMatrixWorld();
         mine.copy(ray).applyMatrix4(inverse.copy(thing.model.matrixWorld).invert());

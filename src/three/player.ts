@@ -12,8 +12,12 @@ export interface Circle {
   names?: string[];
   /** How far before an obstacle in your way you bump into it. */
   ahead?: number;
+  /** No far side to have come from (a way that kills you): it stops you all round. */
+  allRound?: boolean;
   /** The height of its top, if it's low enough to climb onto. */
   top?: number;
+  /** The height of its underside, if it's a slab you can walk under (once it's over your head). */
+  bottom?: number;
 }
 
 export interface Box {
@@ -24,6 +28,8 @@ export interface Box {
   names?: string[];
   /** All round it (rounded at its corners): you're this near it, at most, before you bump into it. */
   ahead?: number;
+  /** No far side to have come from (a way that kills you): it stops you all round. */
+  allRound?: boolean;
   top?: number;
 }
 
@@ -93,6 +99,11 @@ export function wayThrough(names: string[], ox: number, oz: number, x: number, z
     if (direction === "east") return x < ox;
     return x > ox;
   });
+}
+
+/** An obstacle, the same however often it's put back: its exits, and where it is. */
+function same(thing: Circle | Box) {
+  return `${thing.names?.join() ?? ""} ${thing.x} ${thing.z}`;
 }
 
 /** Whether a spot is in a solid thing, or an obstacle's reach (and so far round it). */
@@ -166,7 +177,13 @@ const RUN = WALK * 3; // the land is big, and the tunnel long
 const BODY = 0.35; // your own radius, for bumping into things
 const LOOK = 0.0022; // radians per pixel of mouse movement
 const TOUCH_LOOK = 0.005;
-const BOUNCE = 5; // metres a second, back off an obstacle, slowing to a stop in about half a metre
+// Bumping into an obstacle: a soft nudge back off it, easing out and to a
+// stop (walking on, you're slow at first, then back to speed), and not
+// again while you push on: only once you've stepped back from it.
+const NUDGE = 0.18; // metres
+const NUDGING = 0.4; // seconds
+const EASING_IN = 0.6; // seconds after, walking on into it comes back to speed
+const AGAIN = 0.5; // metres back from where you bumped into it, before another
 
 export class Player {
   readonly camera = new PerspectiveCamera(70, 1, 0.1, 3000);
@@ -195,7 +212,8 @@ export class Player {
   private nearUnder = new Map<string, Near>();
   private stick = { x: 0, y: 0 }; // the thumb's walking stick, -1 to 1
   private bob = 0;
-  private knock = { x: 0, z: 0 }; // bouncing back off an obstacle
+  // Nudged back off an obstacle: which way, how far into it, and where from (none yet: armed).
+  private knock = { x: 0, z: 0, t: NUDGING + EASING_IN, from: undefined as { x: number; z: number } | undefined };
   // One-way obstacles you're going through the free way, until you're out of their reach.
   private passing = new Set<Circle | Box>();
   private before = new Vector3(); // where you were, before this step
@@ -237,8 +255,14 @@ export class Player {
   /** The solid things on the land (or underground), sorted into squares so only those near you are checked. */
   solid(circles: Circle[], boxes: Box[], under = false) {
     const near = under ? this.nearUnder : this.near;
+    // (What you were going through, the free way, you still are: the same
+    // obstacle, put back, when what's open changes, as you come out of the
+    // tower past the snake, say.)
+    const old = new Set([...near.values()].flatMap((found) => [...found.circles, ...found.boxes]));
+    const going = new Set([...this.passing].filter((thing) => old.has(thing)).map(same));
+    for (const thing of old) this.passing.delete(thing);
+    for (const thing of [...circles, ...boxes]) if (going.has(same(thing))) this.passing.add(thing);
     near.clear();
-    this.passing.clear();
     // Adds a thing to every square it (or you, touching it) could be in.
     const file = (x0: number, x1: number, z0: number, z1: number, add: (found: Near) => void) => {
       for (let i = Math.floor((x0 - 1) / CELL); i <= Math.floor((x1 + 1) / CELL); i++) {
@@ -276,7 +300,7 @@ export class Player {
     this.lift = this.rise = 0;
     // (Not climbing any more, or going through anything: somewhere new.)
     this.following = undefined;
-    this.knock = { x: 0, z: 0 };
+    this.knock = { x: 0, z: 0, t: NUDGING + EASING_IN, from: undefined };
     this.passing.clear();
     this.yaw = yaw;
     this.pitch = 0;
@@ -316,7 +340,7 @@ export class Player {
   follow(path: (t: number) => Vector3, seconds: number, done: () => void) {
     this.following = { path, seconds, t: 0, done };
     this.lift = this.rise = 0;
-    this.knock = { x: 0, z: 0 };
+    this.knock = { x: 0, z: 0, t: NUDGING + EASING_IN, from: undefined };
   }
 
   /** Whether you're being taken along a path, not walking. */
@@ -341,18 +365,33 @@ export class Player {
     }
     this.eye += ((crouching ? CROUCHED : EYE) - this.eye) * Math.min(1, dt * 10);
     this.before.copy(this.position);
-    const bouncing = Math.hypot(this.knock.x, this.knock.z) > 0.5;
-    if (bouncing) {
-      this.step(this.knock.x * dt, this.knock.z * dt);
-      const fade = Math.exp(-dt * 8);
-      this.knock.x *= fade;
-      this.knock.z *= fade;
-    } else if (length > 0.01) {
+    // (The nudge: fastest halfway, so it eases out and to a stop. Stepped
+    // back from where it was, you'd be nudged again.)
+    const k = this.knock;
+    if (k.from && Math.hypot(this.position.x - k.from.x, this.position.z - k.from.z) > AGAIN) k.from = undefined;
+    const eased = (t: number) => (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, t)))) / 2;
+    const back = eased((k.t - NUDGING) / EASING_IN); // (walking on into it: none at first, then all)
+    if (k.t < NUDGING + EASING_IN) {
+      const was = eased(k.t / NUDGING);
+      k.t = Math.min(NUDGING + EASING_IN, k.t + dt);
+      const moved = NUDGE * (eased(k.t / NUDGING) - was);
+      if (moved > 0) this.step(k.x * moved, k.z * moved);
+    }
+    if (length > 0.01) {
       const scale = (speed * dt * length) / Math.hypot(forward, right);
       const sin = Math.sin(this.yaw);
       const cos = Math.cos(this.yaw);
       // Forward is -z when yaw is 0; right is +x.
-      this.step((-sin * forward + cos * right) * scale, (-cos * forward - sin * right) * scale);
+      let dx = (-sin * forward + cos * right) * scale;
+      let dz = (-cos * forward - sin * right) * scale;
+      // (Nudged, walking on into it comes back slowly: along it, or away, you're free.)
+      const into = -(dx * k.x + dz * k.z);
+      if (into > 0) {
+        const held = into * (1 - back);
+        dx += k.x * held;
+        dz += k.z * held;
+      }
+      this.step(dx, dz);
       this.bob += dt * speed * 1.6;
     }
     this.collide();
@@ -360,7 +399,8 @@ export class Player {
     if (this.keys.has("Space") && this.lift === 0 && this.rise === 0) this.jump();
     this.upAndDown(dt);
 
-    const bob = reducedMotion || length < 0.01 || bouncing || this.lift > 0 ? 0 : Math.sin(this.bob) * 0.04;
+    const bob =
+      reducedMotion || length < 0.01 || this.knock.t < NUDGING || this.lift > 0 ? 0 : Math.sin(this.bob) * 0.04;
     this.camera.position.set(this.position.x, this.position.y + this.lift + this.eye + bob, this.position.z);
     this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
   }
@@ -386,7 +426,7 @@ export class Player {
     const { x, z } = this.position;
     const near = (this.under ? this.nearUnder : this.near).get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
     for (const thing of [...(near?.circles ?? []), ...(near?.boxes ?? [])]) {
-      if (thing.names && touching(thing, x, z, BODY)) this.passing.add(thing);
+      if (thing.names && !thing.allRound && touching(thing, x, z, BODY)) this.passing.add(thing);
     }
   }
 
@@ -416,9 +456,11 @@ export class Player {
     }
     // Under a roof, a jump stops at it: jumping where a tunnel drops away
     // steeply, the roof drops with the floor, and would leave you behind.
+    // (Or under a slab, at its underside.)
     if (this.under && this.lift > 0) {
       const tall = this.under.hall ? (this.halls.get(this.under.hall)?.tall ?? ROOF) : PROPS;
-      const most = Math.max(0, this.under.floor + tall - HEADROOM - this.eye - p.y);
+      const roof = Math.min(this.under.floor + tall, this.slabOver(p.x, p.z, p.y + this.eye));
+      const most = Math.max(0, roof - HEADROOM - this.eye - p.y);
       if (this.lift > most) {
         this.lift = most;
         this.rise = Math.min(this.rise, 0);
@@ -430,15 +472,32 @@ export class Player {
   // step above your feet).
   private topUnder(feet: number) {
     if (!this.under) return -Infinity;
-    const p = this.position;
-    const near = this.nearUnder.get(`${Math.floor(p.x / CELL)},${Math.floor(p.z / CELL)}`);
+    return this.topAt(this.position.x, this.position.z, feet + STEP);
+  }
+
+  // The underside of the lowest slab over your head (standing, or jumping).
+  private slabOver(x: number, z: number, head: number) {
+    const near = this.nearUnder.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
+    let lowest = Infinity;
+    for (const c of near?.circles ?? []) {
+      if (c.bottom !== undefined && c.bottom >= head && Math.hypot(x - c.x, z - c.z) < c.r + BODY)
+        lowest = Math.min(lowest, c.bottom);
+    }
+    return lowest;
+  }
+
+  /**
+   * Off the land, the top of the highest thing at a spot you could stand on
+   * (or put something on: a step, a table, the chest's tray), up to a height.
+   */
+  topAt(x: number, z: number, most = Infinity) {
+    const near = this.nearUnder.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
     let best = -Infinity;
     for (const c of near?.circles ?? []) {
-      if (c.top !== undefined && c.top <= feet + STEP && Math.hypot(p.x - c.x, p.z - c.z) < c.r)
-        best = Math.max(best, c.top);
+      if (c.top !== undefined && c.top <= most && Math.hypot(x - c.x, z - c.z) < c.r) best = Math.max(best, c.top);
     }
     for (const b of near?.boxes ?? []) {
-      if (b.top !== undefined && b.top <= feet + STEP && Math.abs(p.x - b.x) < b.halfX && Math.abs(p.z - b.z) < b.halfZ)
+      if (b.top !== undefined && b.top <= most && Math.abs(x - b.x) < b.halfX && Math.abs(z - b.z) < b.halfZ)
         best = Math.max(best, b.top);
     }
     return best;
@@ -566,8 +625,10 @@ export class Player {
     // (Anything you're above, or a step below, you go over, not into.)
     const feet = p.y + this.lift;
     const below = (thing: Circle | Box) => thing.top !== undefined && feet >= thing.top - STEP;
+    // (And a slab over your head, you go under.)
+    const over = (thing: Circle) => thing.bottom !== undefined && feet + this.eye + HEADROOM <= thing.bottom;
     for (const c of near.circles) {
-      if (below(c)) continue;
+      if (below(c) || over(c)) continue;
       const dx = p.x - c.x;
       const dz = p.z - c.z;
       const d = Math.hypot(dx, dz);
@@ -622,7 +683,9 @@ export class Player {
   private blocking(thing: Circle | Box, within: boolean, cameOut: boolean): string | null {
     if (!thing.names) return "";
     if (!this.passing.has(thing) && !(cameOut && within)) {
-      const exit = wayThrough(thing.names, thing.x, thing.z, this.position.x, this.position.z);
+      const exit = thing.allRound
+        ? thing.names[0]
+        : wayThrough(thing.names, thing.x, thing.z, this.position.x, this.position.z);
       if (exit) return exit;
     }
     if (within) this.passing.add(thing);
@@ -656,8 +719,8 @@ export class Player {
 
   // Off an obstacle, the way you came (once, until you've stopped).
   private bounce(exit: string, nx: number, nz: number) {
-    if (Math.hypot(this.knock.x, this.knock.z) > 0.5) return;
-    this.knock = { x: nx * BOUNCE, z: nz * BOUNCE };
+    if (this.knock.from) return;
+    this.knock = { x: nx, z: nz, t: 0, from: { x: this.position.x, z: this.position.z } };
     this.onBump(exit);
   }
 
