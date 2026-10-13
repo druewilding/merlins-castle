@@ -222,7 +222,7 @@ const snake = new Snake(
   snaky.scene,
   things.scene.getObjectByName("apple")!,
   onPaths(ground, land.paths),
-  guarded!.box!,
+  (guarded!.circle ?? guarded!.box)!,
   reducedMotion
 );
 let allOpen = false; // (the debug panel's "open every obstacle")

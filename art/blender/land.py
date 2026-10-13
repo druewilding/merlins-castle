@@ -1044,11 +1044,13 @@ for k in range(6):
           c.linear("#7f8f6a"), solid=False)
 # The snake, coiled at the top of the steps (and the stone that shuts you in,
 # from inside), and the balcony, too high to reach from the ground under it.
-# (The snake reaches out from just inside the wall, so its far side is in the
-# tower, where you can't be on the land; the stone is indoors, for the way
+# (The snake's round, in the doorway at the wall's line, so its far side is
+# in the tower, where you can't be on the land: it reaches out in front of
+# the door, and no further round the tower than you'd need to slip past it,
+# which leaves the way east to the balcony. The stone is indoors, for the way
 # out, just inside the round room: in the doorway, you're still on the mossy
 # steps, and it would shut you in out there, past its middle.)
-obstacle(["mossy-steps north"], "box", TOWER[0], -(TOWER[1] - TOWER_R + 1), 3.0, 0.8)
+obstacle(["mossy-steps north"], "circle", TOWER[0], -(TOWER[1] - TOWER_R), 0.8, reach=3.7)
 obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - TOWER_R + 1.5), 1.6, 0.5, under=True, reach=1.5)  # (so you can walk round the room)
 obstacle(["mossy-steps east"], "box", TOWER[0] + 9.5, -TOWER[1], 0.6, 2.5)
 

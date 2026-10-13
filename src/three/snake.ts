@@ -96,13 +96,12 @@ export class Snake {
     model: Object3D,
     appleModel: Object3D,
     private ground: Ground, // (or the top of a path on it)
-    box: number[], // the obstacle in front of the door ([x, z, halfX, halfZ])
+    door: number[], // the middle of the obstacle in the doorway ([x, z, ...])
     private reducedMotion: boolean
   ) {
-    // Its coil, a little to the west of the door's middle, in front of the
-    // obstacle (which reaches back into the doorway).
-    const [x, z, , halfZ] = box;
-    this.centre = new Vector3(x - 0.3, 0, z + halfZ + 2.7);
+    // Its coil, out in front of the door, a little to the west of its middle.
+    const [x, z] = door;
+    this.centre = new Vector3(x - 0.3, 0, z + 2.5);
     this.centre.y = ground(this.centre.x, this.centre.z) ?? 0;
 
     model.updateMatrixWorld(true);
