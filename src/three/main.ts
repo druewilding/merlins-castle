@@ -8,6 +8,7 @@ import "./style.css";
 
 import {
   ACESFilmicToneMapping,
+  AdditiveBlending,
   Color,
   CylinderGeometry,
   DirectionalLight,
@@ -22,6 +23,8 @@ import {
   PMREMGenerator,
   PointLight,
   Scene,
+  Sprite,
+  SpriteMaterial,
   SRGBColorSpace,
   Timer,
   Vector3,
@@ -49,7 +52,7 @@ import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import snakeModel from "./models/snake.glb?url";
 import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable, wayThrough } from "./player";
-import { Shafts, type Window } from "./shafts";
+import { Shafts, speck, type Window } from "./shafts";
 import { sky } from "./sky";
 import { Snake } from "./snake";
 import { Trees, type TreeSpots } from "./trees";
@@ -164,7 +167,7 @@ if (emerald instanceof Mesh) {
     envMap: pmrem.fromScene(new RoomEnvironment(), 0.02).texture,
     envMapIntensity: 0.55,
     emissive: new Color("#0f7a38"),
-    emissiveIntensity: 0.7,
+    emissiveIntensity: 1.0,
   });
   pmrem.dispose();
 }
@@ -273,6 +276,18 @@ const lid = model.scene.getObjectByName("chest-lid");
 const [chestX, chestZ] = land.chest;
 let lidOpen = 0;
 const LID = 1.9; // radians, open (back against the wall)
+const CRACK = 0.07; // and shut, it rests a crack open: the emerald's glow shows through
+// The emerald's own glow, wherever it lies: a little green light, breathing
+// (in the chest, mostly kept in by its lid, but through the crack), and a
+// soft halo round it, which the chest's sides and lid hide.
+const GEM = new Color("#46ff8c");
+const gemLight = new PointLight(GEM, 0, 2.6, 1.4);
+const halo = new Sprite(
+  new SpriteMaterial({ map: speck(), color: GEM, blending: AdditiveBlending, transparent: true, depthWrite: false })
+);
+halo.scale.setScalar(0.7);
+scene.add(gemLight, halo);
+const gemAt = new Vector3();
 // The stone, rolling from beside the tower's door across it, once you're in,
 // and back with the ring: turning as it goes.
 const stone = model.scene.getObjectByName("stone");
@@ -759,11 +774,22 @@ renderer.setAnimationLoop((time) => {
     );
     stone.rotation.z = (-(door[0] - aside[0]) * t) / STONE_R;
   }
+  const gem = items.lyingAt("emerald");
+  const breath = reducedMotion ? 1 : 0.85 + 0.15 * Math.sin(time / 700);
+  if (gem) {
+    gem.getWorldPosition(gemAt).y += 0.1;
+    gemLight.position.copy(gemAt);
+    halo.position.copy(gemAt);
+  }
+  const kept = gem && Math.hypot(gemAt.x - chestX, gemAt.z - chestZ) < 0.8 ? 0.18 + 0.82 * lidOpen : 1;
+  gemLight.intensity = gem ? 2.2 * breath * kept : 0;
+  halo.visible = Boolean(gem);
+  halo.material.opacity = 0.6 * breath;
   if (lid) {
     const near =
       player.under?.hall === "tower" && Math.hypot(player.position.x - chestX, player.position.z - chestZ) < 2.5;
     lidOpen += Math.sign(Number(near) - lidOpen) * Math.min(Math.abs(Number(near) - lidOpen), dt * 1.5);
-    lid.rotation.x = -LID * (lidOpen * lidOpen * (3 - 2 * lidOpen));
+    lid.rotation.x = -(CRACK + (LID - CRACK) * (lidOpen * lidOpen * (3 - 2 * lidOpen)));
   }
   for (const gate of gates.values()) {
     gate.open += Math.sign(gate.wants - gate.open) * Math.min(Math.abs(gate.wants - gate.open), dt * 0.8);

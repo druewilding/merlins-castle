@@ -142,6 +142,8 @@ export interface Items {
   saved(): Omit<ThreeSave, "at">;
   /** Somewhere to stand in a place (arriving in it from a save that doesn't say where). */
   arrival(room: RoomId): [number, number] | undefined;
+  /** An object lying in the world (not carried): its model, where it lies. */
+  lyingAt(id: ItemId): Object3D | undefined;
   /** A game loaded: what you carry, and where everything lies, as it was in it. */
   restart(game: { state: GameState; three?: ThreeSave }): void;
 }
@@ -652,6 +654,7 @@ export function items(options: {
       return { slots: slots.map((id) => id ?? null), lying: spots };
     },
     arrival,
+    lyingAt: (id) => lying.get(id)?.model,
     restart(game) {
       state = game.state;
       layOut(game.three);

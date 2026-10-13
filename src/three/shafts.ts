@@ -220,8 +220,8 @@ export class Shafts {
   }
 }
 
-/** A speck of dust: round, and soft at its edge. */
-function speck() {
+/** A speck of dust (or a glow): round, and soft at its edge. */
+export function speck() {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 32;
   const context = canvas.getContext("2d")!;
