@@ -177,7 +177,13 @@ const RUN = WALK * 3; // the land is big, and the tunnel long
 const BODY = 0.35; // your own radius, for bumping into things
 const LOOK = 0.0022; // radians per pixel of mouse movement
 const TOUCH_LOOK = 0.005;
-const BOUNCE = 5; // metres a second, back off an obstacle, slowing to a stop in about half a metre
+// Bumping into an obstacle: a soft nudge back off it, easing out and to a
+// stop (walking on, you're slow at first, then back to speed), and not
+// again while you push on: only once you've stepped back from it.
+const NUDGE = 0.18; // metres
+const NUDGING = 0.4; // seconds
+const EASING_IN = 0.6; // seconds after, walking on into it comes back to speed
+const AGAIN = 0.5; // metres back from where you bumped into it, before another
 
 export class Player {
   readonly camera = new PerspectiveCamera(70, 1, 0.1, 3000);
@@ -206,7 +212,8 @@ export class Player {
   private nearUnder = new Map<string, Near>();
   private stick = { x: 0, y: 0 }; // the thumb's walking stick, -1 to 1
   private bob = 0;
-  private knock = { x: 0, z: 0 }; // bouncing back off an obstacle
+  // Nudged back off an obstacle: which way, how far into it, and where from (none yet: armed).
+  private knock = { x: 0, z: 0, t: NUDGING + EASING_IN, from: undefined as { x: number; z: number } | undefined };
   // One-way obstacles you're going through the free way, until you're out of their reach.
   private passing = new Set<Circle | Box>();
   private before = new Vector3(); // where you were, before this step
@@ -293,7 +300,7 @@ export class Player {
     this.lift = this.rise = 0;
     // (Not climbing any more, or going through anything: somewhere new.)
     this.following = undefined;
-    this.knock = { x: 0, z: 0 };
+    this.knock = { x: 0, z: 0, t: NUDGING + EASING_IN, from: undefined };
     this.passing.clear();
     this.yaw = yaw;
     this.pitch = 0;
@@ -333,7 +340,7 @@ export class Player {
   follow(path: (t: number) => Vector3, seconds: number, done: () => void) {
     this.following = { path, seconds, t: 0, done };
     this.lift = this.rise = 0;
-    this.knock = { x: 0, z: 0 };
+    this.knock = { x: 0, z: 0, t: NUDGING + EASING_IN, from: undefined };
   }
 
   /** Whether you're being taken along a path, not walking. */
@@ -358,18 +365,33 @@ export class Player {
     }
     this.eye += ((crouching ? CROUCHED : EYE) - this.eye) * Math.min(1, dt * 10);
     this.before.copy(this.position);
-    const bouncing = Math.hypot(this.knock.x, this.knock.z) > 0.5;
-    if (bouncing) {
-      this.step(this.knock.x * dt, this.knock.z * dt);
-      const fade = Math.exp(-dt * 8);
-      this.knock.x *= fade;
-      this.knock.z *= fade;
-    } else if (length > 0.01) {
+    // (The nudge: fastest halfway, so it eases out and to a stop. Stepped
+    // back from where it was, you'd be nudged again.)
+    const k = this.knock;
+    if (k.from && Math.hypot(this.position.x - k.from.x, this.position.z - k.from.z) > AGAIN) k.from = undefined;
+    const eased = (t: number) => (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, t)))) / 2;
+    const back = eased((k.t - NUDGING) / EASING_IN); // (walking on into it: none at first, then all)
+    if (k.t < NUDGING + EASING_IN) {
+      const was = eased(k.t / NUDGING);
+      k.t = Math.min(NUDGING + EASING_IN, k.t + dt);
+      const moved = NUDGE * (eased(k.t / NUDGING) - was);
+      if (moved > 0) this.step(k.x * moved, k.z * moved);
+    }
+    if (length > 0.01) {
       const scale = (speed * dt * length) / Math.hypot(forward, right);
       const sin = Math.sin(this.yaw);
       const cos = Math.cos(this.yaw);
       // Forward is -z when yaw is 0; right is +x.
-      this.step((-sin * forward + cos * right) * scale, (-cos * forward - sin * right) * scale);
+      let dx = (-sin * forward + cos * right) * scale;
+      let dz = (-cos * forward - sin * right) * scale;
+      // (Nudged, walking on into it comes back slowly: along it, or away, you're free.)
+      const into = -(dx * k.x + dz * k.z);
+      if (into > 0) {
+        const held = into * (1 - back);
+        dx += k.x * held;
+        dz += k.z * held;
+      }
+      this.step(dx, dz);
       this.bob += dt * speed * 1.6;
     }
     this.collide();
@@ -377,7 +399,8 @@ export class Player {
     if (this.keys.has("Space") && this.lift === 0 && this.rise === 0) this.jump();
     this.upAndDown(dt);
 
-    const bob = reducedMotion || length < 0.01 || bouncing || this.lift > 0 ? 0 : Math.sin(this.bob) * 0.04;
+    const bob =
+      reducedMotion || length < 0.01 || this.knock.t < NUDGING || this.lift > 0 ? 0 : Math.sin(this.bob) * 0.04;
     this.camera.position.set(this.position.x, this.position.y + this.lift + this.eye + bob, this.position.z);
     this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
   }
@@ -696,8 +719,8 @@ export class Player {
 
   // Off an obstacle, the way you came (once, until you've stopped).
   private bounce(exit: string, nx: number, nz: number) {
-    if (Math.hypot(this.knock.x, this.knock.z) > 0.5) return;
-    this.knock = { x: nx * BOUNCE, z: nz * BOUNCE };
+    if (this.knock.from) return;
+    this.knock = { x: nx, z: nz, t: 0, from: { x: this.position.x, z: this.position.z } };
     this.onBump(exit);
   }
 
