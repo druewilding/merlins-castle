@@ -285,9 +285,10 @@ const gemLight = new PointLight(GEM, 0, 2.6, 1.4);
 const halo = new Sprite(
   new SpriteMaterial({ map: speck(), color: GEM, blending: AdditiveBlending, transparent: true, depthWrite: false })
 );
-halo.scale.setScalar(0.7);
+halo.scale.setScalar(0.45);
 scene.add(gemLight, halo);
 const gemAt = new Vector3();
+let gemGlow = 0; // 1 lying there, 0 carried
 // The stone, rolling from beside the tower's door across it, once you're in,
 // and back with the ring: turning as it goes.
 const stone = model.scene.getObjectByName("stone");
@@ -678,6 +679,7 @@ let caveLit = 0;
 let indoors = 0;
 let gloom = 0; // in a dark hall: 1
 let murk = 0; // and down in it, where its haze is: 1
+let dark = 0; // how dark it is round you (in a dark hall, or deep underground): 1
 // The lights in the halls: a lit hall's own, in its middle, up towards its
 // roof, flickering (torches, fire); a dark one's, coming in at its windows
 // and cracks, steady (daylight).
@@ -709,6 +711,7 @@ function lightFor(depth: number, time: number, dt: number) {
   const climbed = hall?.dark ? Math.min(1, Math.max(0, (p.y - hall.floor) / (hall.tall * 0.6))) : 0;
   murk += ((hall?.dark ? 1 - climbed * climbed * (3 - 2 * climbed) : 0) - murk) * Math.min(1, dt * 2);
   const under = Math.min(1, Math.max(0, (depth - 0.5) / 3));
+  dark = Math.max(gloom, under);
   sunlight.intensity = 2.8 * (1 - under);
   skylight.intensity = 1.25 * (1 - Math.max(under * 0.92, indoors * 0.55, gloom * 0.8));
   skylight.color.copy(SKY).lerp(COLD, gloom);
@@ -774,17 +777,19 @@ renderer.setAnimationLoop((time) => {
     );
     stone.rotation.z = (-(door[0] - aside[0]) * t) / STONE_R;
   }
+  // (Fading as you pick it up, and in as you put it down: where it was, meanwhile.)
   const gem = items.lyingAt("emerald");
+  gemGlow += Math.sign(Number(Boolean(gem)) - gemGlow) * Math.min(Math.abs(Number(Boolean(gem)) - gemGlow), dt * 3);
+  if (gem) gem.getWorldPosition(gemAt).y += 0.1;
   const breath = reducedMotion ? 1 : 0.85 + 0.15 * Math.sin(time / 700);
-  if (gem) {
-    gem.getWorldPosition(gemAt).y += 0.1;
-    gemLight.position.copy(gemAt);
-    halo.position.copy(gemAt);
-  }
-  const kept = gem && Math.hypot(gemAt.x - chestX, gemAt.z - chestZ) < 0.8 ? 0.18 + 0.82 * lidOpen : 1;
-  gemLight.intensity = gem ? 2.2 * breath * kept : 0;
-  halo.visible = Boolean(gem);
-  halo.material.opacity = 0.6 * breath;
+  const kept = Math.hypot(gemAt.x - chestX, gemAt.z - chestZ) < 0.8 ? 0.18 + 0.82 * lidOpen : 1;
+  // (Only a glimmer in daylight: it shows in the dark.)
+  gemLight.position.copy(gemAt);
+  gemLight.intensity = gemGlow * breath * kept * (0.15 + 1.0 * dark);
+  // (The halo a little towards you, so the ground doesn't cut it off.)
+  halo.position.copy(gemAt).addScaledVector(player.camera.position.clone().sub(gemAt).normalize(), 0.15);
+  halo.visible = gemGlow > 0.01;
+  halo.material.opacity = gemGlow * breath * (0.05 + 0.3 * dark);
   if (lid) {
     const near =
       player.under?.hall === "tower" && Math.hypot(player.position.x - chestX, player.position.z - chestZ) < 2.5;
