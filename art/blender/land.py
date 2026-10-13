@@ -120,6 +120,12 @@ BRIDGE_HALF = SHORE + 0.5  # half the forest bridge's length, so it reaches the 
 BRIDGE = P["old-wall"][0], -40 * K  # where the path south from the old wall crosses
 TOWER = (P["tower"][0], P["tower"][1] + 6)  # on its knoll, north of the mossy steps
 TOWER_R = 6
+TOWER_LANDING = 5.6  # the top of its stairs, at the window onto the balcony, above its floor
+TOWER_WINDOW = (0.9, 2.6)  # the window's sill and lintel, above the landing
+# Which way the window and the balcony face (round from due east): to the
+# mountain, with the castle's spire off to the right. (A whole number of the
+# round room's sides, so its wall opens at its corners.)
+TOWER_FACING = -3 * 2 * math.pi / 32
 HUT = P["charcoal-hut"]
 # Where you step in at their doors: the tower's faces south, down the mossy
 # steps; the hut's north, to the crossroads.
@@ -318,7 +324,7 @@ HALLS = {h.place: h for h in [
     # once the land's shape is known): the charcoal burner's hut, lit by its
     # fire, and the round room in the tower, just inside its wall.
     Hall("charcoal-hut", 0, 0, 3.8, c.linear("#5e4a36"), c.linear("#6e5236"), "#ffb878", 1.2, w=3.4, d=2.4),
-    Hall("tower", 0, TOWER_R - 0.8, 6, c.linear("#8d8a80"), c.linear("#807d76"), "#ffd9a0", 3, at=TOWER, indoor=True),
+    Hall("tower", 0, TOWER_R - 0.8, 9, c.linear("#8d8a80"), c.linear("#807d76"), "#ffd9a0", 3, at=TOWER, indoor=True),
 ]}
 
 T, O, G, DM = P["trolls"], P["oak-door"], P["giant"], P["damp-tunnels"]
@@ -1025,11 +1031,46 @@ tz0, tz1 = height(*TOWER) - 0.5, height(*TOWER) - 0.5 + 20
 door_top = HALLS["tower"].floor + TUNNEL_TALL - 0.3  # under the doorway's roof (which slopes down a little), so there's no gap
 ring = [(TOWER[0] + math.cos(-math.pi / 2 + 2 * math.pi * k / SIDES) * TOWER_R,
          TOWER[1] + math.sin(-math.pi / 2 + 2 * math.pi * k / SIDES) * TOWER_R) for k in range(SIDES)]
+# High in its east side, the window onto the balcony, as wide as the room's
+# wall is open inside (its two sides either side of where it faces): its
+# stone sill, lintel and sides through the wall between.
+win0, win1 = (HALLS["tower"].floor + TOWER_LANDING + h for h in TOWER_WINDOW)
+WIN = 2 * math.pi / 32  # (round_room's sides)
+win_lo, win_hi = TOWER_FACING - WIN, TOWER_FACING + WIN
+inner_r = HALLS["tower"].r + 0.35
+
+
+def outer_at(a):
+    """The tower's outer wall at an angle (round from due east): straight between its corners."""
+    side = math.floor((a + math.pi / 2) / (2 * math.pi / SIDES))
+    middle = -math.pi / 2 + (side + 0.5) * 2 * math.pi / SIDES
+    r = TOWER_R * math.cos(math.pi / SIDES) / math.cos(a - middle)
+    return TOWER[0] + math.cos(a) * r, TOWER[1] + math.sin(a) * r
+
+
 for k in range(SIDES):
     p0, p1 = ring[k], ring[(k + 1) % SIDES]
     door = k in (0, SIDES - 1)  # the two sides either side of due south
+    shade = [c.vary(GREY, 0.06, Vector((*p0, 1.0)))] * 4
+    a0 = -math.pi / 2 + 2 * math.pi * k / SIDES
+    a1 = a0 + 2 * math.pi / SIDES
+    if a0 < win_hi and a1 > win_lo:  # (the window's in this side)
+        built.add([(*p0, tz0), (*p1, tz0), (*p1, win0), (*p0, win0)], [(0, 1, 2, 3)], shade)
+        built.add([(*p0, win1), (*p1, win1), (*p1, tz1), (*p0, tz1)], [(0, 1, 2, 3)], shade)
+        for q0, q1 in (((p0, outer_at(win_lo)),) if a0 < win_lo - 0.001 else ()) + (((outer_at(win_hi), p1),) if a1 > win_hi + 0.001 else ()):
+            built.add([(*q0, win0), (*q1, win0), (*q1, win1), (*q0, win1)], [(0, 1, 2, 3)], shade)
+        continue
     built.add([(*p0, door_top if door else tz0), (*p1, door_top if door else tz0), (*p1, tz1), (*p0, tz1)],
-              [(0, 1, 2, 3)], [c.vary(GREY, 0.06, Vector((*p0, 1.0)))] * 4)
+              [(0, 1, 2, 3)], shade)
+inside = [(TOWER[0] + math.cos(a) * inner_r, TOWER[1] + math.sin(a) * inner_r) for a in (win_lo, TOWER_FACING, win_hi)]
+outside = [outer_at(a) for a in (win_lo, TOWER_FACING, win_hi)]
+for k in range(2):
+    for z, colour in ((win0, STONE), (win1, GREY)):  # (facing up, both: see quad())
+        pts = [(*inside[k], z), (*outside[k], z), (*outside[k + 1], z), (*inside[k + 1], z)]
+        built.add(pts, [(0, 1, 2, 3)], [c.vary(colour, 0.06, Vector(pts[0]))] * 4)
+for k in (0, 2):
+    pts = [(*inside[k], win0), (*outside[k], win0), (*outside[k], win1), (*inside[k], win1)]
+    built.add(pts, [(0, 1, 2, 3)], [c.vary(GREY, 0.06, Vector(pts[0]))] * 4)
 built.add([(*p, tz1) for p in ring], [tuple(range(SIDES))], [GREY] * SIDES)
 built.cone((*TOWER, tz1), 9, TOWER_R * 1.15, ROOF, sides=SIDES, droop=0)
 solid_circle(*TOWER, TOWER_R)
@@ -1037,7 +1078,31 @@ fl = HALLS["tower"].floor
 porch(TOWER[0], TOWER[1] - TOWER_R + 0.6, TOWER_LIP[1], WAYS["tower-door"].half, GREY)
 block(built, TOWER[0] - 1.6, TOWER[1] - TOWER_R - 0.2, fl - 0.6, TOWER[0] + 1.6, TOWER[1] - TOWER_R + 0.6, fl - 0.02,
       STONE, solid=False)  # the sill under the door
-block(built, TOWER[0] + 6, TOWER[1] - 2, height(*TOWER) + 11, TOWER[0] + 8.5, TOWER[1] + 2, height(*TOWER) + 11.5, GREY, solid=False)
+
+
+def out_from_tower(u, v):
+    """A spot u out from the tower's middle, the way the balcony faces, and v across."""
+    fx, fy = math.cos(TOWER_FACING), math.sin(TOWER_FACING)
+    return TOWER[0] + fx * u - fy * v, TOWER[1] + fy * u + fx * v
+
+
+def balcony_block(u0, v0, u1, v1, z0, z1):
+    """A box, square to the way the balcony faces."""
+    corners = [out_from_tower(u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))]
+    v = [(*p, z0) for p in corners] + [(*p, z1) for p in corners]
+    shade = [c.vary(GREY, 0.1, Vector((*corners[0], z0 + k))) for k in range(8)]
+    built.add(v, [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7), (0, 3, 2, 1)], shade)
+
+
+# The balcony, out under the window: level with the landing inside, with a
+# parapet round it, on two stone brackets.
+bz = fl + TOWER_LANDING
+bu0, bu1, bv = 5.5, 8.5, 2.0
+balcony_block(bu0, -bv, bu1, bv, bz - 0.4, bz)
+for u0, v0, u1, v1 in ((bu1 - 0.25, -bv, bu1, bv), (bu0, -bv, bu1 - 0.25, -bv + 0.25), (bu0, bv - 0.25, bu1 - 0.25, bv)):
+    balcony_block(u0, v0, u1, v1, bz, bz + 0.9)
+for v in (-1.3, 1.3):
+    balcony_block(bu0, v - 0.25, 7.2, v + 0.25, bz - 1.4, bz - 0.4)
 for k in range(6):
     sy = P["mossy-steps"][1] + 18 + k * 1.4
     block(built, TOWER[0] - 2, sy, height(TOWER[0], sy) - 0.4, TOWER[0] + 2, sy + 1.4, height(TOWER[0], sy) + 0.15,
@@ -1047,12 +1112,13 @@ for k in range(6):
 # (The snake's round, in the doorway at the wall's line, so its far side is
 # in the tower, where you can't be on the land: it reaches out in front of
 # the door, and no further round the tower than you'd need to slip past it,
-# which leaves the way east to the balcony. The stone is indoors, for the way
+# which leaves the way round to the balcony, which reaches only a little past
+# its edge: you see it overhead. The stone is indoors, for the way
 # out, just inside the round room: in the doorway, you're still on the mossy
 # steps, and it would shut you in out there, past its middle.)
 obstacle(["mossy-steps north"], "circle", TOWER[0], -(TOWER[1] - TOWER_R), 0.8, reach=3.7)
 obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - TOWER_R + 1.5), 1.6, 0.5, under=True, reach=1.5)  # (so you can walk round the room)
-obstacle(["mossy-steps east"], "box", TOWER[0] + 9.5, -TOWER[1], 0.6, 2.5)
+obstacle(["mossy-steps east"], "circle", out_from_tower(9.3, 0)[0], -out_from_tower(9.3, 0)[1], 1.0, reach=1.5)
 
 # The witches, on the way west to the crossroads.
 wx, wy = P["forest-witches"]
@@ -2115,26 +2181,35 @@ def round_room(b, hall):
             quad(b, [(*p0, low), (*p1, low), (*p1, f + tall), (*p0, f + tall)], hall.wall)
             continue
         quad(b, [(*p0, f - 0.3), (*p1, f - 0.3), (*p1, f + 1.0), (*p0, f + 1.0)], band)
+        if hall.place == "tower" and k - round(TOWER_FACING / (2 * math.pi / sides)) in (-1, 0, sides - 1, sides):
+            # (The two sides either side of where it faces: the window onto the balcony.)
+            sill, lintel = (f + TOWER_LANDING + h for h in TOWER_WINDOW)
+            quad(b, [(*p0, f + 1.0), (*p1, f + 1.0), (*p1, sill), (*p0, sill)], hall.wall)
+            quad(b, [(*p0, lintel), (*p1, lintel), (*p1, f + tall), (*p0, f + tall)], hall.wall)
+            continue
         quad(b, [(*p0, f + 1.0), (*p1, f + 1.0), (*p1, f + tall), (*p0, f + tall)], hall.wall)
     b.add([(*at(k, R + E), f + tall) for k in range(sides)], [tuple(range(sides))],
           [c.mix(hall.wall, c.linear("#000000"), 0.35)] * sides)
     if hall.place == "tower":
-        # A chest against the north wall, and stone steps curling up the wall
-        # from the west towards the north, to the floor above. (Nothing in the
-        # middle: you'd stop there, in the reach of the stone that shuts you in.)
-        furniture(b, hx - 0.9, hy + R - 1.0, hx + 0.9, hy + R - 0.3, f, f + 0.7, DARK_WOOD)
-        for k in range(6):
-            a0, a1 = math.pi - k * 0.2, math.pi - (k + 1) * 0.2
+        # A chest against the west wall, south of the stairs; and stone steps
+        # curling up the wall from the west, round by the north, to a landing
+        # in the east, at the window onto the balcony. (Nothing in the middle:
+        # you'd stop there, in the reach of the stone that shuts you in.)
+        furniture(b, hx - 4.3, hy - 3.0, hx - 3.6, hy - 1.4, f, f + 0.7, DARK_WOOD)
+        n, wide, ahead = 15, 0.25, TOWER_FACING  # steps, half the landing's angle, and its middle
+        rise = TOWER_LANDING / (n + 1)
+        turn = (math.pi - wide - ahead) / n
+        flights = [(math.pi - k * turn, math.pi - (k + 1) * turn, f + rise * (k + 1)) for k in range(n)]
+        flights += [(ahead + wide, ahead, f + TOWER_LANDING), (ahead, ahead - wide, f + TOWER_LANDING)]  # (in two, to follow the wall)
+        for a0, a1, top in flights:
             inner, outer = R - 1.1, R + E + 0.2  # (into the wall, which is straight between its corners)
             pts = [(hx + math.cos(a) * r, hy + math.sin(a) * r) for a, r in ((a0, inner), (a1, inner), (a1, outer), (a0, outer))]
-            top = f + 0.35 * (k + 1)
             quad(b, [(*p, top) for p in pts], STONE, 0.08)
             quad(b, [(*pts[0], f), (*pts[1], f), (*pts[1], top), (*pts[0], top)], STONE, 0.08)
             quad(b, [(*pts[1], f), (*pts[2], f), (*pts[2], top), (*pts[1], top)], STONE, 0.08)
             quad(b, [(*pts[3], f), (*pts[0], f), (*pts[0], top), (*pts[3], top)], STONE, 0.08)  # up from the step below
-            mid = (a0 + a1) / 2
-            under_circle(hx + math.cos(mid) * (R - 0.5), hy + math.sin(mid) * (R - 0.5), 0.6, top=top)
-
+            for a in ((3 * a0 + a1) / 4, (a0 + 3 * a1) / 4):  # (two, or near its inner edge you'd fall through)
+                under_circle(hx + math.cos(a) * (R - 0.5), hy + math.sin(a) * (R - 0.5), 0.6, top=top)
 
 for hall in HALLS.values():
     if hall.room:
