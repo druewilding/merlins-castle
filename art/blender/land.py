@@ -149,11 +149,17 @@ def polygon_at(a, r, sides, start):
     return TOWER[0] + math.cos(a) * d, TOWER[1] + math.sin(a) * d
 
 
-def wall_pieces(p0, p1, a0, a1, low, high, floor, at):
+def tower_door():
+    """The doorway through the round room's wall, as a window (no wider than
+    the doorway: wider, you'd see the doorway's thick sides past it)."""
+    return -math.pi / 2, math.asin((WAYS["tower-door"].half + 0.02) / (HALLS["tower"].r + 0.35)), -0.3, TUNNEL_TALL - 0.3
+
+
+def wall_pieces(p0, p1, a0, a1, low, high, floor, at, openings=TOWER_WINDOWS):
     """A side of the tower's wall, from p0 (at angle a0) to p1 (a1), low to
     high: in pieces round a window in it, if there is one (at: the point on
     the wall at an angle)."""
-    for a, half, z0, z1 in TOWER_WINDOWS:
+    for a, half, z0, z1 in openings:
         for turn in (-2 * math.pi, 0, 2 * math.pi):
             lo, hi = a + turn - half, a + turn + half
             if a0 < hi and a1 > lo:
@@ -364,9 +370,10 @@ HALLS = {h.place: h for h in [
     # Out in the land, on the ground where they stand (their floors are set
     # once the land's shape is known): the charcoal burner's hut, lit by its
     # fire, and the round room in the tower, just inside its wall (dark and
-    # musty, lit only by what comes in: round_room).
+    # musty, lit only by what comes in: round_room; its floor and wall the
+    # mortar between its stones, tower_stones).
     Hall("charcoal-hut", 0, 0, 3.8, c.linear("#5e4a36"), c.linear("#6e5236"), "#ffb878", 1.2, w=3.4, d=2.4),
-    Hall("tower", 0, TOWER_R - 0.8, 9, c.linear("#8d8a80"), c.linear("#807d76"), at=TOWER, indoor=True, dark=True),
+    Hall("tower", 0, TOWER_R - 0.8, 9, c.linear("#2c2a26"), c.linear("#34312c"), at=TOWER, indoor=True, dark=True),
 ]}
 
 T, O, G, DM = P["trolls"], P["oak-door"], P["giant"], P["damp-tunnels"]
@@ -1099,7 +1106,7 @@ built.add([(*p, tz1) for p in ring], [tuple(range(SIDES))], [GREY] * SIDES)
 built.cone((*TOWER, tz1), 9, TOWER_R * 1.15, ROOF, sides=SIDES, droop=0)
 solid_circle(*TOWER, TOWER_R)
 fl = HALLS["tower"].floor
-porch(TOWER[0], TOWER[1] - TOWER_R + 0.6, TOWER_LIP[1], WAYS["tower-door"].half, GREY)
+porch(TOWER[0], TOWER[1] - HALLS["tower"].r - 0.37, TOWER_LIP[1], WAYS["tower-door"].half, GREY)  # (from the round room's wall)
 block(built, TOWER[0] - 1.6, TOWER[1] - TOWER_R - 0.2, fl - 0.6, TOWER[0] + 1.6, TOWER[1] - TOWER_R + 0.6, fl - 0.02,
       STONE, solid=False)  # the sill under the door
 
@@ -1956,6 +1963,8 @@ for hall in HALLS.values():
 # darker band at the bottom and doorways where the corridors come in, a
 # beamed ceiling, and what's in each room.
 rooms = c.Builder()
+# (The tower's inside, its own object: the game keeps it dark, seen from outside.)
+tower_inside = c.Builder()
 WOOD = c.linear("#6b4a2c")
 DARK_WOOD = c.linear("#4a3220")
 RED = c.linear("#9e2b25")
@@ -2198,6 +2207,208 @@ def room(b, hall):
             under_circle(px, hy - D + 0.8, 0.45)
 
 
+# The tower's stonework, in front of its floor and wall (which are the dark
+# mortar between): the wall in courses of blocks, each its own shade, damp
+# and mossy near the floor; big uneven flagstones; moss and rubble at the
+# foot of the wall, and heaped at the foot of the stairs. And cobwebs (their
+# own object, which the game makes see-through), in the doorway's top
+# corners, the narrow windows' and under the stairs.
+TOWER_BLOCK, TOWER_FLAG = c.linear("#6e6a62"), c.linear("#615d55")
+DAMP, MOSS, WEB = c.linear("#3f4434"), c.linear("#4a5a2c"), c.linear("#d8d8d4")
+COURSE, JOINT = (0.34, 0.48), 0.035  # how tall a course of blocks is, and the mortar between
+webs = c.Builder()
+
+
+def tower_stones(b, hall, sides):
+    rnd = random.Random("tower stones")  # (its own: a change anywhere else doesn't move them)
+    hx, hy, f, R, tall = hall.x, hall.y, hall.floor, hall.r, hall.tall
+    wall_r = R + 0.35  # (round_room's wall)
+    corners = [2 * math.pi * k / sides for k in range(2 * sides + 1)]
+
+    def on_wall(a0, a1, z0, z1, colour):
+        """A block's face on the wall, between two angles, in front of the
+        mortar: split at the wall's corners, so it lies flat on it."""
+        cuts = [a0] + [k for k in corners if a0 < k < a1] + [a1]
+        for b0, b1 in zip(cuts, cuts[1:]):
+            p0, p1 = polygon_at(b0, wall_r - 0.03, sides, 0), polygon_at(b1, wall_r - 0.03, sides, 0)
+            quad(b, [(*p0, z0), (*p1, z0), (*p1, z1), (*p0, z1)], colour, 0.05)
+
+    # Where the wall's open: the doorway, and the windows (once round, and
+    # again past the start, where the courses end).
+    holes = []
+    for a, half, z0, z1 in [tower_door()] + TOWER_WINDOWS:
+        holes.append(((a - half) % (2 * math.pi), (a - half) % (2 * math.pi) + 2 * half, f + z0, f + z1))
+    holes += [(lo + 2 * math.pi, hi + 2 * math.pi, h0, h1) for lo, hi, h0, h1 in holes]
+
+    def clear(rect):
+        """The parts of a block (a0, a1, z0, z1) clear of the openings."""
+        out = [rect]
+        for lo, hi, h0, h1 in holes:
+            left = []
+            for a0, a1, z0, z1 in out:
+                if a1 <= lo or a0 >= hi or z1 <= h0 or z0 >= h1:
+                    left.append((a0, a1, z0, z1))
+                    continue
+                left += [(a0, a1, z0, h0)] if z0 < h0 else []
+                left += [(a0, a1, h1, z1)] if z1 > h1 else []
+                zl, zh = max(z0, h0), min(z1, h1)
+                left += [(a0, lo, zl, zh)] if a0 < lo else []
+                left += [(hi, a1, zl, zh)] if a1 > hi else []
+            out = left
+        return out
+
+    def stone(base, z):
+        """A stone's colour: its own shade, damp and sometimes mossy low down."""
+        t = rnd.uniform(-0.2, 0.35)
+        colour = c.mix(base, c.linear("#000000"), t) if t > 0 else c.mix(base, c.linear("#a8a398"), -t)
+        low = max(0.0, 1 - (z - f) / 1.4)
+        if rnd.random() < low * 0.8:
+            colour = c.mix(colour, DAMP, rnd.uniform(0.3, 0.7))
+        if rnd.random() < low * 0.35:
+            colour = c.mix(colour, MOSS, rnd.uniform(0.3, 0.6))
+        return colour
+
+    # The wall: course on course, each block a little longer or shorter, the
+    # joints between them never in line with the course's below.
+    z = f
+    while z < f + tall - 0.05:
+        h = min(rnd.uniform(*COURSE), f + tall - z)
+        start = a = rnd.uniform(0.2, 0.7) / wall_r
+        while a < start + 2 * math.pi - 0.3 / wall_r:
+            a1 = min(a + rnd.uniform(0.55, 1.15) / wall_r, start + 2 * math.pi)
+            colour = stone(TOWER_BLOCK, z)
+            for a0_, a1_, z0_, z1_ in clear((a + JOINT / wall_r / 2, a1 - JOINT / wall_r / 2, z + JOINT / 2, z + h - JOINT / 2)):
+                if (a1_ - a0_) * wall_r > 0.04 and z1_ - z0_ > 0.04:
+                    on_wall(a0_, a1_, z0_, z1_, colour)
+            a = a1
+        z += h
+
+    # The floor: flagstones on a jittered grid, some of them two together,
+    # cut at the outer wall (it reaches out under the doorway).
+    cell, out = 0.95, TOWER_R * math.cos(math.pi / SIDES) - 0.02
+    n = int(out / cell) + 2
+    grid = {(i, j): (hx + i * cell + rnd.uniform(-0.27, 0.27) * cell, hy + j * cell + rnd.uniform(-0.27, 0.27) * cell)
+            for i in range(-n, n + 2) for j in range(-n, n + 2)}
+    taken = set()
+    for i in range(-n, n):
+        for j in range(-n, n):
+            if (i, j) in taken:
+                continue
+            ring_ = [(i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1)]
+            if rnd.random() < 0.25 and (i + 1, j) not in taken:
+                ring_ = [(i, j), (i + 1, j), (i + 2, j), (i + 2, j + 1), (i + 1, j + 1), (i, j + 1)]
+                taken.add((i + 1, j))
+            elif rnd.random() < 0.25 and (i, j + 1) not in taken:
+                ring_ = [(i, j), (i + 1, j), (i + 1, j + 1), (i + 1, j + 2), (i, j + 2), (i, j + 1)]
+                taken.add((i, j + 1))
+            pts = [grid[k] for k in ring_]
+            mx, my = sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)
+            if math.hypot(mx - hx, my - hy) > out + 0.3:
+                continue
+            # (In to the outer wall; and in from the joints all round.)
+            pts = [(hx + (x - hx) * min(1, out / (math.hypot(x - hx, y - hy) or 1)),
+                    hy + (y - hy) * min(1, out / (math.hypot(x - hx, y - hy) or 1))) for x, y in pts]
+            pts = [(x + (mx - x) * JOINT / (math.hypot(mx - x, my - y) or 1), y + (my - y) * JOINT / (math.hypot(mx - x, my - y) or 1))
+                   for x, y in pts]
+            colour = stone(TOWER_FLAG, f + 0.4)
+            if math.hypot(mx - hx, my - hy) > R - 1.0 and rnd.random() < 0.45:
+                colour = c.mix(colour, MOSS, rnd.uniform(0.25, 0.55))
+            b.add([(x, y, f - 0.045) for x, y in pts], [tuple(range(len(pts)))], [c.vary(colour, 0.05, Vector((x, y, 3.0))) for x, y in pts])
+
+    # Moss and rubble at the foot of the wall (not in the doorway, nor by the
+    # chest, under the stairs at the back), and a heap at the foot of the stairs.
+    def free(a):
+        a %= 2 * math.pi
+        return not (holes[0][0] - 0.3 < a < holes[0][1] + 0.3) and abs(a - math.pi / 2) > 0.25
+
+    for k in range(26):
+        a = rnd.uniform(0, 2 * math.pi)
+        if free(a):
+            x, y = hx + math.cos(a) * (wall_r - 0.25), hy + math.sin(a) * (wall_r - 0.25)
+            b.blob((x, y, f - 0.03), rnd.uniform(0.2, 0.4), c.mix(MOSS, DAMP, rnd.random() * 0.5), squash=0.18, lumpy=0.4,
+                   seed=200 + k, subdivisions=1)
+    spots = [(rnd.uniform(0, 2 * math.pi), rnd.uniform(0.1, 0.5), rnd.uniform(0.05, 0.16)) for _ in range(60)]
+    spots += [(math.pi + rnd.uniform(0.05, 0.45), rnd.uniform(0.15, 0.9), rnd.uniform(0.07, 0.24)) for _ in range(16)]
+    for k, (a, inwards, size) in enumerate(spots):
+        if free(a):
+            x, y = hx + math.cos(a) * (wall_r - inwards), hy + math.sin(a) * (wall_r - inwards)
+            b.blob((x, y, f - 0.02 + size * 0.3), size, stone(TOWER_BLOCK, f + 0.5), squash=0.65, lumpy=0.35,
+                   seed=300 + k, subdivisions=1)
+
+    # The doorway's sides, inside: stone too, on its mortar.
+    def flat_wall(x, y0, y1, z0, z1):
+        """Blocks on a flat wall facing across the doorway, at x, from y0 to y1."""
+        quad(b, [(x, y0, z0), (x, y1, z0), (x, y1, z1), (x, y0, z1)], hall.wall, 0.04)
+        x -= math.copysign(0.02, x - hx)
+        z = z0
+        while z < z1 - 0.05:
+            h = min(rnd.uniform(*COURSE), z1 - z)
+            y = y0 + rnd.uniform(0.2, 0.7)
+            ends = [y0]
+            while y < y1:
+                ends.append(y)
+                y += rnd.uniform(0.55, 1.15)
+            ends.append(y1)
+            colour = None
+            for e0, e1 in zip(ends, ends[1:]):
+                if e1 - e0 > 0.1:
+                    colour = stone(TOWER_BLOCK, z)
+                    quad(b, [(x, e0 + JOINT / 2, z + JOINT / 2), (x, e1 - JOINT / 2, z + JOINT / 2),
+                             (x, e1 - JOINT / 2, z + h - JOINT / 2), (x, e0 + JOINT / 2, z + h - JOINT / 2)], colour, 0.05)
+            z += h
+
+    for side in (-1, 1):
+        flat_wall(hx + side * (WAYS["tower-door"].half + 0.01), TOWER_LIP[1], hy - wall_r, f - 0.6, f + TUNNEL_TALL)
+
+    # Cobwebs: in the top corners of the doorway, just in from the room
+    # (you see them against the stone, looking back)...
+    for side in (-1, 1):
+        cobweb((hx + side * (WAYS["tower-door"].half - 0.03), hy - wall_r - 0.35, f + TUNNEL_TALL - 0.02),
+               (0, 0, -1), (-side, 0, 0), 0.75, f"door {side}")
+    # ...in a top corner of each narrow window, against the light...
+    for k, (a, half, z0, z1) in enumerate(TOWER_WINDOWS[1:]):
+        side = 1 if k == 0 else -1
+        x, y = polygon_at(a - side * (half - 0.01), wall_r - 0.05, sides, 0)
+        cobweb((x, y, f + z1 - 0.01), (0, 0, -1), (-math.sin(a) * side, math.cos(a) * side, 0), 0.22, f"window {k}")
+    # ...and under a few of the stairs' slabs, strung along the corner where
+    # the slab meets the wall, facing into the room (the first over the chest).
+    turn = (math.pi - 0.25 - TOWER_FACING) / 15
+    for k in (6, 9, 12):
+        a = math.pi - (k + 0.85) * turn
+        x, y = polygon_at(a, wall_r - 0.04, sides, 0)
+        inward = Vector((-math.cos(a), -math.sin(a), 0))
+        cobweb((x, y, f + TOWER_LANDING / 16 * (k + 1) - 0.15), (math.sin(a), -math.cos(a), 0),
+               Vector((0, 0, -1)) + inward * 0.7, 0.7, f"stair {k}")
+
+
+def cobweb(corner, e1, e2, size, seed):
+    """A cobweb across a corner: threads out from it, between its two edges
+    (e1, e2: which way they go from it), and rings of thread across them,
+    sagging a little towards it."""
+    rnd = random.Random(seed)
+    corner, e1, e2 = Vector(corner), Vector(e1).normalized(), Vector(e2).normalized()
+    normal = e1.cross(e2).normalized()
+
+    def thread(p, q):
+        w = normal.cross((q - p).normalized()) * 0.006
+        webs.add([tuple(p - w), tuple(q - w), tuple(q + w), tuple(p + w)], [(0, 1, 2, 3)], [WEB] * 4)
+
+    spokes = 7
+    ends = []
+    for k in range(spokes):
+        t = k / (spokes - 1) * math.pi / 2
+        ends.append((e1 * math.cos(t) + e2 * math.sin(t)) * size * rnd.uniform(0.7, 1.0))
+        thread(corner, corner + ends[-1])
+    for ring_ in range(1, 6):
+        out = ring_ / 5.6 * rnd.uniform(0.9, 1.05)
+        pts = [corner + e * out for e in ends]
+        for p, q in zip(pts, pts[1:]):
+            m = (p + q) / 2
+            m = m + (corner - m) * 0.1
+            thread(p, m)
+            thread(m, q)
+
+
 def round_room(b, hall):
     """A round room: a floor of flagstones in rings, out under the wall;
     the wall, with a doorway where a way comes in; and a flat ceiling."""
@@ -2218,6 +2429,13 @@ def round_room(b, hall):
     for k in range(sides):
         p0, p1 = at(k, R + E), at(k + 1, R + E)
         mx, my = at(k + 0.5, R + E + 0.6)
+        if hall.place == "tower":
+            # (Its doorway, and its windows: just as wide as they are.)
+            a0 = 2 * math.pi * k / sides
+            for piece in wall_pieces(p0, p1, a0, a0 + 2 * math.pi / sides, f - 0.3, f + tall, f,
+                                     lambda a: polygon_at(a, R + E, sides, 0), TOWER_WINDOWS + [tower_door()]):
+                quad(b, piece, hall.wall)
+            continue
         if opening(hall, mx, my):
             # (Down a little over the door frame, which is straight where the
             # wall curves, and the doorway's roof, which slopes down outward.)
@@ -2225,16 +2443,11 @@ def round_room(b, hall):
             quad(b, [(*p0, low), (*p1, low), (*p1, f + tall), (*p0, f + tall)], hall.wall)
             continue
         quad(b, [(*p0, f - 0.3), (*p1, f - 0.3), (*p1, f + 1.0), (*p0, f + 1.0)], band)
-        if hall.place == "tower":
-            a0 = 2 * math.pi * k / sides
-            for piece in wall_pieces(p0, p1, a0, a0 + 2 * math.pi / sides, f + 1.0, f + tall, f,
-                                     lambda a: polygon_at(a, R + E, sides, 0)):
-                quad(b, piece, hall.wall)
-            continue
         quad(b, [(*p0, f + 1.0), (*p1, f + 1.0), (*p1, f + tall), (*p0, f + tall)], hall.wall)
     b.add([(*at(k, R + E), f + tall) for k in range(sides)], [tuple(range(sides))],
           [c.mix(hall.wall, c.linear("#000000"), 0.35)] * sides)
     if hall.place == "tower":
+        tower_stones(b, hall, sides)
         # No light of its own: what comes in at its windows (cold daylight,
         # most at the big one), and warm through the cracks round the stone
         # across the doorway, on the floor just inside it. And the shafts of
@@ -2293,7 +2506,7 @@ for hall in HALLS.values():
     if hall.room:
         room(rooms, hall)
     elif hall.indoor:
-        round_room(rooms, hall)
+        round_room(tower_inside if hall.place == "tower" else rooms, hall)
 
 # The castle's guards and doors, in its corridors.
 gh, wk, du, ml = HALLS["grand-hall"], HALLS["wizards-kitchen"], HALLS["dungeon"], HALLS["merlins-lair"]
@@ -2312,6 +2525,8 @@ lx_, ly_ = ml.x + ml.w + 0.6, SR[1]
 block(rooms, lx_ - 0.15, ly_ - TUNNEL_HALF, ml.floor, lx_ + 0.15, ly_ + TUNNEL_HALF, ml.floor + TUNNEL_TALL, OAK, solid=False)
 obstacle(["merlins-lair east"], "box", lx_, -ly_, 0.5, TUNNEL_HALF + 0.3, under=True)
 rooms.build("rooms", smooth=False)
+webs.build("cobwebs", smooth=False)
+tower_inside.build("tower-inside", smooth=False)
 
 # Doors and things that block the ways (until the game opens them).
 t_edge = T[1] + HALLS["trolls"].r + 1.5

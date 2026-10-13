@@ -11,6 +11,7 @@ import {
   Color,
   CylinderGeometry,
   DirectionalLight,
+  DoubleSide,
   Fog,
   HemisphereLight,
   Mesh,
@@ -131,6 +132,23 @@ const [model, file, things, snaky] = await Promise.all([
   loader.loadAsync(snakeModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
+// The tower's inside, its own material: dark seen from outside, as it is
+// once you're in (in there, the sky's light is dim: lightFor).
+const towerInside = model.scene.getObjectByName("tower-inside");
+const insideLook = towerInside instanceof Mesh ? (towerInside.material = towerInside.material.clone()) : undefined;
+// The tower's cobwebs: faint, and see-through (not lit: pale threads, even in the dark).
+const cobwebs = model.scene.getObjectByName("cobwebs");
+if (cobwebs instanceof Mesh) {
+  cobwebs.material = new MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.3,
+    side: DoubleSide,
+    depthWrite: false,
+  });
+  cobwebs.castShadow = false;
+  cobwebs.receiveShadow = false;
+}
 // The emerald, glassy: a little room's lights caught in its facets (its own,
 // not the scene's), and a glow from within, so it shines even in the tower.
 const emerald = things.scene.getObjectByName("emerald");
@@ -702,6 +720,7 @@ function lightFor(depth: number, time: number, dt: number) {
   fog.near = (40 - 38 * under) * (1 - murk) + 1.5 * murk;
   fog.far = (320 - 290 * under + 40 * caveLit) * (1 - murk) + 22 * murk;
   shafts?.update(dt, gloom, player.camera.position);
+  insideLook?.color.setScalar(0.25 + 0.75 * gloom);
 }
 
 const timer = new Timer();
