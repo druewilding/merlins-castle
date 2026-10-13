@@ -441,7 +441,7 @@ if (debugMode) {
 
 overlay.innerHTML = `
   <h1>Merlin's Castle</h1>
-  <p class="start">Click to walk</p>
+  <button type="button" class="play">${handoff ? T.continue : T.play}</button>
   <p class="keys">Mouse to look · WASD to walk · Shift to run · Space to jump · C to crouch · E to take or use · 1–5 to choose · G to drop · Esc to stop</p>
   <p class="keys touch">Left thumb to walk · right thumb to look</p>`;
 overlay.hidden = Boolean(at);
@@ -552,13 +552,18 @@ function load(slot: { name: string; state: GameState; three?: ThreeSave }) {
 }
 
 function resume() {
+  // Once you've walked (or loaded), the way back in carries on the game.
+  overlay.querySelector(".play")!.textContent = T.continue;
   // (If the browser won't take the mouse after all, the menu's back, to click.)
   Promise.resolve(renderer.domElement.requestPointerLock?.()).catch(() => (overlay.hidden = false));
   overlay.hidden = true;
   panel.hidden = true;
 }
 overlay.addEventListener("click", resume);
-overlay.addEventListener("touchend", () => (overlay.hidden = true));
+overlay.addEventListener("touchend", () => {
+  overlay.querySelector(".play")!.textContent = T.continue;
+  overlay.hidden = true;
+});
 // With the debug panel open, clicking the world looks around again.
 renderer.domElement.addEventListener("click", () => {
   if (document.body.classList.contains("debugging")) void renderer.domElement.requestPointerLock?.();
