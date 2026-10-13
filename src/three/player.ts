@@ -12,6 +12,8 @@ export interface Circle {
   names?: string[];
   /** How far before an obstacle in your way you bump into it. */
   ahead?: number;
+  /** No far side to have come from (a way that kills you): it stops you all round. */
+  allRound?: boolean;
   /** The height of its top, if it's low enough to climb onto. */
   top?: number;
 }
@@ -24,6 +26,8 @@ export interface Box {
   names?: string[];
   /** All round it (rounded at its corners): you're this near it, at most, before you bump into it. */
   ahead?: number;
+  /** No far side to have come from (a way that kills you): it stops you all round. */
+  allRound?: boolean;
   top?: number;
 }
 
@@ -386,7 +390,7 @@ export class Player {
     const { x, z } = this.position;
     const near = (this.under ? this.nearUnder : this.near).get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
     for (const thing of [...(near?.circles ?? []), ...(near?.boxes ?? [])]) {
-      if (thing.names && touching(thing, x, z, BODY)) this.passing.add(thing);
+      if (thing.names && !thing.allRound && touching(thing, x, z, BODY)) this.passing.add(thing);
     }
   }
 
@@ -622,7 +626,9 @@ export class Player {
   private blocking(thing: Circle | Box, within: boolean, cameOut: boolean): string | null {
     if (!thing.names) return "";
     if (!this.passing.has(thing) && !(cameOut && within)) {
-      const exit = wayThrough(thing.names, thing.x, thing.z, this.position.x, this.position.z);
+      const exit = thing.allRound
+        ? thing.names[0]
+        : wayThrough(thing.names, thing.x, thing.z, this.position.x, this.position.z);
       if (exit) return exit;
     }
     if (within) this.passing.add(thing);
