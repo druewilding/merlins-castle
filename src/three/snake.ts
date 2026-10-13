@@ -35,7 +35,7 @@ const COIL = 0.5; // the radius of its coil, round the outside
 const NEAR = 7.5; // metres: this near, it rears up and hisses
 const NECK = 0.6; // metres of its neck that curve up to its head, lifted off the ground
 const FAR = 80; // metres: further off than this, it's left as it is
-const SPEED = 1.9; // metres a second, slithering away
+const SPEED = 3.4; // metres a second, slithering away
 const APPLE = 0.65; // the apple's size in its jaws, for the one you carry (made big, to see in the grass)
 
 type Point = { at: Vector3; grounded: number }; // grounded: 1 lying on the ground, 0 up in the air
@@ -266,14 +266,14 @@ export class Snake {
       return;
     }
     this.caught = true;
-    // Caught: its jaws close on it, it draws back, lowers its head to the
-    // ground, and it's off.
+    // Caught: its jaws close on it, it draws back and down to the ground,
+    // and it's straight off (quickly: the way's free).
     this.down ??= this.lowered();
-    const back = smooth((t - T - 0.15) / 0.5);
-    const lower = smooth((t - T - 0.75) / 0.9);
+    const back = smooth((t - T - 0.05) / 0.3);
+    const lower = smooth((t - T - 0.1) / 0.4);
     const pose = this.blend(this.blend(lunge, hiss, back), this.down, lower);
     this.pose(pose, 1.1 - 0.75 * smooth((t - T) / 0.12), 0);
-    if (t > T + 1.75) this.slither();
+    if (t > T + 0.5) this.slither();
   }
 
   /** Off it goes, along its own body and then away west, down into the trees. */

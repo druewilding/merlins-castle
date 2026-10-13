@@ -1026,10 +1026,11 @@ for k in range(6):
 # The snake, coiled at the top of the steps (and the stone that shuts you in,
 # from inside), and the balcony, too high to reach from the ground under it.
 # (The snake reaches out from just inside the wall, so its far side is in the
-# tower, where you can't be on the land; the stone is in the doorway, so
-# indoors, for the way out.)
+# tower, where you can't be on the land; the stone is indoors, for the way
+# out, just inside the round room: in the doorway, you're still on the mossy
+# steps, and it would shut you in out there, past its middle.)
 obstacle(["mossy-steps north"], "box", TOWER[0], -(TOWER[1] - TOWER_R + 1), 3.0, 0.8)
-obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - TOWER_R - 0.6), 1.6, 0.5, under=True)
+obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - TOWER_R + 1.5), 1.6, 0.5, under=True)
 obstacle(["mossy-steps east"], "box", TOWER[0] + 9.5, -TOWER[1], 0.6, 2.5)
 
 # The witches, on the way west to the crossroads.
