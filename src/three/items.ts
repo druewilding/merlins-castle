@@ -57,11 +57,18 @@ export interface Path {
   lift: number;
 }
 
-/** The ground, or the top of a path lying on it. */
-export function onPaths(ground: Ground, paths: Path[]): Ground {
+/** A step on the land (land.json): [x, z, half x, half z, top]. */
+export type Step = number[];
+
+/** The ground, or the top of a path lying on it (or of a step). */
+export function onPaths(ground: Ground, paths: Path[], steps: Step[] = []): Ground {
   return (x, z) => {
     const g = ground(x, z);
     if (g === undefined) return undefined;
+    let top = -Infinity;
+    for (const [sx, sz, halfX, halfZ, high] of steps) {
+      if (Math.abs(x - sx) <= halfX && Math.abs(z - sz) <= halfZ) top = Math.max(top, high);
+    }
     let lift = 0;
     for (const path of paths) {
       for (let k = 0; k < path.points.length - 1; k++) {
@@ -74,7 +81,7 @@ export function onPaths(ground: Ground, paths: Path[]): Ground {
         if (Math.hypot(x - ax - t * (bx - ax), z - az - t * (bz - az)) <= path.half) lift = Math.max(lift, path.lift);
       }
     }
-    return g + lift;
+    return Math.max(g + lift, top);
   };
 }
 
@@ -146,8 +153,9 @@ export function items(options: {
   models: Object3D;
   ground: Ground;
   walkable: Walkable;
-  /** The paths, a little above the ground (land.json): what lies on one lies on top of it. */
+  /** The paths, a little above the ground (land.json): what lies on one lies on top of it. And the steps. */
   paths: Path[];
+  steps: Step[];
   root: HTMLElement;
   /** Words at the bottom of the screen ("Nothing happens."). */
   say: (words: string) => void;
@@ -232,7 +240,7 @@ export function items(options: {
   }
 
   /** The ground, or the top of a path lying on it. */
-  const surface = onPaths(ground, options.paths);
+  const surface = onPaths(ground, options.paths, options.steps);
 
   /** The line an object rests on, along its length: the ground's upper hull, under its middle. */
   function resting(x: number, z: number, yaw: number, half: number, wide: number) {

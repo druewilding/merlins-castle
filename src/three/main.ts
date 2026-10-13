@@ -269,7 +269,7 @@ const snake = new Snake(
   scene,
   snaky.scene,
   things.scene.getObjectByName("apple")!,
-  onPaths(ground, land.paths),
+  onPaths(ground, land.paths, land.steps),
   (guarded!.circle ?? guarded!.box)!,
   reducedMotion
 );
@@ -400,6 +400,7 @@ const items = setUpItems({
   ground,
   walkable,
   paths: land.paths,
+  steps: land.steps,
   root,
   say,
   changed: inUse,

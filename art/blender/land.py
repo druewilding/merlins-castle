@@ -1127,10 +1127,13 @@ for u0, v0, u1, v1 in ((bu1 - 0.25, -bv, bu1, bv), (bu0, -bv, bu1 - 0.25, -bv + 
     balcony_block(u0, v0, u1, v1, bz, bz + 0.9)
 for v in (-1.3, 1.3):
     balcony_block(bu0, v - 0.25, 7.2, v + 0.25, bz - 1.4, bz - 0.4)
+# The mossy steps: what slithers or lies on them is on top of them (STEPS).
+STEPS = []
 for k in range(6):
     sy = P["mossy-steps"][1] + 18 + k * 1.4
     block(built, TOWER[0] - 2, sy, height(TOWER[0], sy) - 0.4, TOWER[0] + 2, sy + 1.4, height(TOWER[0], sy) + 0.15,
           c.linear("#7f8f6a"), solid=False)
+    STEPS.append([TOWER[0], round(-(sy + 0.7), 2), 2, 0.7, round(height(TOWER[0], sy) + 0.15, 2)])
 # The snake, coiled at the top of the steps (and the stone that shuts you in,
 # from inside), and the balcony, too high to reach from the ground under it.
 # (The snake's round, in the doorway at the wall's line, so its far side is
@@ -2386,6 +2389,8 @@ if out:
         "circles": circles,
         "boxes": boxes,
         "trees": tree_spots,
+        # Steps on the land, for lying on: [x, z, half x, half z, top].
+        "steps": STEPS,
         # The paths, lying a little above the ground (so what's dropped on
         # one lies on it, not in it): each its line [x, z], in three.js's
         # axes, how far either side of it it goes, and how far up it is.
