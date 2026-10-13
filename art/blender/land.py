@@ -998,6 +998,22 @@ while y < 118 * K:
     block(built, WW - 0.6, y, height(WW, y) - 0.5, WW + 0.6, y + 2, height(WW, y) + WALL, STONE)
     y += 2
 
+def porch(x, y_wall, y_lip, half, colour):
+    """Where a building's doorway sticks out of its wall (to the lip, where
+    you step in): its walls and roof are only its inside, seen from in it;
+    from outside, they're a thick stone shell round it, solid, so you can't
+    walk into them and look through."""
+    y0, y1 = sorted((y_wall, y_lip))
+    thick = 0.45
+    way = next(w for w in WAYS.values() if w.indoor and math.hypot(w.points[0][0] - x, w.points[0][1] - y_lip) < 0.1)
+    roof = max(p[2] for p in way.points) + TUNNEL_TALL + 0.02
+    top = roof + 0.35
+    low = min(height(x + dx, y) for dx in (-half - thick, half + thick) for y in (y0, y1)) - 0.4
+    for x0, x1 in ((x - half - 0.02 - thick, x - half - 0.02), (x + half + 0.02, x + half + 0.02 + thick)):
+        block(built, x0, y0, low, x1, y1, top, colour)
+    block(built, x - half - 0.02 - thick, y0, roof, x + half + 0.02 + thick, y1, top, colour, solid=False)
+
+
 # The tower on its knoll, with the balcony high on its east side, and the
 # mossy steps up to it.
 # Its round wall, with a door in the south side (the doorway's own walls and
@@ -1016,6 +1032,7 @@ built.add([(*p, tz1) for p in ring], [tuple(range(SIDES))], [GREY] * SIDES)
 built.cone((*TOWER, tz1), 9, TOWER_R * 1.15, ROOF, sides=SIDES, droop=0)
 solid_circle(*TOWER, TOWER_R)
 fl = HALLS["tower"].floor
+porch(TOWER[0], TOWER[1] - TOWER_R + 0.6, TOWER_LIP[1], WAYS["tower-door"].half, GREY)
 block(built, TOWER[0] - 1.6, TOWER[1] - TOWER_R - 0.2, fl - 0.6, TOWER[0] + 1.6, TOWER[1] - TOWER_R + 0.6, fl - 0.02,
       STONE, solid=False)  # the sill under the door
 block(built, TOWER[0] + 6, TOWER[1] - 2, height(*TOWER) + 11, TOWER[0] + 8.5, TOWER[1] + 2, height(*TOWER) + 11.5, GREY, solid=False)
@@ -1050,6 +1067,7 @@ block(built, hx + gap, hy + 2.5, hz0, hx + 4, hy + 3, hz1, HUT_WALL, solid=False
 block(built, hx - gap, hy + 2.5, HALLS["charcoal-hut"].floor + TUNNEL_TALL - 0.3, hx + gap, hy + 3, hz1, HUT_WALL,
       solid=False)  # over the door, down to the doorway's roof
 built.cone((hx, hy, hz1), 3, 5.5, c.linear("#5d4630"), sides=4, droop=0)
+porch(hx, hy + 2.7, HUT_LIP[1], WAYS["hut-door"].half, HUT_WALL)
 # A sill under the door, where the doorway's floor meets the room's (over
 # the hole in the ground the hut stands in).
 fl = HALLS["charcoal-hut"].floor
