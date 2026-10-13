@@ -33,6 +33,7 @@ const STEP = 0.03; // metres between the points along its spine
 const PITCH = 0.2; // metres from one turn of its coil to the next
 const COIL = 0.5; // the radius of its coil, round the outside
 const NEAR = 7.5; // metres: this near, it rears up and hisses
+const NECK = 0.6; // metres of its neck that curve up to its head, lifted off the ground
 const FAR = 80; // metres: further off than this, it's left as it is
 const SPEED = 1.9; // metres a second, slithering away
 const APPLE = 0.65; // the apple's size in its jaws, for the one you carry (made big, to see in the grass)
@@ -94,7 +95,7 @@ export class Snake {
     scene: Scene,
     model: Object3D,
     appleModel: Object3D,
-    private ground: Ground,
+    private ground: Ground, // (or the top of a path on it)
     box: number[], // the obstacle in front of the door ([x, z, halfX, halfZ])
     private reducedMotion: boolean
   ) {
@@ -235,7 +236,7 @@ export class Snake {
       const hiss = this.hissing(eye);
       // Its mouth opens as it rears; its tongue flickers now and then, and
       // fast, hissing.
-      const jaw = a * (0.5 + 0.06 * Math.sin(this.time * 3));
+      const jaw = a * (0.16 + 0.03 * Math.sin(this.time * 3)); // (just parted: its tongue does the hissing)
       const flick = Math.sin(this.time * 2.1) > 0.75 ? 1 : 0;
       const tongue = a > 0.5 ? 0.6 + 0.4 * Math.sin(this.time * 23) : flick * (0.5 + 0.5 * Math.sin(this.time * 30));
       this.pose(this.blend(rest, hiss, a), jaw, tongue);
@@ -459,10 +460,12 @@ export class Snake {
     if (hu.lengthSq() < 0.02) hu.copy(ups[hi]);
     hu.normalize();
     const hr = new Vector3().crossVectors(ht, hu);
-    // (Low down, it lifts its head a little: more, with the apple in its jaws, to clear the ground.)
+    // (Low down, it lifts its head a little, its neck curving up to it:
+    // more, with the apple in its jaws, to clear the ground.)
+    const raise = this.caught ? 0.07 : 0.01;
+    const neck = (s: number) => raise * smooth((s - this.hinge + NECK) / NECK);
     const lift =
-      this.grounded[hi] *
-      (this.belly[Math.min(this.belly.length - 1, Math.round(this.hinge / STEP))] + (this.caught ? 0.07 : 0.01));
+      this.grounded[hi] * (this.belly[Math.min(this.belly.length - 1, Math.round(this.hinge / STEP))] + raise);
     hinge.addScaledVector(UP, lift);
 
     const p = new Vector3();
@@ -505,7 +508,7 @@ export class Snake {
           const g = f - k;
           const belly = this.belly[Math.min(this.belly.length - 1, Math.round(s / STEP))];
           const grounded = this.grounded[k] + (this.grounded[k + 1] - this.grounded[k]) * g;
-          p.lerpVectors(points[k], points[k + 1], g).addScaledVector(UP, grounded * belly);
+          p.lerpVectors(points[k], points[k + 1], g).addScaledVector(UP, grounded * (belly + neck(s)));
           const t = tangents[k];
           const r = rights[k];
           const u = ups[k];

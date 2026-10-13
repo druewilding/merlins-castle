@@ -57,6 +57,27 @@ export interface Path {
   lift: number;
 }
 
+/** The ground, or the top of a path lying on it. */
+export function onPaths(ground: Ground, paths: Path[]): Ground {
+  return (x, z) => {
+    const g = ground(x, z);
+    if (g === undefined) return undefined;
+    let lift = 0;
+    for (const path of paths) {
+      for (let k = 0; k < path.points.length - 1; k++) {
+        const [ax, az] = path.points[k];
+        const [bx, bz] = path.points[k + 1];
+        const t = Math.max(
+          0,
+          Math.min(1, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / ((bx - ax) ** 2 + (bz - az) ** 2 || 1))
+        );
+        if (Math.hypot(x - ax - t * (bx - ax), z - az - t * (bz - az)) <= path.half) lift = Math.max(lift, path.lift);
+      }
+    }
+    return g + lift;
+  };
+}
+
 /** Where an object stands, and which way it lies when it falls. */
 export interface Footing {
   x: number;
@@ -194,23 +215,7 @@ export function items(options: {
   }
 
   /** The ground, or the top of a path lying on it. */
-  function surface(x: number, z: number) {
-    const g = ground(x, z);
-    if (g === undefined) return undefined;
-    let lift = 0;
-    for (const path of options.paths) {
-      for (let k = 0; k < path.points.length - 1; k++) {
-        const [ax, az] = path.points[k];
-        const [bx, bz] = path.points[k + 1];
-        const t = Math.max(
-          0,
-          Math.min(1, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / ((bx - ax) ** 2 + (bz - az) ** 2 || 1))
-        );
-        if (Math.hypot(x - ax - t * (bx - ax), z - az - t * (bz - az)) <= path.half) lift = Math.max(lift, path.lift);
-      }
-    }
-    return g + lift;
-  }
+  const surface = onPaths(ground, options.paths);
 
   /** The line an object rests on, along its length: the ground's upper hull, under its middle. */
   function resting(x: number, z: number, yaw: number, half: number, wide: number) {

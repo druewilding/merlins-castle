@@ -36,7 +36,7 @@ import { h } from "../shared/dom";
 import { find3d, leave3d, listSaves, nextSaveName, saveGame, takeHandoff, type ThreeSave } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Felling } from "./felling";
-import { items as setUpItems } from "./items";
+import { items as setUpItems, onPaths } from "./items";
 import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
 import itemModels from "./models/items.glb?url";
@@ -220,7 +220,7 @@ const snake = new Snake(
   scene,
   snaky.scene,
   things.scene.getObjectByName("apple")!,
-  ground,
+  onPaths(ground, land.paths),
   guarded!.box!,
   reducedMotion
 );
