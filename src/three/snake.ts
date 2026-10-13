@@ -31,7 +31,7 @@ import type { Ground } from "./player";
 const UP = new Vector3(0, 1, 0);
 const STEP = 0.03; // metres between the points along its spine
 const PITCH = 0.2; // metres from one turn of its coil to the next
-const COIL = 0.42; // the radius of its coil, round the outside
+const COIL = 0.5; // the radius of its coil, round the outside
 const NEAR = 7.5; // metres: this near, it rears up and hisses
 const FAR = 80; // metres: further off than this, it's left as it is
 const SPEED = 1.9; // metres a second, slithering away
@@ -235,7 +235,7 @@ export class Snake {
       const hiss = this.hissing(eye);
       // Its mouth opens as it rears; its tongue flickers now and then, and
       // fast, hissing.
-      const jaw = a * (0.75 + 0.08 * Math.sin(this.time * 3));
+      const jaw = a * (0.5 + 0.06 * Math.sin(this.time * 3));
       const flick = Math.sin(this.time * 2.1) > 0.75 ? 1 : 0;
       const tongue = a > 0.5 ? 0.6 + 0.4 * Math.sin(this.time * 23) : flick * (0.5 + 0.5 * Math.sin(this.time * 30));
       this.pose(this.blend(rest, hiss, a), jaw, tongue);
@@ -289,7 +289,7 @@ export class Snake {
     const ways = [
       nose,
       nose.clone().addScaledVector(ahead, 0.7),
-      new Vector3(c.x - 2.5, 0, c.z + 1),
+      new Vector3(c.x - 2.8, 0, c.z + 1.9),
       new Vector3(c.x - 5.5, 0, c.z + 1.8),
       new Vector3(c.x - 9, 0, c.z + 2.4),
       new Vector3(c.x - 13, 0, c.z + 2.8),
@@ -313,7 +313,7 @@ export class Snake {
       const side = new Vector3().subVectors(point, last).cross(UP).normalize();
       const p = point
         .clone()
-        .addScaledVector(side, 0.16 * smooth(travelled / 1.5) * Math.sin((travelled / 1.2) * 2 * Math.PI));
+        .addScaledVector(side, 0.15 * smooth((travelled - 0.5) / 3) * Math.sin((travelled / 1.9) * 2 * Math.PI));
       p.y = this.ground(p.x, p.z) ?? nose.y;
       return p;
     });
@@ -349,12 +349,12 @@ export class Snake {
     return { head, facing: this.towards(eye, head, -0.6, 0.35), raised: 1 };
   }
 
-  /** Its head down on the ground ahead of its coil, turned west to go. */
+  /** Its head down on the ground ahead of its coil, turned south-west to go. */
   private lowered(): Pose {
     const c = this.centre;
-    const head = new Vector3(c.x - 0.1, c.y, c.z + 0.65);
+    const head = new Vector3(c.x - 0.2, c.y, c.z + 1);
     head.y = this.ground(head.x, head.z) ?? c.y;
-    return { head, facing: new Vector3(-1, 0, 0.2).normalize(), raised: 0 };
+    return { head, facing: new Vector3(-0.8, 0, 0.6).normalize(), raised: 0 };
   }
 
   /** Facing from its head to your eyes, turned no further than it can from the south, and tilted within reason. */
@@ -401,7 +401,7 @@ export class Snake {
     }
     // ...and round and round its coil, inwards.
     for (let a = 0; ; a += 0.05) {
-      const r = Math.max(0.07, COIL - (PITCH * a) / (2 * Math.PI));
+      const r = Math.max(0.24, COIL - (PITCH * a) / (2 * Math.PI)); // (not so tight it bunches up, uncoiling)
       line.push({ at: new Vector3(c.x + Math.cos(-a) * r, c.y, c.z + Math.sin(-a) * r), grounded: 1 });
       if (a > 30) break;
     }
