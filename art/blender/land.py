@@ -1100,8 +1100,10 @@ for a, half, z0, z1 in TOWER_WINDOWS:
             pts = [(*inside[k], z), (*outside[k], z), (*outside[k + 1], z), (*inside[k + 1], z)]
             built.add(pts, [(0, 1, 2, 3)], [c.vary(colour, 0.06, Vector(pts[0]))] * 4)
     for k in (0, 2):
+        # (Each facing into the window: facing into the stone, the sun's
+        # shadows fall on it in stripes.)
         pts = [(*inside[k], sill), (*outside[k], sill), (*outside[k], lintel), (*inside[k], lintel)]
-        built.add(pts, [(0, 1, 2, 3)], [c.vary(GREY, 0.06, Vector(pts[0]))] * 4)
+        built.add(pts if k else pts[::-1], [(0, 1, 2, 3)], [c.vary(GREY, 0.06, Vector(pts[0]))] * 4)
 built.add([(*p, tz1) for p in ring], [tuple(range(SIDES))], [GREY] * SIDES)
 built.cone((*TOWER, tz1), 9, TOWER_R * 1.15, ROOF, sides=SIDES, droop=0)
 solid_circle(*TOWER, TOWER_R)
