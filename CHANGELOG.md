@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.6.0](https://github.com/druewilding/merlins-castle/compare/v2.5.1...v2.6.0) (2026-10-13)
+
+
+### Features
+
+* Build the apple and the snake, and tweak obstacle zones ([#63](https://github.com/druewilding/merlins-castle/issues/63)) ([3f4de25](https://github.com/druewilding/merlins-castle/commit/3f4de25e648bcb9463042bea73772ad3f9503f09))
+* Build the tower, with the snake and the beginning of the ladder balcony sequence ([#65](https://github.com/druewilding/merlins-castle/issues/65)) ([6355b4f](https://github.com/druewilding/merlins-castle/commit/6355b4fa02b00f97f0b84b2ad098c0b4c3765ea4))
+* Show a big Play button on the 3D title screen, which says Continue once you're playing ([#64](https://github.com/druewilding/merlins-castle/issues/64)) ([70a80a6](https://github.com/druewilding/merlins-castle/commit/70a80a64b31e0dc8947aad694c79a0bdcdf208d7))
+
 ## [2.5.1](https://github.com/druewilding/merlins-castle/compare/v2.5.0...v2.5.1) (2026-10-13)
 
 
