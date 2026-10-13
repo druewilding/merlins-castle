@@ -127,6 +127,43 @@ TOWER_WINDOW = (0.9, 2.6)  # the window's sill and lintel, above the landing
 # mountain, with the castle's spire off to the right. (A whole number of the
 # round room's sides, so its wall opens at its corners.)
 TOWER_FACING = -3 * 2 * math.pi / 32
+# All its windows: which way each faces (round from due east), half its
+# width (as an angle), and its sill and lintel above the floor. The big one at
+# the top of the stairs, onto the balcony; and two narrow ones, letting a
+# little daylight into the dark, clear of the stairs (the north-west one over
+# a low step, the south-west one where there are none).
+TOWER_WINDOWS = [
+    (TOWER_FACING, 2 * math.pi / 32, TOWER_LANDING + TOWER_WINDOW[0], TOWER_LANDING + TOWER_WINDOW[1]),
+    (2.3, 0.05, 2.6, 3.9),
+    (3.75, 0.05, 2.2, 3.5),
+]
+
+
+def polygon_at(a, r, sides, start):
+    """Round the tower's middle, a point at an angle on a regular polygon
+    (its corners r out, the first at angle start): its walls are straight
+    between their corners."""
+    side = math.floor((a - start) / (2 * math.pi / sides))
+    middle = start + (side + 0.5) * 2 * math.pi / sides
+    d = r * math.cos(math.pi / sides) / math.cos(a - middle)
+    return TOWER[0] + math.cos(a) * d, TOWER[1] + math.sin(a) * d
+
+
+def wall_pieces(p0, p1, a0, a1, low, high, floor, at):
+    """A side of the tower's wall, from p0 (at angle a0) to p1 (a1), low to
+    high: in pieces round a window in it, if there is one (at: the point on
+    the wall at an angle)."""
+    for a, half, z0, z1 in TOWER_WINDOWS:
+        for turn in (-2 * math.pi, 0, 2 * math.pi):
+            lo, hi = a + turn - half, a + turn + half
+            if a0 < hi and a1 > lo:
+                sill, lintel = floor + z0, floor + z1
+                pieces = [[(*p0, low), (*p1, low), (*p1, sill), (*p0, sill)],
+                          [(*p0, lintel), (*p1, lintel), (*p1, high), (*p0, high)]]
+                for q0, q1 in ([(p0, at(lo))] if a0 < lo - 0.001 else []) + ([(at(hi), p1)] if a1 > hi + 0.001 else []):
+                    pieces.append([(*q0, sill), (*q1, sill), (*q1, lintel), (*q0, lintel)])
+                return pieces
+    return [[(*p0, low), (*p1, low), (*p1, high), (*p0, high)]]
 HUT = P["charcoal-hut"]
 # Where you step in at their doors: the tower's faces south, down the mossy
 # steps; the hut's north, to the crossroads.
@@ -277,7 +314,7 @@ class Hall:
     Either way it has a flat floor, and being in it is being in its place."""
 
     def __init__(self, place, floor, r, tall, ground, wall, light=None, glow=0.0, w=None, d=None, at=None,
-                 indoor=False):
+                 indoor=False, dark=False):
         self.place = place
         self.x, self.y = at or P[place]  # (a room can be off its place's spot, to sit against its neighbour)
         self.floor, self.tall = floor, tall
@@ -287,6 +324,9 @@ class Hall:
         self.r = math.hypot(w, d) if self.room else r  # how far it reaches, at most
         self.ground, self.wall = ground, wall  # colours
         self.light, self.glow = light, glow  # its own light, if it has one
+        # Or (no light of its own) the light coming in, where it does; and
+        # dark, without: dim and cold (the tower). And its windows' light.
+        self.lights, self.dark, self.windows = [], dark, []
 
     @property
     def doorway(self):
@@ -323,9 +363,10 @@ HALLS = {h.place: h for h in [
     Hall("coach-house", 0.4, 0, 6, c.linear("#b89a5a"), c.linear("#8a6a44"), "#ffd28a", 9, w=8, d=6),
     # Out in the land, on the ground where they stand (their floors are set
     # once the land's shape is known): the charcoal burner's hut, lit by its
-    # fire, and the round room in the tower, just inside its wall.
+    # fire, and the round room in the tower, just inside its wall (dark and
+    # musty, lit only by what comes in: round_room).
     Hall("charcoal-hut", 0, 0, 3.8, c.linear("#5e4a36"), c.linear("#6e5236"), "#ffb878", 1.2, w=3.4, d=2.4),
-    Hall("tower", 0, TOWER_R - 0.8, 9, c.linear("#8d8a80"), c.linear("#807d76"), "#ffd9a0", 3, at=TOWER, indoor=True),
+    Hall("tower", 0, TOWER_R - 0.8, 9, c.linear("#8d8a80"), c.linear("#807d76"), at=TOWER, indoor=True, dark=True),
 ]}
 
 T, O, G, DM = P["trolls"], P["oak-door"], P["giant"], P["damp-tunnels"]
@@ -1032,46 +1073,28 @@ tz0, tz1 = height(*TOWER) - 0.5, height(*TOWER) - 0.5 + 20
 door_top = HALLS["tower"].floor + TUNNEL_TALL - 0.3  # under the doorway's roof (which slopes down a little), so there's no gap
 ring = [(TOWER[0] + math.cos(-math.pi / 2 + 2 * math.pi * k / SIDES) * TOWER_R,
          TOWER[1] + math.sin(-math.pi / 2 + 2 * math.pi * k / SIDES) * TOWER_R) for k in range(SIDES)]
-# High in its east side, the window onto the balcony, as wide as the room's
-# wall is open inside (its two sides either side of where it faces): its
-# stone sill, lintel and sides through the wall between.
-win0, win1 = (HALLS["tower"].floor + TOWER_LANDING + h for h in TOWER_WINDOW)
-WIN = 2 * math.pi / 32  # (round_room's sides)
-win_lo, win_hi = TOWER_FACING - WIN, TOWER_FACING + WIN
-inner_r = HALLS["tower"].r + 0.35
-
-
-def outer_at(a):
-    """The tower's outer wall at an angle (round from due east): straight between its corners."""
-    side = math.floor((a + math.pi / 2) / (2 * math.pi / SIDES))
-    middle = -math.pi / 2 + (side + 0.5) * 2 * math.pi / SIDES
-    r = TOWER_R * math.cos(math.pi / SIDES) / math.cos(a - middle)
-    return TOWER[0] + math.cos(a) * r, TOWER[1] + math.sin(a) * r
-
-
+# Its windows (TOWER_WINDOWS), through both its walls: their stone sills,
+# lintels and sides through the wall between.
 for k in range(SIDES):
     p0, p1 = ring[k], ring[(k + 1) % SIDES]
     door = k in (0, SIDES - 1)  # the two sides either side of due south
     shade = [c.vary(GREY, 0.06, Vector((*p0, 1.0)))] * 4
     a0 = -math.pi / 2 + 2 * math.pi * k / SIDES
-    a1 = a0 + 2 * math.pi / SIDES
-    if a0 < win_hi and a1 > win_lo:  # (the window's in this side)
-        built.add([(*p0, tz0), (*p1, tz0), (*p1, win0), (*p0, win0)], [(0, 1, 2, 3)], shade)
-        built.add([(*p0, win1), (*p1, win1), (*p1, tz1), (*p0, tz1)], [(0, 1, 2, 3)], shade)
-        for q0, q1 in (((p0, outer_at(win_lo)),) if a0 < win_lo - 0.001 else ()) + (((outer_at(win_hi), p1),) if a1 > win_hi + 0.001 else ()):
-            built.add([(*q0, win0), (*q1, win0), (*q1, win1), (*q0, win1)], [(0, 1, 2, 3)], shade)
-        continue
-    built.add([(*p0, door_top if door else tz0), (*p1, door_top if door else tz0), (*p1, tz1), (*p0, tz1)],
-              [(0, 1, 2, 3)], shade)
-inside = [(TOWER[0] + math.cos(a) * inner_r, TOWER[1] + math.sin(a) * inner_r) for a in (win_lo, TOWER_FACING, win_hi)]
-outside = [outer_at(a) for a in (win_lo, TOWER_FACING, win_hi)]
-for k in range(2):
-    for z, colour in ((win0, STONE), (win1, GREY)):  # (facing up, both: see quad())
-        pts = [(*inside[k], z), (*outside[k], z), (*outside[k + 1], z), (*inside[k + 1], z)]
-        built.add(pts, [(0, 1, 2, 3)], [c.vary(colour, 0.06, Vector(pts[0]))] * 4)
-for k in (0, 2):
-    pts = [(*inside[k], win0), (*outside[k], win0), (*outside[k], win1), (*inside[k], win1)]
-    built.add(pts, [(0, 1, 2, 3)], [c.vary(GREY, 0.06, Vector(pts[0]))] * 4)
+    for piece in wall_pieces(p0, p1, a0, a0 + 2 * math.pi / SIDES, door_top if door else tz0, tz1, HALLS["tower"].floor,
+                             lambda a: polygon_at(a, TOWER_R, SIDES, -math.pi / 2)):
+        built.add(piece, [(0, 1, 2, 3)], shade)
+for a, half, z0, z1 in TOWER_WINDOWS:
+    angles = (a - half, a, a + half)
+    inside = [polygon_at(t, HALLS["tower"].r + 0.35, 32, 0) for t in angles]  # (round_room's wall)
+    outside = [polygon_at(t, TOWER_R, SIDES, -math.pi / 2) for t in angles]
+    sill, lintel = HALLS["tower"].floor + z0, HALLS["tower"].floor + z1
+    for k in range(2):
+        for z, colour in ((sill, STONE), (lintel, GREY)):  # (facing up, both: see quad())
+            pts = [(*inside[k], z), (*outside[k], z), (*outside[k + 1], z), (*inside[k + 1], z)]
+            built.add(pts, [(0, 1, 2, 3)], [c.vary(colour, 0.06, Vector(pts[0]))] * 4)
+    for k in (0, 2):
+        pts = [(*inside[k], sill), (*outside[k], sill), (*outside[k], lintel), (*inside[k], lintel)]
+        built.add(pts, [(0, 1, 2, 3)], [c.vary(GREY, 0.06, Vector(pts[0]))] * 4)
 built.add([(*p, tz1) for p in ring], [tuple(range(SIDES))], [GREY] * SIDES)
 built.cone((*TOWER, tz1), 9, TOWER_R * 1.15, ROOF, sides=SIDES, droop=0)
 solid_circle(*TOWER, TOWER_R)
@@ -2199,16 +2222,32 @@ def round_room(b, hall):
             quad(b, [(*p0, low), (*p1, low), (*p1, f + tall), (*p0, f + tall)], hall.wall)
             continue
         quad(b, [(*p0, f - 0.3), (*p1, f - 0.3), (*p1, f + 1.0), (*p0, f + 1.0)], band)
-        if hall.place == "tower" and k - round(TOWER_FACING / (2 * math.pi / sides)) in (-1, 0, sides - 1, sides):
-            # (The two sides either side of where it faces: the window onto the balcony.)
-            sill, lintel = (f + TOWER_LANDING + h for h in TOWER_WINDOW)
-            quad(b, [(*p0, f + 1.0), (*p1, f + 1.0), (*p1, sill), (*p0, sill)], hall.wall)
-            quad(b, [(*p0, lintel), (*p1, lintel), (*p1, f + tall), (*p0, f + tall)], hall.wall)
+        if hall.place == "tower":
+            a0 = 2 * math.pi * k / sides
+            for piece in wall_pieces(p0, p1, a0, a0 + 2 * math.pi / sides, f + 1.0, f + tall, f,
+                                     lambda a: polygon_at(a, R + E, sides, 0)):
+                quad(b, piece, hall.wall)
             continue
         quad(b, [(*p0, f + 1.0), (*p1, f + 1.0), (*p1, f + tall), (*p0, f + tall)], hall.wall)
     b.add([(*at(k, R + E), f + tall) for k in range(sides)], [tuple(range(sides))],
           [c.mix(hall.wall, c.linear("#000000"), 0.35)] * sides)
     if hall.place == "tower":
+        # No light of its own: what comes in at its windows (cold daylight,
+        # most at the big one), and warm through the cracks round the stone
+        # across the doorway, on the floor just inside it. And the shafts of
+        # light from the windows (the game draws them): where each one's
+        # inside face is, and which way is in.
+        for a, half, z0, z1 in TOWER_WINDOWS:
+            big = half > 0.1
+            # (The big one's, out over the room: right by you on the landing,
+            # it would blaze.)
+            hall.lights.append({"at": (*polygon_at(a, R - (2.5 if big else 0.4), sides, 0), f + (z0 + z1) / 2),
+                                "colour": "#dbe7ff" if big else "#b9cbef", "glow": 1.0 if big else 0.7,
+                                "reach": 11 if big else 6})
+            x_, y_ = polygon_at(a, R + E, sides, 0)
+            hall.windows.append({"at": (x_, y_), "sill": f + z0, "lintel": f + z1, "wide": 2 * (R + E) * math.sin(half),
+                                 "in": (-math.cos(a), -math.sin(a))})
+        hall.lights.append({"at": (hx, hy - R + 0.5, f + 0.3), "colour": "#ffb066", "glow": 0.5, "reach": 4.5})
         # Stone slabs coming out of the wall, curling up it from the west,
         # round by the north, to a landing in the east, at the window onto the
         # balcony: you walk under them, once they're over your head. (Nothing
@@ -2326,7 +2365,17 @@ if out:
         "halls": {place: {"x": hall.x, "z": -hall.y, "floor": hall.floor, "r": round(hall.r, 2), "tall": hall.tall,
                           **({"w": hall.w, "d": hall.d} if hall.room else {}),
                           **({"indoor": True} if hall.indoor else {}),
-                          **({"light": hall.light, "glow": hall.glow} if hall.light else {})}
+                          **({"light": hall.light, "glow": hall.glow} if hall.light else {}),
+                          # (Or the light coming in, at [x, y, z]; and dark without it.)
+                          **({"lights": [{"at": [round(x, 2), round(z, 2), round(-y, 2)], "colour": l["colour"],
+                                          "glow": l["glow"], "reach": l["reach"]}
+                                         for l in hall.lights for x, y, z in [l["at"]]]} if hall.lights else {}),
+                          **({"dark": True} if hall.dark else {}),
+                          # (And its windows' shafts of light: each one's inside face, and which way is in.)
+                          **({"windows": [{"x": round(w["at"][0], 2), "z": round(-w["at"][1], 2), "sill": round(w["sill"], 2),
+                                           "lintel": round(w["lintel"], 2), "wide": round(w["wide"], 2),
+                                           "in": [round(w["in"][0], 3), round(-w["in"][1], 3)]} for w in hall.windows]}
+                             if hall.windows else {})}
                   for place, hall in HALLS.items()},
         "under": {"circles": under_circles, "boxes": under_boxes},
         # The tower's stone: how big, and where its middle is [x, z, y], beside the door and across it.

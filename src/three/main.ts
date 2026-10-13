@@ -48,6 +48,7 @@ import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import snakeModel from "./models/snake.glb?url";
 import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable, wayThrough } from "./player";
+import { Shafts, type Window } from "./shafts";
 import { sky } from "./sky";
 import { Snake } from "./snake";
 import { Trees, type TreeSpots } from "./trees";
@@ -74,7 +75,14 @@ const scene = new Scene();
 const fog = new Fog(HAZE, 40, 320);
 scene.fog = fog;
 scene.add(sky(SUN, HAZE));
-const skylight = new HemisphereLight("#cfe2ff", "#6d7a3c", 1.25);
+const SKY = new Color("#cfe2ff");
+const SKY_GROUND = new Color("#6d7a3c");
+const skylight = new HemisphereLight(SKY, SKY_GROUND, 1.25);
+// In the dark (the tower), what little of the sky's light there is is cold,
+// and a dark haze hangs in the air (thinning as you climb to the window).
+const COLD = new Color("#7d8fb8");
+const COLD_GROUND = new Color("#1c1d22");
+const GLOOM = new Color("#07080b");
 scene.add(skylight);
 
 // Underground, the daylight fades and a warm lamp glow takes over (one day,
@@ -177,7 +185,13 @@ const walkable: Walkable = (x, z) => {
 };
 player.standOn(ground, walkable);
 player.ways = Object.values(land.ways);
-const halls = land.halls as Record<string, Hall & { tall: number; light?: string; glow?: number }>;
+// (A lit hall has a light of its own; a dark one, only what comes in: lights
+// at its windows, and its windows' shafts of light.)
+type Fixture = { at: number[]; colour: string; glow: number; reach: number };
+const halls = land.halls as Record<
+  string,
+  Hall & { tall: number; light?: string; glow?: number; lights?: Fixture[]; dark?: boolean; windows?: Window[] }
+>;
 player.halls = new Map(Object.entries(halls));
 
 // Solid things, and the obstacles: closed, until an object in use opens one.
@@ -628,34 +642,65 @@ resize();
 // roof's shadow keeps it off you, and outside the door it's still day).
 let caveLit = 0;
 let indoors = 0;
-const litHalls = Object.values(halls).filter((hall) => hall.light);
+let gloom = 0; // in a dark hall: 1
+let murk = 0; // and down in it, where its haze is: 1
+// The lights in the halls: a lit hall's own, in its middle, up towards its
+// roof, flickering (torches, fire); a dark one's, coming in at its windows
+// and cracks, steady (daylight).
+const fixtures = Object.values(halls).flatMap((hall) =>
+  hall.lights
+    ? hall.lights.map(({ at: [x, y, z], colour, glow, reach }) => ({ x, y, z, colour, glow, reach, flickers: false }))
+    : hall.light
+      ? [
+          {
+            x: hall.x,
+            y: hall.floor + hall.tall * 0.6,
+            z: hall.z,
+            colour: hall.light,
+            glow: hall.glow ?? 0,
+            reach: hall.r * 1.8,
+            flickers: true,
+          },
+        ]
+      : []
+);
+const darkHall = Object.values(halls).find((hall) => hall.dark);
+const shafts = darkHall?.windows && new Shafts(scene, darkHall, darkHall.windows, reducedMotion);
 function lightFor(depth: number, time: number, dt: number) {
   indoors += ((player.under?.indoor ? 1 : 0) - indoors) * Math.min(1, dt * 4);
+  const hall = player.under?.hall ? halls[player.under.hall] : undefined;
+  gloom += ((hall?.dark ? 1 : 0) - gloom) * Math.min(1, dt * 2);
+  const p = player.position;
+  // (Climbing towards the top window, out of the haze: the view from it clear.)
+  const climbed = hall?.dark ? Math.min(1, Math.max(0, (p.y - hall.floor) / (hall.tall * 0.6))) : 0;
+  murk += ((hall?.dark ? 1 - climbed * climbed * (3 - 2 * climbed) : 0) - murk) * Math.min(1, dt * 2);
   const under = Math.min(1, Math.max(0, (depth - 0.5) / 3));
   sunlight.intensity = 2.8 * (1 - under);
-  skylight.intensity = 1.25 * (1 - Math.max(under * 0.92, indoors * 0.55));
+  skylight.intensity = 1.25 * (1 - Math.max(under * 0.92, indoors * 0.55, gloom * 0.8));
+  skylight.color.copy(SKY).lerp(COLD, gloom);
+  skylight.groundColor.copy(SKY_GROUND).lerp(COLD_GROUND, gloom);
   const flicker = reducedMotion ? 1 : 0.92 + 0.05 * Math.sin(time / 90) + 0.03 * Math.sin(time / 37);
-  lamp.intensity = 3.5 * Math.max(under, indoors * 0.4) * flicker;
+  lamp.intensity = 3.5 * Math.max(under, indoors * 0.4) * flicker * (1 - gloom);
   lamp.position.set(player.position.x, player.position.y + 1.4, player.position.z);
 
-  // The lit halls nearest you, each with its own light.
-  const p = player.position;
-  const away = (hall: (typeof litHalls)[number]) => Math.hypot(hall.x - p.x, hall.floor - p.y, hall.z - p.z) - hall.r;
-  const nearest = litHalls.filter((hall) => away(hall) < 40).sort((a, b) => away(a) - away(b));
+  // The halls' lights nearest you.
+  const away = (light: (typeof fixtures)[number]) =>
+    Math.hypot(light.x - p.x, light.y - p.y, light.z - p.z) - light.reach / 1.8;
+  const nearest = fixtures.filter((light) => away(light) < 40).sort((a, b) => away(a) - away(b));
   roomLights.forEach((light, k) => {
-    const hall = nearest[k];
-    light.intensity = hall ? (hall.glow ?? 0) * 4 * flicker : 0;
-    if (!hall) return;
-    light.color.set(hall.light!);
-    light.distance = hall.r * 1.8;
-    light.position.set(hall.x, hall.floor + hall.tall * 0.6, hall.z);
+    const fixture = nearest[k];
+    light.intensity = fixture ? fixture.glow * 4 * (fixture.flickers ? flicker : 1) : 0;
+    if (!fixture) return;
+    light.color.set(fixture.colour);
+    light.distance = fixture.reach;
+    light.position.set(fixture.x, fixture.y, fixture.z);
   });
 
-  const hall = player.under?.hall ? halls[player.under.hall] : undefined;
   caveLit += ((hall?.light ? 1 : 0) - caveLit) * Math.min(1, dt * 3);
-  fog.color.copy(HAZE).lerp(DARK, under);
-  fog.near = 40 - 38 * under;
-  fog.far = 320 - 290 * under + 40 * caveLit;
+  fog.color.copy(HAZE).lerp(DARK, under).lerp(GLOOM, murk);
+  fog.near = (40 - 38 * under) * (1 - murk) + 1.5 * murk;
+  fog.far = (320 - 290 * under + 40 * caveLit) * (1 - murk) + 22 * murk;
+  shafts?.update(dt, gloom, player.camera.position);
 }
 
 const timer = new Timer();
