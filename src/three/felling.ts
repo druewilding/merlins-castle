@@ -14,9 +14,9 @@ const RISE = 0.7; // seconds, springing back up
 const STUMP = 0.26; // a stump's size, for a tree's
 const STUMP_TALL = 0.62; // the stump model's height, at its own size
 const SUNK = 0.3; // the trees stand sunk this far into the ground (land.py)
-const CLEAR = 3.5; // metres: parting, they slide this far either side of you
-const NEAR = 8; // metres, ahead or behind: the ones this near you slide right out of the way
-const FAR = 10; // and the ones this far stay (or slide back) in place
+const CLEAR = 5; // metres: parting, they slide this far either side of you
+const NEAR = 16; // metres, ahead or behind: the ones this near you slide right out of the way
+const FAR = 20; // and the ones this far stay (or slide back) in place
 const SLIDE = 16; // how quickly they slide (the larger, the quicker)
 
 interface Felled {
