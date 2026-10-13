@@ -43,7 +43,9 @@ const PULL: Record<RoomId, number> = { "grassy-bank": 12 };
  */
 export function placeAt(x: number, z: number, current: RoomId, inside: { has(id: string): boolean }): RoomId {
   let best = current;
-  let nearest = REACH;
+  // (Out of one of those, on its doorstep, you're in the nearest place, however
+  // far its middle: not still inside.)
+  let nearest = inside.has(current) ? Infinity : REACH;
   for (const [id, p] of PLACES) {
     if (inside.has(id)) continue;
     const d = Math.hypot(x - p.x, z - p.z) - (PULL[id] ?? 0);

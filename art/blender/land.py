@@ -1120,6 +1120,17 @@ for k in range(6):
 # tower, you're past it, and shut in. Any further in, and you'd be in the
 # tower but not past it, and could still turn back and walk out.)
 obstacle(["mossy-steps north"], "circle", TOWER[0], -(TOWER[1] - TOWER_R), 0.8, reach=3.7)
+# The enormous stone: waiting beside the door, to the west (out of the way
+# round to the balcony), until you're in the tower, when the game rolls it
+# across the doorway, just outside it, where the snake was; using the ring,
+# it rolls back. Its own object, round its middle, so it turns as it rolls.
+STONE_R = 2.0
+stone = c.Builder()
+stone.blob((0, 0, 0), STONE_R, c.linear("#8a8478"), squash=0.9, lumpy=0.18, seed=11, subdivisions=3, lit=False)
+stone_y = TOWER_LIP[1] - STONE_R - 0.05  # (just outside the doorway: in it, it would roll through its sides)
+STONE_SPOTS = {k: (x, stone_y, height(x, stone_y) + STONE_R * 0.75) for k, x in (("aside", TOWER[0] - 5.0), ("door", TOWER[0]))}
+stone.build("stone", smooth=False).location = STONE_SPOTS["aside"]
+solid_circle(*STONE_SPOTS["aside"][:2], STONE_R * 0.9)
 stone_at = HALLS["tower"].r - 0.35 + 0.15
 obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - stone_at), 1.6, 0.5, under=True, reach=1.5)  # (so you can walk round the room)
 bx, by = out_from_tower(7.6, 0)  # (under the balcony, and with its reach, all of it: right in to the wall, from either side)
@@ -2318,6 +2329,8 @@ if out:
                           **({"light": hall.light, "glow": hall.glow} if hall.light else {})}
                   for place, hall in HALLS.items()},
         "under": {"circles": under_circles, "boxes": under_boxes},
+        # The tower's stone: how big, and where its middle is [x, z, y], beside the door and across it.
+        "stone": {"r": STONE_R, **{k: [round(x, 2), round(-y, 2), round(z, 2)] for k, (x, y, z) in STONE_SPOTS.items()}},
         # The chest in the tower, where the emerald starts: its middle [x, z], and its tray.
         "chest": [round(CHEST["x"], 2), round(-CHEST["y"], 2), round(CHEST["floor"], 2)],
         "bounds": [X0 + 4, X1 - 4, Y0 + 4, Y1 - 4],

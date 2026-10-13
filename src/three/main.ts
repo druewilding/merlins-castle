@@ -241,6 +241,12 @@ const lid = model.scene.getObjectByName("chest-lid");
 const [chestX, chestZ] = land.chest;
 let lidOpen = 0;
 const LID = 1.9; // radians, open (back against the wall)
+// The stone, rolling from beside the tower's door across it, once you're in,
+// and back with the ring: turning as it goes.
+const stone = model.scene.getObjectByName("stone");
+const { r: STONE_R, aside, door } = land.stone;
+let rolled: number | undefined; // 0 beside the door, 1 across it
+const ROLL = 0.45; // of the way, a second
 // The dense trees across the mountain path, which the axe fells (felling.ts).
 const dense = shapeOf.get("mountain-path north");
 // The snake coiled at the top of the mossy steps, which takes the apple (snake.ts).
@@ -253,6 +259,8 @@ const snake = new Snake(
   (guarded!.circle ?? guarded!.box)!,
   reducedMotion
 );
+// The enormous stone that shuts you in the tower, which the ring rolls away.
+const shut = shapeOf.get("tower south");
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 // A way that kills you even with the object (the balcony) has no far side
@@ -401,7 +409,7 @@ function inUse() {
     return needs &&
       using.includes(needs) &&
       shape &&
-      (walls.has(shape) || gates.has(shape) || shape === dense || shape === guarded)
+      (walls.has(shape) || gates.has(shape) || shape === dense || shape === guarded || shape === shut)
       ? [`${here} ${direction}`]
       : [];
   });
@@ -675,6 +683,16 @@ renderer.setAnimationLoop((time) => {
   if (!player.busy) {
     if (player.under?.hall) room = player.under.hall;
     else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
+  }
+  if (stone) {
+    const wants = room === "tower" && shut && !opened.has(shut) && !allOpen ? 1 : 0;
+    rolled =
+      rolled === undefined ? wants : rolled + Math.sign(wants - rolled) * Math.min(Math.abs(wants - rolled), dt * ROLL);
+    const t = rolled * rolled * (3 - 2 * rolled);
+    stone.position.set(
+      ...(([0, 2, 1] as const).map((k) => aside[k] + (door[k] - aside[k]) * t) as [number, number, number])
+    );
+    stone.rotation.z = (-(door[0] - aside[0]) * t) / STONE_R;
   }
   if (lid) {
     const near =
