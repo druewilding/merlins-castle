@@ -218,7 +218,7 @@ player.halls = new Map(Object.entries(halls));
 // Solid things, and the obstacles: closed, until an object in use opens one.
 const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
-type Obstacle = { box?: number[]; circle?: number[]; under?: boolean; reach?: number };
+type Obstacle = { box?: number[]; circle?: number[]; under?: boolean; reach?: number; allRound?: boolean };
 const obstacles = land.obstacles as Record<string, Obstacle>;
 const underCircles: Circle[] = land.under.circles.map(([x, z, r, top, bottom]) => ({ x, z, r, top, bottom }));
 const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ, top]) => ({ x, z, halfX, halfZ, top }));
@@ -322,15 +322,27 @@ function solidify() {
     // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
-        ...closed.flatMap(({ circle, names, reach = AHEAD }) =>
-          circle ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: reach, allRound: deadly(names) }] : []
+        ...closed.flatMap(({ circle, names, reach = AHEAD, allRound }) =>
+          circle
+            ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: reach, allRound: allRound || deadly(names) }]
+            : []
         ),
         ...(under ? underCircles : circles),
       ],
       [
-        ...closed.flatMap(({ box, names, reach = AHEAD }) =>
+        ...closed.flatMap(({ box, names, reach = AHEAD, allRound }) =>
           box
-            ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names, ahead: reach, allRound: deadly(names) }]
+            ? [
+                {
+                  x: box[0],
+                  z: box[1],
+                  halfX: box[2],
+                  halfZ: box[3],
+                  names,
+                  ahead: reach,
+                  allRound: allRound || deadly(names),
+                },
+              ]
             : []
         ),
         ...plain.map(({ box }) => ({ x: box![0], z: box![1], halfX: box![2], halfZ: box![3] })),

@@ -101,6 +101,11 @@ export function wayThrough(names: string[], ox: number, oz: number, x: number, z
   });
 }
 
+/** An obstacle, the same however often it's put back: its exits, and where it is. */
+function same(thing: Circle | Box) {
+  return `${thing.names?.join() ?? ""} ${thing.x} ${thing.z}`;
+}
+
 /** Whether a spot is in a solid thing, or an obstacle's reach (and so far round it). */
 function touching(thing: Circle | Box, x: number, z: number, margin: number) {
   const reach = thing.ahead ?? 0;
@@ -243,8 +248,14 @@ export class Player {
   /** The solid things on the land (or underground), sorted into squares so only those near you are checked. */
   solid(circles: Circle[], boxes: Box[], under = false) {
     const near = under ? this.nearUnder : this.near;
+    // (What you were going through, the free way, you still are: the same
+    // obstacle, put back, when what's open changes, as you come out of the
+    // tower past the snake, say.)
+    const old = new Set([...near.values()].flatMap((found) => [...found.circles, ...found.boxes]));
+    const going = new Set([...this.passing].filter((thing) => old.has(thing)).map(same));
+    for (const thing of old) this.passing.delete(thing);
+    for (const thing of [...circles, ...boxes]) if (going.has(same(thing))) this.passing.add(thing);
     near.clear();
-    this.passing.clear();
     // Adds a thing to every square it (or you, touching it) could be in.
     const file = (x0: number, x1: number, z0: number, z1: number, add: (found: Near) => void) => {
       for (let i = Math.floor((x0 - 1) / CELL); i <= Math.floor((x1 + 1) / CELL); i++) {

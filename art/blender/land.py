@@ -132,8 +132,8 @@ TOWER_FACING = -3 * 2 * math.pi / 32
 # balcony's underside (not quite: it's not hooked over anything, so it
 # slips). Not so wide it rises through the tower's floor, but wider than the
 # ground's grid (2 m), or there'd be nothing of it.
-BALCONY_RISE = (TOWER[0] + math.cos(TOWER_FACING) * 7.0 + math.sin(TOWER_FACING) * 3.6,
-                TOWER[1] + math.sin(TOWER_FACING) * 7.0 - math.cos(TOWER_FACING) * 3.6)
+BALCONY_RISE = (TOWER[0] + math.cos(TOWER_FACING) * 7.9 + math.sin(TOWER_FACING) * 3.3,
+                TOWER[1] + math.sin(TOWER_FACING) * 7.9 - math.cos(TOWER_FACING) * 3.3)
 # All its windows: which way each faces (round from due east), half its
 # width (as an angle), and its sill and lintel above the floor. The big one at
 # the top of the stairs, onto the balcony; and two narrow ones, letting a
@@ -538,7 +538,7 @@ def height(x, y):
     h = max(h, dragon_hill(x, y), ridge(x, y))
     t = math.hypot(x - TOWER[0], y - TOWER[1])
     h += 5 * smooth(1 - (t - 8) / 10)
-    h += 0.9 * smooth(1 - math.hypot(x - BALCONY_RISE[0], y - BALCONY_RISE[1]) / 3)
+    h += 1.3 * smooth(1 - math.hypot(x - BALCONY_RISE[0], y - BALCONY_RISE[1]) / 3)
     g = math.hypot(x - P["evergreen-glade"][0], y - P["evergreen-glade"][1])
     h -= 1.5 * smooth(1 - (g - 10) / 8)  # the glade lies a little low
     r = river.distance(x, y)
@@ -793,12 +793,14 @@ circles, boxes = [], []
 obstacles = {}
 
 
-def obstacle(exits, shape, *values, under=False, reach=None):
+def obstacle(exits, shape, *values, under=False, reach=None, all_round=False):
     """Underground ones block only the ways, and land ones only the land. You
-    bump into one this far before it, all round it (5 m, unless it says)."""
+    bump into one this far before it, all round it (5 m, unless it says).
+    (All round: it stops you from every side, with no far side on the land
+    to come from: only out of a door, which the game lets you.)"""
     for exit in exits:
         obstacles[exit] = {shape: [round(v, 2) for v in values], **({"under": True} if under else {}),
-                           **({"reach": reach} if reach is not None else {})}
+                           **({"reach": reach} if reach is not None else {}), **({"allRound": True} if all_round else {})}
 
 
 def solid_box(x, y, half_x, half_y):
@@ -1141,7 +1143,7 @@ bz = fl + TOWER_LANDING
 bu0, bu1, bv = 5.5, 8.5, 2.0
 # (Where the ladder's top rests: under the edge of the balcony's side towards
 # the mossy steps, past its bracket, so it faces you coming up them.)
-LADDER_TOP = (*out_from_tower(7.0, -bv + 0.15), bz - 0.42)
+LADDER_TOP = (*out_from_tower(7.9, -bv + 0.15), bz - 0.42)
 balcony_block(bu0, -bv, bu1, bv, bz - 0.4, bz)
 for u0, v0, u1, v1 in ((bu1 - 0.25, -bv, bu1, bv), (bu0, -bv, bu1 - 0.25, -bv + 0.25), (bu0, bv - 0.25, bu1 - 0.25, bv)):
     balcony_block(u0, v0, u1, v1, bz, bz + 0.9)
@@ -1157,15 +1159,16 @@ for k in range(6):
 # The snake, coiled at the top of the steps (and the stone that shuts you in,
 # from inside), and the balcony, too high to reach from the ground under it.
 # (The snake's round, in the doorway at the wall's line, so its far side is
-# in the tower, where you can't be on the land: it reaches out in front of
-# the door, and no further round the tower than you'd need to slip past it,
-# which leaves the way round to the balcony, whose reach is just past its
-# edge: you see it overhead. The stone is indoors, for the way out, its
+# in the tower, where you can't be on the land: it reaches out just past its
+# coil in front of the door, and stops you from every side (coming round
+# the tower's wall from the east, you'd come into it from its far side).
+# That leaves the way round to the ladder under the balcony, whose reach
+# covers the balcony and the ladder's foot, and no more. The stone is indoors, for the way out, its
 # middle just before you're far enough in to be in the tower (the round
 # room's edge, less your body's 0.35 m, player.ts): once you're in the
 # tower, you're past it, and shut in. Any further in, and you'd be in the
 # tower but not past it, and could still turn back and walk out.)
-obstacle(["mossy-steps north"], "circle", TOWER[0], -(TOWER[1] - TOWER_R), 0.8, reach=3.7)
+obstacle(["mossy-steps north"], "circle", TOWER[0], -(TOWER[1] - TOWER_R), 0.8, reach=2.4, all_round=True)
 # The enormous stone: waiting beside the door, to the west (out of the way
 # round to the balcony), until you're in the tower, when the game rolls it
 # across the doorway, just outside it, where the snake was; using the ring,
@@ -1179,8 +1182,8 @@ stone.build("stone", smooth=False).location = STONE_SPOTS["aside"]
 solid_circle(*STONE_SPOTS["aside"][:2], STONE_R * 0.9)
 stone_at = HALLS["tower"].r - 0.35 + 0.15
 obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - stone_at), 1.6, 0.5, under=True, reach=1.5)  # (so you can walk round the room)
-bx, by = out_from_tower(7.6, 0)  # (under the balcony, and with its reach, all of it: right in to the wall, from either side)
-obstacle(["mossy-steps east"], "circle", bx, -by, 1.6, reach=0.6)
+bx, by = out_from_tower(7.4, -0.8)  # (under the balcony, and with its reach, all of it, and the ladder's foot)
+obstacle(["mossy-steps east"], "circle", bx, -by, 2.6, reach=0.4)
 
 # The witches, on the way west to the crossroads.
 wx, wy = P["forest-witches"]
