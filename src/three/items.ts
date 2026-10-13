@@ -482,9 +482,8 @@ export function items(options: {
     state = result.state;
     slots[held] = undefined;
     // On to the next thing you carry (round from the last slot to the first),
-    // so G again drops that: or, carrying nothing, your hand stays empty.
-    const next = Array.from({ length: SLOTS }, (_, k) => (held + k) % SLOTS).find((k) => slots[k]);
-    if (next !== undefined) held = next;
+    // so G again drops that: or, carrying nothing now, back to the first slot.
+    held = Array.from({ length: SLOTS }, (_, k) => (held + k) % SLOTS).find((k) => slots[k]) ?? 0;
     draw();
     // (Something with no model yet, carried over from another version, is
     // just dropped, where you can't see it.)
