@@ -26,6 +26,7 @@ interface Leaning {
   thick: number; // half the wall's thickness
   model?: Object3D; // (gone once you've dropped it against the wall: it's lying there then)
   armed: boolean; // you've stepped away since it went up, so walking in climbs
+  slips?: boolean; // (propped under the balcony, not hooked over anything: no climbing it)
 }
 
 export class Ladder {
@@ -74,6 +75,36 @@ export class Ladder {
     if (show) this.show();
   }
 
+  /**
+   * Propped up under something overhead (the balcony) for an exit, its top at
+   * [x, y, z] and its foot out from there ([x, z]): as steep as it has to be
+   * to reach. It's not hooked over anything, so it slips: no climbing it.
+   */
+  prop([x, y, z]: number[], [ox, oz]: number[], exit: string, show: boolean) {
+    this.away();
+    const length = this.lengthOf(this.model);
+    let run = 1;
+    let foot = new Vector3();
+    for (let k = 0; k < 4; k++) {
+      foot = new Vector3(x + ox * run, 0, z + oz * run);
+      foot.y = this.ground(foot.x, foot.z) ?? 0;
+      run = Math.sqrt(Math.max(0.0625, length ** 2 - (y - foot.y) ** 2));
+    }
+    const corner = new Vector3(x, y, z);
+    this.leaning = {
+      exit,
+      foot,
+      corner,
+      out: [ox, oz],
+      along: [-oz, ox],
+      centre: [x, z],
+      thick: 0,
+      armed: false,
+      slips: true,
+    };
+    if (show) this.show();
+  }
+
   /** Back against the wall where it was (taken from there, it's still in use). */
   show() {
     const l = this.leaning;
@@ -114,7 +145,7 @@ export class Ladder {
   /** Each frame: walk into it and you climb over, then over(exit) is called. */
   update(over: (exit: string) => void) {
     const l = this.leaning;
-    if (!l || this.player.busy) return;
+    if (!l || this.player.busy || l.slips) return;
     const p = this.player.position;
     const fromFace = (p.x - l.corner.x) * l.out[0] + (p.z - l.corner.z) * l.out[1];
     const sideways = (p.x - l.foot.x) * l.along[0] + (p.z - l.foot.z) * l.along[1];

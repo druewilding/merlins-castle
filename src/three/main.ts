@@ -476,11 +476,17 @@ function inUse() {
     else snake.feed(player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
   } else if (instantly && here !== "tower") snake.back();
   const wall = exits.find((exit) => walls.has(shapeOf.get(exit)!));
-  if (wall !== leaning) {
+  // (Or propped under the balcony, at the mossy steps: "propped up ready",
+  // but it slips, so it opens nothing.)
+  const balcony = here === "mossy-steps" && using.includes("ladder") ? "mossy-steps east" : undefined;
+  const up = wall ?? balcony;
+  if (up !== leaning) {
     ladder.away();
-    if (wall) ladder.lean(shapeOf.get(wall)!.box!, wall, PLACES.get(here)!, itemLocations.ladder === "carried");
-    leaning = wall;
-  } else if (wall && itemLocations.ladder === "carried") ladder.show();
+    const carried = itemLocations.ladder === "carried";
+    if (wall) ladder.lean(shapeOf.get(wall)!.box!, wall, PLACES.get(here)!, carried);
+    else if (balcony) ladder.prop(land.balcony.top, land.balcony.out, balcony, carried);
+    leaning = up;
+  } else if (up && itemLocations.ladder === "carried") ladder.show();
 }
 
 // A game loaded: you're where you were in it (or, saved in another version,
