@@ -730,10 +730,12 @@ circles, boxes = [], []
 obstacles = {}
 
 
-def obstacle(exits, shape, *values, under=False):
-    """Underground ones block only the ways, and land ones only the land."""
+def obstacle(exits, shape, *values, under=False, reach=None):
+    """Underground ones block only the ways, and land ones only the land. You
+    bump into one this far before it, all round it (5 m, unless it says)."""
     for exit in exits:
-        obstacles[exit] = {shape: [round(v, 2) for v in values], **({"under": True} if under else {})}
+        obstacles[exit] = {shape: [round(v, 2) for v in values], **({"under": True} if under else {}),
+                           **({"reach": reach} if reach is not None else {})}
 
 
 def solid_box(x, y, half_x, half_y):
@@ -1047,7 +1049,7 @@ for k in range(6):
 # out, just inside the round room: in the doorway, you're still on the mossy
 # steps, and it would shut you in out there, past its middle.)
 obstacle(["mossy-steps north"], "box", TOWER[0], -(TOWER[1] - TOWER_R + 1), 3.0, 0.8)
-obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - TOWER_R + 1.5), 1.6, 0.5, under=True)
+obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - TOWER_R + 1.5), 1.6, 0.5, under=True, reach=1.5)  # (so you can walk round the room)
 obstacle(["mossy-steps east"], "box", TOWER[0] + 9.5, -TOWER[1], 0.6, 2.5)
 
 # The witches, on the way west to the crossroads.

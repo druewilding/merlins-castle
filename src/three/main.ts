@@ -161,12 +161,13 @@ player.halls = new Map(Object.entries(halls));
 // Solid things, and the obstacles: closed, until an object in use opens one.
 const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
-type Obstacle = { box?: number[]; circle?: number[]; under?: boolean };
+type Obstacle = { box?: number[]; circle?: number[]; under?: boolean; reach?: number };
 const obstacles = land.obstacles as Record<string, Obstacle>;
 const underCircles: Circle[] = land.under.circles.map(([x, z, r, top]) => ({ x, z, r, top }));
 const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ, top]) => ({ x, z, halfX, halfZ, top }));
-// You bump into an obstacle in your way this far before it, so you can see
-// what it is (and know there's something to do here).
+// You bump into an obstacle in your way this far before it (all round it), so
+// you can see what it is (and know there's something to do here): unless it
+// says how far itself (land.json), as the stone in the tower does.
 const AHEAD = 5;
 // One shape for each obstacle, with the names of every exit it blocks (a gate
 // blocks the way through from both sides).
@@ -234,14 +235,14 @@ function solidify() {
     // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
-        ...closed.flatMap(({ circle, names }) =>
-          circle ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: AHEAD }] : []
+        ...closed.flatMap(({ circle, names, reach = AHEAD }) =>
+          circle ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: reach }] : []
         ),
         ...(under ? underCircles : circles),
       ],
       [
-        ...closed.flatMap(({ box, names }) =>
-          box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names, ahead: AHEAD }] : []
+        ...closed.flatMap(({ box, names, reach = AHEAD }) =>
+          box ? [{ x: box[0], z: box[1], halfX: box[2], halfZ: box[3], names, ahead: reach }] : []
         ),
         ...plain.map(({ box }) => ({ x: box![0], z: box![1], halfX: box![2], halfZ: box![3] })),
         ...(under ? underBoxes : boxes),
