@@ -1294,9 +1294,11 @@ CORRIDOR_WALL = c.linear("#8f8878")
 under_circles, under_boxes = [], []
 
 
-# (Given its top, a thing low enough to climb onto: you can stand on it.)
-def under_circle(x, y, r, top=None):
-    under_circles.append([round(x, 2), round(-y, 2), round(r, 2)] + ([round(top, 2)] if top is not None else []))
+# (Given its top, a thing low enough to climb onto: you can stand on it. And
+# given its bottom too, a slab: you can walk under it, once it's over your head.)
+def under_circle(x, y, r, top=None, bottom=None):
+    under_circles.append([round(x, 2), round(-y, 2), round(r, 2)] + ([round(top, 2)] if top is not None else [])
+                         + ([round(bottom, 2)] if bottom is not None else []))
 
 
 def under_box(x, y, half_x, half_y, top=None):
@@ -2193,38 +2195,43 @@ def round_room(b, hall):
     b.add([(*at(k, R + E), f + tall) for k in range(sides)], [tuple(range(sides))],
           [c.mix(hall.wall, c.linear("#000000"), 0.35)] * sides)
     if hall.place == "tower":
-        # A chest against the west wall, south of the stairs, with the emerald
-        # in it: on a shallow tray (so you see it over the front), under a
-        # lid on its back edge, its own object, which the game opens as you
-        # come up to it. And stone steps curling up the wall from the west,
-        # round by the north, to a landing in the east, at the window onto
-        # the balcony. (Nothing in the middle: you'd stop there, in the reach
-        # of the stone that shuts you in.)
-        x0, y0, x1, y1, top, tray, t = hx - 4.3, hy - 2.6, hx - 3.6, hy - 1.0, f + 0.62, f + 0.4, 0.06
-        block(b, x0, y0, f, x1, y1, tray, DARK_WOOD, solid=False)
-        for wx0, wy0, wx1, wy1 in ((x0, y0, x1, y0 + t), (x0, y1 - t, x1, y1), (x0, y0, x0 + t, y1), (x1 - t, y0, x1, y1)):
-            block(b, wx0, wy0, tray, wx1, wy1, top, DARK_WOOD, solid=False)
-        under_box((x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2, top=top)
-        lid = c.Builder()
-        block(lid, 0, -(y1 - y0) / 2 - 0.02, 0, x1 - x0 + 0.02, (y1 - y0) / 2 + 0.02, 0.08, DARK_WOOD, solid=False)
-        for by in (-0.5, 0.5):
-            block(lid, -0.01, by - 0.04, -0.01, x1 - x0 + 0.03, by + 0.04, 0.09, IRON, solid=False)
-        lid.build("chest-lid", smooth=False).location = (x0, (y0 + y1) / 2, top)
-        CHEST.update(x=(x0 + x1) / 2, y=(y0 + y1) / 2, floor=tray)
+        # Stone slabs coming out of the wall, curling up it from the west,
+        # round by the north, to a landing in the east, at the window onto the
+        # balcony: you walk under them, once they're over your head. (Nothing
+        # in the middle: you'd stop there, in the reach of the stone that
+        # shuts you in.)
         n, wide, ahead = 15, 0.25, TOWER_FACING  # steps, half the landing's angle, and its middle
-        rise = TOWER_LANDING / (n + 1)
+        rise, thick = TOWER_LANDING / (n + 1), 0.15
         turn = (math.pi - wide - ahead) / n
         flights = [(math.pi - k * turn, math.pi - (k + 1) * turn, f + rise * (k + 1)) for k in range(n)]
         flights += [(ahead + wide, ahead, f + TOWER_LANDING), (ahead, ahead - wide, f + TOWER_LANDING)]  # (in two, to follow the wall)
         for a0, a1, top in flights:
             inner, outer = R - 1.1, R + E + 0.2  # (into the wall, which is straight between its corners)
             pts = [(hx + math.cos(a) * r, hy + math.sin(a) * r) for a, r in ((a0, inner), (a1, inner), (a1, outer), (a0, outer))]
+            low = max(f, top - thick)
             quad(b, [(*p, top) for p in pts], STONE, 0.08)
-            quad(b, [(*pts[0], f), (*pts[1], f), (*pts[1], top), (*pts[0], top)], STONE, 0.08)
-            quad(b, [(*pts[1], f), (*pts[2], f), (*pts[2], top), (*pts[1], top)], STONE, 0.08)
-            quad(b, [(*pts[3], f), (*pts[0], f), (*pts[0], top), (*pts[3], top)], STONE, 0.08)  # up from the step below
+            quad(b, [(*p, low) for p in pts], STONE, 0.08)
+            for i, j in ((0, 1), (1, 2), (3, 0)):  # its inner edge and its ends
+                quad(b, [(*pts[i], low), (*pts[j], low), (*pts[j], top), (*pts[i], top)], STONE, 0.08)
             for a in ((3 * a0 + a1) / 4, (a0 + 3 * a1) / 4):  # (two, or near its inner edge you'd fall through)
-                under_circle(hx + math.cos(a) * (R - 0.5), hy + math.sin(a) * (R - 0.5), 0.6, top=top)
+                under_circle(hx + math.cos(a) * (R - 0.5), hy + math.sin(a) * (R - 0.5), 0.6, top=top, bottom=low)
+        # A chest at the back, under the stairs, with the emerald in it: on a
+        # shallow tray (so you see it over the front, and what you drop in
+        # lands on it), under a lid on its back edge, its own object, which
+        # the game opens as you come up to it. Its sides are too high to step
+        # over: you can't climb in (but you can go over them, up the stairs).
+        x0, y0, x1, y1, top, tray, t = hx - 0.8, hy + R - 1.0, hx + 0.8, hy + R - 0.3, f + 0.62, f + 0.4, 0.06
+        block(b, x0, y0, f, x1, y1, tray, DARK_WOOD, solid=False)
+        for wx0, wy0, wx1, wy1 in ((x0, y0, x1, y0 + t), (x0, y1 - t, x1, y1), (x0, y0, x0 + t, y1), (x1 - t, y0, x1, y1)):
+            block(b, wx0, wy0, tray, wx1, wy1, top, DARK_WOOD, solid=False)
+            under_box((wx0 + wx1) / 2, (wy0 + wy1) / 2, (wx1 - wx0) / 2, (wy1 - wy0) / 2, top=top)
+        under_box((x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2 - t, (y1 - y0) / 2 - t, top=tray)
+        lid = c.Builder()
+        block(lid, -(x1 - x0) / 2 - 0.02, -(y1 - y0) - 0.02, 0, (x1 - x0) / 2 + 0.02, 0, 0.08, DARK_WOOD, solid=False)
+        for bx in (-0.5, 0.5):
+            block(lid, bx - 0.04, -(y1 - y0) - 0.03, -0.01, bx + 0.04, 0.01, 0.09, IRON, solid=False)
+        lid.build("chest-lid", smooth=False).location = ((x0 + x1) / 2, y1, top)
+        CHEST.update(x=(x0 + x1) / 2, y=(y0 + y1) / 2, floor=tray)
 
 for hall in HALLS.values():
     if hall.room:

@@ -15,8 +15,10 @@ import {
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
+  MeshPhysicalMaterial,
   type Object3D,
   PCFShadowMap,
+  PMREMGenerator,
   PointLight,
   Scene,
   SRGBColorSpace,
@@ -24,6 +26,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
@@ -120,6 +123,25 @@ const [model, file, things, snaky] = await Promise.all([
   loader.loadAsync(snakeModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
+// The emerald, glassy: a little room's lights caught in its facets (its own,
+// not the scene's), and a glow from within, so it shines even in the tower.
+const emerald = things.scene.getObjectByName("emerald");
+if (emerald instanceof Mesh) {
+  const pmrem = new PMREMGenerator(renderer);
+  emerald.material = new MeshPhysicalMaterial({
+    vertexColors: true,
+    flatShading: true,
+    roughness: 0.12,
+    metalness: 0.9, // (its reflections green, as in its picture: white only in a thin coat over them)
+    clearcoat: 0.2,
+    clearcoatRoughness: 0.05,
+    envMap: pmrem.fromScene(new RoomEnvironment(), 0.02).texture,
+    envMapIntensity: 0.55,
+    emissive: new Color("#0f7a38"),
+    emissiveIntensity: 0.7,
+  });
+  pmrem.dispose();
+}
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
   node.castShadow = !["paths", "water"].includes(node.name);
@@ -163,7 +185,7 @@ const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
 type Obstacle = { box?: number[]; circle?: number[]; under?: boolean; reach?: number };
 const obstacles = land.obstacles as Record<string, Obstacle>;
-const underCircles: Circle[] = land.under.circles.map(([x, z, r, top]) => ({ x, z, r, top }));
+const underCircles: Circle[] = land.under.circles.map(([x, z, r, top, bottom]) => ({ x, z, r, top, bottom }));
 const underBoxes: Box[] = land.under.boxes.map(([x, z, halfX, halfZ, top]) => ({ x, z, halfX, halfZ, top }));
 // You bump into an obstacle in your way this far before it (all round it), so
 // you can see what it is (and know there's something to do here): unless it
@@ -658,7 +680,7 @@ renderer.setAnimationLoop((time) => {
     const near =
       player.under?.hall === "tower" && Math.hypot(player.position.x - chestX, player.position.z - chestZ) < 2.5;
     lidOpen += Math.sign(Number(near) - lidOpen) * Math.min(Math.abs(Number(near) - lidOpen), dt * 1.5);
-    lid.rotation.z = LID * (lidOpen * lidOpen * (3 - 2 * lidOpen));
+    lid.rotation.x = -LID * (lidOpen * lidOpen * (3 - 2 * lidOpen));
   }
   for (const gate of gates.values()) {
     gate.open += Math.sign(gate.wants - gate.open) * Math.min(Math.abs(gate.wants - gate.open), dt * 0.8);

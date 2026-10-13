@@ -216,12 +216,12 @@ export function items(options: {
     });
   }
 
-  /** The hall (or room) a thing lies in, if any: on its floor, and within its walls. */
+  /** The hall (or room) a thing lies in, if any: on its floor (or a step), and within its walls. */
   function hallOf(thing: Lying) {
     if (thing.floor === undefined) return undefined;
     const { x, z } = thing.model.position;
     for (const [place, hall] of player.halls) {
-      if (Math.abs(hall.floor - thing.floor) > 1.5) continue;
+      if (thing.floor < hall.floor - 0.5 || thing.floor > hall.floor + hall.tall) continue;
       const within =
         hall.w !== undefined && hall.d !== undefined
           ? Math.abs(x - hall.x) <= hall.w && Math.abs(z - hall.z) <= hall.d
@@ -532,7 +532,7 @@ export function items(options: {
     const size = new Box3().setFromObject(models.getObjectByName(id)!).getSize(new Vector3());
     const side = [Math.cos(player.yaw), -Math.sin(player.yaw)];
     const forward = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
-    const [px, pz] = pointedAt();
+    const [px, pz, floor] = pointedAt();
     const spots = NUDGES.map(([aside, on]) => ({
       x: px + forward[0] * on + side[0] * aside,
       z: pz + forward[1] * on + side[1] * aside,
@@ -542,15 +542,17 @@ export function items(options: {
     }));
     const taken = [...lying.values()].flatMap((thing) => (thing.footprint ? [thing.footprint] : []));
     const { x, z } = spots.find((spot) => !taken.some((other) => overlap(spot, other))) ?? spots[0];
-    lay(id, state.room, x, z, yaw, player.under ? player.under.floor : undefined);
+    lay(id, state.room, x, z, yaw, floor);
   }
 
   /**
-   * Where you're pointing, on the ground (or the floor): along your gaze until
-   * it meets it, as far as you can reach, and not past anything you couldn't
-   * walk past (a wall, the forest, the water, an obstacle), nor right under you.
+   * Where you're pointing, on the ground (or the floor, or the top of a step
+   * or a table, or the chest's tray, coming down onto it): along your gaze
+   * until it meets it, as far as you can reach, and not past anything you
+   * couldn't walk past (a wall, the forest, the water, an obstacle), nor
+   * right under you. Off the land, how high that is.
    */
-  function pointedAt(): [number, number] {
+  function pointedAt(): [number, number, number | undefined] {
     player.camera.getWorldPosition(eye);
     player.camera.getWorldDirection(look);
     const { position: me, under } = player;
@@ -562,19 +564,27 @@ export function items(options: {
             return there.d < way.half - 0.2 && Math.abs(there.floor - under.floor) < 1;
           })
       : (x: number, z: number) => walkable(x, z) && player.clear(x, z, false, 0.05);
-    let spot: [number, number] = [me.x, me.z];
+    // (What your gaze was already over, a step before: not what it goes into
+    // the side of, or under.)
+    const floorAt = (x: number, z: number, over: number) =>
+      under ? Math.max(under.floor, player.topAt(x, z, over)) : undefined;
+    let spot: [number, number, number | undefined] = [me.x, me.z, under?.floor];
+    let was = eye.y;
     for (let d = 0.1; d <= REACH; d += 0.1) {
       const x = eye.x + look.x * d;
       const z = eye.z + look.z * d;
       if (!open(x, z)) break;
-      spot = [x, z];
-      if (eye.y + look.y * d <= (under ? under.floor : (ground(x, z) ?? -Infinity))) break;
+      const floor = floorAt(x, z, was);
+      spot = [x, z, floor];
+      was = eye.y + look.y * d;
+      if (was <= (floor ?? ground(x, z) ?? -Infinity)) break;
     }
     // (At least a little way in front of you.)
     const away = Math.hypot(spot[0] - me.x, spot[1] - me.z);
     if (away < NEAREST) {
       const forward = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
-      spot = [me.x + forward[0] * NEAREST, me.z + forward[1] * NEAREST];
+      const [x, z] = [me.x + forward[0] * NEAREST, me.z + forward[1] * NEAREST];
+      spot = [x, z, floorAt(x, z, me.y + 0.45)];
     }
     return spot;
   }

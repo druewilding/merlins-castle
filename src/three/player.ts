@@ -16,6 +16,8 @@ export interface Circle {
   allRound?: boolean;
   /** The height of its top, if it's low enough to climb onto. */
   top?: number;
+  /** The height of its underside, if it's a slab you can walk under (once it's over your head). */
+  bottom?: number;
 }
 
 export interface Box {
@@ -420,9 +422,11 @@ export class Player {
     }
     // Under a roof, a jump stops at it: jumping where a tunnel drops away
     // steeply, the roof drops with the floor, and would leave you behind.
+    // (Or under a slab, at its underside.)
     if (this.under && this.lift > 0) {
       const tall = this.under.hall ? (this.halls.get(this.under.hall)?.tall ?? ROOF) : PROPS;
-      const most = Math.max(0, this.under.floor + tall - HEADROOM - this.eye - p.y);
+      const roof = Math.min(this.under.floor + tall, this.slabOver(p.x, p.z, p.y + this.eye));
+      const most = Math.max(0, roof - HEADROOM - this.eye - p.y);
       if (this.lift > most) {
         this.lift = most;
         this.rise = Math.min(this.rise, 0);
@@ -434,15 +438,32 @@ export class Player {
   // step above your feet).
   private topUnder(feet: number) {
     if (!this.under) return -Infinity;
-    const p = this.position;
-    const near = this.nearUnder.get(`${Math.floor(p.x / CELL)},${Math.floor(p.z / CELL)}`);
+    return this.topAt(this.position.x, this.position.z, feet + STEP);
+  }
+
+  // The underside of the lowest slab over your head (standing, or jumping).
+  private slabOver(x: number, z: number, head: number) {
+    const near = this.nearUnder.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
+    let lowest = Infinity;
+    for (const c of near?.circles ?? []) {
+      if (c.bottom !== undefined && c.bottom >= head && Math.hypot(x - c.x, z - c.z) < c.r + BODY)
+        lowest = Math.min(lowest, c.bottom);
+    }
+    return lowest;
+  }
+
+  /**
+   * Off the land, the top of the highest thing at a spot you could stand on
+   * (or put something on: a step, a table, the chest's tray), up to a height.
+   */
+  topAt(x: number, z: number, most = Infinity) {
+    const near = this.nearUnder.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
     let best = -Infinity;
     for (const c of near?.circles ?? []) {
-      if (c.top !== undefined && c.top <= feet + STEP && Math.hypot(p.x - c.x, p.z - c.z) < c.r)
-        best = Math.max(best, c.top);
+      if (c.top !== undefined && c.top <= most && Math.hypot(x - c.x, z - c.z) < c.r) best = Math.max(best, c.top);
     }
     for (const b of near?.boxes ?? []) {
-      if (b.top !== undefined && b.top <= feet + STEP && Math.abs(p.x - b.x) < b.halfX && Math.abs(p.z - b.z) < b.halfZ)
+      if (b.top !== undefined && b.top <= most && Math.abs(x - b.x) < b.halfX && Math.abs(z - b.z) < b.halfZ)
         best = Math.max(best, b.top);
     }
     return best;
@@ -570,8 +591,10 @@ export class Player {
     // (Anything you're above, or a step below, you go over, not into.)
     const feet = p.y + this.lift;
     const below = (thing: Circle | Box) => thing.top !== undefined && feet >= thing.top - STEP;
+    // (And a slab over your head, you go under.)
+    const over = (thing: Circle) => thing.bottom !== undefined && feet + this.eye + HEADROOM <= thing.bottom;
     for (const c of near.circles) {
-      if (below(c)) continue;
+      if (below(c) || over(c)) continue;
       const dx = p.x - c.x;
       const dz = p.z - c.z;
       const d = Math.hypot(dx, dz);

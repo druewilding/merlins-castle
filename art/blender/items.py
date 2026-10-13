@@ -366,7 +366,7 @@ for ring_, (lo, hi) in enumerate(zip(rings, rings[1:])):
         pts = [lo[k], lo[(k + 1) % 8], hi[(k + 1) % 8], hi[k]]
         emerald.add(pts, [(0, 1, 2, 3)], [c.vary(EM_COLOURS[ring_], 0.18, Vector((k, ring_, 1.0)))] * 4)
 emerald.add(rings[0][::-1], [tuple(range(8))], [c.linear("#0b4a24")] * 8)
-emerald.add(rings[-1], [tuple(range(8))], [c.linear("#7fe8a4")] * 8)
+emerald.add(rings[-1], [tuple(range(8))], [c.linear("#34c26c")] * 8)
 outward(emerald.build("emerald", smooth=False))
 
 if out:
