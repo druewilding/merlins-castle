@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.1](https://github.com/druewilding/merlins-castle/compare/v2.5.0...v2.5.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* Various fixes and improvements ([#61](https://github.com/druewilding/merlins-castle/issues/61)) ([984257c](https://github.com/druewilding/merlins-castle/commit/984257c368813541a6e3dd672d4f9338ed6d98c3))
+
 ## [2.5.0](https://github.com/druewilding/merlins-castle/compare/v2.4.0...v2.5.0) (2026-10-12)
 
 
