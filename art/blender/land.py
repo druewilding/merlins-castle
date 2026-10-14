@@ -1281,11 +1281,6 @@ obstacle(["moat south"], "box", 0, -(MOAT[3] + CASTLE[3] + 2) / 2, 3.2, 1.5)
 # The old stone wall: north from the forest, west along the gate, north again.
 WALL = 4.5
 WX, WY = -100 * K, 60 * K  # the corner by the old stone wall, and the gate's line
-y = -18 * K
-while y < WY:
-    block(built, WX - 0.6, y, height(WX, y) - 0.5, WX + 0.6, min(y + 2, WY + 0.6), height(WX, y) + WALL, STONE,
-          solid=False)
-    y += 2
 # Between the old wall and the old stone wall, it's too high to climb without the ladder.
 obstacle(["old-wall east", "old-stone-wall west"], "box", WX, -(-18 * K + WY + 0.6) / 2, 0.6, (WY + 0.6 + 18 * K) / 2)
 GATE = (P["rusty-gate"][0] - 2.2, P["rusty-gate"][0] + 2.2)  # the gap in the wall, exactly the gate's width
@@ -1293,7 +1288,7 @@ WW = -140 * K  # where it turns north again, up the west of the yellow flowers
 for start, end in ((WW - 0.6, GATE[0]), (GATE[1], WX + 0.6)):
     x = start
     while x < end - 0.01:
-        block(built, x, WY - 0.6, height(x, WY) - 0.5, min(x + 2, end), WY + 0.6, height(x, WY) + WALL, STONE)
+        solid_box((x + min(x + 2, end)) / 2, WY, (min(x + 2, end) - x) / 2, 0.6)
         x += 2
 # The rusty gate, locked: two halves, each on its hinge at the wall, which
 # the game swings open (north, away from the rusty gate) while the key's in use.
@@ -1320,8 +1315,194 @@ for name, hinge, way in (("gate-west", GATE[0], 1), ("gate-east", GATE[1], -1)):
 obstacle(["rusty-gate north", "yellow-flowers south"], "box", (GATE[0] + GATE[1]) / 2, -WY, (GATE[1] - GATE[0]) / 2, 0.6)
 y = WY
 while y < 118 * K:
-    block(built, WW - 0.6, y, height(WW, y) - 0.5, WW + 0.6, y + 2, height(WW, y) + WALL, STONE)
+    solid_box(WW, y + 1, 0.6, 1)
     y += 2
+WALL_END = y
+
+# What it looks like: dry stone, as in the paintings. Rough courses of
+# stones of every size and shade (bigger low down), wider at its foot and
+# leaning in a little as it rises; a row of stones on edge along its top;
+# moss low down, on its top and on its shady side, pale lichen here and
+# there; ivy hanging down from its top in places; a stone missing, or
+# sticking out, now and then; and a few fallen at its foot. (Solid as the
+# boxes above, and as the obstacle: this is only how it looks.)
+# (Light sand, so the ladder shows up clearly against it.)
+WALL_STONES = [c.linear(h) for h in ("#dcc08a", "#e6cf9f", "#d1b47f", "#dfc596", "#ecdbb4", "#ccae7c", "#e2cc9c")]
+WALL_GAP = c.linear("#9a8868")  # (in between them, deep in)
+MOSS = c.linear("#8a9446")
+LICHEN = c.linear("#eee8cf")
+IVY = (c.linear("#2c5220"), c.linear("#4c7a2c"))
+WALL_TALL = WALL + 0.5  # from its foot, under the ground, to its top
+FOOT_HALF, TOP_HALF = 0.62, 0.56  # half its thickness (the ladder rests on its top edge: ladder.ts)
+SUN_XY = Vector((-0.75, 0.5)).normalized()  # where the sun is (main.ts), in Blender's axes, across the land
+wall = c.Builder()
+wall_rng = random.Random("the old stone wall")
+
+
+def facing(builder, pts, colours, outward):
+    """A face, wound to face outward (or it's not drawn: it's facing away)."""
+    n = (Vector(pts[1]) - Vector(pts[0])).cross(Vector(pts[2]) - Vector(pts[0]))
+    if n.dot(Vector(outward)) < 0:
+        pts, colours = pts[::-1], colours[::-1]
+    builder.add(pts, [tuple(range(len(pts)))], colours)
+
+
+def stone_wall(x0, y0, x1, y1):
+    length = math.hypot(x1 - x0, y1 - y0)
+    dx, dy = (x1 - x0) / length, (y1 - y0) / length
+    nx_, ny_ = -dy, dx  # across it
+
+    def foot(t):
+        return height(x0 + dx * t, y0 + dy * t) - 0.5
+
+    def half(h):
+        return FOOT_HALF + (TOP_HALF - FOOT_HALF) * h / WALL_TALL
+
+    def at(t, h, side, depth=0.0):
+        """A point on its face (side 1 or -1), t along it and h up from its foot, depth in from its face."""
+        out = (half(h) - depth) * side
+        return (x0 + dx * t + nx_ * out, y0 + dy * t + ny_ * out, foot(t) + h)
+
+    def stone(a0, a1, b0, b1, side, shady, bevel=None, bulge=None):
+        """One stone, its face from a0 to a1 along the wall and b0 to b1 up,
+        bevelled round its edges, a little askew, and some of it standing out."""
+        bevel = wall_rng.uniform(0.03, 0.06) if bevel is None else bevel
+        bevel = min(bevel, (a1 - a0) / 3, (b1 - b0) / 3)
+        if bulge is None:
+            bulge = wall_rng.uniform(0.0, 0.04) + (0.07 if wall_rng.random() < 0.02 else 0.0)
+        mid, h = (a0 + a1) / 2, (b0 + b1) / 2
+        colour = c.vary(wall_rng.choice(WALL_STONES), 0.1, Vector((a0, b0, side * 3)))
+        mossy = max(smooth(1 - (h - 0.5) / 1.2), smooth((h - WALL_TALL + 1.2) / 1.0) * 0.6) * (0.5 + 0.6 * shady)
+        mossy *= max(0.0, 0.6 + 0.8 * noise.noise(Vector((x0 + dx * mid, y0 + dy * mid, h * 2))))
+        colour = c.mix(colour, MOSS, min(0.6, mossy * 0.75))
+        if wall_rng.random() < 0.15:
+            colour = c.mix(colour, LICHEN, wall_rng.uniform(0.25, 0.55))
+        dark = c.mix(colour, WALL_GAP, 0.35)
+        # (Askew: its corners up or down a little.)
+        tip = [wall_rng.uniform(-0.025, 0.025) for _ in range(4)]
+        ts, hs = (a0, a1, a1, a0), (b0, b0, b1, b1)
+        towards = ((1, 1), (-1, 1), (-1, -1), (1, -1))
+        front = [at(ts[k] + towards[k][0] * bevel, hs[k] + towards[k][1] * bevel + tip[k], side, -bulge)
+                 for k in range(4)]
+        rim = [at(ts[k], hs[k] + tip[k], side, 0.02) for k in range(4)]
+        out = (nx_ * side, ny_ * side, 0)
+        facing(wall, front, [colour, colour, c.mix(colour, LICHEN, 0.06), colour], out)
+        for k in range(4):
+            facing(wall, [front[k], rim[k], rim[(k + 1) % 4], front[(k + 1) % 4]], [colour, dark, dark, colour], out)
+
+    # Its core, deep in: what you see between the stones, and at its ends.
+    for side in (1, -1):
+        facing(wall, [at(0, 0, side, 0.05), at(length, 0, side, 0.05), at(length, WALL_TALL, side, 0.05),
+                      at(0, WALL_TALL, side, 0.05)], [WALL_GAP] * 4, (nx_ * side, ny_ * side, 0))
+    for t in (0.0, length):
+        way = -1 if t == 0 else 1
+        pts = [at(t, 0, -1, 0.05), at(t, 0, 1, 0.05), at(t, WALL_TALL, 1, 0.05), at(t, WALL_TALL, -1, 0.05)]
+        facing(wall, pts, [c.mix(WALL_GAP, WALL_STONES[0], 0.5)] * 4, (dx * way, dy * way, 0))
+    facing(wall, [at(0, WALL_TALL, -1, 0.05), at(length, WALL_TALL, -1, 0.05), at(length, WALL_TALL, 1, 0.05),
+                  at(0, WALL_TALL, 1, 0.05)], [WALL_GAP] * 4, (0, 0, 1))
+    # The stones, in rough courses, each side: none quite filling its course
+    # (a dark chink over it, now and then packed with a small stone), now
+    # and then two on top of each other, or one gone.
+    for side in (1, -1):
+        shady = max(0.0, -(nx_ * side * SUN_XY.x + ny_ * side * SUN_XY.y))
+        h = 0.0
+        while h < WALL_TALL - 0.05:
+            low = 1 - h / WALL_TALL
+            tall = min(wall_rng.uniform(0.32, 0.5) + 0.18 * low, WALL_TALL - h)
+            if WALL_TALL - h - tall < 0.15:
+                tall = WALL_TALL - h
+            t = -wall_rng.uniform(0, 0.5)
+            while t < length:
+                long = wall_rng.uniform(0.5, 1.2) + 0.45 * low
+                ta, tb = max(t, 0.0), min(t + long, length)
+                t += long
+                if tb - ta < 0.12:
+                    continue
+                if wall_rng.random() < 0.012 and 0.6 < h < WALL_TALL - 0.6:
+                    continue
+                gap = 0.02
+                short = wall_rng.uniform(0.0, 0.12) if h + tall < WALL_TALL - 0.01 else 0.0
+                a0, a1, b0, b1 = ta + gap, tb - gap, h + gap, h + tall - gap - short
+                if short > 0.06 and a1 - a0 > 0.45:
+                    pa = wall_rng.uniform(a0 + 0.05, a1 - 0.25)
+                    stone(pa, pa + wall_rng.uniform(0.15, 0.28), b1 + gap, h + tall - gap, side, shady, 0.015, 0.0)
+                if wall_rng.random() < 0.08 and b1 - b0 > 0.3:
+                    split = b0 + (b1 - b0) * wall_rng.uniform(0.4, 0.6)
+                    cut = wall_rng.uniform(a0 + 0.1, a1 - 0.1) if a1 - a0 > 0.5 else None
+                    stone(a0, a1, b0, split - gap, side, shady)
+                    if cut:
+                        stone(a0, cut - gap, split + gap, b1, side, shady)
+                        stone(cut + gap, a1, split + gap, b1, side, shady)
+                    else:
+                        stone(a0, a1, split + gap, b1, side, shady)
+                else:
+                    stone(a0, a1, b0, b1, side, shady)
+            h += tall
+    # Along its top, stones on edge, leaning this way and that, ragged.
+    t = 0.0
+    while t < length - 0.1:
+        thick = wall_rng.uniform(0.18, 0.3)
+        ta, tb = t + 0.015, min(t + thick, length) - 0.015
+        t += thick
+        lean = wall_rng.uniform(-0.08, 0.08)
+        up = wall_rng.uniform(0.3, 0.5)
+        colour = c.mix(c.vary(wall_rng.choice(WALL_STONES), 0.1, Vector((ta, 0, 9))), MOSS, wall_rng.uniform(0.1, 0.45))
+        w = TOP_HALF + 0.02
+        corners = []
+        for z in (0.0, 1.0):
+            for (tt, side) in ((ta, -1), (tb, -1), (tb, 1), (ta, 1)):
+                rise = up + wall_rng.uniform(-0.07, 0.07) if z else 0.0
+                base = foot(tt) + WALL_TALL - 0.05
+                tt2 = tt + lean * rise
+                corners.append((x0 + dx * tt2 + nx_ * w * side, y0 + dy * tt2 + ny_ * w * side, base + rise))
+        middle = Vector(corners[0]) + Vector(corners[6])
+        for f in [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7)]:
+            pts = [corners[k] for k in f]
+            shade = c.mix(colour, LICHEN, 0.1) if f == (4, 5, 6, 7) else colour
+            facing(wall, pts, [shade] * 4, tuple(Vector(pts[0]) + Vector(pts[2]) - middle))
+    # Ivy, hanging down from its top, here and there, either side.
+    for side in (1, -1):
+        t = wall_rng.uniform(2, 8)
+        while t < length - 1:
+            wide = wall_rng.uniform(1.5, 3.5)
+            drop = wall_rng.uniform(1.5, 4.0)
+            for _ in range(int(wide * drop * 32)):
+                u = wall_rng.uniform(-1, 1)
+                # (Hanging lower in the middle, and ragged at its foot.)
+                reach = drop * (1 - 0.6 * u * u) * wall_rng.uniform(0.55, 1.0)
+                down = reach * wall_rng.random() ** 1.4
+                lt = t + u * wide / 2
+                if not 0 < lt < length:
+                    continue
+                h = min(WALL_TALL + 0.15, WALL_TALL - down + 0.15)
+                size = wall_rng.uniform(0.13, 0.21)
+                spin = wall_rng.uniform(0, 2 * math.pi)
+                cx, cy, cz = at(lt, h, side, -wall_rng.uniform(0.02, 0.1))
+                corners = []
+                for a, r in ((0, 1.0), (math.pi / 2, 0.6), (math.pi, 0.5), (3 * math.pi / 2, 0.6)):
+                    along_, up_ = math.cos(spin + a) * size * r, math.sin(spin + a) * size * r
+                    lift = 0.04 * wall_rng.random() if a == 0 else 0.0
+                    corners.append((cx + dx * along_ + nx_ * side * lift, cy + dy * along_ + ny_ * side * lift, cz + up_))
+                leaf = c.mix(*IVY, wall_rng.random())
+                facing(wall, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf],
+                       (nx_ * side, ny_ * side, 0))
+            t += wide + wall_rng.uniform(5, 14)
+    # Fallen stones, at its foot, either side (just out of your reach).
+    t = wall_rng.uniform(1, 5)
+    while t < length - 1:
+        side = wall_rng.choice((1, -1))
+        out = FOOT_HALF + wall_rng.uniform(0.05, 0.3)
+        cx, cy = x0 + dx * t + nx_ * out * side, y0 + dy * t + ny_ * out * side
+        size = wall_rng.uniform(0.18, 0.3)
+        wall.blob((cx, cy, drawn_height(cx, cy) + size * 0.25), size, c.mix(wall_rng.choice(WALL_STONES), MOSS, 0.3),
+                  squash=0.55, lumpy=0.2, seed=int(t * 13) + side, subdivisions=1)
+        t += wall_rng.uniform(3, 9)
+
+
+for run in ((WX, -18 * K, WX, WY + 0.6), (WW - 0.6, WY, GATE[0], WY), (GATE[1], WY, WX + 0.6, WY),
+            (WW, WY, WW, WALL_END)):
+    stone_wall(*run)
+wall.build("old-stone-wall", smooth=False)
 
 def porch(x, y_wall, y_lip, half, colour):
     """Where a building's doorway sticks out of its wall (to the lip, where
