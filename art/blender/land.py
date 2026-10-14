@@ -949,6 +949,156 @@ obj, top = nature("TreeStump")
 vertex_coloured(obj, "stump", top)
 bpy.data.objects.remove(obj)
 
+# What grows on the ground, each kind once in land.glb ("plant-<kind>"): the
+# game scatters them round you, by what grows where (growth(), below), as in
+# the paintings. Grass and flowers are ours (the pack's are stiff and few);
+# the leafy plants, ferns, bushes and stones are the pack's.
+RECOLOUR["Rock"] = c.linear("#8e877b")  # (warm grey, not the pack's blue)
+for kind, name in (("Plant_1", "leafy"), ("Plant_3", "fern"), ("Rock_Moss_1", "boulder-1"), ("Rock_Moss_3", "boulder-2"),
+                   ("Rock_Moss_5", "boulder-3"), ("Rock_Moss_7", "boulder-4"), ("Rock_2", "pebble-1"),
+                   ("Rock_4", "pebble-2")):
+    obj, top = nature(kind)
+    # (The leafy ones simpler: there are hundreds round you.)
+    vertex_coloured(obj, f"plant-{name}", top, ratio=0.4 if name in ("leafy", "fern") else None)
+    bpy.data.objects.remove(obj)
+
+BLADE_BASE = c.linear("#4a7425")
+BLADE_TIP = c.linear("#9dbb4c")
+
+
+def blade(b, x, y, angle, tall, lean, wide, base=BLADE_BASE, tip=BLADE_TIP, simple=False):
+    """A blade of grass (or a leaf): from its foot at [x, y], up and arching
+    over, away from the middle, tapering to a point. (Simple: straight, one
+    triangle, for the thousands of tufts in the grass.)"""
+    ox, oy = math.cos(angle), math.sin(angle)
+    sx, sy = -oy, ox  # across it
+    pts, cols = [], []
+    for t in (0.0,) if simple else (0.0, 0.4, 0.75):
+        out = lean * tall * t * t
+        w = wide * (1 - 0.7 * t)
+        z = tall * t * (1 - 0.25 * lean * t)
+        for side in (-1, 1):
+            pts.append((x + ox * out + sx * w * side, y + oy * out + sy * w * side, z))
+            cols.append(c.mix(base, tip, t))
+    pts.append((x + ox * lean * tall, y + oy * lean * tall, tall * (1 - 0.25 * lean)))
+    cols.append(tip)
+    b.add(pts, [(0, 1, 2)] if simple else [(0, 1, 3, 2), (2, 3, 5, 4), (4, 5, 6)], cols)
+
+
+def tuft(b, rng, blades, tall, spread=0.08, lean=(0.15, 0.6), base=BLADE_BASE, tip=BLADE_TIP, wide=(0.018, 0.03),
+         simple=False):
+    for _ in range(blades):
+        a = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(0, spread)
+        shade = rng.uniform(0.85, 1.1)
+        blade(b, math.cos(a) * r, math.sin(a) * r, a + rng.uniform(-0.6, 0.6), tall * rng.uniform(0.55, 1.0),
+              rng.uniform(*lean), rng.uniform(*wide), base, tuple(v * shade for v in tip[:3]) + (1.0,), simple)
+
+
+def flower_head(b, x, y, z, petals, size, colour, middle, cup=0.0, tilt=(0.0, 0.0)):
+    """A flower facing up (tipped a little by tilt): petals round a middle,
+    flat (a daisy) or cupped up (a buttercup)."""
+    tx, ty = tilt
+
+    def at(px, py, pz):
+        return (x + px, y + py, z + pz + px * tx + py * ty)
+
+    for k in range(petals):
+        a = 2 * math.pi * k / petals
+        ca, sa = math.cos(a), math.sin(a)
+        da = math.pi / petals * 0.8
+        lift = size * cup
+        b.add([at(0, 0, 0),
+               at(math.cos(a - da) * size * 0.55, math.sin(a - da) * size * 0.55, lift * 0.5),
+               at(ca * size, sa * size, lift),
+               at(math.cos(a + da) * size * 0.55, math.sin(a + da) * size * 0.55, lift * 0.5)],
+              [(0, 1, 2, 3)], [colour] * 4)
+    r = size * 0.32
+    b.add([at(math.cos(2 * math.pi * k / 6) * r, math.sin(2 * math.pi * k / 6) * r, size * 0.08) for k in range(6)],
+          [tuple(range(6))], [middle] * 6)
+
+
+def stem(b, x0, y0, x1, y1, z1, colour=BLADE_BASE, wide=0.008):
+    """A thin stem up to a flower: two crossed strips."""
+    for sx, sy in ((wide, 0), (0, wide)):
+        b.add([(x0 - sx, y0 - sy, 0), (x0 + sx, y0 + sy, 0), (x1 + sx, y1 + sy, z1), (x1 - sx, y1 - sy, z1)],
+              [(0, 1, 2, 3)], [colour, colour, c.mix(colour, BLADE_TIP, 0.4), c.mix(colour, BLADE_TIP, 0.4)])
+
+
+def bell(b, x, y, z, angle, size, colour, inside):
+    """A foxglove's flower: a little bell hanging off its stem (at [x, y, z]),
+    its open end out (towards angle) and down."""
+    sides = 5
+    ox, oy = math.cos(angle), math.sin(angle)
+    tip = (x, y, z + size * 0.4)
+    mouth = (x + ox * size, y + oy * size, z - size * 0.35)
+    sx, sy = -oy, ox
+    rim = []
+    for k in range(sides):
+        a = 2 * math.pi * k / sides
+        u, v = math.cos(a) * size * 0.42, math.sin(a) * size * 0.42
+        # (round the mouth: across it, and up and down, tipped back towards the stem)
+        rim.append((mouth[0] + sx * u - ox * v * 0.4, mouth[1] + sy * u - oy * v * 0.4, mouth[2] + v * 0.9))
+    b.add([tip] + rim, [(0, 1 + k, 1 + (k + 1) % sides) for k in range(sides)], [colour] + [inside] * sides)
+
+
+plant_rng = random.Random("what grows")
+for name, tall, blades in (("grass", 0.45, 16), ("grass-short", 0.26, 14)):
+    b = c.Builder()
+    tuft(b, plant_rng, blades, tall, spread=0.22, lean=(0.1, 0.5), wide=(0.03, 0.05), simple=True)
+    b.build(f"plant-{name}", smooth=False)
+# Ox-eye daisies: white with yellow middles, held up over the grass.
+b = c.Builder()
+tuft(b, plant_rng, 5, 0.14, spread=0.05, lean=(0.6, 1.0), wide=(0.03, 0.04), simple=True)
+for k in range(4):
+    a = plant_rng.uniform(0, 2 * math.pi)
+    r = plant_rng.uniform(0.04, 0.14)
+    x, y, z = math.cos(a) * r, math.sin(a) * r, plant_rng.uniform(0.38, 0.55)
+    stem(b, 0, 0, x, y, z)
+    flower_head(b, x, y, z, 9, plant_rng.uniform(0.06, 0.075), c.linear("#fbf8ee"), c.linear("#f0c02a"),
+                tilt=(x * 2, y * 2))
+b.build("plant-daisy", smooth=False)
+# Buttercups: glossy yellow cups, on tall stems.
+b = c.Builder()
+tuft(b, plant_rng, 4, 0.16, spread=0.05, lean=(0.6, 1.0), wide=(0.03, 0.04), simple=True)
+for k in range(6):
+    a = plant_rng.uniform(0, 2 * math.pi)
+    r = plant_rng.uniform(0.05, 0.16)
+    x, y, z = math.cos(a) * r, math.sin(a) * r, plant_rng.uniform(0.4, 0.6)
+    stem(b, 0, 0, x, y, z)
+    flower_head(b, x, y, z, 5, 0.055, c.linear("#f6c425"), c.linear("#d99a12"), cup=0.7)
+b.build("plant-buttercup", smooth=False)
+# Foxgloves: tall spikes of purple bells over a rosette of broad leaves.
+b = c.Builder()
+tuft(b, plant_rng, 7, 0.28, spread=0.04, lean=(0.9, 1.3), base=c.linear("#35591f"), tip=c.linear("#6f9a3c"))
+for x0, y0, tall in ((0.0, 0.0, 1.05), (0.12, 0.05, 0.8)):
+    stem(b, x0, y0, x0, y0, tall, wide=0.012)
+    n = 11
+    for k in range(n):
+        f = k / (n - 1)
+        z = tall * (0.45 + 0.5 * f)
+        a = k * 2.4
+        size = 0.055 * (1 - 0.55 * f)
+        colour = c.mix(c.linear("#a8509f"), c.linear("#c983c4"), plant_rng.random() * 0.5 + f * 0.3)
+        bell(b, x0 + math.cos(a) * 0.012, y0 + math.sin(a) * 0.012, z, a, size, colour, c.linear("#f0d8ea"))
+b.build("plant-foxglove", smooth=False)
+# Bushes: round, leafy clumps, lighter where the sun's on them (one with berries).
+for k, (lumps, berries) in enumerate(((4, False), (6, False), (5, True)), 1):
+    b = c.Builder()
+    leaves = c.linear(("#55822f", "#4b7a2c", "#5c8a35")[k - 1])
+    for n in range(lumps):
+        a = 2 * math.pi * n / lumps + plant_rng.uniform(-0.4, 0.4)
+        r = plant_rng.uniform(0.25, 0.5) if n else 0
+        size = plant_rng.uniform(0.45, 0.6) * (1.2 if not n else 1)
+        b.blob((math.cos(a) * r, math.sin(a) * r, size * 0.75 + (0.15 if not n else 0)), size, leaves, squash=0.85,
+               lumpy=0.3, seed=k * 10 + n)
+    if berries:
+        for n in range(14):
+            a, up = plant_rng.uniform(0, 2 * math.pi), plant_rng.uniform(0.2, 1.0)
+            r = 0.75 * math.sqrt(1 - up * up * 0.6)
+            b.blob((math.cos(a) * r, math.sin(a) * r, 0.25 + up * 0.75), 0.045, c.linear("#b3202a"), subdivisions=1)
+    b.build(f"plant-bush-{k}", smooth=False)
+
 TREES = {}  # each tree's spot and how far its branches spread, by 10 m square
 tree_spots = {"kinds": KINDS, "at": [], "dense": []}  # [kind, x, y, z, yaw, scale], in three.js's axes
 
@@ -2614,7 +2764,7 @@ for x, y, r in ((WEST_LIP[0] - 6, WEST_LIP[1] + 6.5, 4.2), (WEST_LIP[0] - 6, WES
     solid_circle(x, y, r * 0.85)
 rocks.build("rocks", smooth=True)
 
-# ---------------------------------------------------------------- write it all out
+# ---------------------------------------------------------------- what grows where
 
 # Where you can stand, a square metre at a time.
 MASK_STEP = 1.0
@@ -2622,13 +2772,70 @@ mx, my = int((X1 - X0) / MASK_STEP), int((Y1 - Y0) / MASK_STEP)
 mask = bytes(1 if walkable(X0 + (i + 0.5) * MASK_STEP, Y0 + (j + 0.5) * MASK_STEP) else 0
              for j in range(my) for i in range(mx))
 
+# A square metre at a time (as the walkable mask), what grows there: what
+# kind of ground (GROUND, its lowest three bits; 0, nothing: water, paths,
+# floors, bare rock), and what mix of flowers and plants (MIXES, the rest),
+# by the place nearest (give or take, so they blend). The game scatters
+# grass, flowers, bushes and stones by it, round you (src/three/plants.ts).
+GROUND = {"meadow": 1, "verge": 2, "forest": 3, "bank": 4, "wall": 5}
+MIXES = {
+    # Daisies and buttercups, and foxgloves here and there.
+    **dict.fromkeys(["old-wall", "old-stone-wall", "rusty-gate", "grassy-bank", "forest-edge", "deep-river",
+                     "river-south-bank", "moat", "courtyard"], 1),
+    "yellow-flowers": 2,  # buttercups everywhere
+    **dict.fromkeys(["mossy-steps", "tower"], 3),  # ferns and mossy stones
+    **dict.fromkeys(["evergreen-glade", "mountain-path", "mountain", "cave-entrance", "dragon-cave", "maze",
+                     "trolls", "oak-door", "treasure-room", "giant", "damp-tunnels"], 4),  # under the firs: ferns
+    **dict.fromkeys(["forest-crossroads", "forest-witches", "charcoal-hut"], 5),  # woodland: foxgloves and ferns
+}
+WALL_LINES = Lines()
+WALL_LINES.add([(WX, -18 * K), (WX, WY), (WW, WY), (WW, 118 * K)])
+
+
+def growth(x, y):
+    if deck(x, y) is not None or in_moat(x, y) or rocky(x, y) or in_building(x, y):
+        return 0
+    if CASTLE[0] - 1 <= x <= CASTLE[1] + 1 and CASTLE[2] - 1 <= y <= CASTLE[3] + 1:
+        return 0
+    river = from_river(x, y)
+    if river < BANK + 0.6 or open_to_the_sky(x, y, 1.0) is not None or over_an_opening(x, y):
+        return 0
+    if any(abs(x - sx) <= hx + 0.4 and abs(y + sz) <= hz + 0.4 for sx, sz, hx, hz, _ in STEPS):
+        return 0
+    to_path = path_lines.distance(x, y)
+    to_wall = WALL_LINES.distance(x, y)
+    if to_path < ACROSS[-1] + 0.15 or to_wall < 0.75:
+        return 0
+    if to_wall < 2.4:
+        ground = "wall"
+    elif to_path < 3.4:
+        ground = "verge"
+    elif river < SHORE + 2.5:
+        ground = "bank"
+    elif open_ground(x, y):
+        ground = "meadow"
+    else:
+        ground = "forest"
+    jx, jy = noise.noise(Vector((x / 25, y / 25, 3))) * 14, noise.noise(Vector((x / 25, y / 25, 9))) * 14
+    nearest = min(P, key=lambda p: math.hypot(x + jx - P[p][0], y + jy - P[p][1]))
+    return GROUND[ground] | MIXES.get(nearest, 1) << 3
+
+
+growing = bytes(growth(X0 + (i + 0.5) * MASK_STEP, Y0 + (j + 0.5) * MASK_STEP)
+                for j in range(my) for i in range(mx))
+
+# ---------------------------------------------------------------- write it all out
+
+
 if out:
     c.export(out)
     base = Path(out).with_suffix("")
-    base.with_suffix(".bin").write_bytes(struct.pack(f"<{len(walk)}f", *walk) + mask)
+    base.with_suffix(".bin").write_bytes(struct.pack(f"<{len(walk)}f", *walk) + mask + growing)
     base.with_suffix(".json").write_text(json.dumps({
         "ground": {"x0": X0, "y0": Y0, "step": STEP, "nx": nx, "ny": ny},
         "walkable": {"x0": X0, "y0": Y0, "step": MASK_STEP, "nx": mx, "ny": my, "offset": len(walk) * 4},
+        # What grows where, on the same grid (just after it).
+        "growth": {"offset": len(walk) * 4 + len(mask)},
         "obstacles": obstacles,
         # The river's middle, upstream to down, [x, z] in three.js's axes, and its water's height.
         # (And how wide it is at each, of its usual width: narrower at the narrows.)
