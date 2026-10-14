@@ -67,6 +67,7 @@ import { Shafts, speck, type Window } from "./shafts";
 import { sky } from "./sky";
 import { Snake } from "./snake";
 import OWN_SOUNDS from "./sounds.json";
+import { Swept } from "./swept";
 import { Trees, type TreeSpots } from "./trees";
 
 const english = worldJson as unknown as World;
@@ -465,9 +466,12 @@ function tell(exit: string) {
   told = exit;
 }
 player.onBump = (exit) => {
-  if (exit === BALCONY && slip()) return;
+  if (dying(exit)) return;
   const [id, direction] = exit.split(" ");
   const way = world.rooms[id]?.exits[direction as Direction];
+  // (In use, but the 3D world can't open it yet, with no model for it: the plank. Nothing to say.)
+  const needs = way?.obstacle?.needs;
+  if (needs && effects(world, items.state).includes(needs)) return;
   say(way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo);
   sounds.play("blocked");
 };
@@ -554,36 +558,57 @@ function arrive(game: { state: GameState; three?: ThreeSave }) {
 }
 if (handoff && !at) arrive(handoff);
 
-// Dying. For now, the one death there is: climbing the ladder propped under
-// the balcony. Walk into it and you start to climb, it slips, and you fall
-// (fall.ts); then a curtain falls, with the original's words, and after it
+// Dying: walking into a way that kills you, its scene plays out (climbing
+// the ladder propped under the balcony, fall.ts; wading into the deep river,
+// swept.ts); then a curtain falls, with the original's words, and after it
 // your score, as in the illustrated version.
 const BALCONY = "mossy-steps east";
-let fall: Fall | undefined;
+const RIVER = "deep-river south";
+let playing: { update(dt: number): boolean; dispose?(): void } | undefined; // the scene
 const ending = h("div", { class: "ending", hidden: true });
 // (Clicking or typing here isn't walking: nor taking, using or dropping.)
 for (const type of ["click", "touchend", "keydown", "keyup"]) ending.addEventListener(type, (e) => e.stopPropagation());
 root.append(ending);
+// Under the water (swept away in the river): murky.
+const murky = h("div", { class: "murky" });
+root.append(murky);
 
-/** Walking into the balcony with the ladder up: the scene (and true), or nothing to see (false). */
-function slip() {
-  const propped = ladder.propped(BALCONY);
-  // (Dropped there, it's still up, as an object lying in the place.)
-  const model = propped?.model ?? items.lyingAt("ladder");
-  if (!propped || !model || !effects(world, items.state).includes("ladder")) return false;
-  const way = world.rooms["mossy-steps"].exits.east;
-  items.go("east"); // (the engine: you're dead)
+/** Each way that kills you that has a scene: it, ending with done(), or nothing (nothing to see there now). */
+const scenes: Record<string, (done: () => void) => { update(dt: number): boolean; dispose?(): void } | undefined> = {
+  [BALCONY]: (done) => {
+    const propped = ladder.propped(BALCONY);
+    // (Dropped there, it's still up, as an object lying in the place.)
+    const model = propped?.model ?? items.lyingAt("ladder");
+    if (!propped || !model || !effects(world, items.state).includes("ladder")) return undefined;
+    return new Fall(
+      { ...propped, model },
+      player.camera,
+      drawn,
+      player.halls.get("tower")!,
+      reducedMotion,
+      () => ownSounds.play("thud"),
+      done
+    );
+  },
+  // (Not with the plank across it: the way's open then.)
+  [RIVER]: (done) =>
+    effects(world, items.state).includes("plank")
+      ? undefined
+      : new Swept(scene, player.camera, drawn, land.river, reducedMotion, done),
+};
+
+/** Walking into a way that kills you: its scene (and true), or nothing to see (false). */
+function dying(exit: string) {
+  const [id, direction] = exit.split(" ") as [string, Direction];
+  const way = world.rooms[id]?.exits[direction];
+  // (The words: the way's own, going through it, or its obstacle's, in the way.)
+  const words = (way?.fatal ? way.message : way?.obstacle?.blocked) ?? "";
+  const scene = scenes[exit]?.(() => curtain(words));
+  if (!scene) return false;
+  items.go(direction); // (the engine: you're dead)
   player.held = true;
   document.body.classList.add("scene");
-  fall = new Fall(
-    { ...propped, model },
-    player.camera,
-    drawn,
-    player.halls.get("tower")!,
-    reducedMotion,
-    () => ownSounds.play("thud"),
-    () => curtain(way?.message ?? "")
-  );
+  playing = scene;
   return true;
 }
 
@@ -795,7 +820,8 @@ function load(slot: { name: string; state: GameState; three?: ThreeSave }) {
 function restart(game: { state: GameState; three?: ThreeSave }) {
   items.restart(game);
   // (Out of any scene, and the ladder put up afresh if it's up: it may have fallen.)
-  fall = undefined;
+  playing?.dispose?.();
+  playing = undefined;
   player.held = false;
   document.body.classList.remove("scene");
   ending.hidden = true;
@@ -922,7 +948,8 @@ renderer.setAnimationLoop((time) => {
   timer.update(time);
   const dt = Math.min(timer.getDelta(), 0.1);
   player.update(dt, reducedMotion);
-  fall?.update(dt);
+  playing?.update(dt);
+  murky.classList.toggle("under", Boolean(playing) && player.camera.position.y < land.river.water);
   trees.update(player.position, player.yaw, player.camera);
   // Coming down from the mountain to the dense trees, they part for you
   // (going up, they don't), until you're clear of them.
