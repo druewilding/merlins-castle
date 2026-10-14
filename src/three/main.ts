@@ -63,6 +63,7 @@ import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import snakeModel from "./models/snake.glb?url";
 import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable, wayThrough } from "./player";
+import { River } from "./river";
 import { Shafts, speck, type Window } from "./shafts";
 import { sky } from "./sky";
 import { Snake } from "./snake";
@@ -203,6 +204,8 @@ const trees = new Trees(scene, model.scene, spots);
 const stump = model.scene.getObjectByName("stump") as Mesh;
 stump.removeFromParent();
 const felling = new Felling(scene, trees.models, spots.kinds, spots.dense, stump, reducedMotion);
+// The river, flowing: foam carried along it.
+const river = new River(scene, land.river, reducedMotion);
 
 // The heights are in Blender's axes (y is north), on a grid; in between, blend.
 const { x0, y0, step, nx, ny } = land.ground;
@@ -564,7 +567,14 @@ if (handoff && !at) arrive(handoff);
 // your score, as in the illustrated version.
 const BALCONY = "mossy-steps east";
 const RIVER = "deep-river south";
-let playing: { update(dt: number): boolean; dispose?(): void } | undefined; // the scene
+// (Each scene plays on behind the curtain, which starts to come down a
+// little before its end, so the end is seen through it, not cut off.)
+interface Scene3d {
+  update(dt: number): void;
+  readonly ends: number; // seconds
+}
+const EARLY = 1.5; // seconds before a scene's end, the curtain starts to fall
+let playing: { scene: Scene3d; t: number; words: string } | undefined;
 const ending = h("div", { class: "ending", hidden: true });
 // (Clicking or typing here isn't walking: nor taking, using or dropping.)
 for (const type of ["click", "touchend", "keydown", "keyup"]) ending.addEventListener(type, (e) => e.stopPropagation());
@@ -574,27 +584,19 @@ const murky = h("div", { class: "murky" });
 root.append(murky);
 
 /** Each way that kills you that has a scene: it, ending with done(), or nothing (nothing to see there now). */
-const scenes: Record<string, (done: () => void) => { update(dt: number): boolean; dispose?(): void } | undefined> = {
-  [BALCONY]: (done) => {
+const scenes: Record<string, () => Scene3d | undefined> = {
+  [BALCONY]: () => {
     const propped = ladder.propped(BALCONY);
     // (Dropped there, it's still up, as an object lying in the place.)
     const model = propped?.model ?? items.lyingAt("ladder");
     if (!propped || !model || !effects(world, items.state).includes("ladder")) return undefined;
-    return new Fall(
-      { ...propped, model },
-      player.camera,
-      drawn,
-      player.halls.get("tower")!,
-      reducedMotion,
-      () => ownSounds.play("thud"),
-      done
+    return new Fall({ ...propped, model }, player.camera, drawn, player.halls.get("tower")!, reducedMotion, () =>
+      ownSounds.play("thud")
     );
   },
   // (Not with the plank across it: the way's open then.)
-  [RIVER]: (done) =>
-    effects(world, items.state).includes("plank")
-      ? undefined
-      : new Swept(scene, player.camera, drawn, land.river, reducedMotion, done),
+  [RIVER]: () =>
+    effects(world, items.state).includes("plank") ? undefined : new Swept(player.camera, drawn, river, reducedMotion),
 };
 
 /** Walking into a way that kills you: its scene (and true), or nothing to see (false). */
@@ -603,12 +605,12 @@ function dying(exit: string) {
   const way = world.rooms[id]?.exits[direction];
   // (The words: the way's own, going through it, or its obstacle's, in the way.)
   const words = (way?.fatal ? way.message : way?.obstacle?.blocked) ?? "";
-  const scene = scenes[exit]?.(() => curtain(words));
+  const scene = scenes[exit]?.();
   if (!scene) return false;
   items.go(direction); // (the engine: you're dead)
   player.held = true;
   document.body.classList.add("scene");
-  playing = scene;
+  playing = { scene, t: 0, words };
   return true;
 }
 
@@ -820,7 +822,6 @@ function load(slot: { name: string; state: GameState; three?: ThreeSave }) {
 function restart(game: { state: GameState; three?: ThreeSave }) {
   items.restart(game);
   // (Out of any scene, and the ladder put up afresh if it's up: it may have fallen.)
-  playing?.dispose?.();
   playing = undefined;
   player.held = false;
   document.body.classList.remove("scene");
@@ -948,7 +949,13 @@ renderer.setAnimationLoop((time) => {
   timer.update(time);
   const dt = Math.min(timer.getDelta(), 0.1);
   player.update(dt, reducedMotion);
-  playing?.update(dt);
+  if (playing) {
+    playing.scene.update(dt);
+    const was = playing.t;
+    playing.t += dt;
+    if (was < playing.scene.ends - EARLY && playing.t >= playing.scene.ends - EARLY) curtain(playing.words);
+  }
+  river.update(dt);
   murky.classList.toggle("under", Boolean(playing) && player.camera.position.y < land.river.water);
   trees.update(player.position, player.yaw, player.camera);
   // Coming down from the mountain to the dense trees, they part for you

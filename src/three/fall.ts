@@ -4,7 +4,8 @@
 // its foot slides out from under you, and as it goes the camera draws back
 // so you see it come down, slowly, its top scraping down under the balcony
 // until it lies on the ground (on the edge of the rise under the balcony,
-// and down the slope from there). Then done(): the curtain.
+// and down the slope from there). The curtain comes down over the end of it
+// (from a little before `ends`).
 
 import { Box3, type Object3D, type PerspectiveCamera, Quaternion, Vector3 } from "three";
 
@@ -15,7 +16,7 @@ const STEP_UP = 0.5; // to the foot of the ladder, turning to it
 const CLIMBED = 2.1; // up a few rungs
 const JUDDER = 2.6; // it shifts under you
 const DOWN = 6.4; // slipping, slowly, to the ground
-const AFTER = 7.6; // a moment lying there, then the curtain
+const ENDS = 6.9; // landed, and bounced
 
 const UP_IT = 0.32; // how far up the ladder you get (of its length)
 const EYE = 1.45; // your eye above the rung you stand on
@@ -38,6 +39,7 @@ export interface Propped {
 }
 
 export class Fall {
+  readonly ends = ENDS;
   private t = 0;
   private thudded = false;
   private readonly from: Vector3;
@@ -59,8 +61,7 @@ export class Fall {
     tower: { x: number; z: number },
     private reducedMotion: boolean,
     /** It hits the ground. */
-    private thud: () => void,
-    private done: () => void
+    private thud: () => void
   ) {
     this.from = camera.position.clone();
     this.facing = camera.quaternion.clone();
@@ -106,9 +107,8 @@ export class Fall {
     this.watch = spots.find((watch) => seen.every((p) => sees(watch, p))) ?? spots[0];
   }
 
-  /** Each frame; false once it's over. */
+  /** Each frame. */
   update(dt: number) {
-    if (this.t >= AFTER) return false;
     this.t += dt;
     const t = this.t;
     const { corner, out } = this.ladder;
@@ -159,8 +159,6 @@ export class Fall {
       const turned = this.camera.quaternion.clone();
       this.camera.quaternion.slerpQuaternions(this.facing, turned, ease(t / STEP_UP));
     }
-    if (t >= AFTER) this.done();
-    return true;
   }
 
   /**
