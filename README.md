@@ -25,8 +25,7 @@ it. You can carry five things at a time.
 There are two ways to play:
 
 - **Illustrated**: painted scenes, objects you can see and drag, music and
-  sound effects. Use the right object and the picture changes: the ladder
-  leans against the wall, the snake leaves the steps, Merlin becomes a frog.
+  sound effects. Use the right object and the picture changes.
 - **Classic**: the original 1983 teletext screen, with its font, its colours,
   its beep and its victory tune. Switch between them at any time, even
   mid-game.
@@ -96,13 +95,8 @@ Mouse to look, WASD or the arrow keys to walk, Shift to run, Space to jump
 (how high is `JUMP_HEIGHT` in `src/three/player.ts`; hold it to keep hopping), Ctrl or C to crouch.
 Look at an object and press E to take it; 1 to 5 picks which of your five
 slots is in your hand, E (when you're not looking at an object) or a click
-uses it and G drops it. (Only the ladder, the
-key, the axe and the apple are in the world so far: their models are made by
-`art/blender/items.py`. Use the ladder by the old stone wall and walk into
-it to climb over; use the key by the rusty gate, and the axe by the dense
-trees on the mountain path, and throw the apple to the snake coiled at the
-top of the mossy steps (made by `art/blender/snake.py`), which catches it
-and slithers off with it.)
+uses it and G drops it. (Only some of the objects are in the world so far:
+their models are made by `art/blender/items.py`.)
 Esc brings back the start screen, where you can save and load: the same
 saves as the other versions (a 3D save also knows where you stood and where
 everything lies), and Illustrated and Classic carry on the same game there,
