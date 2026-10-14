@@ -1,4 +1,6 @@
 {
   "walk": { "file": "kenney_impact-sounds/Audio/footstep_grass_003.ogg", "volume": 0.2 },
-  "run": { "file": "kenney_rpg-audio/Audio/footstep05.ogg", "volume": 0.2 }
+  "run": { "file": "kenney_rpg-audio/Audio/footstep05.ogg", "volume": 0.2 },
+  "slip": { "file": "kenney_rpg-audio/Audio/creak1.ogg", "volume": 0.5 },
+  "thud": { "file": "kenney_impact-sounds/Audio/impactWood_heavy_002.ogg", "volume": 0.6 }
 }
