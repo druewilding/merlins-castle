@@ -55,7 +55,8 @@ DEATHS = {k: at(v) for k, v in layout["deaths"].items() if k != "_"}
 X0, X1, Y0, Y1 = (round(v * K) for v in (-200, 200, -290, 210))
 STEP = 2.0
 
-GRASS = c.linear("#77a03a")
+GRASS = c.linear("#7c9f3a")  # (as the grass on it looks, from a little way off: plants.ts)
+BUTTERCUPS = c.linear("#a8a83a")  # and where the yellow flowers grow thick
 FOREST_FLOOR = c.linear("#3f5f2a")
 DIRT = c.linear("#b88754")
 ROCK = c.linear("#8a8478")
@@ -724,6 +725,8 @@ def ground_colour(x, y, z):
         col = FLAGS
     elif open_ground(x, y):
         col = GRASS
+        yellow = P["yellow-flowers"]
+        col = c.mix(col, BUTTERCUPS, 0.6 * smooth(1 - (math.hypot(x - yellow[0], y - yellow[1]) - 6) / 10))
     else:
         col = FOREST_FLOOR
     if z > 8:

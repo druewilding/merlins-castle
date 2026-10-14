@@ -95,7 +95,12 @@ root.append(renderer.domElement);
 
 haze();
 const scene = new Scene();
-const fog = new Fog(HAZE, 40, 320);
+// The haze starting not far off, and thickening slowly (haze.ts): softening
+// the middle distance, where the trees turn simpler and the grass gives way
+// to the ground's own green, and still letting you see the mountain.
+const HAZE_NEAR = 18;
+const HAZE_FAR = 340;
+const fog = new Fog(HAZE, HAZE_NEAR, HAZE_FAR);
 scene.fog = fog;
 scene.add(sky(SUN, HAZE));
 const SKY = new Color("#c4d8ff");
@@ -997,8 +1002,8 @@ function lightFor(depth: number, time: number, dt: number) {
 
   caveLit += ((hall?.light ? 1 : 0) - caveLit) * Math.min(1, dt * 3);
   fog.color.copy(HAZE).lerp(DARK, under).lerp(GLOOM, murk);
-  fog.near = (40 - 38 * under) * (1 - murk) + 1.5 * murk;
-  fog.far = (320 - 290 * under + 40 * caveLit) * (1 - murk) + 22 * murk;
+  fog.near = (HAZE_NEAR - (HAZE_NEAR - 2) * under) * (1 - murk) + 1.5 * murk;
+  fog.far = (HAZE_FAR - (HAZE_FAR - 30) * under + 40 * caveLit) * (1 - murk) + 22 * murk;
   shafts?.update(dt, gloom, player.camera.position);
   insideLook?.color.setScalar(0.25 + 0.75 * gloom);
 }
