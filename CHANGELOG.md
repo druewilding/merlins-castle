@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.7.0](https://github.com/druewilding/merlins-castle/compare/v2.6.0...v2.7.0) (2026-10-14)
+
+
+### Features
+
+* Animate the ladder death sequence ([#69](https://github.com/druewilding/merlins-castle/issues/69)) ([18af316](https://github.com/druewilding/merlins-castle/commit/18af3161aa193eef4c8ddd65d32ad046925475ae))
+* Animate the river death ([#70](https://github.com/druewilding/merlins-castle/issues/70)) ([53d858d](https://github.com/druewilding/merlins-castle/commit/53d858dc4425d477fb154f3d2f498cd2e8df364e))
+* Dramatically improve the look of the landscape ([#72](https://github.com/druewilding/merlins-castle/issues/72)) ([618f4ad](https://github.com/druewilding/merlins-castle/commit/618f4adbaae3c8d8d28e34410a859ff181483c39))
+* Draw the plank and use it ([#71](https://github.com/druewilding/merlins-castle/issues/71)) ([8cf96de](https://github.com/druewilding/merlins-castle/commit/8cf96de2c045e57ff3e572835bb85f106c5eb5d9))
+* Play the sound effects in 3D too, from a shared library, and add footsteps for walking and running ([#68](https://github.com/druewilding/merlins-castle/issues/68)) ([0125c55](https://github.com/druewilding/merlins-castle/commit/0125c55485ac8406f2355141d01eb294f4aaa516))
+
+
+### Documentation
+
+* Keep the README and the v3 plan free of spoilers ([#67](https://github.com/druewilding/merlins-castle/issues/67)) ([ec4cc80](https://github.com/druewilding/merlins-castle/commit/ec4cc8065e44cda1a1ac3b06cba6bd616927be98))
+
 ## [2.6.0](https://github.com/druewilding/merlins-castle/compare/v2.5.1...v2.6.0) (2026-10-13)
 
 
