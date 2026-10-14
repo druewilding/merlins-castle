@@ -13,7 +13,8 @@ const TIPPING = 0.7; // seconds, falling over across the river
 const CROSS = 1.6; // seconds, running from its end on this side to the far bank
 const STRIDE = 1.3; // metres, running across it
 // How near its end on your side you start across: from behind it, or on past
-// it, and to either side (anywhere near it, walking towards the far bank).
+// it, and to either side (anywhere near it, coming at it from any side: but
+// not walking away from the river).
 const BEHIND = 2.2;
 const PAST = 0.8;
 const ASIDE = 1.8;
@@ -113,13 +114,14 @@ export class Plank {
       return;
     }
     if (this.player.busy) return;
-    // Near its end on your side, walking towards the far one.
+    // Near its end on your side, and walking (but not away from the river).
     const length = l.near.distanceTo(l.far);
     const along = new Vector3(l.far.x - l.near.x, 0, l.far.z - l.near.z).normalize();
     const on = (p.x - l.near.x) * along.x + (p.z - l.near.z) * along.z;
     const aside = (p.x - l.near.x) * along.z - (p.z - l.near.z) * along.x;
     const going = moved.x * along.x + moved.z * along.z;
-    if (on < -BEHIND || on > PAST || Math.abs(aside) > ASIDE || going <= 0.001) return;
+    const walking = Math.hypot(moved.x, moved.z);
+    if (on < -BEHIND || on > PAST || Math.abs(aside) > ASIDE || walking < 0.001 || going < -0.5 * walking) return;
     this.player.follow(this.across(l, length, along), CROSS, () => over(l.exit));
   }
 
