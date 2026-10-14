@@ -117,6 +117,24 @@ river.add(RIVER)
 BANK = 8.5  # from the river's middle to where its banks come up out of the water
 SHORE = 10  # and to where you can walk: back from the edge, where the bank levels out
 BRIDGE_HALF = SHORE + 0.5  # half the forest bridge's length, so it reaches the shore
+# Where the way crosses the deep river, it narrows: its rocky banks close in
+# (a plank reaches across), for a stretch either side, then it widens again.
+NARROWS_X = 0  # its middle (the river runs straight east there, 60 * K south)
+NARROWS_HALF = 12  # half its length
+NARROWS_EASE = 12  # and how far it takes to widen out again
+NARROW = 0.3  # how wide the river is there, of its usual width (its shores 6 m apart)
+
+
+def narrowing(x, y):
+    """How wide the river is here, of its usual width (narrower at the narrows)."""
+    return NARROW + (1 - NARROW) * smooth((abs(x - NARROWS_X) - NARROWS_HALF) / NARROWS_EASE)
+
+
+def from_river(x, y):
+    """How far from the river's middle, as if it were its usual width here
+    (so its banks, shore and bed all come in where it narrows)."""
+    return river.distance(x, y) / narrowing(x, y)
+
 BRIDGE = P["old-wall"][0], -40 * K  # where the path south from the old wall crosses
 TOWER = (P["tower"][0], P["tower"][1] + 6)  # on its knoll, north of the mossy steps
 TOWER_R = 6
@@ -541,7 +559,7 @@ def height(x, y):
     h += 1.3 * smooth(1 - math.hypot(x - BALCONY_RISE[0], y - BALCONY_RISE[1]) / 3)
     g = math.hypot(x - P["evergreen-glade"][0], y - P["evergreen-glade"][1])
     h -= 1.5 * smooth(1 - (g - 10) / 8)  # the glade lies a little low
-    r = river.distance(x, y)
+    r = from_river(x, y)
     if r < 10:
         h = h + (-3.2 - h) * smooth(1 - (r - 5) / 5)
     if in_moat(x, y):
@@ -648,7 +666,7 @@ def open_ground(x, y):
     for spot in LOST.values():
         if math.hypot(x - spot[0], y - spot[1]) < 11 and not beyond_the_mist(x, y):
             return True
-    return path_lines.distance(x, y) < 5.5 or river.distance(x, y) < BANK or in_moat(x, y)
+    return path_lines.distance(x, y) < 5.5 or from_river(x, y) < BANK or in_moat(x, y)
 
 
 def under_a_tree(x, y):
@@ -664,7 +682,7 @@ def walkable(x, y):
     not under a tree."""
     if deck(x, y) is not None:
         return True
-    if river.distance(x, y) < SHORE or in_moat(x, y):
+    if from_river(x, y) < SHORE or in_moat(x, y):
         return False
     floor = open_to_the_sky(x, y, 2.0)
     if floor is not None and floor < height(x, y) - 0.35:
@@ -700,7 +718,7 @@ def drawn_height(x, y, exactly=False):
 
 
 def ground_colour(x, y, z):
-    if river.distance(x, y) < 7 or in_moat(x, y):
+    if from_river(x, y) < 7 or in_moat(x, y):
         col = RIVERBED
     elif CASTLE[0] <= x <= CASTLE[1] and CASTLE[2] <= y <= CASTLE[3]:
         col = FLAGS
@@ -908,7 +926,7 @@ GROVE_AT = [(P[place], mix) for place, mix in GROVES.items()]
 def tree_kind(x, y, rng):
     """Which kind of tree grows here: the mix of the place nearest (give or
     take, so the groves blend), and willows down by the river."""
-    if river.distance(x, y) < BANK + 9 and rng.random() < 0.7:
+    if from_river(x, y) < BANK + 9 and rng.random() < 0.7:
         return rng.choice(WILLOWS)
     jx, jy = noise.noise(Vector((x / 25, y / 25, 1))) * 18, noise.noise(Vector((x / 25, y / 25, 7))) * 18
     nearest = min(P.values(), key=lambda p: math.hypot(x + jx - p[0], y + jy - p[1]))
@@ -991,7 +1009,8 @@ verts, faces = [], []
 for k, (x, y) in enumerate(RIVER):
     (ax, ay), (bx, by) = RIVER[max(k - 1, 0)], RIVER[min(k + 1, len(RIVER) - 1)]
     dd = math.hypot(bx - ax, by - ay) or 1
-    ox, oy = -(by - ay) / dd * 9.5, (bx - ax) / dd * 9.5
+    w = 9.5 * narrowing(x, y)
+    ox, oy = -(by - ay) / dd * w, (bx - ax) / dd * w
     verts += [(x + ox, y + oy, -1), (x - ox, y - oy, -1)]
     if k:
         a = (k - 1) * 2
@@ -1007,12 +1026,26 @@ WATER_LEVEL = -1
 # The deep river, where the way crosses it, from shore to shore: from the
 # north bank it kills you (you're swept away: you walk in, and the game plays
 # it out), and from the south one you fall in, but get out safely.
-obstacle(["deep-river south", "river-south-bank north"], "box", P["deep-river"][0], 60 * K, 16, SHORE + 1,
-         reach=0.5)  # (the river runs straight east there, 60 * K south)
+# (Along the narrows, from shore to shore there: further along, where it's
+# wider, its shores are out of reach of the places either side.)
+obstacle(["deep-river south", "river-south-bank north"], "box", NARROWS_X, 60 * K, NARROWS_HALF + 1,
+         SHORE * NARROW + 0.2, reach=0.5)
 
 # ---------------------------------------------------------------- built things
 
 built = c.Builder()
+# Rocks along the narrows, either side, at the water's edge (but for where
+# the way comes down to it, either side, for a plank's ends).
+rock_rng = random.Random(61)
+for side in (-1, 1):
+    x = NARROWS_X - NARROWS_HALF - NARROWS_EASE / 2
+    while x < NARROWS_X + NARROWS_HALF + NARROWS_EASE / 2:
+        x += rock_rng.uniform(1.4, 2.4)
+        if abs(x - NARROWS_X) < 2.2:
+            continue
+        y = -60 * K + side * (BANK * narrowing(x, -60 * K) - 0.1)
+        built.blob((x, y, WATER_LEVEL + rock_rng.uniform(-0.25, 0.1)), rock_rng.uniform(0.55, 0.85), ROCK,
+                   squash=rock_rng.uniform(0.45, 0.7), lumpy=0.35, seed=300 + int(x * 7) + side)
 
 # The forest bridge and the drawbridge.
 block(built, BRIDGE[0] - 2.4, BRIDGE[1] - BRIDGE_HALF, 0.5, BRIDGE[0] + 2.4, BRIDGE[1] + BRIDGE_HALF, 0.9,
@@ -2598,7 +2631,9 @@ if out:
         "walkable": {"x0": X0, "y0": Y0, "step": MASK_STEP, "nx": mx, "ny": my, "offset": len(walk) * 4},
         "obstacles": obstacles,
         # The river's middle, upstream to down, [x, z] in three.js's axes, and its water's height.
-        "river": {"line": [[round(x, 2), round(-y, 2)] for x, y in RIVER], "water": WATER_LEVEL},
+        # (And how wide it is at each, of its usual width: narrower at the narrows.)
+        "river": {"line": [[round(x, 2), round(-y, 2), round(narrowing(x, y), 3)] for x, y in RIVER], "water": WATER_LEVEL,
+                  "bank": BANK, "narrows": {"x": NARROWS_X, "z": round(60 * K, 2), "shore": round(SHORE * NARROW, 2)}},
         # The ways underground: points [x, z, floor] in three.js's axes.
         "ways": {name: {"half": way.half, "points": [[round(x, 2), round(-y, 2), round(f, 2)] for x, y, f in way.points],
                         **({"indoor": True} if way.indoor else {})}
