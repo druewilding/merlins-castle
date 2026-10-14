@@ -216,6 +216,22 @@ const ground: Ground = (x, z) => {
   const h = (a: number, b: number) => heights[(j0 + b) * nx + i0 + a];
   return (h(0, 0) * (1 - fi) + h(1, 0) * fi) * (1 - fj) + (h(0, 1) * (1 - fi) + h(1, 1) * fi) * fj;
 };
+// And exactly as it's drawn: flat triangles, each square split from its first
+// corner to its third, as Blender splits it (drawn_height in land.py). On a
+// sharp rise that's quite different: for laying something right on it.
+const drawn: Ground = (x, z) => {
+  const i = (x - x0) / step;
+  const j = (-z - y0) / step;
+  if (i < 0 || j < 0 || i >= nx - 1 || j >= ny - 1) return undefined;
+  const i0 = Math.floor(i);
+  const j0 = Math.floor(j);
+  const fi = i - i0;
+  const fj = j - j0;
+  const h = (a: number, b: number) => heights[(j0 + b) * nx + i0 + a];
+  return fi > fj
+    ? h(0, 0) + fi * (h(1, 0) - h(0, 0)) + fj * (h(1, 1) - h(1, 0))
+    : h(0, 0) + fj * (h(0, 1) - h(0, 0)) + fi * (h(1, 1) - h(0, 1));
+};
 // Where you can stand, a square metre at a time (again in Blender's axes).
 const mask = land.walkable;
 const standable = new Uint8Array(file, mask.offset, mask.nx * mask.ny);
@@ -502,7 +518,10 @@ function inUse() {
   opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
   solidify();
   for (const [shape, gate] of gates) {
-    gate.wants = opened.has(shape) ? 1 : 0;
+    const wants = opened.has(shape) ? 1 : 0;
+    // (Creaking on its rusty hinges, as it swings open.)
+    if (wants > gate.wants && !instantly) ownSounds.play("creak");
+    gate.wants = wants;
     if (instantly) gate.open = gate.wants;
   }
   if (dense) felling.fell(opened.has(dense), instantly);
@@ -559,10 +578,10 @@ function slip() {
   fall = new Fall(
     { ...propped, model },
     player.camera,
-    ground,
+    drawn,
     player.halls.get("tower")!,
     reducedMotion,
-    { slip: () => ownSounds.play("slip"), thud: () => ownSounds.play("thud") },
+    () => ownSounds.play("thud"),
     () => curtain(way?.message ?? "")
   );
   return true;
@@ -637,7 +656,7 @@ const was = player.position.clone(); // (and just where)
 const debugMode = new URLSearchParams(location.search).has("debug");
 if (debugMode) {
   Object.assign(window, {
-    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, restart },
+    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, restart, drawn },
   });
   const { debug } = await import("./debug");
   debug(
