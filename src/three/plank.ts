@@ -9,8 +9,14 @@ import { type Object3D, type Scene, Vector3 } from "three";
 
 import type { Ground, Player } from "./player";
 
-const TIPPING = 1.3; // seconds, falling over across the river
-const CROSS = 2.6; // seconds, from its end on this side to the far bank
+const TIPPING = 0.7; // seconds, falling over across the river
+const CROSS = 1.6; // seconds, running from its end on this side to the far bank
+const STRIDE = 1.3; // metres, running across it
+// How near its end on your side you start across: from behind it, or on past
+// it, and to either side (anywhere near it, walking towards the far bank).
+const BEHIND = 2.2;
+const PAST = 0.8;
+const ASIDE = 1.8;
 const SAG = 0.08; // metres it gives in the middle, as you cross
 const OFF = 0.9; // metres on, off its far end, where you step down
 
@@ -33,7 +39,9 @@ export class Plank {
     private player: Player,
     private reducedMotion: boolean,
     /** It lands across the river. */
-    private thud: () => void
+    private thud: () => void,
+    /** A footstep, running across it. */
+    private step: () => void
   ) {}
 
   /** Whether you can see it across the river (it's not, once you've dropped it there). */
@@ -105,19 +113,19 @@ export class Plank {
       return;
     }
     if (this.player.busy) return;
-    // On its end on your side (or just behind it), walking towards the far one.
+    // Near its end on your side, walking towards the far one.
     const length = l.near.distanceTo(l.far);
     const along = new Vector3(l.far.x - l.near.x, 0, l.far.z - l.near.z).normalize();
     const on = (p.x - l.near.x) * along.x + (p.z - l.near.z) * along.z;
     const aside = (p.x - l.near.x) * along.z - (p.z - l.near.z) * along.x;
     const going = moved.x * along.x + moved.z * along.z;
-    if (on < -1.4 || on > 0.6 || Math.abs(aside) > 0.6 || going <= 0.001) return;
+    if (on < -BEHIND || on > PAST || Math.abs(aside) > ASIDE || going <= 0.001) return;
     this.player.follow(this.across(l, length, along), CROSS, () => over(l.exit));
   }
 
-  // Onto it, along it (giving a little under you, and a little step at each
-  // stride), and off its far end onto the bank. At the far end it comes back
-  // into your hands.
+  // Onto it, running along it (giving a little under you, and a footstep at
+  // each stride), and off its far end onto the bank. At the far end it comes
+  // back into your hands.
   private across(l: NonNullable<Plank["laid"]>, length: number, along: Vector3) {
     const start = this.player.position.clone();
     const top = (u: number) => {
@@ -127,16 +135,26 @@ export class Plank {
     };
     const off = l.far.clone().addScaledVector(along, OFF);
     off.y = this.ground(off.x, off.z) ?? l.far.y;
-    const strides = Math.round(length / 0.7);
+    const strides = Math.max(2, Math.round(length / STRIDE));
     const at = new Vector3();
+    let stepped = -1; // the last stride you've taken
+    const footstep = (k: number) => {
+      if (k > stepped) this.step();
+      stepped = Math.max(stepped, k);
+    };
     return (t: number) => {
-      if (t < 0.1) return at.lerpVectors(start, top(0), t / 0.1);
+      if (t < 0.15) {
+        footstep(0);
+        return at.lerpVectors(start, top(0), t / 0.15);
+      }
       if (t < 0.9) {
-        const u = (t - 0.1) / 0.8;
+        const u = (t - 0.15) / 0.75;
+        footstep(1 + Math.floor(u * strides));
         at.copy(top(u));
-        if (!this.reducedMotion) at.y += Math.abs(Math.sin(u * strides * Math.PI)) * 0.03;
+        if (!this.reducedMotion) at.y += Math.abs(Math.sin(u * strides * Math.PI)) * 0.04;
         return at;
       }
+      footstep(strides + 1);
       if (l.model && this.laid === l) this.away();
       return at.lerpVectors(top(1), off, (t - 0.9) / 0.1);
     };

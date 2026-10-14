@@ -491,8 +491,14 @@ player.onBump = (exit) => {
 const ladder = new Ladder(scene, things.scene.getObjectByName("ladder")!, ground, player, reducedMotion);
 let leaning: string | undefined; // the exit the ladder's up for
 // And the plank, across the river where it narrows.
-const plank = new Plank(scene, things.scene.getObjectByName("plank")!, drawn, player, reducedMotion, () =>
-  ownSounds.play("thud")
+const plank = new Plank(
+  scene,
+  things.scene.getObjectByName("plank")!,
+  drawn,
+  player,
+  reducedMotion,
+  () => ownSounds.play("thud"),
+  () => ownSounds.play("run", { rate: 0.92 + Math.random() * 0.16 })
 );
 let bridged: string | undefined; // the exit it's across for
 const PLANK = new Box3().setFromObject(things.scene.getObjectByName("plank")!).getSize(new Vector3()).z;
