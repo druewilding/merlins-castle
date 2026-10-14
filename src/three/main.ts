@@ -9,6 +9,7 @@ import "./style.css";
 import {
   ACESFilmicToneMapping,
   AdditiveBlending,
+  Box3,
   Color,
   CylinderGeometry,
   DirectionalLight,
@@ -62,6 +63,7 @@ import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import snakeModel from "./models/snake.glb?url";
+import { Plank } from "./plank";
 import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable, wayThrough } from "./player";
 import { River } from "./river";
 import { Shafts, speck, type Window } from "./shafts";
@@ -349,6 +351,9 @@ const snake = new Snake(
 );
 // The enormous stone that shuts you in the tower, which the ring rolls away.
 const shut = shapeOf.get("tower south");
+// The deep river, where it narrows, which the plank crosses (plank.ts), and
+// which (without it) sweeps you away from the north bank (swept.ts).
+const crossing = shapeOf.get("deep-river south");
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 // A way that kills you even with the object (the balcony) has no far side
@@ -485,6 +490,12 @@ player.onBump = (exit) => {
 // it (for now, the one object that does anything).
 const ladder = new Ladder(scene, things.scene.getObjectByName("ladder")!, ground, player, reducedMotion);
 let leaning: string | undefined; // the exit the ladder's up for
+// And the plank, across the river where it narrows.
+const plank = new Plank(scene, things.scene.getObjectByName("plank")!, drawn, player, reducedMotion, () =>
+  ownSounds.play("thud")
+);
+let bridged: string | undefined; // the exit it's across for
+const PLANK = new Box3().setFromObject(things.scene.getObjectByName("plank")!).getSize(new Vector3()).z;
 const items = setUpItems({
   world,
   scene,
@@ -499,8 +510,10 @@ const items = setUpItems({
   sound: (name) => sounds.play(name),
   changed: inUse,
   stays: (id) => {
-    if (id !== "ladder" || !ladder.shown) return undefined;
-    return { model: ladder.handOver()!, fallsTo: ladder.footing! };
+    if (id === "ladder" && ladder.shown) return { model: ladder.handOver()!, fallsTo: ladder.footing! };
+    // (Leaving, it falls where it lay: across the river, bridging it.)
+    if (id === "plank" && plank.shown) return { model: plank.handOver()!, fallsTo: plank.footing! };
+    return undefined;
   },
   begin: handoff ?? undefined,
   starts: { emerald: { room: "tower", at: land.chest as [number, number, number] } },
@@ -511,14 +524,19 @@ let instantly = true; // (loading, what's in use is as it was: no gate swinging 
 function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
-  // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees, the snake.)
+  // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees, the snake, the river.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
     const shape = shapeOf.get(`${here} ${direction}`);
     return needs &&
       using.includes(needs) &&
       shape &&
-      (walls.has(shape) || gates.has(shape) || shape === dense || shape === guarded || shape === shut)
+      (walls.has(shape) ||
+        gates.has(shape) ||
+        shape === dense ||
+        shape === guarded ||
+        shape === shut ||
+        shape === crossing)
       ? [`${here} ${direction}`]
       : [];
   });
@@ -550,6 +568,24 @@ function inUse() {
     else if (balcony) ladder.prop(land.balcony.top, land.balcony.out, balcony, carried);
     leaning = up;
   } else if (up && itemLocations.ladder === "carried") ladder.show();
+  // The plank across the river, from the bank you're on.
+  const across = exits.find((exit) => shapeOf.get(exit) === crossing);
+  if (across !== bridged) {
+    plank.away();
+    if (across) {
+      const { x, z } = land.river.narrows;
+      const half = PLANK / 2;
+      const south = across.endsWith("south"); // (from the north bank)
+      plank.lay(
+        across,
+        [x, south ? z - half : z + half],
+        [x, south ? z + half : z - half],
+        itemLocations.plank === "carried",
+        instantly
+      );
+    }
+    bridged = across;
+  } else if (across && itemLocations.plank === "carried") plank.show();
 }
 
 // A game loaded: you're where you were in it (or, saved in another version,
@@ -829,6 +865,8 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   ending.replaceChildren();
   ladder.away();
   leaning = undefined;
+  plank.away();
+  bridged = undefined;
   arrive(game);
   instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
   inUse();
@@ -955,7 +993,7 @@ renderer.setAnimationLoop((time) => {
     playing.t += dt;
     if (was < playing.scene.ends - EARLY && playing.t >= playing.scene.ends - EARLY) curtain(playing.words);
   }
-  river.update(dt);
+  river.update(dt, player.camera.position);
   murky.classList.toggle("under", Boolean(playing) && player.camera.position.y < land.river.water);
   trees.update(player.position, player.yaw, player.camera);
   // Coming down from the mountain to the dense trees, they part for you
@@ -1014,6 +1052,9 @@ renderer.setAnimationLoop((time) => {
     for (const [leaf, way] of gate.leaves) leaf.rotation.y = way * swing;
   }
   ladder.update((exit) => {
+    if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
+  });
+  plank.update(dt, (exit) => {
     if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
   });
   // Through what was in the way (over the wall, through the felled trees or

@@ -2,8 +2,8 @@
 # data/world.json. Each lies as it would on the ground, its middle at the
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
-# The ladder, the key, the axe, the apple and the emerald so far; the rest are to come
-# (PLAN-V3.md).
+# The ladder, the plank, the key, the axe, the apple and the emerald so far;
+# the rest are to come (PLAN-V3.md).
 
 import math
 import sys
@@ -66,6 +66,54 @@ for k in range(n):
     y = -LENGTH / 2 + (k + 0.5) * LENGTH / n
     rung(ladder, -WIDTH / 2, WIDTH / 2, y, DEEP / 2, 0.022, RUNG)
 outward(ladder.build("ladder", smooth=False))
+
+# The plank: long enough to bridge the deep river where it narrows (its
+# shores 6 m apart: art/blender/land.py), with half a metre on either bank.
+# One long, weathered board, grey-brown, its grain running along it, with a
+# few dark knots, and its ends (sawn across) darker.
+PLANK_LONG, PLANK_WIDE, PLANK_THICK = 7.0, 0.45, 0.08
+PLANK = c.linear("#8d7454")
+KNOT = c.linear("#4a3826")
+ENDS = c.linear("#5c4630")
+KNOTS = [(0.08, -2.3), (-0.1, -0.6), (0.06, 1.2), (-0.05, 2.9)]  # across and along
+
+
+def plank_colour(x, y, z):
+    """Its grain: streaks along it (noise stretched out lengthways), and its knots."""
+    grain = noise.noise(Vector((x * 40, y * 1.2, z * 40 + 3)))
+    col = c.mix(PLANK, c.linear("#a68c66"), 0.5 + 0.5 * grain)
+    for kx, ky in KNOTS:
+        d = math.hypot((x - kx) * 1.0, (y - ky) * 0.6)
+        col = c.mix(col, KNOT, max(0.0, 1 - d / 0.06))
+    return col
+
+
+plank = c.Builder()
+ACROSS, ALONG = 4, 56  # points across its faces, and along it
+xs = [-PLANK_WIDE / 2 + PLANK_WIDE * i / ACROSS for i in range(ACROSS + 1)]
+ys = [-PLANK_LONG / 2 + PLANK_LONG * j / ALONG for j in range(ALONG + 1)]
+zs = [0.0, PLANK_THICK]
+
+
+def strip(points):
+    """A face made of a grid of points (rows of them), each corner coloured by its grain."""
+    rows, cols = len(points), len(points[0])
+    verts = [p for row in points for p in row]
+    faces = [(r * cols + k, r * cols + k + 1, (r + 1) * cols + k + 1, (r + 1) * cols + k)
+             for r in range(rows - 1) for k in range(cols - 1)]
+    plank.add(verts, faces, [plank_colour(*p) for p in verts])
+
+
+strip([[(x, y, PLANK_THICK) for x in xs] for y in ys])  # its top
+strip([[(x, y, 0.0) for x in xs[::-1]] for y in ys])  # its underside
+for side in (-1, 1):  # its long edges
+    x = side * PLANK_WIDE / 2
+    strip([[(x, y, z) for z in (zs if side > 0 else zs[::-1])] for y in ys])
+for end in (-1, 1):  # its ends, sawn across
+    y = end * PLANK_LONG / 2
+    pts = [(x, y, z) for z in zs for x in (xs[0], xs[-1])]
+    plank.add(pts, [(0, 1, 3, 2)], [c.vary(ENDS, 0.1, Vector(p) * 5) for p in pts])
+outward(plank.build("plank", smooth=False))
 
 # The key: a big old one (70 cm, so you can spot it in the grass: drawn half a
 # metre long, then made KEY_SIZE times bigger), rusty bronze as in its

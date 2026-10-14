@@ -18,7 +18,7 @@ const TURNING = 1.2; // from this, the current turns you downstream…
 const TURNED = 4.6; // …slowly, till this
 const ENDS = 7.4; // carried off: the curtain comes down over the end of it, and there it stops
 
-const IN = 3; // metres from the river's middle you wade out to
+const IN = 3; // metres from the river's middle you wade out to (or less, where it's narrow)
 const NECK = 0.28; // your eyes above the water, swept along
 const FAST = FLOW * 1.15; // metres a second, at your fastest (a little faster than its foam)
 const SPEEDING = 1.8; // seconds for it to get you up to that
@@ -39,6 +39,7 @@ export class Swept {
   private readonly side: number; // which side of its middle you're on (1: its left, looking downstream)
   private readonly wadeTo: Vector3;
   private readonly wading: number; // which way you wade in (a yaw)
+  private readonly in: number; // how far from its middle you wade out to
   private along = 0; // how far the current's carried you
 
   constructor(
@@ -51,13 +52,14 @@ export class Swept {
     this.facing = camera.quaternion.clone();
     this.eye = this.from.y - (ground(this.from.x, this.from.z) ?? 0);
     this.start = river.nearest(this.from.x, this.from.z);
+    this.in = Math.min(IN, river.half(this.start) * 0.7);
     // (Which side of its middle you're on: the one nearer you.)
     const near = (side: number) => {
-      const [x, z] = river.at(this.start, IN * side);
+      const [x, z] = river.at(this.start, this.in * side);
       return Math.hypot(x - this.from.x, z - this.from.z);
     };
     this.side = near(1) < near(-1) ? 1 : -1;
-    const [x, z] = river.at(this.start, IN * this.side);
+    const [x, z] = river.at(this.start, this.in * this.side);
     this.wadeTo = new Vector3(x, river.water + NECK, z);
     this.wading = yawOf(this.wadeTo.x - this.from.x, this.wadeTo.z - this.from.z);
   }
@@ -83,8 +85,11 @@ export class Swept {
     } else {
       // The current: slow at first, then fast, and drawing you out into the middle.
       this.along += dt * FAST * Math.min(1, s / SPEEDING) ** 2;
-      const out = IN * (1 - smoother(s / 3.5)) + 0.8 * Math.sin(s * 0.9) * grow;
-      const [x, z] = this.river.at(this.start + this.along, out * this.side);
+      // (Swaying from side to side in it, less where it's narrow.)
+      const here = this.start + this.along;
+      const out =
+        this.in * (1 - smoother(s / 3.5)) + Math.min(0.8, this.river.half(here) * 0.4) * Math.sin(s * 0.9) * grow;
+      const [x, z] = this.river.at(here, out * this.side);
       const bob = (0.1 * Math.sin(s * 2.7) + 0.05 * Math.sin(s * 5.9 + 1)) * grow;
       const under = this.reducedMotion
         ? 0
