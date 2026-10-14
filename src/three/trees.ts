@@ -2,11 +2,14 @@
 // "tree-<kind>-far" and "-distant"), stamped wherever land.json says one
 // grows. Near you they're drawn in full; further off, simpler (casting
 // shadows as far as the sun's shadows reach); and beyond that, simpler still,
-// and only the ones you're facing.
+// and only the ones you're facing. Each dissolves into the next over a few
+// metres (speckled away, pixel by pixel, as the other speckles in), rather
+// than changing all at once.
 
 import {
   Color,
   InstancedMesh,
+  type Material,
   MathUtils,
   Matrix4,
   type Mesh,
@@ -15,6 +18,7 @@ import {
   Quaternion,
   type Scene,
   Vector3,
+  type WebGLProgramParametersWithUniforms,
 } from "three";
 
 /** Where they grow: [kind, x, y, z, yaw, scale] (the dense trees on their own, for the axe: felling.ts). */
@@ -29,6 +33,7 @@ const SHADOWED = 70; // and casting shadows, nearer than this (the sun's reach 6
 const MOVED = 3; // sorted again each time you've gone this far
 const TURNED = 0.15; // or turned this far (radians)
 const SLACK = 0.4; // the far ones drawn this far (radians) outside the view, for turning in between
+const BAND = 5; // metres either side of where one dissolves into the next
 
 interface Kind {
   near: InstancedMesh;
@@ -76,8 +81,8 @@ export class Trees {
       for (const mesh of [full, simple, simplest]) mesh.removeFromParent();
       this.models.set(kind, full);
       const count = trees[k].length;
-      const made = (mesh: Mesh, shadows: boolean) => {
-        const many = new InstancedMesh(mesh.geometry, mesh.material, count);
+      const made = (mesh: Mesh, shadows: boolean, from: number, to: number) => {
+        const many = new InstancedMesh(mesh.geometry, dissolving(mesh.material as Material, from, to), count);
         many.castShadow = shadows;
         many.receiveShadow = true;
         // (They're everywhere: always drawn, rather than worked out where they all are.)
@@ -87,7 +92,12 @@ export class Trees {
         scene.add(many);
         return many;
       };
-      this.kinds.push({ near: made(full, true), mid: made(simple, true), far: made(simplest, false), trees: trees[k] });
+      this.kinds.push({
+        near: made(full, true, 0, NEAR),
+        mid: made(simple, true, NEAR, SHADOWED),
+        far: made(simplest, false, SHADOWED, 0),
+        trees: trees[k],
+      });
     });
   }
 
@@ -107,11 +117,20 @@ export class Trees {
         const dx = this.x[i] - at.x;
         const dz = this.z[i] - at.z;
         const d = Math.hypot(dx, dz);
-        if (d >= SHADOWED && (dx * ahead[0] + dz * ahead[1]) / d < seen) continue;
-        const many = d < NEAR ? kind.near : d < SHADOWED ? kind.mid : kind.far;
-        const n = many.count++;
-        many.instanceMatrix.array.set(this.matrices.subarray(i * 16, i * 16 + 16), n * 16);
-        many.instanceColor!.array.set(this.colours.subarray(i * 3, i * 3 + 3), n * 3);
+        const edge = BAND + MOVED; // (as far as it can be from where it was sorted)
+        if (d >= SHADOWED + edge && (dx * ahead[0] + dz * ahead[1]) / d < seen) continue;
+        // (In between, in both: half dissolved.)
+        const levels = [
+          d < NEAR + edge && kind.near,
+          d > NEAR - edge && d < SHADOWED + edge && kind.mid,
+          d > SHADOWED - edge && kind.far,
+        ];
+        for (const many of levels) {
+          if (!many) continue;
+          const n = many.count++;
+          many.instanceMatrix.array.set(this.matrices.subarray(i * 16, i * 16 + 16), n * 16);
+          many.instanceColor!.array.set(this.colours.subarray(i * 3, i * 3 + 3), n * 3);
+        }
       }
       for (const many of [kind.near, kind.mid, kind.far]) {
         many.instanceMatrix.needsUpdate = true;
@@ -119,4 +138,39 @@ export class Trees {
       }
     }
   }
+}
+
+// A tree's material, drawn only from one distance to another (0: no limit),
+// dissolving in and out at each: speckled, by a pattern on the screen that's
+// the same for the next one in or out, so between them every pixel's drawn
+// once. (By how far the tree is, not each bit of it, so it goes as a whole.)
+function dissolving(material: Material, from: number, to: number) {
+  const own = material.clone();
+  own.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
+    Object.assign(shader.uniforms, { lodFrom: { value: from }, lodTo: { value: to } });
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying float treeAway;")
+      .replace(
+        "#include <begin_vertex>",
+        `#include <begin_vertex>
+        treeAway = distance((modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz, cameraPosition.xz);`
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+        varying float treeAway;
+        uniform float lodFrom;
+        uniform float lodTo;`
+      )
+      .replace(
+        "#include <clipping_planes_fragment>",
+        `#include <clipping_planes_fragment>
+        float speckle = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+        if (lodFrom > 0.0 && speckle >= smoothstep(lodFrom - ${BAND}.0, lodFrom + ${BAND}.0, treeAway)) discard;
+        if (lodTo > 0.0 && speckle < smoothstep(lodTo - ${BAND}.0, lodTo + ${BAND}.0, treeAway)) discard;`
+      );
+  };
+  own.customProgramCacheKey = () => `tree ${from} ${to}`;
+  return own;
 }

@@ -31,7 +31,9 @@ export function sky(sun: Vector3, horizon: Color): Mesh {
         float up = max(direction.y, 0.0);
         vec3 colour = mix(horizon, top, pow(up, 0.55));
         float toward = max(dot(direction, sun), 0.0);
-        colour = mix(colour, glow, pow(toward, 12.0) * 0.6 + pow(toward, 600.0));
+        // (A wide warm glow round the sun, low in the sky, and the sun itself.)
+        float low = 1.0 - smoothstep(0.0, 0.6, up);
+        colour = mix(colour, glow, pow(toward, 4.0) * 0.35 * low + pow(toward, 12.0) * 0.5 + pow(toward, 600.0));
         gl_FragColor = vec4(colour, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

@@ -145,6 +145,8 @@ export interface Items {
   arrival(room: RoomId): [number, number] | undefined;
   /** An object lying in the world (not carried): its model, where it lies. */
   lyingAt(id: ItemId): Object3D | undefined;
+  /** Every object lying in the world: their models. */
+  lying(): Object3D[];
   /** A game loaded: what you carry, and where everything lies, as it was in it. */
   restart(game: { state: GameState; three?: ThreeSave }): void;
 }
@@ -669,6 +671,7 @@ export function items(options: {
     },
     arrival,
     lyingAt: (id) => lying.get(id)?.model,
+    lying: () => [...lying.values()].map((thing) => thing.model),
     restart(game) {
       state = game.state;
       layOut(game.three);

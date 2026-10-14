@@ -55,6 +55,7 @@ import {
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
+import { haze } from "./haze";
 import { items as setUpItems, onPaths } from "./items";
 import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
@@ -64,6 +65,7 @@ import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import snakeModel from "./models/snake.glb?url";
 import { Plank } from "./plank";
+import { type Growth, Plants } from "./plants";
 import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable, wayThrough } from "./player";
 import { River } from "./river";
 import { Shafts, speck, type Window } from "./shafts";
@@ -91,12 +93,18 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = PCFShadowMap;
 root.append(renderer.domElement);
 
+haze();
 const scene = new Scene();
-const fog = new Fog(HAZE, 40, 320);
+// The haze starting not far off, and thickening slowly (haze.ts): softening
+// the middle distance, where the trees turn simpler and the grass gives way
+// to the ground's own green, and still letting you see the mountain.
+const HAZE_NEAR = 18;
+const HAZE_FAR = 340;
+const fog = new Fog(HAZE, HAZE_NEAR, HAZE_FAR);
 scene.fog = fog;
 scene.add(sky(SUN, HAZE));
-const SKY = new Color("#cfe2ff");
-const SKY_GROUND = new Color("#6d7a3c");
+const SKY = new Color("#c4d8ff");
+const SKY_GROUND = new Color("#6f7a3e");
 const skylight = new HemisphereLight(SKY, SKY_GROUND, 1.25);
 // In the dark (the tower), what little of the sky's light there is is cold,
 // and a dark haze hangs in the air (thinning as you climb to the window).
@@ -120,7 +128,9 @@ const roomLights = Array.from({ length: ROOM_LIGHTS }, () => new PointLight("#ff
 scene.add(...roomLights);
 const DARK = new Color("#0b0806");
 
-const sunlight = new DirectionalLight("#ffdcae", 2.8);
+// Golden: late afternoon (and the shadows, lit only by the sky, cool).
+const SUNLIGHT = 3.1;
+const sunlight = new DirectionalLight("#ffd497", SUNLIGHT);
 sunlight.castShadow = true;
 sunlight.shadow.mapSize.set(2048, 2048);
 Object.assign(sunlight.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 400 });
@@ -247,6 +257,16 @@ const walkable: Walkable = (x, z) => {
   return i >= 0 && j >= 0 && i < mask.nx && j < mask.ny && standable[j * mask.nx + i] === 1;
 };
 player.standOn(ground, walkable);
+// What grows on the ground, round you: grass, flowers, bushes and stones.
+const plants = new Plants(
+  scene,
+  model.scene,
+  file,
+  { ...land.walkable, ...(land.growth as Pick<Growth, "offset">) },
+  drawn,
+  walkable,
+  matchMedia("(pointer: coarse)").matches
+);
 player.ways = Object.values(land.ways);
 // (A lit hall has a light of its own; a dark one, only what comes in: lights
 // at its windows, and its windows' shafts of light.)
@@ -959,7 +979,7 @@ function lightFor(depth: number, time: number, dt: number) {
   murk += ((hall?.dark ? 1 - climbed * climbed * (3 - 2 * climbed) : 0) - murk) * Math.min(1, dt * 2);
   const under = Math.min(1, Math.max(0, (depth - 0.5) / 3));
   dark = Math.max(gloom, under);
-  sunlight.intensity = 2.8 * (1 - under);
+  sunlight.intensity = SUNLIGHT * (1 - under);
   skylight.intensity = 1.25 * (1 - Math.max(under * 0.92, indoors * 0.55, gloom * 0.8));
   skylight.color.copy(SKY).lerp(COLD, gloom);
   skylight.groundColor.copy(SKY_GROUND).lerp(COLD_GROUND, gloom);
@@ -982,8 +1002,8 @@ function lightFor(depth: number, time: number, dt: number) {
 
   caveLit += ((hall?.light ? 1 : 0) - caveLit) * Math.min(1, dt * 3);
   fog.color.copy(HAZE).lerp(DARK, under).lerp(GLOOM, murk);
-  fog.near = (40 - 38 * under) * (1 - murk) + 1.5 * murk;
-  fog.far = (320 - 290 * under + 40 * caveLit) * (1 - murk) + 22 * murk;
+  fog.near = (HAZE_NEAR - (HAZE_NEAR - 2) * under) * (1 - murk) + 1.5 * murk;
+  fog.far = (HAZE_FAR - (HAZE_FAR - 30) * under + 40 * caveLit) * (1 - murk) + 22 * murk;
   shafts?.update(dt, gloom, player.camera.position);
   insideLook?.color.setScalar(0.25 + 0.75 * gloom);
 }
@@ -1002,6 +1022,7 @@ renderer.setAnimationLoop((time) => {
   river.update(dt, player.camera.position);
   murky.classList.toggle("under", Boolean(playing) && player.camera.position.y < land.river.water);
   trees.update(player.position, player.yaw, player.camera);
+  plants.update(dt, player.camera.position, items.lying());
   // Coming down from the mountain to the dense trees, they part for you
   // (going up, they don't), until you're clear of them.
   if (dense?.box) {
