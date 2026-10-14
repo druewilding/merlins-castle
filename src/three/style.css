@@ -593,3 +593,17 @@ body.scene :is(.corner, .said, .aim, .prompt, .slots) {
     animation: none;
   }
 }
+
+/* Under the water, swept away in the river: murky green-blue. */
+.murky {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, rgba(40, 92, 96, 0.82), rgba(10, 34, 40, 0.94));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.murky.under {
+  opacity: 1;
+}

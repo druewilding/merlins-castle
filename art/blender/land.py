@@ -1003,6 +1003,12 @@ iw, ie, is_, in_ = CASTLE[0] - 2, CASTLE[1] + 2, CASTLE[2] - 2, CASTLE[3] + 2
 for x0, y0, x1, y1 in ((mw, in_, me, mn), (mw, ms, me, is_), (mw, is_, iw, in_), (ie, is_, me, in_)):
     water.add([(x0, y0, -1), (x1, y0, -1), (x1, y1, -1), (x0, y1, -1)], [(0, 1, 2, 3)], [WATER] * 4)
 water.build("water", smooth=False)
+WATER_LEVEL = -1
+# The deep river, where the way crosses it, from shore to shore: from the
+# north bank it kills you (you're swept away: you walk in, and the game plays
+# it out), and from the south one you fall in, but get out safely.
+obstacle(["deep-river south", "river-south-bank north"], "box", P["deep-river"][0], 60 * K, 16, SHORE + 1,
+         reach=0.5)  # (the river runs straight east there, 60 * K south)
 
 # ---------------------------------------------------------------- built things
 
@@ -2591,6 +2597,8 @@ if out:
         "ground": {"x0": X0, "y0": Y0, "step": STEP, "nx": nx, "ny": ny},
         "walkable": {"x0": X0, "y0": Y0, "step": MASK_STEP, "nx": mx, "ny": my, "offset": len(walk) * 4},
         "obstacles": obstacles,
+        # The river's middle, upstream to down, [x, z] in three.js's axes, and its water's height.
+        "river": {"line": [[round(x, 2), round(-y, 2)] for x, y in RIVER], "water": WATER_LEVEL},
         # The ways underground: points [x, z, floor] in three.js's axes.
         "ways": {name: {"half": way.half, "points": [[round(x, 2), round(-y, 2), round(f, 2)] for x, y, f in way.points],
                         **({"indoor": True} if way.indoor else {})}
