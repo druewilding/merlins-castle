@@ -301,6 +301,25 @@ export class Player {
     return !near || ![...near.circles, ...near.boxes].some((thing) => touching(thing, x, z, margin));
   }
 
+  /**
+   * Whether nothing solid stands between two spots (a wall, a rock: not an
+   * obstacle's reach round it), on the land or underground: for reaching
+   * from one to the other. (Not quite all the way: what you reach for may
+   * lie against something solid, or on it.)
+   */
+  between(ax: number, az: number, bx: number, bz: number, under = false) {
+    const long = Math.hypot(bx - ax, bz - az);
+    for (let s = 0; s < long - 0.4; s += 0.1) {
+      const x = ax + ((bx - ax) * s) / long;
+      const z = az + ((bz - az) * s) / long;
+      const near = (under ? this.nearUnder : this.near).get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
+      if (near && [...near.circles, ...near.boxes].some((thing) => touching({ ...thing, ahead: 0 }, x, z, 0))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /** Puts you somewhere: in a hall underground, if the spot's in one. */
   place(x: number, z: number, yaw = 0, floor?: number) {
     // (On a floor underground or indoors, if it says: a hall's, or a way's.)
