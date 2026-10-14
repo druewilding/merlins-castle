@@ -92,6 +92,8 @@ function buildSounds(quiet) {
   if (!existsSync("art/originals/fx")) return 0;
   let built = 0;
   for (const { list, dir } of SOUND_LISTS) {
+    // (Not there for a moment: switching branches, with the dev server running.)
+    if (!existsSync(list)) continue;
     const sounds = JSON.parse(readFileSync(list, "utf8"));
     mkdirSync(dir, { recursive: true });
     const wanted = new Set();
