@@ -53,6 +53,7 @@ const SORTS = {
   fern: { models: ["fern"], far: 38, size: [0.35, 0.6], sway: 0.25, up: 0.5 },
   leafy: { models: ["leafy"], far: 40, size: [0.35, 0.55], sway: 0.15, up: 0.5 },
   pebble: { models: ["pebble-1", "pebble-2"], far: 24, size: [0.15, 0.35], low: true },
+  grit: { models: ["pebble-1", "pebble-2"], far: 18, size: [0.05, 0.13], low: true },
   stone: { models: ["boulder-2", "boulder-3"], far: 40, size: [0.35, 0.6], low: true },
   boulder: {
     models: ["boulder-1", "boulder-2", "boulder-3", "boulder-4"],
@@ -74,7 +75,10 @@ const GROUNDS: Record<number, Partial<Record<Name, number>>> = {
   3: { grass: 0.5, short: 0.5, fern: 0.07, leafy: 0.04, bush: 0.02, boulder: 0.006 }, // the forest
   4: { grass: 3, short: 1, leafy: 0.04, pebble: 0.05, stone: 0.01 }, // the river's banks
   5: { grass: 3, short: 1, fern: 0.1, leafy: 0.08, foxglove: 0.12, stone: 0.03, pebble: 0.1 }, // the old stone wall
+  6: { grit: 0.35, pebble: 0.015 }, // on a path
 };
+const PATH = 6;
+const ON_THE_PATH = 0.03; // metres: (paths lie a little above the ground: land.py)
 const MIXES: Record<number, Partial<Record<Name, number>>> = {
   1: { daisy: 0.35, buttercup: 0.15, foxglove: 0.015 }, // the meadows
   2: { buttercup: 0.8, daisy: 0.1 }, // the yellow flowers
@@ -209,7 +213,7 @@ export class Plants {
         const random = randoms(gi * 7919 + gj * 104729);
         const flowery = clumped(x, z);
         const here = { ...GROUNDS[kind] };
-        for (const [name, n] of Object.entries(MIXES[g >> 3] ?? {}) as [Name, number][]) {
+        for (const [name, n] of Object.entries(kind === PATH ? {} : (MIXES[g >> 3] ?? {})) as [Name, number][]) {
           const fewer = kind === 3 && FLOWERS.has(name) ? IN_THE_FOREST : 1;
           here[name] = (here[name] ?? 0) + n * fewer * (FLOWERS.has(name) ? flowery : 1);
         }
@@ -228,7 +232,11 @@ export class Plants {
             if (y === undefined || (sort.wild && this.walkable(px, pz))) continue;
             // (Thinning out up the mountain, where the ground turns to rock.)
             if (!sort.low && random() < (y - 8) / 8) continue;
-            matrix.compose(where.set(px, y - 0.03, pz), turn.setFromAxisAngle(up, yaw), scale.setScalar(size));
+            matrix.compose(
+              where.set(px, y + (kind === PATH ? ON_THE_PATH : -0.03), pz),
+              turn.setFromAxisAngle(up, yaw),
+              scale.setScalar(size)
+            );
             matrices[k].push(...matrix.elements);
             tint.setRGB(shade, shade * (0.97 + 0.06 * random()), shade * 0.95);
             colours[k].push(tint.r, tint.g, tint.b);

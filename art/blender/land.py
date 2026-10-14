@@ -758,53 +758,119 @@ for j in range(ny - 1):
             continue
         a = j * nx + i
         faces.append((a, a + 1, a + nx + 1, a + nx))
-c.mesh_object("ground", verts, faces, colours)
+ground_obj = c.mesh_object("ground", verts, faces, colours)
 
-# Paths: strips of earth on the ground, lying on it as it's drawn (flat
-# triangles, a little under height() on a rise), in pieces small enough to
-# bend with it, so they neither float over a mound nor sink into a hollow.
-ACROSS = [-1.5, -0.75, 0.0, 0.75, 1.5]
-strips = c.Builder()
-for k, line in enumerate(paths):
-    samples = []
-    for (ax, ay), (bx, by) in zip(line, line[1:]):
-        n = max(1, int(math.hypot(bx - ax, by - ay) / 0.5))
-        samples += [(ax + (bx - ax) * f / n, ay + (by - ay) * f / n) for f in range(n)]
-    samples.append(line[-1])
-    # (A few centimetres above the grass, so the two don't flicker into each
-    # other far off, nor the grass come up through it on a slope; and a
-    # little apart from each other, where they cross.)
-    lift = 0.04 + 0.003 * (k % 10)
-    verts, colours, faces = [], [], []
-    for i, (x, y) in enumerate(samples):
-        nx_, ny_ = samples[min(i + 1, len(samples) - 1)]
-        px_, py_ = samples[max(i - 1, 0)]
-        tx, ty = nx_ - px_, ny_ - py_
-        dd = math.hypot(tx, ty) or 1
-        ox, oy = -ty / dd, tx / dd
-        for side in ACROSS:
-            vx, vy = x + ox * side, y + oy * side
-            d = deck(vx, vy)
-            verts.append((vx, vy, (d if d is not None else drawn_height(vx, vy, exactly=True)) + lift))
-            colours.append(c.vary(DIRT, 0.12, Vector((vx, vy, 2.0))))
-        if i:
-            # (Wound to face up: facing down, the sun's shadows fall on the
-            # path in stripes.)
-            m = len(ACROSS)
-            for j in range(m - 1):
-                a = (i - 1) * m + j
-                faces.append((a, a + m, a + m + 1, a + 1))
-    strips.add(verts, faces, colours)
-    # Its sides, down into the ground, so you never see under its edge (not
-    # across its ends, which mostly meet another path, and would stand up
-    # through it).
-    m = len(ACROSS)
-    for edge in (0, m - 1):
-        tops = verts[edge::m]
-        for p0, p1 in zip(tops, tops[1:]):
-            side = [p0, p1, (*p1[:2], p1[2] - lift - 0.25), (*p0[:2], p0[2] - lift - 0.25)]
-            strips.add(side, [(0, 1, 2, 3)], [c.vary(DIRT, 0.12, Vector(p0))] * 4)
-strips.build("paths")
+
+def ground_normal(i, j):
+    """The ground's normal at a point of its grid, from the slope there (the
+    paths' edges are lit the same, so they don't show where they meet it)."""
+    h = lambda a, b: verts[min(max(b, 0), ny - 1) * nx + min(max(a, 0), nx - 1)][2]
+    n = Vector((-(h(i + 1, j) - h(i - 1, j)) / (2 * STEP), -(h(i, j + 1) - h(i, j - 1)) / (2 * STEP), 1.0))
+    return tuple(n.normalized())
+
+
+GROUND_NORMALS = [ground_normal(i, j) for j in range(ny) for i in range(nx)]
+ground_obj.data.normals_split_custom_set_from_vertices(GROUND_NORMALS)
+
+# Paths: earth on the ground, all of them one surface (so there's no seeing
+# where one meets another), lying a few centimetres over the ground, on a
+# finer grid than it but split as it is, so it follows it exactly. Worn, as
+# in the paintings: pale and dusty down the middle, where feet go, darker
+# towards the edges, in patches; wandering a little wider and narrower, with
+# ragged edges fading into the grass. Past the dirt, it's the ground's own
+# colour and lit as the ground is, coming down onto it, so there's no line
+# where they meet.
+GROUND_COLOURS = colours
+DIRT_WORN = c.linear("#c99c66")
+DIRT_EDGE = c.linear("#8e6a45")
+HALF = 1.45  # half a path's width, on the whole
+WANDERS = 0.3  # wider or narrower than that, by as much as this
+REACH = HALF + WANDERS  # (as far as the dirt can be from its middle)
+FADES = 1.3  # how far out, of its width, it's faded into the grass
+PATH_LIFT = 0.03
+SUB = 4  # its grid: this many squares across each of the ground's
+
+
+def ground_at(x, y, values):
+    """Something of the ground's (its colour, its normal) as drawn, between
+    the grid's points: as drawn_height, on the triangle it's on."""
+    fi, fj = (x - X0) / STEP, (y - Y0) / STEP
+    i, j = min(math.floor(fi), nx - 2), min(math.floor(fj), ny - 2)
+    fx, fy = fi - i, fj - j
+    at = lambda a, b: values[(j + b) * nx + i + a]
+    w = ((1 - fx), (fx - fy), 0, fy) if fx > fy else ((1 - fy), 0, (fy - fx), fx)
+    corners = (at(0, 0), at(1, 0), at(0, 1), at(1, 1))
+    return tuple(sum(wk * ck[n] for wk, ck in zip(w, corners)) for n in range(len(corners[0])))
+
+
+def dirt(x, y, u):
+    """The path's colour, u of the way out from its middle to the edge of its dirt."""
+    worn = smooth(1 - abs(u) / 0.75)
+    patch = noise.noise(Vector((x / 4, y / 4, 11.0)))
+    col = c.mix(c.mix(DIRT, DIRT_EDGE, smooth((abs(u) - 0.4) / 0.6)), DIRT_WORN, worn * (0.6 + 0.4 * patch))
+    return c.vary(col, 0.12, Vector((x, y, 2.0)))
+
+
+def out_on_the_path(x, y):
+    """How far out from the nearest path's middle, of its width there (1 at
+    the edge of its dirt): wandering, and frayed."""
+    half = HALF + WANDERS * noise.noise(Vector((x / 7, y / 7, 0.5)))
+    fray = 0.13 * noise.noise(Vector((x / 1.2, y / 1.2, 4.0))) + 0.05 * noise.noise(Vector((x / 0.4, y / 0.4, 6.0)))
+    return path_lines.distance(x, y) / half + fray
+
+
+def off_the_land(x, y):
+    """Over water, beside a bridge: no path there (it'd hang down to the riverbed)."""
+    return deck(x, y) is None and (from_river(x, y) < BANK + 0.5 or in_moat(x, y))
+
+
+path_points, path_index = [], {}
+
+
+def path_point(gi, gj):
+    """A point of the paths' grid (SUB to each of the ground's squares), made once."""
+    if (gi, gj) in path_index:
+        return path_index[(gi, gj)]
+    x, y = X0 + gi * STEP / SUB, Y0 + gj * STEP / SUB
+    u = out_on_the_path(x, y)
+    d = deck(x, y)
+    if d is not None:
+        z, colour, normal = d + PATH_LIFT, dirt(x, y, min(u, 1.0)), (0.0, 0.0, 1.0)
+    else:
+        grass = ground_at(x, y, GROUND_COLOURS)
+        faded = smooth((u - 1) / (FADES - 1))
+        colour = c.mix(dirt(x, y, min(u, 1.0)), grass, faded)
+        # (Coming down onto the ground at its very edge, where it's the ground's colour.)
+        z = drawn_height(x, y, exactly=True) + PATH_LIFT * (1 - smooth((u - 1.05) / (FADES - 1.05)))
+        normal = tuple(Vector(ground_at(x, y, GROUND_NORMALS)).normalized())
+    path_index[(gi, gj)] = len(path_points)
+    path_points.append(((x, y, z), colour, normal, u, off_the_land(x, y)))
+    return path_index[(gi, gj)]
+
+
+path_faces = []
+for j in range(ny - 1):
+    for i in range(nx - 1):
+        if (i, j) in CUT:
+            continue
+        if path_lines.distance(X0 + (i + 0.5) * STEP, Y0 + (j + 0.5) * STEP) > REACH * FADES + 1.6:
+            continue
+        for a in range(SUB):
+            for b in range(SUB):
+                gi, gj = i * SUB + a, j * SUB + b
+                k00, k10 = path_point(gi, gj), path_point(gi + 1, gj)
+                k11, k01 = path_point(gi + 1, gj + 1), path_point(gi, gj + 1)
+                corners = [path_points[k] for k in (k00, k10, k11, k01)]
+                if min(p[3] for p in corners) >= FADES or any(p[4] for p in corners):
+                    continue
+                # (Split as the ground is: from the first corner to the third.)
+                path_faces += [(k00, k10, k11), (k00, k11, k01)]
+# (Only the points it uses.)
+used = sorted({k for f in path_faces for k in f})
+renumber = {k: n for n, k in enumerate(used)}
+paths_obj = c.mesh_object("paths", [path_points[k][0] for k in used],
+                          [tuple(renumber[k] for k in f) for f in path_faces], [path_points[k][1] for k in used])
+paths_obj.data.normals_split_custom_set_from_vertices([path_points[k][2] for k in used])
 
 # ---------------------------------------------------------------- what's solid
 
@@ -2780,7 +2846,7 @@ mask = bytes(1 if walkable(X0 + (i + 0.5) * MASK_STEP, Y0 + (j + 0.5) * MASK_STE
 # floors, bare rock), and what mix of flowers and plants (MIXES, the rest),
 # by the place nearest (give or take, so they blend). The game scatters
 # grass, flowers, bushes and stones by it, round you (src/three/plants.ts).
-GROUND = {"meadow": 1, "verge": 2, "forest": 3, "bank": 4, "wall": 5}
+GROUND = {"meadow": 1, "verge": 2, "forest": 3, "bank": 4, "wall": 5, "path": 6}
 MIXES = {
     # Daisies and buttercups, and foxgloves here and there.
     **dict.fromkeys(["old-wall", "old-stone-wall", "rusty-gate", "grassy-bank", "forest-edge", "deep-river",
@@ -2796,6 +2862,11 @@ WALL_LINES.add([(WX, -18 * K), (WX, WY), (WW, WY), (WW, 118 * K)])
 
 
 def growth(x, y):
+    # (Nor up through the bridges' sides, nor the drawbridge's.)
+    if abs(x - BRIDGE[0]) <= 3.0 and abs(y - BRIDGE[1]) <= BRIDGE_HALF + 0.6:
+        return 0
+    if abs(x) <= 3.6 and -143 * K - 0.6 <= y <= -127 * K + 0.6:
+        return 0
     if deck(x, y) is not None or in_moat(x, y) or rocky(x, y) or in_building(x, y):
         return 0
     if CASTLE[0] - 1 <= x <= CASTLE[1] + 1 and CASTLE[2] - 1 <= y <= CASTLE[3] + 1:
@@ -2807,9 +2878,12 @@ def growth(x, y):
         return 0
     to_path = path_lines.distance(x, y)
     to_wall = WALL_LINES.distance(x, y)
-    if to_path < ACROSS[-1] + 0.15 or to_wall < 0.75:
+    if to_wall < 0.75:
         return 0
-    if to_wall < 2.4:
+    # (On a path, only grit; and the grass by it growing a little way over its edges.)
+    if to_path < HALF - 0.4:
+        ground = "path"
+    elif to_wall < 2.4:
         ground = "wall"
     elif to_path < 3.4:
         ground = "verge"
@@ -2881,7 +2955,7 @@ if out:
         # The paths, lying a little above the ground (so what's dropped on
         # one lies on it, not in it): each its line [x, z], in three.js's
         # axes, how far either side of it it goes, and how far up it is.
-        "paths": [{"half": ACROSS[-1], "lift": round(0.04 + 0.003 * (k % 10), 3),
+        "paths": [{"half": round(REACH * 1.1, 2), "lift": PATH_LIFT,
                    "points": [[round(x, 2), round(-y, 2)] for x, y in line]} for k, line in enumerate(paths)],
     }, separators=(",", ":")))
     print(f"Exported {out}: {len(circles)} solid circles, {len(boxes)} boxes, {len(obstacles)} obstacles")
