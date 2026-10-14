@@ -15,6 +15,7 @@ import {
 } from "../engine/engine";
 import type { Command, Direction, GameEvent, GameState, ItemId, World } from "../engine/types";
 import { h } from "../shared/dom";
+import { Sounds } from "../shared/sounds";
 import {
   deleteSave,
   effectsOn,
@@ -38,7 +39,6 @@ import { itemWidth, placeThings } from "./layout";
 import { deathMoment, lostMoment } from "./moments";
 import { Music } from "./music";
 import { NOTES } from "./notes";
-import { Sounds } from "./sounds";
 import { plainText, segments, splitClue } from "./text";
 import { Typewriter } from "./typewriter";
 
@@ -331,7 +331,7 @@ export class IllustratedApp {
     if (this.game!.status !== "won") return;
     // The music steps aside so the victory fanfare rings out on its own.
     this.music.end(600);
-    this.sounds.play("victory", 300);
+    this.sounds.play("victory", { delay: 300 });
     await this.transition(() => this.render(), 1600, true);
   }
 

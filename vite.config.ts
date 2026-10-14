@@ -15,7 +15,7 @@ function artWatcher(): Plugin {
     async configureServer(server) {
       await buildArt({ quiet: true });
       server.watcher.add("art/originals");
-      server.watcher.add("src/illustrated/sounds.json");
+      server.watcher.add(["src/shared/sounds.json", "src/three/sounds.json"]);
       const rebuild = async (file: string) => {
         if (!/[\\/]art[\\/]originals[\\/].*\.(png|mp3|ogg|wav)$|sounds\.json$/.test(file)) return;
         const built = await buildArt({ quiet: true });

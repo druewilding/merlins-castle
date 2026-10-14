@@ -1,0 +1,4 @@
+{
+  "walk": { "file": "kenney_impact-sounds/Audio/footstep_grass_003.ogg", "volume": 0.2 },
+  "run": { "file": "kenney_rpg-audio/Audio/footstep05.ogg", "volume": 0.2 }
+}

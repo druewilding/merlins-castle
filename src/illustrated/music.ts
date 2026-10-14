@@ -5,8 +5,8 @@
 // The volume is set through Web Audio rather than on the <audio> element,
 // because iPhones and iPads ignore an element's volume, so fades wouldn't work.
 
+import { audioContext } from "../shared/audio";
 import { musicOn } from "../shared/storage";
-import { audioContext } from "./audio";
 
 const URL = "music/the-path-of-the-goblin-king.mp3";
 const VOLUME = 0.45;
