@@ -184,6 +184,10 @@ const NUDGE = 0.18; // metres
 const NUDGING = 0.4; // seconds
 const EASING_IN = 0.6; // seconds after, walking on into it comes back to speed
 const AGAIN = 0.5; // metres back from where you bumped into it, before another
+// Footsteps a second, at full speed (slower, going slower: crouching, or
+// pushing along a wall), and none walking on into one.
+const WALKING_STEPS = 2.1;
+const RUNNING_STEPS = 3.2;
 
 export class Player {
   readonly camera = new PerspectiveCamera(70, 1, 0.1, 3000);
@@ -204,6 +208,8 @@ export class Player {
   under: Under | undefined;
   /** Called when you bounce off an obstacle, with the exit you were trying ("moat south"). */
   onBump: (exit: string) => void = () => {};
+  /** Called at each footstep (and landing from a jump), walking or running, and how loud (1 is a step at full speed). */
+  onStep: (kind: "walk" | "run", loudness: number) => void = () => {};
 
   private keys = new Set<string>();
   private ground: Ground = () => 0;
@@ -212,6 +218,7 @@ export class Player {
   private nearUnder = new Map<string, Near>();
   private stick = { x: 0, y: 0 }; // the thumb's walking stick, -1 to 1
   private bob = 0;
+  private strides = 0; // footsteps taken (the next one at the next whole number)
   // Nudged back off an obstacle: which way, how far into it, and where from (none yet: armed).
   private knock = { x: 0, z: 0, t: NUDGING + EASING_IN, from: undefined as { x: number; z: number } | undefined };
   // One-way obstacles you're going through the free way, until you're out of their reach.
@@ -354,7 +361,8 @@ export class Player {
     const right = this.axis("KeyD", "ArrowRight") - this.axis("KeyA", "ArrowLeft") + this.stick.x;
     // (Crouching on Ctrl, or C: Ctrl and W together closes the browser's tab.)
     const crouching = !this.flying && this.axis("ControlLeft", "ControlRight", "KeyC") > 0;
-    const pace = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight") ? RUN : WALK;
+    const running = this.keys.has("ShiftLeft") || this.keys.has("ShiftRight");
+    const pace = running ? RUN : WALK;
     const speed = pace * this.boost * (crouching ? CROUCHING : 1);
     const length = Math.min(1, Math.hypot(forward, right));
     if (this.flying) {
@@ -397,12 +405,34 @@ export class Player {
     this.collide();
     // Holding Space, you hop again as soon as you land (a bunny hop).
     if (this.keys.has("Space") && this.lift === 0 && this.rise === 0) this.jump();
+    const landing = this.lift > 0;
     this.upAndDown(dt);
+    this.footsteps(dt, running, length, pace, landing && this.lift === 0);
 
     const bob =
       reducedMotion || length < 0.01 || this.knock.t < NUDGING || this.lift > 0 ? 0 : Math.sin(this.bob) * 0.04;
     this.camera.position.set(this.position.x, this.position.y + this.lift + this.eye + bob, this.position.z);
     this.camera.quaternion.setFromEuler(new Euler(this.pitch, this.yaw, 0, "YXZ"));
+  }
+
+  // A footstep each time you've gone a stride (how fast you're really going,
+  // on the ground), and one as you land. Setting off, the first comes soon.
+  private footsteps(dt: number, running: boolean, length: number, pace: number, landed: boolean) {
+    const kind = running ? "run" : "walk";
+    if (landed) {
+      this.onStep(kind, 1.3);
+      this.strides = Math.floor(this.strides) + 0.3;
+      return;
+    }
+    const going = Math.hypot(this.position.x - this.before.x, this.position.z - this.before.z) / dt;
+    if (length < 0.01 || this.lift > 0 || going < 0.3) {
+      if (this.lift === 0) this.strides = Math.floor(this.strides) + 0.7;
+      return;
+    }
+    const share = Math.min(1, going / (pace * this.boost));
+    const was = this.strides;
+    this.strides += dt * (running ? RUNNING_STEPS : WALKING_STEPS) * share;
+    if (Math.floor(this.strides) > Math.floor(was)) this.onStep(kind, 0.4 + 0.6 * share);
   }
 
   private along(dt: number) {

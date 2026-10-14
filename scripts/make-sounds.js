@@ -5,7 +5,7 @@
 //
 //   node scripts/make-sounds.js
 //
-// Then point src/illustrated/sounds.json at them, e.g.
+// Then point src/shared/sounds.json at them, e.g.
 //   "discover": { "file": "merlin/discover.wav", "volume": 0.7 }
 
 import { mkdirSync, writeFileSync } from "node:fs";

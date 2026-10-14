@@ -97,6 +97,9 @@ Look at an object and press E to take it; 1 to 5 picks which of your five
 slots is in your hand, E (when you're not looking at an object) or a click
 uses it and G drops it. (Only some of the objects are in the world so far:
 their models are made by `art/blender/items.py`.)
+It has the same sound effects as Illustrated (`src/shared/sounds.json`), and
+footsteps of its own, walking and running (`src/three/sounds.json`, built
+into `src/three/fx/` by `npm run art:build`).
 Esc brings back the start screen, where you can save and load: the same
 saves as the other versions (a 3D save also knows where you stood and where
 everything lies), and Illustrated and Classic carry on the same game there,

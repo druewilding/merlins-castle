@@ -11,6 +11,7 @@ import { Box3, Matrix4, type Object3D, Ray, type Scene, Vector3 } from "three";
 import { act, effects, newGame } from "../engine/engine";
 import { type Direction, EXIT_ORDER, type GameState, type ItemId, type RoomId, type World } from "../engine/types";
 import { artUrl } from "../illustrated/art";
+import type { Shared } from "../shared/sounds";
 import type { ThreeSave } from "../shared/storage";
 import { T } from "../shared/strings";
 import { Glow } from "./glow";
@@ -161,6 +162,8 @@ export function items(options: {
   root: HTMLElement;
   /** Words at the bottom of the screen ("Nothing happens."). */
   say: (words: string) => void;
+  /** A sound effect, as in the illustrated version (taking, dropping, using). */
+  sound: (name: Shared) => void;
   /** What's in use has changed: an object used, or the place left. */
   changed: () => void;
   /** Dropping an object where it's in use, it stays as it is (the ladder against the wall): its model, if so. */
@@ -171,7 +174,7 @@ export function items(options: {
   starts?: Partial<Record<ItemId, { room: RoomId; at: [number, number, number] }>>;
   reducedMotion: boolean;
 }): Items {
-  const { world, scene, player, models, ground, walkable, root, say, changed, stays, begin } = options;
+  const { world, scene, player, models, ground, walkable, root, say, sound, changed, stays, begin } = options;
   const glow = new Glow(options.reducedMotion); // round what you're pointing at
   let state = begin?.state ?? newGame(world);
   const lying = new Map<ItemId, Lying>();
@@ -470,8 +473,12 @@ export function items(options: {
     const result = act(world, { ...state, room: thing.room }, { type: "take", item: id });
     if (result.state.itemLocations[id] !== "carried") {
       flash();
+      sound("refuse");
       return;
     }
+    // (The first time you've found it, a twinkle.)
+    if (!state.found?.includes(id)) sound("discover");
+    sound("take");
     state = { ...result.state, room: state.room };
     scene.remove(thing.model);
     lying.delete(id);
@@ -485,11 +492,13 @@ export function items(options: {
     if (!carrying()) {
       say(T.carryingNothing);
       shake();
+      sound("nothing");
       return;
     }
     const id = slots[held];
     if (!id) {
       shake(); // (an empty hand)
+      sound("nothing");
       return;
     }
     const result = act(world, state, { type: "use", item: id });
@@ -499,12 +508,14 @@ export function items(options: {
       if (EXIT_ORDER.some((d) => world.rooms[state.room].exits[d]?.obstacle?.needs === id)) {
         say(result.events.at(-1)?.text ?? "");
       }
+      sound("effect");
       draw();
       changed();
       return;
     }
     say(result.events.at(-1)?.text ?? "");
     shake();
+    sound("nothing");
   }
 
   function drop() {
@@ -514,6 +525,9 @@ export function items(options: {
     const result = act(world, state, { type: "drop", item: id });
     if (result.state.itemLocations[id] === "carried") return;
     state = result.state;
+    sound("drop");
+    // (The last treasure on the grassy bank: you've won.)
+    if (state.status === "won") sound("victory");
     slots[held] = undefined;
     // On to the next thing you carry (round from the last slot to the first),
     // so G again drops that: or, carrying nothing now, back to the first slot.

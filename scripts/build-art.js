@@ -7,8 +7,8 @@
 // Scenes, rooms, moments and effects become 1536px-wide WebP. Objects are cropped to
 // their outline, padded evenly onto a transparent square, and saved at 384px.
 // Music in art/originals/music becomes a 128 kbps MP3 in public/music, and the
-// sound effects chosen in src/illustrated/sounds.json (from art/originals/fx)
-// become MP3s in public/fx (both need ffmpeg). Only new or changed originals are rebuilt, and web files
+// sound effects chosen in src/shared/sounds.json and src/three/sounds.json
+// (from art/originals/fx) become MP3s (both need ffmpeg). Only new or changed originals are rebuilt, and web files
 // whose original has gone (moved or deleted) are removed.
 
 import { spawnSync } from "node:child_process";
@@ -47,7 +47,7 @@ export async function buildArt({ quiet = false } = {}) {
     }
     for (const file of readdirSync(`public/art/${kind}`).filter((f) => f.endsWith(".webp"))) {
       if (manifest[kind].includes(file.replace(/\.webp$/, ""))) continue;
-      rmSync(`public/art/${kind}/${file}`);
+      rmSync(`public/art/${kind}/${file}`, { force: true });
       if (!quiet) console.log(`  removed public/art/${kind}/${file}`);
     }
   }
@@ -80,28 +80,42 @@ function mp3(src, out, bitrate) {
 
 const newer = (out, ...srcs) => existsSync(out) && srcs.every((src) => statSync(out).mtimeMs >= statSync(src).mtimeMs);
 
+// The sound effects: both versions' in public/fx, and the 3D version's own
+// (its footsteps) in src/three/fx, where only the 3D version's build picks
+// them up. A sound with takes (a list of files) becomes <name>-0.mp3 and so on.
+const SOUND_LISTS = [
+  { list: "src/shared/sounds.json", dir: "public/fx" },
+  { list: "src/three/sounds.json", dir: "src/three/fx" },
+];
+
 function buildSounds(quiet) {
-  const list = "src/illustrated/sounds.json";
   if (!existsSync("art/originals/fx")) return 0;
-  const sounds = JSON.parse(readFileSync(list, "utf8"));
-  mkdirSync("public/fx", { recursive: true });
   let built = 0;
-  for (const [name, { file }] of Object.entries(sounds)) {
-    const src = `art/originals/fx/${file}`;
-    const out = `public/fx/${name}.mp3`;
-    if (!existsSync(src)) {
-      console.warn(`  sound "${name}": ${src} doesn't exist`);
-      continue;
+  for (const { list, dir } of SOUND_LISTS) {
+    const sounds = JSON.parse(readFileSync(list, "utf8"));
+    mkdirSync(dir, { recursive: true });
+    const wanted = new Set();
+    for (const [name, { file }] of Object.entries(sounds)) {
+      const files = typeof file === "string" ? [file] : file;
+      files.forEach((file, k) => {
+        const src = `art/originals/fx/${file}`;
+        const out = `${dir}/${typeof sounds[name].file === "string" ? name : `${name}-${k}`}.mp3`;
+        wanted.add(out);
+        if (!existsSync(src)) {
+          console.warn(`  sound "${name}": ${src} doesn't exist`);
+          return;
+        }
+        if (newer(out, src, list)) return;
+        if (!mp3(src, out, "96k")) return;
+        built++;
+        if (!quiet) console.log(`  built ${out} (${file})`);
+      });
     }
-    if (newer(out, src, list)) continue;
-    if (!mp3(src, out, "96k")) continue;
-    built++;
-    if (!quiet) console.log(`  built ${out} (${file})`);
-  }
-  for (const file of readdirSync("public/fx").filter((f) => f.endsWith(".mp3"))) {
-    if (file.replace(/\.mp3$/, "") in sounds) continue;
-    rmSync(`public/fx/${file}`);
-    if (!quiet) console.log(`  removed public/fx/${file}`);
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".mp3"))) {
+      if (wanted.has(`${dir}/${file}`)) continue;
+      rmSync(`${dir}/${file}`, { force: true }); // (force: the dev server may be building at the same time)
+      if (!quiet) console.log(`  removed ${dir}/${file}`);
+    }
   }
   return built;
 }
@@ -122,7 +136,7 @@ function buildMusic(quiet) {
   }
   for (const file of readdirSync("public/music").filter((f) => f.endsWith(".mp3"))) {
     if (ids.includes(file)) continue;
-    rmSync(`public/music/${file}`);
+    rmSync(`public/music/${file}`, { force: true });
     if (!quiet) console.log(`  removed public/music/${file}`);
   }
   return built;

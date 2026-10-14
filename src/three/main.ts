@@ -40,6 +40,7 @@ import { effects, messages, score } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
 import { type Direction, EXIT_ORDER, type GameState, type World } from "../engine/types";
 import { h } from "../shared/dom";
+import { Sounds } from "../shared/sounds";
 import { find3d, leave3d, listSaves, nextSaveName, saveGame, takeHandoff, type ThreeSave } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Felling } from "./felling";
@@ -55,6 +56,7 @@ import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Wa
 import { Shafts, speck, type Window } from "./shafts";
 import { sky } from "./sky";
 import { Snake } from "./snake";
+import FOOTSTEPS from "./sounds.json";
 import { Trees, type TreeSpots } from "./trees";
 
 const english = worldJson as unknown as World;
@@ -113,6 +115,14 @@ sunlight.shadow.normalBias = 0.05;
 scene.add(sunlight, sunlight.target);
 
 const player = new Player(renderer.domElement);
+// The sound effects, as in the illustrated version (from public/fx), and
+// footsteps, the 3D version's own (src/three/fx: only it downloads them).
+// Each footstep a little higher or lower than the last, so no two are quite
+// the same.
+const sounds = new Sounds();
+const fx = import.meta.glob<string>("./fx/*.mp3", { eager: true, query: "?url", import: "default" });
+const footsteps = new Sounds(FOOTSTEPS, (file) => fx[`./fx/${file}`]);
+player.onStep = (kind, loudness) => footsteps.play(kind, { volume: loudness, rate: 0.92 + Math.random() * 0.16 });
 const overlay = document.createElement("div");
 overlay.className = "overlay";
 overlay.innerHTML = "<h1>Merlin's Castle</h1><p>Loading the land…</p>";
@@ -430,6 +440,7 @@ player.onBump = (exit) => {
   const [id, direction] = exit.split(" ");
   const way = world.rooms[id]?.exits[direction as Direction];
   say(way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo);
+  sounds.play("blocked");
 };
 
 // The objects, lying where the game puts them, and the five slots you carry
@@ -449,6 +460,7 @@ const items = setUpItems({
   steps: land.steps,
   root,
   say,
+  sound: (name) => sounds.play(name),
   changed: inUse,
   stays: (id) => {
     if (id !== "ladder" || !ladder.shown) return undefined;
@@ -661,6 +673,9 @@ function load(slot: { name: string; state: GameState; three?: ThreeSave }) {
 }
 
 function resume() {
+  // (A click: the browser lets sound start now.)
+  sounds.load();
+  footsteps.load();
   // Once you've walked (or loaded), the way back in carries on the game.
   overlay.querySelector(".play")!.textContent = T.continue;
   // (If the browser won't take the mouse after all, the menu's back, to click.)
@@ -670,6 +685,8 @@ function resume() {
 }
 overlay.addEventListener("click", resume);
 overlay.addEventListener("touchend", () => {
+  sounds.load();
+  footsteps.load();
   overlay.querySelector(".play")!.textContent = T.continue;
   overlay.hidden = true;
 });
