@@ -402,3 +402,194 @@ kbd {
     animation: none;
   }
 }
+
+/* A scene playing out (falling off the ladder): nothing but the world. */
+body.scene :is(.corner, .said, .aim, .prompt, .slots) {
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+
+/* ---- Dying: as in the illustrated version ---- */
+
+/* A red curtain slowly falls over the whole screen, then the last words. */
+.ending[hidden] {
+  display: none;
+}
+
+.ending .curtain,
+.ending .over {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1.4rem;
+  padding: 16px;
+  overflow: hidden;
+  text-align: center;
+}
+
+.ending .curtain::before,
+.ending .over::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 -20%;
+  background: linear-gradient(to bottom, rgba(120, 14, 28, 0.55), rgba(110, 12, 30, 0.32) 60%, rgba(60, 4, 12, 0.6));
+  mask-image: linear-gradient(to bottom, #000 80%, transparent);
+}
+
+.ending .curtain::before {
+  animation: curtain-fall 1.6s cubic-bezier(0.45, 0, 0.6, 1) both;
+}
+
+/* A soft shadow just behind the words, so they read over the bright sky. */
+.ending .curtain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 34rem 14rem at 50% 50%, rgba(5, 3, 2, 0.55), transparent);
+  animation: fade-in 0.8s ease 1.4s both;
+}
+
+.ending .curtain > *,
+.ending .over > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ending .curtain > * {
+  animation: fade-in 0.8s ease 1.4s both;
+}
+
+.last-words {
+  margin: 0;
+  max-width: 30ch;
+  color: #ff7b6b;
+  font:
+    italic clamp(22px, 2.6vw, 34px) / 1.3 "IM Fell English",
+    Georgia,
+    serif;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.ending .card {
+  max-width: 34rem;
+  padding: 2.2rem 2.6rem;
+  border: 1px solid rgba(243, 233, 210, 0.3);
+  border-radius: 18px;
+  background: rgba(12, 8, 5, 0.85);
+  color: var(--ink);
+  font:
+    clamp(16px, 1.4vw, 20px) / 1.5 "IM Fell English",
+    Georgia,
+    serif;
+  animation: fade-in 0.5s ease both;
+}
+
+.ending .card h2 {
+  margin: 0 0 0.8em;
+  color: #ffe08a;
+  font:
+    700 clamp(20px, 2.2vw, 30px) / 1.2 Cinzel,
+    Georgia,
+    serif;
+}
+
+.ending .card p {
+  margin: 0.3em 0;
+}
+
+.ending .card .yours {
+  font-size: 1.2em;
+}
+
+.ending .buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.8rem;
+  margin-top: 1.6rem;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.7em 1.8em;
+  border: 1px solid rgba(201, 184, 255, 0.55);
+  border-radius: 999px;
+  background: rgba(20, 16, 50, 0.45);
+  box-shadow: 0 0 18px rgba(170, 140, 255, 0.25);
+  color: #e9dcff;
+  font:
+    600 clamp(13px, 1.1vw, 16px) Cinzel,
+    Georgia,
+    serif;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.pill:focus-visible {
+  border-color: #ffe08a;
+  color: #fff6d6;
+  box-shadow: 0 0 22px rgba(255, 216, 120, 0.45);
+  outline: none;
+}
+
+@media (hover: hover) {
+  .pill:hover {
+    border-color: #ffe08a;
+    color: #fff6d6;
+    box-shadow: 0 0 22px rgba(255, 216, 120, 0.45);
+  }
+}
+
+.pill.quiet {
+  border-color: rgba(243, 233, 210, 0.3);
+  background: transparent;
+  box-shadow: none;
+}
+
+.ending .links {
+  margin-top: 1.6rem;
+}
+
+.ending .links button {
+  padding: 0.3rem 0.6rem;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font:
+    600 12px Cinzel,
+    Georgia,
+    serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.ending .links button:hover,
+.ending .links button:focus-visible {
+  color: #ffe08a;
+}
+
+@keyframes curtain-fall {
+  from {
+    transform: translateY(-100%);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ending .curtain::before,
+  .ending .curtain::after,
+  .ending .curtain > *,
+  .ending .card {
+    animation: none;
+  }
+}

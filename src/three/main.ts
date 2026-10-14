@@ -36,13 +36,23 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import daJson from "../../data/da.json";
 import worldJson from "../../data/world.json";
-import { effects, messages, score } from "../engine/engine";
+import { bestPossibleScore, effects, messages, newGame, score } from "../engine/engine";
 import { localise, type WorldText } from "../engine/localise";
 import { type Direction, EXIT_ORDER, type GameState, type World } from "../engine/types";
 import { h } from "../shared/dom";
 import { Sounds } from "../shared/sounds";
-import { find3d, leave3d, listSaves, nextSaveName, saveGame, takeHandoff, type ThreeSave } from "../shared/storage";
+import {
+  find3d,
+  leave3d,
+  listSaves,
+  nextSaveName,
+  recordScore,
+  saveGame,
+  takeHandoff,
+  type ThreeSave,
+} from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
+import { Fall } from "./fall";
 import { Felling } from "./felling";
 import { items as setUpItems, onPaths } from "./items";
 import { Ladder } from "./ladder";
@@ -56,7 +66,7 @@ import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Wa
 import { Shafts, speck, type Window } from "./shafts";
 import { sky } from "./sky";
 import { Snake } from "./snake";
-import FOOTSTEPS from "./sounds.json";
+import OWN_SOUNDS from "./sounds.json";
 import { Trees, type TreeSpots } from "./trees";
 
 const english = worldJson as unknown as World;
@@ -116,13 +126,13 @@ scene.add(sunlight, sunlight.target);
 
 const player = new Player(renderer.domElement);
 // The sound effects, as in the illustrated version (from public/fx), and
-// footsteps, the 3D version's own (src/three/fx: only it downloads them).
-// Each footstep a little higher or lower than the last, so no two are quite
-// the same.
+// the 3D version's own, its footsteps and its scenes' sounds (src/three/fx:
+// only it downloads them). Each footstep a little higher or lower than the
+// last, so no two are quite the same.
 const sounds = new Sounds();
 const fx = import.meta.glob<string>("./fx/*.mp3", { eager: true, query: "?url", import: "default" });
-const footsteps = new Sounds(FOOTSTEPS, (file) => fx[`./fx/${file}`]);
-player.onStep = (kind, loudness) => footsteps.play(kind, { volume: loudness, rate: 0.92 + Math.random() * 0.16 });
+const ownSounds = new Sounds(OWN_SOUNDS, (file) => fx[`./fx/${file}`]);
+player.onStep = (kind, loudness) => ownSounds.play(kind, { volume: loudness, rate: 0.92 + Math.random() * 0.16 });
 const overlay = document.createElement("div");
 overlay.className = "overlay";
 overlay.innerHTML = "<h1>Merlin's Castle</h1><p>Loading the land…</p>";
@@ -205,6 +215,22 @@ const ground: Ground = (x, z) => {
   const fj = j - j0;
   const h = (a: number, b: number) => heights[(j0 + b) * nx + i0 + a];
   return (h(0, 0) * (1 - fi) + h(1, 0) * fi) * (1 - fj) + (h(0, 1) * (1 - fi) + h(1, 1) * fi) * fj;
+};
+// And exactly as it's drawn: flat triangles, each square split from its first
+// corner to its third, as Blender splits it (drawn_height in land.py). On a
+// sharp rise that's quite different: for laying something right on it.
+const drawn: Ground = (x, z) => {
+  const i = (x - x0) / step;
+  const j = (-z - y0) / step;
+  if (i < 0 || j < 0 || i >= nx - 1 || j >= ny - 1) return undefined;
+  const i0 = Math.floor(i);
+  const j0 = Math.floor(j);
+  const fi = i - i0;
+  const fj = j - j0;
+  const h = (a: number, b: number) => heights[(j0 + b) * nx + i0 + a];
+  return fi > fj
+    ? h(0, 0) + fi * (h(1, 0) - h(0, 0)) + fj * (h(1, 1) - h(1, 0))
+    : h(0, 0) + fj * (h(0, 1) - h(0, 0)) + fi * (h(1, 1) - h(0, 1));
 };
 // Where you can stand, a square metre at a time (again in Blender's axes).
 const mask = land.walkable;
@@ -415,12 +441,14 @@ said.className = "said";
 said.setAttribute("aria-live", "polite");
 root.append(said);
 let quiet = 0;
-function say(words: string) {
-  // (A teletext colour code shows as a space.)
-  said.textContent = words
+// (A teletext colour code shows as a space.)
+const plain = (words: string) =>
+  words
     .replace(/\{\w+\}/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+function say(words: string) {
+  said.textContent = plain(words);
   said.classList.add("shown");
   clearTimeout(quiet);
   quiet = window.setTimeout(() => said.classList.remove("shown"), 3500);
@@ -437,6 +465,7 @@ function tell(exit: string) {
   told = exit;
 }
 player.onBump = (exit) => {
+  if (exit === BALCONY && slip()) return;
   const [id, direction] = exit.split(" ");
   const way = world.rooms[id]?.exits[direction as Direction];
   say(way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo);
@@ -489,7 +518,10 @@ function inUse() {
   opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
   solidify();
   for (const [shape, gate] of gates) {
-    gate.wants = opened.has(shape) ? 1 : 0;
+    const wants = opened.has(shape) ? 1 : 0;
+    // (Creaking on its rusty hinges, as it swings open.)
+    if (wants > gate.wants && !instantly) ownSounds.play("creak");
+    gate.wants = wants;
     if (instantly) gate.open = gate.wants;
   }
   if (dense) felling.fell(opened.has(dense), instantly);
@@ -521,6 +553,99 @@ function arrive(game: { state: GameState; three?: ThreeSave }) {
   room = game.state.room;
 }
 if (handoff && !at) arrive(handoff);
+
+// Dying. For now, the one death there is: climbing the ladder propped under
+// the balcony. Walk into it and you start to climb, it slips, and you fall
+// (fall.ts); then a curtain falls, with the original's words, and after it
+// your score, as in the illustrated version.
+const BALCONY = "mossy-steps east";
+let fall: Fall | undefined;
+const ending = h("div", { class: "ending", hidden: true });
+// (Clicking or typing here isn't walking: nor taking, using or dropping.)
+for (const type of ["click", "touchend", "keydown", "keyup"]) ending.addEventListener(type, (e) => e.stopPropagation());
+root.append(ending);
+
+/** Walking into the balcony with the ladder up: the scene (and true), or nothing to see (false). */
+function slip() {
+  const propped = ladder.propped(BALCONY);
+  // (Dropped there, it's still up, as an object lying in the place.)
+  const model = propped?.model ?? items.lyingAt("ladder");
+  if (!propped || !model || !effects(world, items.state).includes("ladder")) return false;
+  const way = world.rooms["mossy-steps"].exits.east;
+  items.go("east"); // (the engine: you're dead)
+  player.held = true;
+  document.body.classList.add("scene");
+  fall = new Fall(
+    { ...propped, model },
+    player.camera,
+    drawn,
+    player.halls.get("tower")!,
+    reducedMotion,
+    () => ownSounds.play("thud"),
+    () => curtain(way?.message ?? "")
+  );
+  return true;
+}
+
+// The curtain, red: the words, and Continue.
+function curtain(words: string) {
+  document.exitPointerLock?.();
+  const go = h("button", { type: "button", class: "pill", onclick: over }, T.continue);
+  ending.replaceChildren(h("div", { class: "curtain" }, h("p", { class: "last-words" }, plain(words)), go));
+  ending.hidden = false;
+  go.focus({ preventScroll: true });
+}
+
+// Then your score: play again, load a game, or back to the start.
+function over() {
+  const yours = score(world, items.state);
+  const best = recordScore(yours);
+  const again = h("button", { type: "button", class: "pill", onclick: () => newStart(true) }, T.playAgain);
+  ending.replaceChildren(
+    h(
+      "div",
+      { class: "over" },
+      h(
+        "div",
+        { class: "card" },
+        h("h2", {}, T.adventureOver),
+        h("p", { class: "yours" }, T.yourScore(yours)),
+        h("p", {}, T.bestSoFar(best)),
+        h("p", {}, T.bestPossible(bestPossibleScore(world))),
+        h(
+          "div",
+          { class: "buttons" },
+          again,
+          listSaves().length > 0 &&
+            h(
+              "button",
+              {
+                type: "button",
+                class: "pill quiet",
+                onclick: () => {
+                  newStart(false);
+                  showLoad();
+                },
+              },
+              T.loadAGame
+            )
+        ),
+        h("nav", { class: "links" }, h("button", { type: "button", onclick: () => newStart(false) }, T.mainMenu))
+      )
+    )
+  );
+  again.focus({ preventScroll: true });
+}
+
+/** A new game: straight into it, or to the start screen (to play, or load). */
+function newStart(playing: boolean) {
+  saveName = "";
+  restart({ state: newGame(world) });
+  if (playing) return resume();
+  overlay.querySelector(".play")!.textContent = T.play;
+  panel.hidden = true;
+  overlay.hidden = false;
+}
 inUse();
 instantly = false;
 let lastRoom = room; // (where you were last frame)
@@ -530,7 +655,9 @@ const was = player.position.clone(); // (and just where)
 // handle for test scripts. Otherwise none of it is even loaded.
 const debugMode = new URLSearchParams(location.search).has("debug");
 if (debugMode) {
-  Object.assign(window, { world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake } });
+  Object.assign(window, {
+    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, restart, drawn },
+  });
   const { debug } = await import("./debug");
   debug(
     {
@@ -659,8 +786,23 @@ function showLoad() {
 // the click on its name hands the mouse straight back to the game).
 function load(slot: { name: string; state: GameState; three?: ThreeSave }) {
   saveName = slot.name;
-  items.restart(slot);
-  arrive(slot);
+  restart(slot);
+  resume();
+  say(T.loadedAs(slot.name));
+}
+
+// A game (loaded, or new) right here: no starting the page again.
+function restart(game: { state: GameState; three?: ThreeSave }) {
+  items.restart(game);
+  // (Out of any scene, and the ladder put up afresh if it's up: it may have fallen.)
+  fall = undefined;
+  player.held = false;
+  document.body.classList.remove("scene");
+  ending.hidden = true;
+  ending.replaceChildren();
+  ladder.away();
+  leaning = undefined;
+  arrive(game);
   instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
   inUse();
   instantly = false;
@@ -668,14 +810,12 @@ function load(slot: { name: string; state: GameState; three?: ThreeSave }) {
   told = undefined;
   lastRoom = room;
   was.copy(player.position);
-  resume();
-  say(T.loadedAs(slot.name));
 }
 
 function resume() {
   // (A click: the browser lets sound start now.)
   sounds.load();
-  footsteps.load();
+  ownSounds.load();
   // Once you've walked (or loaded), the way back in carries on the game.
   overlay.querySelector(".play")!.textContent = T.continue;
   // (If the browser won't take the mouse after all, the menu's back, to click.)
@@ -686,7 +826,7 @@ function resume() {
 overlay.addEventListener("click", resume);
 overlay.addEventListener("touchend", () => {
   sounds.load();
-  footsteps.load();
+  ownSounds.load();
   overlay.querySelector(".play")!.textContent = T.continue;
   overlay.hidden = true;
 });
@@ -696,7 +836,8 @@ renderer.domElement.addEventListener("click", () => {
 });
 document.addEventListener("pointerlockchange", () => {
   const debugging = document.body.classList.contains("debugging");
-  if (!player.locked && !debugging && !matchMedia("(pointer: coarse)").matches) overlay.hidden = false;
+  // (Not in a scene, or once you've died: that has its own screen.)
+  if (!player.locked && !debugging && !player.held && !matchMedia("(pointer: coarse)").matches) overlay.hidden = false;
 });
 
 function resize() {
@@ -781,6 +922,7 @@ renderer.setAnimationLoop((time) => {
   timer.update(time);
   const dt = Math.min(timer.getDelta(), 0.1);
   player.update(dt, reducedMotion);
+  fall?.update(dt);
   trees.update(player.position, player.yaw, player.camera);
   // Coming down from the mountain to the dense trees, they part for you
   // (going up, they don't), until you're clear of them.

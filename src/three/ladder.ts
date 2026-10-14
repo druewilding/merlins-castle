@@ -136,6 +136,12 @@ export class Ladder {
     return model;
   }
 
+  /** Propped up under the balcony (and slipping, if you climb it): for exit, where it stands, and its model if it's still there to see. */
+  propped(exit: string) {
+    const l = this.leaning;
+    return l?.slips && l.exit === exit ? { foot: l.foot, corner: l.corner, out: l.out, model: l.model } : undefined;
+  }
+
   /** Where its foot is, and which way it faces: for laying it down where it stood. */
   get footing() {
     const l = this.leaning;

@@ -201,6 +201,8 @@ export class Player {
   // For the debug panel: flying, walking through anything, and going faster.
   ghost = false;
   boost = 1;
+  /** Held still while a scene plays out (falling off the ladder): no walking, jumping or looking, and the camera isn't yours. */
+  held = false;
 
   ways: Way[] = [];
   halls = new Map<string, Hall>();
@@ -235,7 +237,7 @@ export class Player {
   constructor(private element: HTMLElement) {
     addEventListener("keydown", (event) => {
       this.keys.add(event.code);
-      if (event.code === "Space" && !event.repeat) this.jump();
+      if (event.code === "Space" && !event.repeat && !this.held) this.jump();
     });
     addEventListener("keyup", (event) => this.keys.delete(event.code));
     addEventListener("blur", () => this.keys.clear());
@@ -352,10 +354,11 @@ export class Player {
 
   /** Whether you're being taken along a path, not walking. */
   get busy() {
-    return Boolean(this.following);
+    return Boolean(this.following) || this.held;
   }
 
   update(dt: number, reducedMotion: boolean) {
+    if (this.held) return;
     if (this.following) return this.along(dt);
     const forward = this.axis("KeyW", "ArrowUp") - this.axis("KeyS", "ArrowDown") - this.stick.y;
     const right = this.axis("KeyD", "ArrowRight") - this.axis("KeyA", "ArrowLeft") + this.stick.x;
