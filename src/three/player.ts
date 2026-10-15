@@ -226,6 +226,9 @@ export class Player {
   // One-way obstacles you're going through the free way, until you're out of their reach.
   private passing = new Set<Circle | Box>();
   private before = new Vector3(); // where you were, before this step
+  // Turned back at an obstacle you'd come over: what, and where (said once,
+  // not again till you've stepped back from there).
+  private turned: { thing: Circle | Box; x: number; z: number } | undefined;
   private wasInside = false;
   private flying = false;
   private lift = 0; // how high you are off the ground, jumping
@@ -239,8 +242,10 @@ export class Player {
       this.keys.add(event.code);
       if (event.code === "Space" && !event.repeat && !this.held) this.jump();
     });
-    addEventListener("keyup", (event) => this.keys.delete(event.code));
-    addEventListener("blur", () => this.keys.clear());
+    // (Letting go is heard first, before anything else: over the ending, or a
+    // menu, which keep their keys to themselves. Or a key would stay down.)
+    addEventListener("keyup", (event) => this.keys.delete(event.code), true);
+    addEventListener("blur", () => this.letGo());
     addEventListener("mousemove", (event) => {
       if (document.pointerLockElement !== element) return;
       this.turn(event.movementX * LOOK, event.movementY * LOOK);
@@ -315,6 +320,11 @@ export class Player {
         (thing) => thing.top === undefined && touching({ ...thing, ahead: 0 }, x, z, 0)
       )
     );
+  }
+
+  /** No keys down (a game started afresh, say): you stop. */
+  letGo() {
+    this.keys.clear();
   }
 
   /**
@@ -782,6 +792,9 @@ export class Player {
       if (Math.abs(p.z - thing.z) >= Math.abs(b.z - thing.z)) return;
       p.z = b.z;
     }
+    const was = this.turned;
+    if (was?.thing === thing && Math.hypot(p.x - was.x, p.z - was.z) < AGAIN) return;
+    this.turned = { thing, x: p.x, z: p.z };
     this.onBump(exit);
   }
 

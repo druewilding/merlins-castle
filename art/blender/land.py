@@ -54,6 +54,8 @@ DEATHS = {k: at(v) for k, v in layout["deaths"].items() if k != "_"}
 
 X0, X1, Y0, Y1 = (round(v * K) for v in (-200, 200, -290, 260))  # (north, past the mountain, for its far side)
 STEP = 2.0
+INTO_THE_DARK = 8  # metres of tunnel past a dead end's last step, fading to black
+BLACK = (0.0, 0.0, 0.0, 1.0)
 
 GRASS = c.linear("#7c9f3a")  # (as the grass on it looks, from a little way off: plants.ts)
 BUTTERCUPS = c.linear("#a8a83a")  # and where the yellow flowers grow thick
@@ -225,6 +227,34 @@ SHAPES = {
     ("deep-river", "evergreen-glade"): [P["deep-river"], (22 * K, -32 * K), (34 * K, -14 * K), P["evergreen-glade"]],
 }
 
+# Straight from place to place, unless something's in the way (an obstacle,
+# the castle's walls, the way up the mountain): then windy (below).
+STRAIGHT = {"courtyard", "mountain", "maze"}
+
+
+def windy(line, seed):
+    """A path from one place to another, wandering a little from side to side
+    as a trodden path does: not at its ends (where it meets the place, and
+    other paths, as it did), nor by the river (over its bridge, straight)."""
+    (ax, ay), (bx, by) = line
+    run = math.hypot(bx - ax, by - ay)
+    if run < 12:
+        return line
+    ux, uy = (bx - ax) / run, (by - ay) / run
+    rng = random.Random(f"windy {seed}")
+    wide = min(2.0, run * 0.06) * rng.choice((1, -1))
+    bends, phase = rng.uniform(1.0, 2.0), rng.uniform(0, math.pi)
+    steps = max(2, round(run / 2.5))
+    out = []
+    for k in range(steps + 1):
+        t = k / steps
+        px, py = ax + (bx - ax) * t, ay + (by - ay) * t
+        free = smooth((from_river(px, py) - BANK - 2) / 8)
+        o = wide * free * math.sin(math.pi * t) ** 2 * math.sin(math.pi * bends * t + phase)
+        out.append((px - uy * o, py + ux * o))
+    return out
+
+
 paths = []
 done = set()
 for place, room in world["rooms"].items():
@@ -242,12 +272,18 @@ for place, room in world["rooms"].items():
         if {place, to} & INDOORS:
             continue  # indoors, along the castle's corridors (or up to a door, below)
         done.add(pair)
-        paths.append(SHAPES.get((place, to)) or SHAPES.get((to, place)) or [P[place], P[to]])
+        shape = SHAPES.get((place, to)) or SHAPES.get((to, place))
+        back = world["rooms"][to]["exits"]
+        blocked = exit.get("obstacle") or any(e.get("to") == place and e.get("obstacle") for e in back.values())
+        if shape or blocked or {place, to} & STRAIGHT:
+            paths.append(shape or [P[place], P[to]])
+        else:
+            paths.append(windy([P[place], P[to]], pair))
 # Into the mist, and to Merlin's trap.
 for key, spot in {**LOST, **DEATHS}.items():
     place = key.split(" ")[0]
     if KIND.get(place) != "cave" and key != "mossy-steps east":
-        paths.append([P[place], spot])
+        paths.append(windy([P[place], spot], key) if key in LOST else [P[place], spot])
 
 # Up to the lamp tunnel's mouths: in the rocky bank west of the old wall, and
 # down the steps south of the cave entrance.
@@ -259,10 +295,42 @@ DRAGON_LIP = (DC[0] - 22, DC[1])
 paths += [[P["old-wall"], WEST_LIP], [P["cave-entrance"], EAST_LIP], [P["cave-entrance"], DRAGON_LIP]]
 # And to the tower's and the hut's doors.
 paths += [[P["mossy-steps"], TOWER_LIP], [P["forest-crossroads"], HUT_LIP]]
+# And down to the water's edge at the narrows, from both sides: trodden, as if
+# others had crossed there. (It goes on into the river: stopped where the
+# water is, at the edge of its bank.)
+paths += [[P["deep-river"], (NARROWS_X, -60 * K)], [P["river-south-bank"], (NARROWS_X, -60 * K)]]
 
 path_lines = Lines()
 for line in paths:
     path_lines.add(line)
+
+# Past each mist above ground, a trail on into the trees, wandering, as if it
+# led somewhere: to a glimpse of something old in a sunlit gap (standing
+# stones, a ruined arch). Only to look at: you'd be lost before you got
+# there, and coming by the mist another way (round the moat), it's no way
+# on. (Its kind, how far it goes past the mist's middle, and how far it
+# turns off straight on: south of the witches, away from the moat's bank.)
+LURE_KINDS = {"forest-crossroads west": ("ring", 20, 0), "forest-witches north": ("ruined arch", 10, 0),
+              "forest-witches south": ("stones", 16, -0.7)}
+GAP = 4.5  # the sunlit gap round what's there
+LURES = {}  # each mist's way in: the trail [(x, y)], and where it ends
+trails = Lines()
+for key, spot in LOST.items():
+    px, py = P[key.split(" ")[0]]
+    ax, ay = spot[0] - px, spot[1] - py
+    run = math.hypot(ax, ay)
+    _, long, turn = LURE_KINDS[key]
+    ax, ay = (ax * math.cos(turn) - ay * math.sin(turn)) / run, (ax * math.sin(turn) + ay * math.cos(turn)) / run
+    bend = random.Random(f"lure {key}").choice((1, -1))
+    trail = [spot] + [(spot[0] + ax * long * t - ay * o, spot[1] + ay * long * t + ax * o)
+                      for t in (0.2, 0.4, 0.6, 0.8, 1.0) for o in [bend * 2.2 * math.sin(t * math.pi * 1.2)]]
+    trails.add(trail)
+    LURES[key] = trail
+
+
+def on_a_lure(x, y):
+    """Along a trail past a mist, or in the gap at its end."""
+    return trails.distance(x, y) < 2.6 or any(math.hypot(x - t[-1][0], y - t[-1][1]) < GAP for t in LURES.values())
 
 # ---------------------------------------------------------------- ways underground
 
@@ -731,9 +799,12 @@ def beyond_the_mist(x, y):
     return False
 
 
-def open_ground(x, y):
+def open_ground(x, y, lures=True):
     """Ground with no forest on it: round the places, along the paths and the
-    river, and round the mists (on the side you come into them from)."""
+    river, and round the mists (on the side you come into them from). And
+    (unless not) along the trails past them."""
+    if lures and on_a_lure(x, y):
+        return True
     for place, (px, py) in P.items():
         if KIND.get(place) == "cave":
             continue
@@ -766,7 +837,8 @@ def walkable(x, y):
     floor = open_to_the_sky(x, y, 2.0)
     if floor is not None and floor < height(x, y) - 0.35:
         return False  # over the ramp: you go in at the top
-    return open_ground(x, y) and not rocky(x, y) and not in_building(x, y) and not under_a_tree(x, y)
+    # (Not along the trails past the mists: only to look at.)
+    return open_ground(x, y, lures=False) and not rocky(x, y) and not in_building(x, y) and not under_a_tree(x, y)
 
 
 # ---------------------------------------------------------------- the ground
@@ -902,7 +974,14 @@ def out_on_the_path(x, y):
     the edge of its dirt): wandering, and frayed."""
     half = HALF + WANDERS * noise.noise(Vector((x / 7, y / 7, 0.5)))
     fray = 0.13 * noise.noise(Vector((x / 1.2, y / 1.2, 4.0))) + 0.05 * noise.noise(Vector((x / 0.4, y / 0.4, 6.0)))
-    return path_lines.distance(x, y) / half + fray
+    # (The trails past the mists narrower: less trodden. And at the narrows,
+    # going down to the water, it peters out into the grass of the bank,
+    # raggedly: no one's trodden the last of it.)
+    out = min(path_lines.distance(x, y), trails.distance(x, y) * 1.4) / half + fray
+    if abs(x - NARROWS_X) < NARROWS_HALF:
+        bank = (from_river(x, y) - BANK) * narrowing(x, y) + 0.5 * noise.noise(Vector((x / 1.5, y / 1.5, 8.0)))
+        out += 1.5 * (1 - smooth(bank / 2.5))
+    return out
 
 
 def off_the_land(x, y):
@@ -939,7 +1018,8 @@ for j in range(ny - 1):
     for i in range(nx - 1):
         if (i, j) in CUT:
             continue
-        if path_lines.distance(X0 + (i + 0.5) * STEP, Y0 + (j + 0.5) * STEP) > REACH * FADES + 1.6:
+        mx_, my_ = X0 + (i + 0.5) * STEP, Y0 + (j + 0.5) * STEP
+        if min(path_lines.distance(mx_, my_), trails.distance(mx_, my_)) > REACH * FADES + 1.6:
             continue
         for a in range(SUB):
             for b in range(SUB):
@@ -1351,6 +1431,14 @@ for side in (-1, 1):
         y = -60 * K + side * (BANK * narrowing(x, -60 * K) - 0.1)
         built.blob((x, y, WATER_LEVEL + rock_rng.uniform(-0.25, 0.1)), rock_rng.uniform(0.55, 0.85), ROCK,
                    squash=rock_rng.uniform(0.45, 0.7), lumpy=0.35, seed=300 + int(x * 7) + side)
+    # And smaller ones where the way comes down: either side of it, at the
+    # edge, and a few out in the shallows, worn smooth.
+    for k in range(9):
+        x = NARROWS_X + rock_rng.choice((-1, 1)) * rock_rng.uniform(0.9, 3.2)
+        wet = rock_rng.uniform(-0.5, 0.5) if k < 6 else rock_rng.uniform(0.5, 1.0)
+        y = -60 * K + side * (BANK * narrowing(x, -60 * K) - wet)
+        built.blob((x, y, WATER_LEVEL + rock_rng.uniform(-0.15, 0.1)), rock_rng.uniform(0.18, 0.4), ROCK,
+                   squash=rock_rng.uniform(0.4, 0.65), lumpy=0.3, seed=400 + k * 2 + side)
 
 # The forest bridge and the drawbridge.
 block(built, BRIDGE[0] - 2.4, BRIDGE[1] - BRIDGE_HALF, 0.5, BRIDGE[0] + 2.4, BRIDGE[1] + BRIDGE_HALF, 0.9,
@@ -1589,6 +1677,113 @@ for run in ((WX, -18 * K, WX, WY + 0.6), (WW - 0.6, WY, GATE[0], WY), (GATE[1], 
             (WW, WY, WW, WALL_END)):
     stone_wall(*run)
 wall.build("old-stone-wall", smooth=False)
+
+
+# What's at the end of each trail past a mist: old stones, grey and mossy,
+# standing in the sunlit gap. A ring of them; an arch, fallen in on one
+# side; or a few left standing.
+OLD_STONE = c.linear("#a5a196")
+
+
+def slab(b, x, y, yaw, wide, thick, tall, lean=0.0, sink=0.4, colour=OLD_STONE):
+    """A standing stone: rough, a little narrower at the top, leaning over
+    (forward, towards yaw) by `lean`, and sunk into the ground."""
+    z = height(x, y) - sink
+    ux, uy = math.cos(yaw), math.sin(yaw)  # across it
+    fx, fy = -uy, ux  # out of its face
+    rng = random.Random(f"slab {x:.1f} {y:.1f}")
+    verts = []
+    for level, (w, t) in enumerate(((wide, thick), (wide * 0.82, thick * 0.85))):
+        up = (tall + sink) * level
+        tip = lean * up
+        for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+            jx = rng.uniform(-0.06, 0.06)
+            verts.append((x + ux * (sx * w / 2 + jx) + fx * (sy * t / 2 + tip),
+                          y + uy * (sx * w / 2 + jx) + fy * (sy * t / 2 + tip), z + up + rng.uniform(-0.08, 0.08) * level))
+    shade = [c.mix(c.vary(colour, 0.12, Vector(v)), MOSS, 0.45 if k < 4 else 0.1) for k, v in enumerate(verts)]
+    b.add(verts, [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7)], shade)
+    return verts[4:]
+
+
+def lintel(b, a, z_a, d, z_d, wide=0.7, thick=0.55):
+    """A stone laid from one point [x, y] at z_a to another at z_d."""
+    (ax, ay), (dx, dy) = a, d
+    run = math.hypot(dx - ax, dy - ay) or 1
+    ox, oy = -(dy - ay) / run * wide / 2, (dx - ax) / run * wide / 2
+    verts = [(px + sx * ox, py + sx * oy, pz + up) for (px, py, pz) in ((ax, ay, z_a), (dx, dy, z_d))
+             for sx, up in ((-1, 0), (1, 0), (1, thick), (-1, thick))]
+    b.add(verts, [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (0, 3, 2, 1), (4, 5, 6, 7)],
+          [c.mix(c.vary(OLD_STONE, 0.12, Vector(v)), MOSS, 0.25 if v[2] > max(z_a, z_d) else 0.05) for v in verts])
+
+
+def old_stones(b, kind, ex, ey, yaw, solid=False):
+    """Old stones round [ex, ey], facing along yaw (towards you, coming): a
+    ring of them (one fallen), an arch (whole, or fallen in on one side), or
+    a few left standing. Solid, where you can get to them."""
+    rng = random.Random(f"old stones {ex:.1f} {ey:.1f}")
+    pillars = []  # (x, y, how wide): to bump into
+
+    def standing(x, y, a, wide, thick, tall, lean=0.0):
+        slab(b, x, y, a, wide, thick, tall, lean=lean)
+        pillars.append((x, y, max(wide, thick) / 2))
+
+    def fallen(a, z_a, d, z_d, wide, thick):
+        lintel(b, a, z_a, d, z_d, wide, thick)
+        pillars.extend(((a[0] + (d[0] - a[0]) * f, a[1] + (d[1] - a[1]) * f, wide / 2) for f in (0.15, 0.5, 0.85)))
+
+    if kind == "ring":
+        # (A gap in it facing you.)
+        for k in range(8):
+            a = yaw + math.pi + math.pi / 8 + k * 2 * math.pi / 9
+            x, y = ex + math.cos(a) * 3.3, ey + math.sin(a) * 3.3
+            if k == 5:
+                fallen((x - math.cos(a) * 0.2, y - math.sin(a) * 0.2), height(x, y) - 0.1,
+                       (x + math.sin(a) * 1.9, y - math.cos(a) * 1.9), height(x, y) - 0.15, 0.8, 0.45)
+                continue
+            standing(x, y, a + math.pi / 2, rng.uniform(0.8, 1.1), rng.uniform(0.35, 0.5), rng.uniform(1.6, 2.4),
+                     lean=rng.uniform(-0.06, 0.06))
+    elif kind in ("arch", "ruined arch"):
+        across = yaw + math.pi / 2
+        ux, uy = math.cos(across), math.sin(across)
+        left, right = (ex + ux * 1.4, ey + uy * 1.4), (ex - ux * 1.4, ey - uy * 1.4)
+        if kind == "arch":
+            # Whole: high enough to walk under.
+            standing(*left, yaw, 0.75, 0.7, 3.3, lean=0.02)
+            standing(*right, yaw, 0.75, 0.7, 3.2, lean=-0.02)
+            lintel(b, (left[0] + ux * 0.45, left[1] + uy * 0.45), height(*left) + 2.95,
+                   (right[0] - ux * 0.45, right[1] - uy * 0.45), height(*right) + 2.85, 0.8, 0.55)
+        else:
+            # The lintel fallen in on one side: from the tall pillar's top down
+            # to the broken one's.
+            standing(*left, yaw, 0.75, 0.7, 3.3, lean=0.02)
+            standing(*right, yaw, 0.75, 0.7, 1.7, lean=-0.03)
+            lintel(b, left, height(*left) + 2.9, right, height(*right) + 1.25)
+        x, y = ex - ux * 2.6 + math.cos(yaw) * 1.2, ey - uy * 2.6 + math.sin(yaw) * 1.2
+        fallen((x, y), height(x, y) - 0.15, (x + math.cos(yaw) * 1.1, y + math.sin(yaw) * 1.1),
+               height(x, y) - 0.2, 0.7, 0.6)  # a fallen block
+    else:
+        for a, r, tall, lean in ((-0.7, 2.4, 2.6, 0.04), (0.2, 2.8, 1.9, -0.1), (1.1, 2.2, 2.2, 0.08)):
+            x, y = ex + math.cos(yaw + a) * r, ey + math.sin(yaw + a) * r
+            standing(x, y, yaw + a + math.pi / 2, 0.9, 0.45, tall, lean=lean)
+    if solid:
+        for x, y, r in pillars:
+            solid_circle(x, y, r)
+            OLD_STONES.append((x, y, r))
+
+
+OLD_STONES = []  # (x, y, r): stones you can get to (nothing grows in them)
+lures = c.Builder()
+for key, trail in LURES.items():
+    (ex, ey), (bx, by) = trail[-1], trail[-2]
+    old_stones(lures, LURE_KINDS[key][0], ex, ey, math.atan2(ey - by, ex - bx))
+# And some where you can get to them, so there's something to them: a ring
+# in the meadow, between the grassy bank and the old stone wall; an arch at
+# the forest's edge, to walk through; and a few among the yellow flowers.
+# (Where they are [x, y], and which way they face.)
+VISITED = [("ring", (-38, 13), math.pi / 2), ("arch", (-30, -70), math.pi / 2), ("stones", (-79, 64), math.pi)]
+for kind, (x, y), yaw in VISITED:
+    old_stones(lures, kind, x, y, yaw, solid=True)
+lures.build("old-stones", smooth=False)
 
 def porch(x, y_wall, y_lip, half, colour):
     """Where a building's doorway sticks out of its wall (to the lip, where
@@ -2383,21 +2578,25 @@ for way in WAYS.values():
                 on = rows[min(max(k + 1 + step * 4, 0), len(rows) - 1)]  # 2 m on
                 if on[2] < hall.floor - 0.5:
                     DROPS.append((hall, edge_left[k + 1], edge_right[k + 1]))
-    # A dead end, deep under the land (off into the mist): a metre more of
-    # tunnel, and earth across the end of it.
+    # A dead end, deep under the land (off into the mist): more tunnel,
+    # darker and darker as it goes on, into black (so it doesn't look like
+    # an end), and black across the end of it.
     for row, edges, outward in ((rows[0], (edge_left[0], edge_right[0]), -1), (rows[-1], (edge_left[-1], edge_right[-1]), 1)):
         x, y, f, nx_, ny_, roofed = row
         if way.indoor or not roofed or in_a_hall(x, y, f, 1.3):
             continue
         ox, oy = ny_ * outward, -nx_ * outward
         (lx_, ly_), (rx_, ry_) = edges
-        el, er = (lx_ + ox, ly_ + oy), (rx_ + ox, ry_ + oy)
-        quad(tunnel, [(lx_, ly_, f), (rx_, ry_, f), (*er, f), (*el, f)], floor_colour)
-        quad(tunnel, [(lx_, ly_, f + TUNNEL_TALL), (rx_, ry_, f + TUNNEL_TALL), (*er, f + TUNNEL_TALL), (*el, f + TUNNEL_TALL)],
-             roof_colour)
-        for p, q in (((lx_, ly_), el), ((rx_, ry_), er)):
-            quad(tunnel, [(*p, f), (*q, f), (*q, f + TUNNEL_TALL), (*p, f + TUNNEL_TALL)], wall_colour)
-        quad(tunnel, [(*el, f), (*er, f), (*er, f + TUNNEL_TALL), (*el, f + TUNNEL_TALL)], LAYERS[3])
+        for k in range(INTO_THE_DARK):
+            dark = ((k + 1) / INTO_THE_DARK) ** 0.6
+            el, er = (lx_ + ox, ly_ + oy), (rx_ + ox, ry_ + oy)
+            quad(tunnel, [(lx_, ly_, f), (rx_, ry_, f), (*er, f), (*el, f)], c.mix(floor_colour, BLACK, dark))
+            quad(tunnel, [(lx_, ly_, f + TUNNEL_TALL), (rx_, ry_, f + TUNNEL_TALL), (*er, f + TUNNEL_TALL),
+                          (*el, f + TUNNEL_TALL)], c.mix(roof_colour, BLACK, dark))
+            for p, q in (((lx_, ly_), el), ((rx_, ry_), er)):
+                quad(tunnel, [(*p, f), (*q, f), (*q, f + TUNNEL_TALL), (*p, f + TUNNEL_TALL)], c.mix(wall_colour, BLACK, dark))
+            (lx_, ly_), (rx_, ry_) = el, er
+        quad(tunnel, [(lx_, ly_, f), (rx_, ry_, f), (rx_, ry_, f + TUNNEL_TALL), (lx_, ly_, f + TUNNEL_TALL)], BLACK)
 # A stone threshold at every mouth onto the land, over the ragged edge of the
 # hole in the ground (which comes in whole squares, so it reaches a little
 # past where the ramp begins, and shows the sky through the gap).
@@ -3361,12 +3560,18 @@ def growth(x, y):
         return 0
     if any(abs(x - sx) <= hx + 0.4 and abs(y + sz) <= hz + 0.4 for sx, sz, hx, hz, _ in STEPS):
         return 0
-    to_path = path_lines.distance(x, y)
+    if any(math.hypot(x - sx, y - sy) < r + 0.3 for sx, sy, r in OLD_STONES):
+        return 0
+    to_path = min(path_lines.distance(x, y), trails.distance(x, y) * 1.4)
     to_wall = WALL_LINES.distance(x, y)
     if to_wall < 0.75:
         return 0
-    # (On a path, only grit; and the grass by it growing a little way over its edges.)
-    if to_path < HALF - 0.4:
+    # (On a path, only grit; and the grass by it growing a little way over its
+    # edges. But not where it peters out, at the narrows: the bank's grass and
+    # stones, up to the water; but for under the plank, laid across there.)
+    if 1.0 < abs(x - NARROWS_X) < NARROWS_HALF and (river - BANK) * narrowing(x, y) < 1.6:
+        ground = "bank"
+    elif to_path < HALF - 0.4:
         ground = "path"
     elif to_wall < 2.4:
         ground = "wall"
