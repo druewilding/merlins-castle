@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.9.0](https://github.com/druewilding/merlins-castle/compare/v2.8.0...v2.9.0) (2026-10-15)
+
+
+### Features
+
+* Enable getting lost and finding a clue ([#80](https://github.com/druewilding/merlins-castle/issues/80)) ([5b113ab](https://github.com/druewilding/merlins-castle/commit/5b113abf94707cc620394f33681ab51ebbcbca32))
+* Make unnoticed objects hop and glow when you seem stuck ([#79](https://github.com/druewilding/merlins-castle/issues/79)) ([ece6cdf](https://github.com/druewilding/merlins-castle/commit/ece6cdf2f3f515a4d09c371ea89fc14f6d1ca180))
+
 ## [2.8.0](https://github.com/druewilding/merlins-castle/compare/v2.7.1...v2.8.0) (2026-10-15)
 
 
