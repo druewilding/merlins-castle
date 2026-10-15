@@ -41,6 +41,7 @@ const SWEEPING = 0.7;
 const BACK = 0.4; // seconds: and back into your hand
 const FLIGHT = [0.5, 0.8]; // seconds, a leaf flying into its heap (at least, and at most)
 const BLOWN = 1.2; // seconds: the wind blowing them all back (each starting up to half of it after the first)
+const FADE = 0.45; // the pile's size (of its full size), from where it fades away
 const MOUTH = 3.2; // metres out from the pile's middle: just out of the mouth
 const LEAN = 0.55; // radians: the broom's handle, leaning back from upright, sweeping
 const COLOURS = ["#c4561d", "#d9822b", "#e0a33a", "#a8401b", "#8a4a22", "#b86a2a", "#7a3b18", "#d46f24"];
@@ -160,7 +161,9 @@ export class Leaves {
     this.mesh.frustumCulled = false;
     // Under them, so you can't see through: the pile's (and heaps') leafy
     // insides, flattening as they're swept off it (and growing, swept on).
-    this.pileCore = new Mesh(dome(PILE, random), coreMaterial);
+    // (The pile's own, to fade away: see draw.)
+    this.pileCore = new Mesh(dome(PILE, random), coreMaterial.clone());
+    (this.pileCore.material as MeshStandardMaterial).transparent = true;
     this.pileCore.position.copy(this.centre);
     this.heapCores = this.heaps.map((heap) => {
       const core = new Mesh(dome(HEAP, random), coreMaterial);
@@ -265,7 +268,14 @@ export class Leaves {
       core.visible = size > 0.03;
       core.scale.set(0.6 + 0.4 * size, Math.max(size, 0.01), 0.6 + 0.4 * size);
     };
-    grow(this.pileCore, sizes.pile);
+    // The pile, once it's this small, keeps its shape (not flattening to a
+    // disc), shrinking all over as it fades away.
+    grow(this.pileCore, Math.max(sizes.pile, FADE));
+    const fade = Math.min(1, sizes.pile / FADE);
+    this.pileCore.scale.multiplyScalar(0.3 + 0.7 * fade);
+    (this.pileCore.material as MeshStandardMaterial).opacity = fade;
+    this.pileCore.visible = fade > 0.02;
+    this.pileCore.castShadow = fade > 0.5;
     this.heapCores.forEach((core, k) => grow(core, sizes.heaps[k]));
   }
 
