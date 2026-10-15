@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.8.0](https://github.com/druewilding/merlins-castle/compare/v2.7.1...v2.8.0) (2026-10-15)
+
+
+### Features
+
+* Make the mountain look more like a mountain ([#77](https://github.com/druewilding/merlins-castle/issues/77)) ([0967471](https://github.com/druewilding/merlins-castle/commit/09674718c9f8dff26fb8938a2ee40449da80e680))
+* Rebuild the charcoal hut so that it looks better and it's easier to take the axe ([#76](https://github.com/druewilding/merlins-castle/issues/76)) ([645ef60](https://github.com/druewilding/merlins-castle/commit/645ef608e61b0d3f5cef229d5f2f9a17f3398fcb))
+
 ## [2.7.1](https://github.com/druewilding/merlins-castle/compare/v2.7.0...v2.7.1) (2026-10-15)
 
 
