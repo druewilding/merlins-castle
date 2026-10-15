@@ -923,6 +923,7 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   // (Out of any scene, and the ladder put up afresh if it's up: it may have fallen.)
   playing = undefined;
   player.held = false;
+  player.letGo();
   document.body.classList.remove("scene");
   ending.hidden = true;
   ending.replaceChildren();

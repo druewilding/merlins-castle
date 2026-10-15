@@ -242,8 +242,10 @@ export class Player {
       this.keys.add(event.code);
       if (event.code === "Space" && !event.repeat && !this.held) this.jump();
     });
-    addEventListener("keyup", (event) => this.keys.delete(event.code));
-    addEventListener("blur", () => this.keys.clear());
+    // (Letting go is heard first, before anything else: over the ending, or a
+    // menu, which keep their keys to themselves. Or a key would stay down.)
+    addEventListener("keyup", (event) => this.keys.delete(event.code), true);
+    addEventListener("blur", () => this.letGo());
     addEventListener("mousemove", (event) => {
       if (document.pointerLockElement !== element) return;
       this.turn(event.movementX * LOOK, event.movementY * LOOK);
@@ -318,6 +320,11 @@ export class Player {
         (thing) => thing.top === undefined && touching({ ...thing, ahead: 0 }, x, z, 0)
       )
     );
+  }
+
+  /** No keys down (a game started afresh, say): you stop. */
+  letGo() {
+    this.keys.clear();
   }
 
   /**
