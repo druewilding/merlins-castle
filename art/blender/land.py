@@ -974,8 +974,14 @@ def out_on_the_path(x, y):
     the edge of its dirt): wandering, and frayed."""
     half = HALF + WANDERS * noise.noise(Vector((x / 7, y / 7, 0.5)))
     fray = 0.13 * noise.noise(Vector((x / 1.2, y / 1.2, 4.0))) + 0.05 * noise.noise(Vector((x / 0.4, y / 0.4, 6.0)))
-    # (The trails past the mists narrower: less trodden.)
-    return min(path_lines.distance(x, y), trails.distance(x, y) * 1.4) / half + fray
+    # (The trails past the mists narrower: less trodden. And at the narrows,
+    # going down to the water, it peters out into the grass of the bank,
+    # raggedly: no one's trodden the last of it.)
+    out = min(path_lines.distance(x, y), trails.distance(x, y) * 1.4) / half + fray
+    if abs(x - NARROWS_X) < NARROWS_HALF:
+        bank = (from_river(x, y) - BANK) * narrowing(x, y) + 0.5 * noise.noise(Vector((x / 1.5, y / 1.5, 8.0)))
+        out += 1.5 * (1 - smooth(bank / 2.5))
+    return out
 
 
 def off_the_land(x, y):
