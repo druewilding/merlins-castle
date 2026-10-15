@@ -17,7 +17,8 @@ import {
 
 import type { Ground } from "./player";
 
-const WALK = 0.975; // metres a second: as far as his walk carries him (so his feet don't slide)
+const TALL = 1.15; // times the size he's made: tall, his face above yours, under his hat's brim
+const WALK = 0.975 * TALL; // metres a second: as far as his walk carries him (so his feet don't slide)
 const TURN = 2.5; // radians a second, turning
 const RANGE = 7; // metres from his spot he wanders, at most
 const STROLL = [2.5, 6]; // metres to the next place he walks to, between these
@@ -53,6 +54,7 @@ export class Merlin {
         o.frustumCulled = false; // (moved by his bones: his bounds don't follow)
       }
     });
+    model.scale.setScalar(TALL);
     model.position.set(home.x, ground(home.x, home.z) ?? 0, home.z);
     scene.add(model);
     this.mixer = new AnimationMixer(model);

@@ -19,7 +19,7 @@ from pathlib import Path
 import bmesh
 import bpy
 import numpy as np
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 HERE = Path(__file__).parent
 sys.path.append(str(HERE))
@@ -50,9 +50,10 @@ GOLD = "#e0b04a"
 HAT_BAND = "#4a2f7a"
 
 WAIST = 1.16  # the robe hangs from here (the belt)...
-HEM = 0.07  # ...down to here
+HEM = 0.035  # ...down to here
 HEAD = (0.0, 0.0, 1.735)  # the middle of the hat's brim
 SIDES = 28  # round the robe and the hat
+TIP = 14  # degrees the hat's tipped back
 
 
 def load(path):
@@ -150,28 +151,32 @@ verts, colours, weights = [], [], []
 for i in range(RINGS + 1):
     t = i / RINGS  # 0 at the waist, 1 at the hem
     z = WAIST + (HEM - WAIST) * t
-    radius = 0.165 + 0.15 * t**1.2
+    radius = 0.165 + 0.21 * t**1.1
     for k in range(SIDES):
         a = 2 * math.pi * k / SIDES
         # Soft folds, deeper towards the hem.
         r = radius * (1 + 0.05 * t * math.sin(a * 9 + 1.3))
-        x, y = math.sin(a) * r, -math.cos(a) * r * 0.88
+        x, y = math.sin(a) * r, -math.cos(a) * r
         verts.append((x, y + 0.02, z))
         # Gold trim round the hem and down the front.
         trim = t > 0.96 or (abs(math.sin(a / 2) * 2) < 0.12 and t > 0.05)
         colours.append(c.vary(c.linear(GOLD if trim else ROBE), 0.12, Vector((a * 2, t * 6, 0))))
-        # Moved by his hips at the top, his legs below, each side by its own leg.
-        side = smooth((x / max(radius, 0.01) + 0.6) / 1.2)  # 0 on his right, 1 on his left
-        hip = 1 - smooth(t * 2.2)
-        thigh = smooth(t * 2.2) * (1 - smooth((t - 0.45) * 2.5))
-        calf = smooth((t - 0.45) * 2.5)
+        # Moved by his hips at the top, and below by his legs, each side by its
+        # own: mostly by his thigh, so the hem swings out in a wide arc with each
+        # stride (and his knee stays inside), and at the back by his calf too, as
+        # his heel lifts behind him.
+        side = smooth((x / max(radius, 0.01) + 0.35) / 0.7)  # 0 on his right, 1 on his left
+        back = smooth((y / max(radius, 0.01) + 0.3) / 1.0)  # 0 at his front, 1 at his back
+        hip = 1 - smooth(t * 2.5)
+        calf = (0.25 + 0.5 * back) * smooth((t - 0.4) * 2)
+        thigh = (1 - hip) - calf
         weights.append(
             {
-                "pelvis": hip + 0.25 * (1 - hip),
+                "pelvis": hip + 0.08,
                 "thigh_l": thigh * side,
                 "thigh_r": thigh * (1 - side),
-                "calf_l": calf * side * 0.8,
-                "calf_r": calf * (1 - side) * 0.8,
+                "calf_l": calf * side,
+                "calf_r": calf * (1 - side),
             }
         )
 faces = []
@@ -229,6 +234,10 @@ for _ in range(16):
         verts.append(tuple(centre + p))
         colours.append(c.linear(GOLD))
     faces.append((first, first + 1, first + 2, first + 3))
+# Tipped back on his head, so his face shows under the brim.
+tip = Matrix.Rotation(math.radians(-TIP), 4, "X")
+pivot = Vector((hx, hy + 0.05, hz - 0.06))
+verts = [tuple(tip @ (Vector(v) - pivot) + pivot) for v in verts]
 hat = skinned("merlin-hat", verts, faces, colours, [{"Head": 1.0}] * len(verts))
 hat.data.materials.append(c.vertex_material())
 
@@ -298,10 +307,15 @@ if out:
     c.export(out, use_selection=True, export_animation_mode="NLA_TRACKS", export_image_format="WEBP")
 
 if preview:
-    # Standing idle, seen from the front, a little to one side (and from the
-    # side, in -side.png).
-    for track in skeleton.animation_data.nla_tracks:
-        track.mute = track.name != "Idle_Loop"
-    bpy.context.scene.frame_set(10)
+    # Standing idle, seen from the front, a little to one side; and mid-stride,
+    # from the side and the front (-stride.png, -stride-front.png).
+    def pose(clip, frame):
+        for track in skeleton.animation_data.nla_tracks:
+            track.mute = track.name != clip
+        bpy.context.scene.frame_set(frame)
+
+    pose("Idle_Loop", 10)
     c.preview(preview, (1.2, -4.2, 1.3), (0, 0, 0.95), (0.4, 0.8, -1), lens=40)
-    c.preview(preview.replace(".png", "-side.png"), (4.3, 0.3, 1.3), (0, 0, 0.95), (0.4, 0.8, -1), lens=40)
+    pose("Walk_Formal_Loop", 8)
+    c.preview(preview.replace(".png", "-stride.png"), (4.3, 0.3, 1.0), (0, 0, 0.85), (0.4, 0.8, -1), lens=40)
+    c.preview(preview.replace(".png", "-stride-front.png"), (0.8, -4.3, 1.0), (0, 0, 0.85), (0.4, 0.8, -1), lens=40)
