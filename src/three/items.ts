@@ -727,6 +727,9 @@ export function items(options: {
         }
         const d = from + at;
         if (d > REACH) continue;
+        // (Nor through anything solid: from the far side of a wall.)
+        const { x, z } = thing.model.position;
+        if (!player.between(eye.x, eye.z, x, z, Boolean(player.under))) continue;
         if (miss < best.miss - 0.01 || (Math.abs(miss - best.miss) <= 0.01 && d < best.d)) {
           best = { miss, d };
           aimed = id;
