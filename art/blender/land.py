@@ -140,6 +140,7 @@ BRIDGE = P["old-wall"][0], -40 * K  # where the path south from the old wall cro
 TOWER = (P["tower"][0], P["tower"][1] + 6)  # on its knoll, north of the mossy steps
 TOWER_R = 6
 TOWER_LANDING = 5.6  # the top of its stairs, at the window onto the balcony, above its floor
+HUT_FIRE = {}  # the fire in the charcoal burner's hut: its middle, and the smoke hole over it (charcoal_hut)
 CHEST = {}  # the chest in the tower: where its middle is, and its tray (round_room)
 TOWER_WINDOW = (0.9, 2.6)  # the window's sill and lintel, above the landing
 # Which way the window and the balcony face (round from due east): to the
@@ -197,10 +198,12 @@ def wall_pieces(p0, p1, a0, a1, low, high, floor, at, openings=TOWER_WINDOWS):
                 return pieces
     return [[(*p0, low), (*p1, low), (*p1, high), (*p0, high)]]
 HUT = P["charcoal-hut"]
+HUT_R = 4.47  # the hut's round wall of logs, to its outside
 # Where you step in at their doors: the tower's faces south, down the mossy
-# steps; the hut's north, to the crossroads.
+# steps; the hut's north, to the crossroads (just outside its wall: it has
+# no doorway, only an opening, so you're in as soon as you're through it).
 TOWER_LIP = (TOWER[0], TOWER[1] - TOWER_R - 1.8)
-HUT_LIP = (HUT[0], HUT[1] + 3 + 1.8)
+HUT_LIP = (HUT[0], HUT[1] + HUT_R + 0.45)
 
 # ---------------------------------------------------------------- the paths
 
@@ -272,10 +275,11 @@ class Way:
     """A way underground: a line of points, each with its floor's height.
     A floor of None is the ground's height there: a mouth."""
 
-    def __init__(self, points, half=TUNNEL_HALF, indoor=False):
+    def __init__(self, points, half=TUNNEL_HALF, indoor=False, open=False):
         self.points = points
         self.half = half
         self.indoor = indoor  # a corridor in a building: walls and a roof all the way
+        self.open = open  # (or just a floor, through an opening in a wall: no walls, roof or door frame of its own)
         self.segments = list(zip(points, points[1:]))
         xs, ys = [p[0] for p in points], [p[1] for p in points]
         self.box = (min(xs), max(xs), min(ys), max(ys))
@@ -397,8 +401,9 @@ HALLS = {h.place: h for h in [
     # once the land's shape is known): the charcoal burner's hut, lit by its
     # fire, and the round room in the tower, just inside its wall (dark and
     # musty, lit only by what comes in: round_room; its floor and wall the
-    # mortar between its stones, tower_stones).
-    Hall("charcoal-hut", 0, 0, 3.8, c.linear("#5e4a36"), c.linear("#6e5236"), "#ffb878", 1.2, w=3.4, d=2.4),
+    # mortar between its stones, tower_stones). The hut is round, to the
+    # inside of its logs (charcoal_hut).
+    Hall("charcoal-hut", 0, HUT_R - 0.33, 3.8, c.linear("#5e4a36"), c.linear("#6e5236"), "#ff9a50", 1.2, indoor=True),
     Hall("tower", 0, TOWER_R - 0.8, 9, c.linear("#2c2a26"), c.linear("#34312c"), at=TOWER, indoor=True, dark=True),
 ]}
 
@@ -474,7 +479,7 @@ WAYS = {
     "coach-door": Way([(CH[0] - HALLS["coach-house"].w - 1.8, CH[1], None), (*CH, 0.4)], half=2.4, indoor=True),
     # In at the tower's door, and the hut's.
     "tower-door": Way([(*TOWER_LIP, None), (*TOWER, None)], half=1.3, indoor=True),
-    "hut-door": Way([(*HUT_LIP, None), (*HUT, None)], half=1.2, indoor=True),
+    "hut-door": Way([(*HUT_LIP, None), (*HUT, None)], half=1.2, indoor=True, open=True),
 }
 
 # ---------------------------------------------------------------- the shape of the land
@@ -497,7 +502,7 @@ def in_building(x, y, whole=False):
     if abs(x - coach.x) <= coach.w + 0.6 and abs(y - coach.y) <= coach.d + 0.6:
         return True
     reach = STEP / 2 if whole else 0.0
-    if abs(x - HUT[0]) <= 4 - reach and abs(y - HUT[1]) <= 3 - reach:
+    if math.hypot(x - HUT[0], y - HUT[1]) <= HUT_R - reach * math.sqrt(2):
         return True
     return math.hypot(x - TOWER[0], y - TOWER[1]) <= TOWER_R - reach * math.sqrt(2)
 
@@ -1628,25 +1633,113 @@ obstacle(["mossy-steps east"], "circle", bx, -by, 2.6, reach=0.4)
 wx, wy = P["forest-witches"]
 obstacle(["forest-witches west"], "box", (wx + P["forest-crossroads"][0]) / 2, -wy, 1.0, 5.5)
 
-# The charcoal burner's hut, its door facing north to the crossroads.
+
+def quad(builder, pts, colour, vary=0.12):
+    # Anything lying flat faces up: facing down, the sun's shadows fall on it
+    # in stripes ("shadow acne").
+    (ax, ay, az), (bx, by, bz), (cx_, cy_, cz) = pts[0], pts[1], pts[2]
+    ux, uy, uz, vx, vy, vz = bx - ax, by - ay, bz - az, cx_ - ax, cy_ - ay, cz - az
+    nz = ux * vy - uy * vx
+    if nz < 0 and abs(nz) > 0.5 * math.sqrt((uy * vz - uz * vy) ** 2 + (uz * vx - ux * vz) ** 2 + nz * nz):
+        pts = pts[::-1]
+    builder.add(pts, [(0, 1, 2, 3)], [c.vary(colour, vary, Vector(pts[0])) for _ in pts])
+
+
+# The charcoal burner's hut, as in its picture: round, a wall of upright
+# logs with an opening in it facing north to the crossroads, and a cone of a
+# roof, its planks laid in courses on rafters, with a hole at the top for the
+# smoke of the fire in the middle (charcoal_hut) to go out by.
 hx, hy = HUT
-HUT_WALL = c.linear("#7a5b3e")
-hz0, hz1 = height(hx, hy) - 0.3, HALLS["charcoal-hut"].floor + 4.2
-gap = 1.2 + 0.1
-block(built, hx - 4, hy - 3, hz0, hx + 4, hy - 2.5, hz1, HUT_WALL, solid=False)
-block(built, hx - 4, hy - 3, hz0, hx - 3.5, hy + 3, hz1, HUT_WALL, solid=False)
-block(built, hx + 3.5, hy - 3, hz0, hx + 4, hy + 3, hz1, HUT_WALL, solid=False)
-block(built, hx - 4, hy + 2.5, hz0, hx - gap, hy + 3, hz1, HUT_WALL, solid=False)
-block(built, hx + gap, hy + 2.5, hz0, hx + 4, hy + 3, hz1, HUT_WALL, solid=False)
-block(built, hx - gap, hy + 2.5, HALLS["charcoal-hut"].floor + TUNNEL_TALL - 0.3, hx + gap, hy + 3, hz1, HUT_WALL,
-      solid=False)  # over the door, down to the doorway's roof
-built.cone((hx, hy, hz1), 3, 5.5, c.linear("#5d4630"), sides=4, droop=0)
-porch(hx, hy + 2.7, HUT_LIP[1], WAYS["hut-door"].half, HUT_WALL)
-# A sill under the door, where the doorway's floor meets the room's (over
-# the hole in the ground the hut stands in).
 fl = HALLS["charcoal-hut"].floor
-block(built, hx - gap, hy + 2.3, fl - 0.6, hx + gap, hy + 3.2, fl - 0.02, STONE, solid=False)
-solid_box(hx, hy, 4, 3)
+HUT_LOGS = HUT_R - 0.17  # the logs' middles
+EAVE = fl + 2.5  # the top of the wall
+HUT_EAVE_R, HUT_HOLE_R = 5.0, 0.55  # the roof's edge, out over the wall, and the smoke hole
+HUT_LOW, HUT_TOP = fl + 2.25, fl + 5.7  # their heights
+HUT_OPEN = 1.35  # half the opening, to its posts' middles
+HUT_WOOD, HUT_DARK = c.linear("#8a6a48"), c.linear("#5a4430")
+hut_rnd = random.Random("charcoal hut")  # (its own: a change anywhere else doesn't move its logs)
+
+
+def hut_roof(r, under=0.0):
+    """The roof's height at r out from the middle (its underside, under it)."""
+    return HUT_LOW + (HUT_EAVE_R - r) * (HUT_TOP - HUT_LOW) / (HUT_EAVE_R - HUT_HOLE_R) - under
+
+
+def log(b, p0, p1, r, colour, sides=6):
+    """A round log from one end to the other, any way up."""
+    p0, p1 = Vector(p0), Vector(p1)
+    along = (p1 - p0).normalized()
+    u = along.cross(Vector((0, 0, 1)) if abs(along.z) < 0.9 else Vector((1, 0, 0))).normalized()
+    v = along.cross(u)
+    verts, colours = [], []
+    for k in range(sides):
+        a = 2 * math.pi * k / sides
+        off = (u * math.cos(a) + v * math.sin(a)) * r
+        verts += [tuple(p0 + off), tuple(p1 + off)]
+        colours += [c.vary(colour, 0.15, p0 + off * 3), c.vary(colour, 0.15, p1 + off * 3)]
+    faces = [(2 * k, 2 * ((k + 1) % sides), 2 * ((k + 1) % sides) + 1, 2 * k + 1) for k in range(sides)]
+    b.add(verts, faces, colours)
+
+
+def ring_at(r, a):
+    return hx + math.cos(a) * r, hy + math.sin(a) * r
+
+
+# The wall: logs standing side by side, round all but the opening.
+n = int(2 * math.pi * HUT_LOGS / 0.31)
+for k in range(n):
+    a = 2 * math.pi * (k + 0.5) / n
+    x, y = ring_at(HUT_LOGS, a)
+    if y > hy and abs(x - hx) < HUT_OPEN + 0.15:
+        continue
+    shade = c.mix(HUT_WOOD, c.linear("#000000"), hut_rnd.uniform(-0.15, 0.3))
+    built.cylinder((x, y, min(fl, height(x, y)) - 0.4), (x, y, EAVE + hut_rnd.uniform(0, 0.12)), 0.17, 0.16, shade)
+# Either side of the opening, a stouter post, and a lintel across between them.
+oy = hy + math.sqrt(HUT_LOGS ** 2 - HUT_OPEN ** 2)
+for side in (-1, 1):
+    built.cylinder((hx + side * HUT_OPEN, oy, min(fl, height(hx + side * HUT_OPEN, oy)) - 0.4),
+                   (hx + side * HUT_OPEN, oy, EAVE + 0.1), 0.21, 0.19, HUT_DARK, sides=8)
+log(built, (hx - HUT_OPEN - 0.25, oy, EAVE - 0.12), (hx + HUT_OPEN + 0.25, oy, EAVE - 0.12), 0.14, HUT_DARK)
+# Round the top of the wall, a ring of logs the rafters rest on.
+for k in range(32):
+    a0, a1 = 2 * math.pi * k / 32, 2 * math.pi * (k + 1) / 32
+    log(built, (*ring_at(HUT_LOGS, a0 - 0.02), EAVE + 0.05), (*ring_at(HUT_LOGS, a1 + 0.02), EAVE + 0.05), 0.15, HUT_DARK)
+# The roof: planks in five courses, each overlapping the one below, every
+# plank its own weathered shade; under them, sooty boards, and the rafters
+# and rings of poles that hold them up; and a collar round the smoke hole.
+SIDES_ROOF = 48
+for course in range(5):
+    r0 = HUT_EAVE_R - course * (HUT_EAVE_R - HUT_HOLE_R) / 5 + (0.1 if course else 0)
+    r1 = HUT_EAVE_R - (course + 1) * (HUT_EAVE_R - HUT_HOLE_R) / 5
+    z0, z1 = hut_roof(r0) + (-0.06 if course else 0), hut_roof(r1)
+    turn = hut_rnd.uniform(0, 1)  # (the joins between planks not lining up from course to course)
+    for k in range(SIDES_ROOF):
+        a0, a1 = 2 * math.pi * (k + turn) / SIDES_ROOF, 2 * math.pi * (k + 1 + turn) / SIDES_ROOF
+        shade = c.mix(c.linear("#8a7052"), c.linear("#3a2e22"), hut_rnd.uniform(0, 0.4))
+        quad(built, [(*ring_at(r0, a0), z0), (*ring_at(r0, a1), z0), (*ring_at(r1, a1), z1), (*ring_at(r1, a0), z1)],
+             shade, 0.08)
+for k in range(SIDES_ROOF):
+    a0, a1 = 2 * math.pi * k / SIDES_ROOF, 2 * math.pi * (k + 1) / SIDES_ROOF
+    r0, r1 = HUT_EAVE_R - 0.05, HUT_HOLE_R
+    quad(built, [(*ring_at(r0, a0), hut_roof(r0, 0.12)), (*ring_at(r0, a1), hut_roof(r0, 0.12)),
+                 (*ring_at(r1, a1), hut_roof(r1, 0.12)), (*ring_at(r1, a0), hut_roof(r1, 0.12))],
+         c.linear("#2e241c"), 0.15)
+    # (And the hole's rim, between them.)
+    quad(built, [(*ring_at(r1, a0), hut_roof(r1, 0.12)), (*ring_at(r1, a1), hut_roof(r1, 0.12)),
+                 (*ring_at(r1, a1), hut_roof(r1)), (*ring_at(r1, a0), hut_roof(r1))], c.linear("#2e241c"), 0.15)
+for k in range(16):
+    a = 2 * math.pi * k / 16
+    log(built, (*ring_at(HUT_EAVE_R - 0.2, a), hut_roof(HUT_EAVE_R - 0.2, 0.2)),
+        (*ring_at(HUT_HOLE_R + 0.1, a), hut_roof(HUT_HOLE_R + 0.1, 0.2)), 0.07, HUT_DARK)
+for r in (3.2, 1.8):
+    for k in range(16):
+        a0, a1 = 2 * math.pi * k / 16, 2 * math.pi * (k + 1) / 16
+        log(built, (*ring_at(r, a0), hut_roof(r, 0.29)), (*ring_at(r, a1), hut_roof(r, 0.29)), 0.06, HUT_DARK)
+for k in range(12):
+    a0, a1 = 2 * math.pi * k / 12, 2 * math.pi * (k + 1) / 12
+    r = HUT_HOLE_R + 0.06
+    log(built, (*ring_at(r, a0 - 0.05), hut_roof(r) + 0.05), (*ring_at(r, a1 + 0.05), hut_roof(r) + 0.05), 0.07, HUT_DARK)
+solid_circle(hx, hy, HUT_R)
 
 # The pile of leaves filling the mouth of the dragon's cave, just inside.
 lx, ly = DRAGON_LIP[0] + 3, DRAGON_LIP[1]
@@ -1866,17 +1959,6 @@ def lid_over(row, back, wide):
                 verts = [(px, py, drawn_height(px, py, exactly=True)) for px, py in pts]
                 colour = ground_colour(*pts[0], height(*pts[0]))
                 tunnel.add(verts, [tuple(range(len(verts)))], [c.vary(colour, 0.12, Vector(v)) for v in verts])
-
-
-def quad(builder, pts, colour, vary=0.12):
-    # Anything lying flat faces up: facing down, the sun's shadows fall on it
-    # in stripes ("shadow acne").
-    (ax, ay, az), (bx, by, bz), (cx_, cy_, cz) = pts[0], pts[1], pts[2]
-    ux, uy, uz, vx, vy, vz = bx - ax, by - ay, bz - az, cx_ - ax, cy_ - ay, cz - az
-    nz = ux * vy - uy * vx
-    if nz < 0 and abs(nz) > 0.5 * math.sqrt((uy * vz - uz * vy) ** 2 + (uz * vx - ux * vz) ** 2 + nz * nz):
-        pts = pts[::-1]
-    builder.add(pts, [(0, 1, 2, 3)], [c.vary(colour, vary, Vector(pts[0])) for _ in pts])
 
 
 def spike(builder, x, y, z, tall, radius, colour, sides=6):
@@ -2120,6 +2202,8 @@ for way in WAYS.values():
                 tunnel.blob((rx3, ry3, a[2] + r * 0.2), r, c.mix(LAYERS[2], LAYERS[3], rubble.random()),
                             squash=0.6, lumpy=0.35, seed=rubble.random() * 100, subdivisions=1)
             continue
+        if way.open:
+            continue
         # (Up the ramps, the walls stop exactly under the stone lip on top of them.)
         for (ax_, ay_), (bx_, by_) in (((alx, aly), (blx, bly)), ((arx, ary), (brx, bry))):
             # (Where the ramp goes under the lintel, the walls stay up at the
@@ -2181,7 +2265,7 @@ for way in WAYS.values():
             lid_over(row, back, wide)
     # Door frames, where the way goes into a hall.
     # (Hung on the walls' own edges: near a bend, they're mitred.)
-    for k, (a, b) in enumerate(zip(rows, rows[1:])):
+    for k, (a, b) in enumerate(zip(rows, rows[1:]) if not way.open else ()):
         for hall in HALLS.values():
             m = hall.doorway
             if abs(hall.floor - a[2]) > 1.5 or hall.inside(a[0], a[1], m) == hall.inside(b[0], b[1], m):
@@ -2637,15 +2721,6 @@ def room(b, hall):
             block(b, px - 0.08, py - 0.08, f, px + 0.08, py + 0.08, f + 1.6, BRASS, solid=False)
             flame(b, px, py, f + 1.6)
             under_circle(px, py, 0.25)
-    elif hall.place == "charcoal-hut":
-        # The hearth against the back wall, glowing; a straw bed; sacks of charcoal.
-        furniture(b, hx - 1.0, hy - D, hx + 1.0, hy - D + 0.9, f, f + 0.55, STONE)
-        for dx in (-0.4, 0.0, 0.4):
-            flame(b, hx + dx, hy - D + 0.45, f + 0.55, 0.3)
-        furniture(b, hx - W, hy - D + 0.3, hx - W + 1.1, hy + 0.9, f, f + 0.4, c.linear("#c9a85a"))
-        for k, (px, py) in enumerate(((hx + W - 0.6, hy - 0.4), (hx + W - 0.7, hy + 0.6))):
-            b.blob((px, py, f + 0.35), 0.55, c.linear("#2a2622"), squash=0.8, lumpy=0.3, seed=40 + k)
-            under_circle(px, py, 0.5)
     elif hall.place == "coach-house":
         # The red coach on its four wheels, and hay.
         cxx, cyy = hx + 1.5, hy
@@ -2957,8 +3032,105 @@ def round_room(b, hall):
         lid.build("chest-lid", smooth=False).location = ((x0 + x1) / 2, y1, top)
         CHEST.update(x=(x0 + x1) / 2, y=(y0 + y1) / 2, floor=tray)
 
+
+# The fire's embers and flames: their own object, which the game makes glow.
+embers = c.Builder()
+
+
+def charcoal_hut(b, hall):
+    """Inside the charcoal burner's hut, as in its picture: an earth floor,
+    and in the middle the fire, smouldering in a ring of stones (the game
+    sends its smoke up and out of the hole in the roof); a bench, sacks of
+    charcoal, a table with a bowl and a stool, a heap of charcoal, and the
+    burner's cloak hanging on one of the posts holding up the roof."""
+    hx, hy, f, R = hall.x, hall.y, hall.floor, hall.r
+    rnd = random.Random("charcoal hut inside")
+    at = lambda r, a: (hx + math.cos(a) * r, hy + math.sin(a) * r)
+    # The floor, out under the wall: trodden earth, grey with ash by the fire.
+    sides, rings = 32, [0.0, 0.8, 1.4, 2.0, 2.6, 3.3, 4.0, HUT_R + 0.05]
+    for i in range(len(rings) - 1):
+        for k in range(sides):
+            a0, a1 = 2 * math.pi * k / sides, 2 * math.pi * (k + 1) / sides
+            corners = [(rings[i], a0), (rings[i], a1), (rings[i + 1], a1), (rings[i + 1], a0)]
+            verts = [(*at(r, a), f - 0.06) for r, a in corners]
+            b.add(verts, [(0, 1, 2, 3)], [c.vary(c.mix(c.linear("#4a3e34"), c.linear("#6b4f35"), (r - 0.6) / 1.6), 0.15,
+                                                 Vector(v)) for (r, _), v in zip(corners, verts)])
+    # The fire: a ring of stones round a bed of ash, burnt logs fallen in
+    # together, and charcoal, glowing (embers, its own object) under little flames.
+    for k in range(11):
+        a = 2 * math.pi * k / 11 + rnd.uniform(-0.1, 0.1)
+        b.blob((*at(0.85 + rnd.uniform(-0.04, 0.06), a), f + 0.06), rnd.uniform(0.2, 0.27), c.linear("#7d7468"),
+               squash=0.72, lumpy=0.3, seed=60 + k)
+    ash = [(hx, hy, f + 0.02)] + [(*at(0.75, 2 * math.pi * k / 16), f + 0.02) for k in range(16)]
+    b.add(ash, [(0, 1 + k, 1 + (k + 1) % 16) for k in range(16)], [c.linear("#3c3631")] * 17)
+    for k in range(4):
+        a = math.pi / 4 + k * math.pi / 2 + rnd.uniform(-0.2, 0.2)
+        inner = (*at(0.12, a + math.pi), f + 0.22)
+        log(b, (*at(0.68, a), f + 0.07), inner, 0.07, c.linear("#2a1f18"))
+        embers.blob(inner, 0.085, c.linear("#e8561a"), squash=0.8, lumpy=0.3, seed=70 + k, subdivisions=1, lit=False)
+    for k in range(26):
+        a, r = rnd.uniform(0, 2 * math.pi), 0.55 * math.sqrt(rnd.random())
+        hot = rnd.random() < 0.6
+        target = embers if hot else b
+        colour = c.mix(c.linear("#8a1c08"), c.linear("#f0702a"), rnd.random()) if hot else c.linear("#1c1916")
+        target.blob((*at(r, a), f + 0.06), rnd.uniform(0.04, 0.09), colour, squash=0.7, lumpy=0.3, seed=80 + k,
+                    subdivisions=1, lit=False)
+    for k in range(2):
+        a = math.pi * k + 0.4
+        embers.cone((*at(0.12, a), f + 0.16), rnd.uniform(0.1, 0.14), 0.04, c.linear("#ff8a2a"), sides=5, droop=0)
+    under_circle(hx, hy, 1.15)
+    # Four posts holding up the roof (on the north side, either side of the opening).
+    for a in (math.pi / 3, 2 * math.pi / 3, 4 * math.pi / 3, 5 * math.pi / 3):
+        px, py = at(3.55, a)
+        b.cylinder((px, py, f - 0.1), (px, py, hut_roof(3.55, 0.15)), 0.18, 0.16, HUT_DARK, sides=8)
+        under_circle(px, py, 0.25)
+    # The bench, along the west wall.
+    furniture(b, hx - 3.2, hy - 1.1, hx - 2.8, hy + 0.7, f + 0.38, f + 0.48, WOOD)
+    for lx in (hx - 3.12, hx - 2.88):
+        for ly in (hy - 0.95, hy + 0.55):
+            block(b, lx - 0.05, ly - 0.05, f, lx + 0.05, ly + 0.05, f + 0.38, DARK_WOOD, solid=False)
+    # Sacks of charcoal, heaped up.
+    for k, (sx, sy) in enumerate(((2.85, 1.45), (2.2, 2.3), (-2.5, 2.2))):
+        sx, sy = hx + sx, hy + sy
+        b.blob((sx, sy, f + 0.4), 0.42, c.linear("#7a6448"), squash=1.15, lumpy=0.15, seed=90 + k)
+        for m in range(7):
+            a, r = rnd.uniform(0, 2 * math.pi), 0.22 * math.sqrt(rnd.random())
+            b.blob((sx + math.cos(a) * r, sy + math.sin(a) * r, f + 0.84), rnd.uniform(0.07, 0.11), c.linear("#1e1b19"),
+                   lumpy=0.35, seed=100 + k * 10 + m, subdivisions=1)
+        under_circle(sx, sy, 0.45)
+    # The table on the east side, with a bowl and a cup on it, and a stump for a stool.
+    tx0, ty0, tx1, ty1 = hx + 2.75, hy - 1.5, hx + 3.25, hy - 0.2
+    furniture(b, tx0, ty0, tx1, ty1, f + 0.7, f + 0.78, WOOD)
+    for lx in (tx0 + 0.07, tx1 - 0.07):
+        for ly in (ty0 + 0.07, ty1 - 0.07):
+            block(b, lx - 0.05, ly - 0.05, f, lx + 0.05, ly + 0.05, f + 0.7, DARK_WOOD, solid=False)
+    b.cylinder((hx + 3.0, hy - 1.0, f + 0.78), (hx + 3.0, hy - 1.0, f + 0.9), 0.1, 0.18, c.linear("#7a5a3a"), sides=10)
+    b.cylinder((hx + 3.0, hy - 0.5, f + 0.78), (hx + 3.0, hy - 0.5, f + 0.92), 0.05, 0.05, c.linear("#8a6a48"), sides=8)
+    sx, sy = hx + 2.2, hy - 1.9
+    b.cylinder((sx, sy, f - 0.05), (sx, sy, f + 0.45), 0.25, 0.24, c.linear("#5e4630"), sides=10)
+    lid = [(sx, sy, f + 0.45)] + [(sx + math.cos(2 * math.pi * k / 10) * 0.24, sy + math.sin(2 * math.pi * k / 10) * 0.24,
+                                   f + 0.45) for k in range(10)]
+    b.add(lid, [(0, 1 + k, 1 + (k + 1) % 10) for k in range(10)], [c.linear("#a88a60")] * 11)
+    under_circle(sx, sy, 0.27, top=f + 0.45)
+    # A heap of charcoal against the south wall.
+    cx_, cy_ = hx - 0.3, hy - 3.2
+    for m in range(40):
+        a, r = rnd.uniform(0, 2 * math.pi), 0.55 * math.sqrt(rnd.random())
+        b.blob((cx_ + math.cos(a) * r, cy_ + math.sin(a) * r, f + 0.05 + (0.55 - r) * 0.4), rnd.uniform(0.07, 0.12),
+               c.linear("#1e1b19"), lumpy=0.35, seed=150 + m, subdivisions=1)
+    under_circle(cx_, cy_, 0.55)
+    # The cloak, on the south-east post, facing in.
+    a = 5 * math.pi / 3
+    px, py = at(3.55 - 0.2, a)
+    wall_panel(b, px, py, (-math.sin(a) * 0.3, math.cos(a) * 0.3), f, f + 0.8, f + 2.0, c.linear("#6a4a2a"))
+    log(b, (*at(3.4, a), f + 2.0), (*at(3.25, a), f + 2.05), 0.03, DARK_WOOD)
+    # The fire, glowing, and where its smoke goes out (the game draws it).
+    HUT_FIRE.update(x=hx, y=hy, floor=f, hole=hut_roof(HUT_HOLE_R), r=HUT_HOLE_R)
+
 for hall in HALLS.values():
-    if hall.room:
+    if hall.place == "charcoal-hut":
+        charcoal_hut(rooms, hall)
+    elif hall.room:
         room(rooms, hall)
     elif hall.indoor:
         round_room(tower_inside if hall.place == "tower" else rooms, hall)
@@ -2982,6 +3154,7 @@ obstacle(["merlins-lair east"], "box", lx_, -ly_, 0.5, TUNNEL_HALF + 0.3, under=
 rooms.build("rooms", smooth=False)
 webs.build("cobwebs", smooth=False)
 tower_inside.build("tower-inside", smooth=False)
+embers.build("embers", smooth=False)
 
 # Doors and things that block the ways (until the game opens them).
 t_edge = T[1] + HALLS["trolls"].r + 1.5
@@ -3127,6 +3300,9 @@ if out:
         "stone": {"r": STONE_R, **{k: [round(x, 2), round(-y, 2), round(z, 2)] for k, (x, y, z) in STONE_SPOTS.items()}},
         # The chest in the tower, where the emerald starts: its middle [x, z], and its tray.
         "chest": [round(CHEST["x"], 2), round(-CHEST["y"], 2), round(CHEST["floor"], 2)],
+        # The fire in the charcoal burner's hut, its middle [x, z] and floor, and the smoke hole over it: how high, and how wide.
+        "hut": {"fire": [round(HUT_FIRE["x"], 2), round(-HUT_FIRE["y"], 2), round(HUT_FIRE["floor"], 2)],
+                "hole": round(HUT_FIRE["hole"], 2), "r": HUT_FIRE["r"]},
         "bounds": [X0 + 4, X1 - 4, Y0 + 4, Y1 - 4],
         "circles": circles,
         "boxes": boxes,

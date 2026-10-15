@@ -302,6 +302,22 @@ export class Player {
   }
 
   /**
+   * Whether a spot is in something solid (a rock, a post, the hut's fire, an
+   * obstacle: not its reach round it), on the land or underground. Not in
+   * something low enough to stand on (a step, a table): that's a top to put
+   * things on.
+   */
+  inSolid(x: number, z: number, under = false) {
+    const near = (under ? this.nearUnder : this.near).get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
+    return (
+      !!near &&
+      [...near.circles, ...near.boxes].some(
+        (thing) => thing.top === undefined && touching({ ...thing, ahead: 0 }, x, z, 0)
+      )
+    );
+  }
+
+  /**
    * Whether nothing solid stands between two spots (a wall, a rock: not an
    * obstacle's reach round it), on the land or underground: for reaching
    * from one to the other. (Not quite all the way: what you reach for may
