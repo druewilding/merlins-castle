@@ -52,7 +52,7 @@ KIND = {place: kind for kind, places in layout["kinds"].items() if kind != "_" f
 LOST = {k: at(v) for k, v in layout["lost"].items() if k != "_" and KIND.get(k.split(" ")[0]) != "cave"}
 DEATHS = {k: at(v) for k, v in layout["deaths"].items() if k != "_"}
 
-X0, X1, Y0, Y1 = (round(v * K) for v in (-200, 200, -290, 210))
+X0, X1, Y0, Y1 = (round(v * K) for v in (-200, 200, -290, 260))  # (north, past the mountain, for its far side)
 STEP = 2.0
 
 GRASS = c.linear("#7c9f3a")  # (as the grass on it looks, from a little way off: plants.ts)
@@ -60,6 +60,8 @@ BUTTERCUPS = c.linear("#a8a83a")  # and where the yellow flowers grow thick
 FOREST_FLOOR = c.linear("#3f5f2a")
 DIRT = c.linear("#b88754")
 ROCK = c.linear("#8a8478")
+CRAG = c.linear("#6f6a66")  # the mountain's cliffs, darker
+SNOW = c.linear("#f2f4f7")
 RIVERBED = c.linear("#55655c")
 FLAGS = c.linear("#a39d90")
 STONE = c.linear("#9a978a")
@@ -521,7 +523,63 @@ def in_moat(x, y):
 def mountain(x, y):
     x, y = x / K, y / K
     across = smooth((95 - abs(x)) / 45)
-    return K * (30 * smooth((y - 45) / 75) * across + 28 * smooth((y - 150) / 45) * smooth((80 - abs(x)) / 40))
+    behind = smooth((255 - y) / 45)  # (its far side, coming down again by the land's north edge)
+    return K * behind * (30 * smooth((y - 45) / 75) * across
+                         + 28 * smooth((y - 150) / 45) * smooth((80 - abs(x)) / 40))
+
+
+# The mountain's peaks, as in the paintings: a tall summit behind the maze,
+# lesser ones round it, and crags all over its upper slopes (where they're
+# high enough, snow: ground_colour). Never near the maze or the way up to
+# it, nor anywhere else you can go, so there the ground is as it was. ((x, y) as in
+# mountain(), how high, and how far its slopes reach.)
+SUMMITS = [((6, 186), 48, 44), ((-40, 170), 28, 26), ((44, 176), 26, 24), ((-16, 208), 34, 30),
+           ((28, 212), 24, 24)]
+
+
+def peaks(x, y):
+    m = mountain(x, y) / TOP
+    if m < 0.25:
+        return 0.0
+    dx = max(0.0, abs(x - MZ[0]) - MAZE_HALF)
+    dy = max(0.0, abs(y - MZ[1]) - MAZE_HALF)
+    away = smooth((math.hypot(dx, dy) - 9) / 14)
+    if y < MZ[1]:
+        away *= smooth((abs(x - MZ[0]) - 14) / 14)  # (the way up, and the mountain at its foot)
+    if away <= 0:
+        return 0.0
+    away *= clear_of_paths(x, y)
+    if away <= 0:
+        return 0.0
+    u, v = x / K, y / K
+    summit = sum(tall * max(0.0, 1 - math.hypot(u - sx, v - sy) / wide) ** 1.4 for (sx, sy), tall, wide in SUMMITS)
+    crag = ridged(u, v, 22, 11.0)
+    rough = smooth((m - 0.25) / 0.6)
+    return K * away * smooth((m - 0.25) / 0.2) * (summit * (0.7 + 0.35 * crag) + rough * 9 * crag)
+
+
+# How far round each place the forest is cleared (12 metres, unless it says).
+CLEARING = {"grassy-bank": 17, "deep-river": 15, "river-south-bank": 15}
+
+
+def clear_of_paths(x, y):
+    """0 near a path, a clearing or a mist, to 1 well away from them: where
+    the mountain can be rougher, and no one will ever walk."""
+    clear = min([path_lines.distance(x, y) - 5.5]
+                + [math.hypot(x - sx, y - sy) - 11 for sx, sy in LOST.values()]
+                + [math.hypot(x - px, y - py) - CLEARING.get(place, 12)
+                   for place, (px, py) in P.items() if KIND.get(place) != "cave"])
+    return smooth((clear - 4) / 12)
+
+
+def ridged(x, y, size, seed):
+    """Noise with sharp crests, rough at every size from `size` metres down:
+    0 to nearly 2."""
+    total, part, f = 0.0, 1.0, 1 / size
+    for octave in range(4):
+        total += part * (1 - abs(noise.noise(Vector((x * f, y * f, seed + octave))))) ** 2
+        part, f = part * 0.5, f * 2.1
+    return total
 
 
 def crags(x, y):
@@ -535,7 +593,10 @@ def crags(x, y):
     d = math.hypot(dx, dy)
     if y < MZ[1]:
         d = min(d, max(0.0, abs(x - MZ[0]) - 6))  # the way up
-    return 15 * top * smooth((d - 1) / 6) * (1 + 0.15 * noise.noise(Vector((x / 6, y / 6, 4.0))))
+    # (Jagged further out, past the tunnels' mouths.)
+    jagged = smooth((d - 10) / 10)
+    jagged = 7 * jagged * clear_of_paths(x, y) * ridged(x, y, 14, 21.0) if jagged > 0 else 0.0
+    return top * (15 * smooth((d - 1) / 6) * (1 + 0.15 * noise.noise(Vector((x / 6, y / 6, 4.0)))) + jagged)
 
 
 def dragon_hill(x, y):
@@ -558,7 +619,7 @@ def height(x, y):
     d = math.hypot((x - MOUND.x) / 9, (y - MOUND.y) / 6.5)
     if d < 1.35:
         h += 3.0 * (math.cos(d / 1.35 * math.pi) + 1) / 2
-    h += mountain(x, y) + crags(x, y)
+    h += mountain(x, y) + crags(x, y) + peaks(x, y)
     h = max(h, dragon_hill(x, y), ridge(x, y))
     t = math.hypot(x - TOWER[0], y - TOWER[1])
     h += 5 * smooth(1 - (t - 8) / 10)
@@ -577,8 +638,9 @@ def height(x, y):
 
 
 def rocky(x, y):
-    """Bare rock you can't climb: the crags, the dragon's hill and the ridge."""
-    return crags(x, y) > 1 or dragon_hill(x, y) > 1 or ridge(x, y) > 1
+    """Bare rock you can't climb: the crags, the mountain's peaks, the
+    dragon's hill and the ridge."""
+    return crags(x, y) > 1 or peaks(x, y) > 3 or dragon_hill(x, y) > 1 or ridge(x, y) > 1
 
 
 for way in WAYS.values():
@@ -637,7 +699,6 @@ def over_an_opening(x, y):
 
 # ---------------------------------------------------------------- where the forest isn't
 
-CLEARING = {"grassy-bank": 17, "deep-river": 15, "river-south-bank": 15}
 OPEN_ZONES = [(w * K, e * K, s * K, n * K) for w, e, s, n in [
     (-96, 25, -7, 22),  # the meadow, along the long path to the old stone wall
     (-80, 80, -282, -124),  # the castle grounds
@@ -736,6 +797,13 @@ def ground_colour(x, y, z):
         col = FOREST_FLOOR
     if z > 8:
         col = c.mix(col, ROCK, smooth((z - 8) / 10))
+    if z > 20:
+        # On the mountain: its cliffs darker, and snow on its heights, lying
+        # lower in hollows than on the crests, and not on the steepest rock.
+        steep = math.hypot(height(x + 1, y) - height(x - 1, y), height(x, y + 1) - height(x, y - 1)) / 2
+        col = c.mix(col, CRAG, smooth((steep - 0.8) / 0.6) * smooth((z - 20) / 8))
+        line = 62 + 6 * noise.noise(Vector((x / 10, y / 10, 13.0)))
+        col = c.mix(col, SNOW, smooth((z - line) / 5) * (1 - 0.7 * smooth((steep - 1.2) / 0.8)))
     return col
 
 
