@@ -59,6 +59,7 @@ import { haze } from "./haze";
 import { items as setUpItems, onPaths } from "./items";
 import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
+import { Lost } from "./lost";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
@@ -66,7 +67,7 @@ import land from "./models/land.json";
 import snakeModel from "./models/snake.glb?url";
 import { Plank } from "./plank";
 import { type Growth, Plants } from "./plants";
-import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable, wayThrough } from "./player";
+import { type Box, type Circle, type Ground, type Hall, Player, type Walkable, wayThrough } from "./player";
 import { River } from "./river";
 import { Shafts, speck, type Window } from "./shafts";
 import { sky } from "./sky";
@@ -112,6 +113,8 @@ const skylight = new HemisphereLight(SKY, SKY_GROUND, 1.25);
 const COLD = new Color("#7d8fb8");
 const COLD_GROUND = new Color("#1c1d22");
 const GLOOM = new Color("#07080b");
+const MIST = new Color("#dde2e4"); // lost in it
+const MIST_UNDER = new Color("#4b4f52");
 scene.add(skylight);
 
 // Underground, the daylight fades and a warm lamp glow takes over (one day,
@@ -433,22 +436,8 @@ solidify();
 const [west, east, south, north] = land.bounds;
 player.bounds = { west, east, north: -north, south: -south };
 
-// Mist where you'd get lost, and red where a way through kills you.
-const mist = new MeshBasicMaterial({ color: "#f4f6f8", transparent: true, opacity: 0.55, depthWrite: false });
+// Red where a way through kills you.
 const danger = new MeshBasicMaterial({ color: "#d9503f", transparent: true, opacity: 0.5, depthWrite: false });
-for (const { x, z, under } of LOST) {
-  if (under) {
-    // In the tunnel, where it runs out into the dark.
-    const way = player.ways.reduce((a, b) => (nearest(a, x, z).d < nearest(b, x, z).d ? a : b));
-    const cloud = new Mesh(new CylinderGeometry(3, 3, 3.4, 24, 1, true), mist);
-    cloud.position.set(x, nearest(way, x, z).floor + 1.7, z);
-    scene.add(cloud);
-    continue;
-  }
-  const cloud = new Mesh(new CylinderGeometry(10, 10, 10, 24, 1, true), mist);
-  cloud.position.set(x, (ground(x, z) ?? 0) + 5, z);
-  scene.add(cloud);
-}
 for (const { x, z } of DEATHS) {
   const mark = new Mesh(new CylinderGeometry(3, 3, 6, 16, 1, true), danger);
   mark.position.set(x, (ground(x, z) ?? 0) + 3, z);
@@ -643,7 +632,7 @@ interface Scene3d {
   readonly ends: number; // seconds
 }
 const EARLY = 1.5; // seconds before a scene's end, the curtain starts to fall
-let playing: { scene: Scene3d; t: number; words: string } | undefined;
+let playing: { scene: Scene3d; t: number; words: string; lost?: boolean } | undefined;
 const ending = h("div", { class: "ending", hidden: true });
 // (Clicking or typing here isn't walking: nor taking, using or dropping.)
 for (const type of ["click", "touchend", "keydown", "keyup"]) ending.addEventListener(type, (e) => e.stopPropagation());
@@ -651,6 +640,9 @@ root.append(ending);
 // Under the water (swept away in the river): murky.
 const murky = h("div", { class: "murky" });
 root.append(murky);
+// Lost in the mist: it comes down over everything, the sky too.
+const misty = h("div", { class: "misty" });
+root.append(misty);
 
 /** Each way that kills you that has a scene: it, ending with done(), or nothing (nothing to see there now). */
 const scenes: Record<string, () => Scene3d | undefined> = {
@@ -683,24 +675,62 @@ function dying(exit: string) {
   return true;
 }
 
-// The curtain, red: the words, and Continue.
-function curtain(words: string) {
+// Getting lost: walking into the mist at the edge of the world, from the
+// place whose way leads into it (only from there: coming through it from
+// the other side, along the tunnel from the dragon's cave, or round the moat,
+// you're still where you set off from, and it's only mist). How near its
+// middle, on the land or along a way underground.
+const LOST_IN = 10;
+const LOST_IN_UNDER = 3;
+function gettingLost() {
+  if (playing || player.busy || items.state.status !== "playing") return;
+  const p = player.position;
+  const spot = LOST.find(
+    ({ exit, under, x, z }) =>
+      exit.startsWith(`${room} `) &&
+      under === player.inside &&
+      Math.hypot(p.x - x, p.z - z) < (under ? LOST_IN_UNDER : LOST_IN)
+  );
+  if (!spot) return;
+  const direction = spot.exit.split(" ")[1] as Direction;
+  const to = world.rooms[room].exits[direction]?.to;
+  const words = (to && world.rooms[to]?.description) || "";
+  items.go(direction); // (the engine: you're lost)
+  player.held = true;
+  document.body.classList.add("scene");
+  playing = { scene: new Lost(player.camera, drawn, spot.under, reducedMotion), t: 0, words, lost: true };
+}
+
+// The curtain, red: the words, and Continue. (Or lost, the mist: what you
+// find, and the clue, in it.)
+function curtain(words: string, lost = false) {
   document.exitPointerLock?.();
-  const go = h("button", { type: "button", class: "pill", onclick: over }, T.continue);
-  ending.replaceChildren(h("div", { class: "curtain" }, h("p", { class: "last-words" }, plain(words)), go));
+  const go = h("button", { type: "button", class: "pill", onclick: () => over(lost) }, T.continue);
+  const [found, ...clue] = plain(words).split(":");
+  ending.replaceChildren(
+    lost
+      ? h(
+          "div",
+          { class: "curtain lost" },
+          clue.length > 0 && h("p", { class: "found" }, `${found}:`),
+          h("p", { class: "last-words" }, clue.length > 0 ? clue.join(":").trim() : found),
+          go
+        )
+      : h("div", { class: "curtain" }, h("p", { class: "last-words" }, plain(words)), go)
+  );
   ending.hidden = false;
   go.focus({ preventScroll: true });
 }
 
-// Then your score: play again, load a game, or back to the start.
-function over() {
+// Then your score: play again, load a game, or back to the start. (Lost, in the mist still.)
+function over(lost = false) {
   const yours = score(world, items.state);
   const best = recordScore(yours);
   const again = h("button", { type: "button", class: "pill", onclick: () => newStart(true) }, T.playAgain);
   ending.replaceChildren(
     h(
       "div",
-      { class: "over" },
+      { class: lost ? "over lost" : "over" },
       h(
         "div",
         { class: "card" },
@@ -1012,6 +1042,14 @@ function lightFor(depth: number, time: number, dt: number) {
   fog.color.copy(HAZE).lerp(DARK, under).lerp(GLOOM, murk);
   fog.near = (HAZE_NEAR - (HAZE_NEAR - 2) * under) * (1 - murk) + 1.5 * murk;
   fog.far = (HAZE_FAR - (HAZE_FAR - 30) * under + 40 * caveLit) * (1 - murk) + 22 * murk;
+  // (Lost: the mist, closing in till there's nothing to see; underground, dim.)
+  const mist = playing?.scene instanceof Lost ? playing.scene.mist : 0;
+  const mistColour = player.inside ? MIST_UNDER : MIST;
+  fog.color.lerp(mistColour, mist);
+  fog.near *= 1 - mist;
+  fog.far += (2.5 - fog.far) * mist;
+  misty.style.opacity = String(0.9 * mist ** 1.6);
+  misty.style.backgroundColor = `#${mistColour.getHexString()}`;
   shafts?.update(dt, gloom, player.camera.position);
   smoke.update(dt, player.camera.position);
   insideLook?.color.setScalar(0.25 + 0.75 * gloom);
@@ -1026,7 +1064,8 @@ renderer.setAnimationLoop((time) => {
     playing.scene.update(dt);
     const was = playing.t;
     playing.t += dt;
-    if (was < playing.scene.ends - EARLY && playing.t >= playing.scene.ends - EARLY) curtain(playing.words);
+    if (was < playing.scene.ends - EARLY && playing.t >= playing.scene.ends - EARLY)
+      curtain(playing.words, playing.lost);
   }
   river.update(dt, player.camera.position);
   murky.classList.toggle("under", Boolean(playing) && player.camera.position.y < land.river.water);
@@ -1052,6 +1091,7 @@ renderer.setAnimationLoop((time) => {
     if (player.under?.hall) room = player.under.hall;
     else if (!player.inside) room = placeAt(player.position.x, player.position.z, room, player.halls);
   }
+  gettingLost();
   if (stone) {
     const wants = room === "tower" && shut && !opened.has(shut) && !allOpen ? 1 : 0;
     rolled =
