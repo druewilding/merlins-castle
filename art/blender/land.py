@@ -593,9 +593,21 @@ def crags(x, y):
     d = math.hypot(dx, dy)
     if y < MZ[1]:
         d = min(d, max(0.0, abs(x - MZ[0]) - 6))  # the way up
-    # (Jagged further out, past the tunnels' mouths.)
-    jagged = smooth((d - 10) / 10)
-    jagged = 7 * jagged * clear_of_paths(x, y) * ridged(x, y, 14, 21.0) if jagged > 0 else 0.0
+    # Jagged further out, past the tunnels' mouths, and not the same on both
+    # sides: to the west, a tall sharp crag, a little behind the maze; to the
+    # east, a lower one (lower than the crags were), with two rough tops.
+    far = smooth((d - 10) / 10)
+    jagged = 0.0
+    if far > 0:
+        far *= clear_of_paths(x, y)
+        if x < MZ[0]:
+            u = 1 - math.hypot(x - MZ[0] + 26, y - MZ[1] - 4) / 15
+            jagged = 4 * ridged(x, y, 10, 21.0) + 22 * smooth(u) ** 1.5
+        else:
+            jagged = 5 * ridged(x, y, 8, 25.0) * smooth((y - MZ[1] + 30) / 30) - 8
+            jagged += 4 * smooth(1 - math.hypot(x - MZ[0] - 30, y - MZ[1] + 6) / 10)
+            jagged += 3 * smooth(1 - math.hypot(x - MZ[0] - 22, y - MZ[1] - 10) / 8)
+        jagged *= far
     return top * (15 * smooth((d - 1) / 6) * (1 + 0.15 * noise.noise(Vector((x / 6, y / 6, 4.0)))) + jagged)
 
 
@@ -843,6 +855,7 @@ def ground_normal(i, j):
 
 
 GROUND_NORMALS = [ground_normal(i, j) for j in range(ny) for i in range(nx)]
+GROUND_HEIGHTS = [z for _, _, z in verts]
 ground_obj.data.normals_split_custom_set_from_vertices(GROUND_NORMALS)
 
 # Paths: earth on the ground, all of them one surface (so there's no seeing
@@ -3262,6 +3275,56 @@ MASK_STEP = 1.0
 mx, my = int((X1 - X0) / MASK_STEP), int((Y1 - Y0) / MASK_STEP)
 mask = bytes(1 if walkable(X0 + (i + 0.5) * MASK_STEP, Y0 + (j + 0.5) * MASK_STEP) else 0
              for j in range(my) for i in range(mx))
+
+
+def out_of_sight():
+    """The trees no one will ever see: from everywhere you can stand (and the
+    balcony), the land's in the way (behind the mountain, or the ridge).
+    They're not grown at all."""
+    import numpy as np
+    heights = np.array(GROUND_HEIGHTS).reshape(ny, nx)
+
+    def lowest(xs, ys):
+        # (The lowest corner of the ground's square: so a crest never hides
+        # more than it would.)
+        i = np.clip(((xs - X0) // STEP).astype(int), 0, nx - 2)
+        j = np.clip(((ys - Y0) // STEP).astype(int), 0, ny - 2)
+        return np.minimum(np.minimum(heights[j, i], heights[j, i + 1]),
+                          np.minimum(heights[j + 1, i], heights[j + 1, i + 1]))
+
+    spots = [(X0 + (i + 0.5) * MASK_STEP, Y0 + (j + 0.5) * MASK_STEP)
+             for j in range(0, my, 3) for i in range(0, mx, 3) if mask[j * mx + i]]
+    ex, ey = np.array([x for x, _ in spots]), np.array([y for _, y in spots])
+    ez = np.array([height(x, y) for x, y in spots]) + 1.6
+    ex, ey, ez = np.append(ex, LADDER_TOP[0]), np.append(ey, LADDER_TOP[1]), np.append(ez, LADDER_TOP[2] + 1.6)
+    t = np.linspace(0.02, 0.97, 96)
+    hidden = []
+    for k, (kind, x, z, y, _, scale) in enumerate(tree_spots["at"]):
+        y = -y
+        d = np.hypot(ex - x, ey - y)
+        if d.min() < 25:
+            continue
+        near = np.argsort(d)
+        tall = scale * TREE_MODEL[KINDS[kind]]
+        seen = False
+        for chunk in np.array_split(near, max(1, len(near) // 400)):
+            for top in (z + 0.4 * tall, z + 0.9 * tall):
+                sx = ex[chunk, None] + (x - ex[chunk, None]) * t
+                sy = ey[chunk, None] + (y - ey[chunk, None]) * t
+                sz = ez[chunk, None] + (top - ez[chunk, None]) * t
+                if (lowest(sx, sy) < sz + 0.2).all(axis=1).any():
+                    seen = True
+                    break
+            if seen:
+                break
+        if not seen:
+            hidden.append(k)
+    return hidden
+
+
+hidden = set(out_of_sight())
+print(f"{len(hidden)} of {len(tree_spots['at'])} trees out of sight")
+tree_spots["at"] = [spot for k, spot in enumerate(tree_spots["at"]) if k not in hidden]
 
 # A square metre at a time (as the walkable mask), what grows there: what
 # kind of ground (GROUND, its lowest three bits; 0, nothing: water, paths,
