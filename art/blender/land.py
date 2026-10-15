@@ -1431,6 +1431,14 @@ for side in (-1, 1):
         y = -60 * K + side * (BANK * narrowing(x, -60 * K) - 0.1)
         built.blob((x, y, WATER_LEVEL + rock_rng.uniform(-0.25, 0.1)), rock_rng.uniform(0.55, 0.85), ROCK,
                    squash=rock_rng.uniform(0.45, 0.7), lumpy=0.35, seed=300 + int(x * 7) + side)
+    # And smaller ones where the way comes down: either side of it, at the
+    # edge, and a few out in the shallows, worn smooth.
+    for k in range(9):
+        x = NARROWS_X + rock_rng.choice((-1, 1)) * rock_rng.uniform(0.9, 3.2)
+        wet = rock_rng.uniform(-0.5, 0.5) if k < 6 else rock_rng.uniform(0.5, 1.0)
+        y = -60 * K + side * (BANK * narrowing(x, -60 * K) - wet)
+        built.blob((x, y, WATER_LEVEL + rock_rng.uniform(-0.15, 0.1)), rock_rng.uniform(0.18, 0.4), ROCK,
+                   squash=rock_rng.uniform(0.4, 0.65), lumpy=0.3, seed=400 + k * 2 + side)
 
 # The forest bridge and the drawbridge.
 block(built, BRIDGE[0] - 2.4, BRIDGE[1] - BRIDGE_HALF, 0.5, BRIDGE[0] + 2.4, BRIDGE[1] + BRIDGE_HALF, 0.9,
@@ -3558,8 +3566,12 @@ def growth(x, y):
     to_wall = WALL_LINES.distance(x, y)
     if to_wall < 0.75:
         return 0
-    # (On a path, only grit; and the grass by it growing a little way over its edges.)
-    if to_path < HALF - 0.4:
+    # (On a path, only grit; and the grass by it growing a little way over its
+    # edges. But not where it peters out, at the narrows: the bank's grass and
+    # stones, up to the water; but for under the plank, laid across there.)
+    if 1.0 < abs(x - NARROWS_X) < NARROWS_HALF and (river - BANK) * narrowing(x, y) < 1.6:
+        ground = "bank"
+    elif to_path < HALF - 0.4:
         ground = "path"
     elif to_wall < 2.4:
         ground = "wall"
