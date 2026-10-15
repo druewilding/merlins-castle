@@ -54,9 +54,9 @@ downloads the whole world, so it works without a connection.
   composed in code by Claude, in `scripts/make-sounds.js`; the rest are from
   [Kenney](https://kenney.nl) (CC0).
 - **Pictures**: painted with ChatGPT from the prompts in `art/prompts`.
-- **Trees** (in 3D): Quaternius's
-  [Ultimate Nature Pack](https://quaternius.com/packs/ultimatenature.html)
-  (CC0), in `art/models/ultimate-nature`.
+- **3D models**: trees and characters built from
+  [Quaternius](https://quaternius.com)'s packs (CC0), listed in
+  `art/models/README.md` with where to download them.
 - **Fonts**: IM Fell English and Cinzel, from Google Fonts.
 
 ## Running it locally

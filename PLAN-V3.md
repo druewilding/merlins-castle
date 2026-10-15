@@ -303,7 +303,7 @@ src/three/         the 3D version
   effects.ts       what each `use` does to the world
   moments.ts       deaths, mist and visions, winning
 art/blender/       Python scripts that build each area in Blender
-art/models/        the .blend sources and image-to-3D downloads
+art/models/        the model packs (downloaded, not in git) and image-to-3D downloads
 public/models/     the compressed .glb files the game loads
 ```
 
