@@ -52,7 +52,7 @@ KIND = {place: kind for kind, places in layout["kinds"].items() if kind != "_" f
 LOST = {k: at(v) for k, v in layout["lost"].items() if k != "_" and KIND.get(k.split(" ")[0]) != "cave"}
 DEATHS = {k: at(v) for k, v in layout["deaths"].items() if k != "_"}
 
-X0, X1, Y0, Y1 = (round(v * K) for v in (-200, 200, -290, 210))
+X0, X1, Y0, Y1 = (round(v * K) for v in (-200, 200, -290, 260))  # (north, past the mountain, for its far side)
 STEP = 2.0
 
 GRASS = c.linear("#7c9f3a")  # (as the grass on it looks, from a little way off: plants.ts)
@@ -60,6 +60,8 @@ BUTTERCUPS = c.linear("#a8a83a")  # and where the yellow flowers grow thick
 FOREST_FLOOR = c.linear("#3f5f2a")
 DIRT = c.linear("#b88754")
 ROCK = c.linear("#8a8478")
+CRAG = c.linear("#6f6a66")  # the mountain's cliffs, darker
+SNOW = c.linear("#f2f4f7")
 RIVERBED = c.linear("#55655c")
 FLAGS = c.linear("#a39d90")
 STONE = c.linear("#9a978a")
@@ -521,7 +523,63 @@ def in_moat(x, y):
 def mountain(x, y):
     x, y = x / K, y / K
     across = smooth((95 - abs(x)) / 45)
-    return K * (30 * smooth((y - 45) / 75) * across + 28 * smooth((y - 150) / 45) * smooth((80 - abs(x)) / 40))
+    behind = smooth((255 - y) / 45)  # (its far side, coming down again by the land's north edge)
+    return K * behind * (30 * smooth((y - 45) / 75) * across
+                         + 28 * smooth((y - 150) / 45) * smooth((80 - abs(x)) / 40))
+
+
+# The mountain's peaks, as in the paintings: a tall summit behind the maze,
+# lesser ones round it, and crags all over its upper slopes (where they're
+# high enough, snow: ground_colour). Never near the maze or the way up to
+# it, nor anywhere else you can go, so there the ground is as it was. ((x, y) as in
+# mountain(), how high, and how far its slopes reach.)
+SUMMITS = [((6, 186), 48, 44), ((-40, 170), 28, 26), ((44, 176), 26, 24), ((-16, 208), 34, 30),
+           ((28, 212), 24, 24)]
+
+
+def peaks(x, y):
+    m = mountain(x, y) / TOP
+    if m < 0.25:
+        return 0.0
+    dx = max(0.0, abs(x - MZ[0]) - MAZE_HALF)
+    dy = max(0.0, abs(y - MZ[1]) - MAZE_HALF)
+    away = smooth((math.hypot(dx, dy) - 9) / 14)
+    if y < MZ[1]:
+        away *= smooth((abs(x - MZ[0]) - 14) / 14)  # (the way up, and the mountain at its foot)
+    if away <= 0:
+        return 0.0
+    away *= clear_of_paths(x, y)
+    if away <= 0:
+        return 0.0
+    u, v = x / K, y / K
+    summit = sum(tall * max(0.0, 1 - math.hypot(u - sx, v - sy) / wide) ** 1.4 for (sx, sy), tall, wide in SUMMITS)
+    crag = ridged(u, v, 22, 11.0)
+    rough = smooth((m - 0.25) / 0.6)
+    return K * away * smooth((m - 0.25) / 0.2) * (summit * (0.7 + 0.35 * crag) + rough * 9 * crag)
+
+
+# How far round each place the forest is cleared (12 metres, unless it says).
+CLEARING = {"grassy-bank": 17, "deep-river": 15, "river-south-bank": 15}
+
+
+def clear_of_paths(x, y):
+    """0 near a path, a clearing or a mist, to 1 well away from them: where
+    the mountain can be rougher, and no one will ever walk."""
+    clear = min([path_lines.distance(x, y) - 5.5]
+                + [math.hypot(x - sx, y - sy) - 11 for sx, sy in LOST.values()]
+                + [math.hypot(x - px, y - py) - CLEARING.get(place, 12)
+                   for place, (px, py) in P.items() if KIND.get(place) != "cave"])
+    return smooth((clear - 4) / 12)
+
+
+def ridged(x, y, size, seed):
+    """Noise with sharp crests, rough at every size from `size` metres down:
+    0 to nearly 2."""
+    total, part, f = 0.0, 1.0, 1 / size
+    for octave in range(4):
+        total += part * (1 - abs(noise.noise(Vector((x * f, y * f, seed + octave))))) ** 2
+        part, f = part * 0.5, f * 2.1
+    return total
 
 
 def crags(x, y):
@@ -535,7 +593,22 @@ def crags(x, y):
     d = math.hypot(dx, dy)
     if y < MZ[1]:
         d = min(d, max(0.0, abs(x - MZ[0]) - 6))  # the way up
-    return 15 * top * smooth((d - 1) / 6) * (1 + 0.15 * noise.noise(Vector((x / 6, y / 6, 4.0))))
+    # Jagged further out, past the tunnels' mouths, and not the same on both
+    # sides: to the west, a tall sharp crag, a little behind the maze; to the
+    # east, a lower one (lower than the crags were), with two rough tops.
+    far = smooth((d - 10) / 10)
+    jagged = 0.0
+    if far > 0:
+        far *= clear_of_paths(x, y)
+        if x < MZ[0]:
+            u = 1 - math.hypot(x - MZ[0] + 26, y - MZ[1] - 4) / 15
+            jagged = 4 * ridged(x, y, 10, 21.0) + 22 * smooth(u) ** 1.5
+        else:
+            jagged = 5 * ridged(x, y, 8, 25.0) * smooth((y - MZ[1] + 30) / 30) - 8
+            jagged += 4 * smooth(1 - math.hypot(x - MZ[0] - 30, y - MZ[1] + 6) / 10)
+            jagged += 3 * smooth(1 - math.hypot(x - MZ[0] - 22, y - MZ[1] - 10) / 8)
+        jagged *= far
+    return top * (15 * smooth((d - 1) / 6) * (1 + 0.15 * noise.noise(Vector((x / 6, y / 6, 4.0)))) + jagged)
 
 
 def dragon_hill(x, y):
@@ -558,7 +631,7 @@ def height(x, y):
     d = math.hypot((x - MOUND.x) / 9, (y - MOUND.y) / 6.5)
     if d < 1.35:
         h += 3.0 * (math.cos(d / 1.35 * math.pi) + 1) / 2
-    h += mountain(x, y) + crags(x, y)
+    h += mountain(x, y) + crags(x, y) + peaks(x, y)
     h = max(h, dragon_hill(x, y), ridge(x, y))
     t = math.hypot(x - TOWER[0], y - TOWER[1])
     h += 5 * smooth(1 - (t - 8) / 10)
@@ -577,8 +650,9 @@ def height(x, y):
 
 
 def rocky(x, y):
-    """Bare rock you can't climb: the crags, the dragon's hill and the ridge."""
-    return crags(x, y) > 1 or dragon_hill(x, y) > 1 or ridge(x, y) > 1
+    """Bare rock you can't climb: the crags, the mountain's peaks, the
+    dragon's hill and the ridge."""
+    return crags(x, y) > 1 or peaks(x, y) > 3 or dragon_hill(x, y) > 1 or ridge(x, y) > 1
 
 
 for way in WAYS.values():
@@ -637,7 +711,6 @@ def over_an_opening(x, y):
 
 # ---------------------------------------------------------------- where the forest isn't
 
-CLEARING = {"grassy-bank": 17, "deep-river": 15, "river-south-bank": 15}
 OPEN_ZONES = [(w * K, e * K, s * K, n * K) for w, e, s, n in [
     (-96, 25, -7, 22),  # the meadow, along the long path to the old stone wall
     (-80, 80, -282, -124),  # the castle grounds
@@ -736,6 +809,13 @@ def ground_colour(x, y, z):
         col = FOREST_FLOOR
     if z > 8:
         col = c.mix(col, ROCK, smooth((z - 8) / 10))
+    if z > 20:
+        # On the mountain: its cliffs darker, and snow on its heights, lying
+        # lower in hollows than on the crests, and not on the steepest rock.
+        steep = math.hypot(height(x + 1, y) - height(x - 1, y), height(x, y + 1) - height(x, y - 1)) / 2
+        col = c.mix(col, CRAG, smooth((steep - 0.8) / 0.6) * smooth((z - 20) / 8))
+        line = 62 + 6 * noise.noise(Vector((x / 10, y / 10, 13.0)))
+        col = c.mix(col, SNOW, smooth((z - line) / 5) * (1 - 0.7 * smooth((steep - 1.2) / 0.8)))
     return col
 
 
@@ -775,6 +855,7 @@ def ground_normal(i, j):
 
 
 GROUND_NORMALS = [ground_normal(i, j) for j in range(ny) for i in range(nx)]
+GROUND_HEIGHTS = [z for _, _, z in verts]
 ground_obj.data.normals_split_custom_set_from_vertices(GROUND_NORMALS)
 
 # Paths: earth on the ground, all of them one surface (so there's no seeing
@@ -3194,6 +3275,56 @@ MASK_STEP = 1.0
 mx, my = int((X1 - X0) / MASK_STEP), int((Y1 - Y0) / MASK_STEP)
 mask = bytes(1 if walkable(X0 + (i + 0.5) * MASK_STEP, Y0 + (j + 0.5) * MASK_STEP) else 0
              for j in range(my) for i in range(mx))
+
+
+def out_of_sight():
+    """The trees no one will ever see: from everywhere you can stand (and the
+    balcony), the land's in the way (behind the mountain, or the ridge).
+    They're not grown at all."""
+    import numpy as np
+    heights = np.array(GROUND_HEIGHTS).reshape(ny, nx)
+
+    def lowest(xs, ys):
+        # (The lowest corner of the ground's square: so a crest never hides
+        # more than it would.)
+        i = np.clip(((xs - X0) // STEP).astype(int), 0, nx - 2)
+        j = np.clip(((ys - Y0) // STEP).astype(int), 0, ny - 2)
+        return np.minimum(np.minimum(heights[j, i], heights[j, i + 1]),
+                          np.minimum(heights[j + 1, i], heights[j + 1, i + 1]))
+
+    spots = [(X0 + (i + 0.5) * MASK_STEP, Y0 + (j + 0.5) * MASK_STEP)
+             for j in range(0, my, 3) for i in range(0, mx, 3) if mask[j * mx + i]]
+    ex, ey = np.array([x for x, _ in spots]), np.array([y for _, y in spots])
+    ez = np.array([height(x, y) for x, y in spots]) + 1.6
+    ex, ey, ez = np.append(ex, LADDER_TOP[0]), np.append(ey, LADDER_TOP[1]), np.append(ez, LADDER_TOP[2] + 1.6)
+    t = np.linspace(0.02, 0.97, 96)
+    hidden = []
+    for k, (kind, x, z, y, _, scale) in enumerate(tree_spots["at"]):
+        y = -y
+        d = np.hypot(ex - x, ey - y)
+        if d.min() < 25:
+            continue
+        near = np.argsort(d)
+        tall = scale * TREE_MODEL[KINDS[kind]]
+        seen = False
+        for chunk in np.array_split(near, max(1, len(near) // 400)):
+            for top in (z + 0.4 * tall, z + 0.9 * tall):
+                sx = ex[chunk, None] + (x - ex[chunk, None]) * t
+                sy = ey[chunk, None] + (y - ey[chunk, None]) * t
+                sz = ez[chunk, None] + (top - ez[chunk, None]) * t
+                if (lowest(sx, sy) < sz + 0.2).all(axis=1).any():
+                    seen = True
+                    break
+            if seen:
+                break
+        if not seen:
+            hidden.append(k)
+    return hidden
+
+
+hidden = set(out_of_sight())
+print(f"{len(hidden)} of {len(tree_spots['at'])} trees out of sight")
+tree_spots["at"] = [spot for k, spot in enumerate(tree_spots["at"]) if k not in hidden]
 
 # A square metre at a time (as the walkable mask), what grows there: what
 # kind of ground (GROUND, its lowest three bits; 0, nothing: water, paths,
