@@ -226,6 +226,9 @@ export class Player {
   // One-way obstacles you're going through the free way, until you're out of their reach.
   private passing = new Set<Circle | Box>();
   private before = new Vector3(); // where you were, before this step
+  // Turned back at an obstacle you'd come over: what, and where (said once,
+  // not again till you've stepped back from there).
+  private turned: { thing: Circle | Box; x: number; z: number } | undefined;
   private wasInside = false;
   private flying = false;
   private lift = 0; // how high you are off the ground, jumping
@@ -782,6 +785,9 @@ export class Player {
       if (Math.abs(p.z - thing.z) >= Math.abs(b.z - thing.z)) return;
       p.z = b.z;
     }
+    const was = this.turned;
+    if (was?.thing === thing && Math.hypot(p.x - was.x, p.z - was.z) < AGAIN) return;
+    this.turned = { thing, x: p.x, z: p.z };
     this.onBump(exit);
   }
 
