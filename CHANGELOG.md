@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.10.0](https://github.com/druewilding/merlins-castle/compare/v2.9.0...v2.10.0) (2026-10-15)
+
+
+### Features
+
+* Model the broom and the leaves, and animate sweeping away ([#82](https://github.com/druewilding/merlins-castle/issues/82)) ([ff910ed](https://github.com/druewilding/merlins-castle/commit/ff910ed34e2b22cc339f5052fef3ff12f154a490))
+* Say you're carrying too much when your slots are full ([#83](https://github.com/druewilding/merlins-castle/issues/83)) ([716f481](https://github.com/druewilding/merlins-castle/commit/716f48187adce33b15a66db05eeb5cd4b7a95054))
+
 ## [2.9.0](https://github.com/druewilding/merlins-castle/compare/v2.8.0...v2.9.0) (2026-10-15)
 
 
