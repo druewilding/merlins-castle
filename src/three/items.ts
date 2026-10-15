@@ -197,9 +197,6 @@ export function items(options: {
    */
   const boxOf = (id: ItemId) => new Box3().setFromObject(models.getObjectByName(id)!);
 
-  /** How long an object is, end to end, so it lies on the slope under it. */
-  const lengthOf = (model: Object3D) => new Box3().setFromObject(model).getSize(new Vector3()).z;
-
   /**
    * Lays an object down at x, z, turned to yaw, on a floor or on the ground.
    * On the ground it rests as a stiff thing would: on the highest bumps under
@@ -293,7 +290,9 @@ export function items(options: {
     const fixed = options.starts?.[id];
     if (fixed?.room === room) return lay(id, room, fixed.at[0], fixed.at[1], 0, fixed.at[2]);
     const hall = player.halls.get(room);
-    const half = lengthOf(models.getObjectByName(id)!) / 2;
+    const size = new Box3().setFromObject(models.getObjectByName(id)!).getSize(new Vector3());
+    const half = size.z / 2;
+    const wide = size.x / 2;
     const area = hall
       ? { has: (x: number, z: number) => inHall(hall, x, z), somewhere: () => somewhereIn(hall) }
       : reachable(room);
@@ -303,10 +302,15 @@ export function items(options: {
       const [x, z] = area.somewhere();
       const yaw = Math.random() * Math.PI * 2;
       const along = [Math.sin(yaw), Math.cos(yaw)];
-      // All of it, every half metre along it, on a spot that fits.
+      const across = [along[1], -along[0]];
+      // All of it, every half metre along it and out to its sides (the axe's
+      // head, say), on a spot that fits: never in the hut's fire, or a wall.
       const n = Math.ceil((half * 2) / 0.5);
       const all = Array.from({ length: n + 1 }, (_, k) => -half + (k / n) * half * 2);
-      if (all.every((d) => fits(x + along[0] * d, z + along[1] * d))) {
+      const sides = [-wide, 0, wide];
+      if (
+        all.every((d) => sides.every((w) => fits(x + along[0] * d + across[0] * w, z + along[1] * d + across[1] * w)))
+      ) {
         lay(id, room, x, z, yaw, hall?.floor);
         return;
       }
@@ -566,9 +570,32 @@ export function items(options: {
       half: size.z / 2,
       wide: size.x / 2,
     }));
+    // (All of it somewhere you could reach to take it again: not in the
+    // hut's fire, say, or a sack, or a wall. Or, if nowhere round where
+    // you're pointing will do, at your feet.)
     const taken = [...lying.values()].flatMap((thing) => (thing.footprint ? [thing.footprint] : []));
-    const { x, z } = spots.find((spot) => !taken.some((other) => overlap(spot, other))) ?? spots[0];
-    lay(id, state.room, x, z, yaw, floor);
+    const free = (spot: Footprint) =>
+      covered(spot).every(([x, z]) => open(x, z)) && !taken.some((other) => overlap(spot, other));
+    const spot = spots.find(free);
+    const { x, z } = spot ?? player.position;
+    lay(id, state.room, x, z, yaw, spot ? floor : player.under?.floor);
+  }
+
+  /**
+   * Whether a spot's open, for something to lie on (or your gaze to go over):
+   * on the land, the ground you could walk on; off it, a hall's floor or a
+   * way's. Not in anything solid there (the hut's fire, a rock, a wall).
+   */
+  function open(x: number, z: number) {
+    const { under } = player;
+    if (!under) return walkable(x, z) && player.clear(x, z, false, 0.05);
+    const floor =
+      Boolean(player.hallAt(x, z)) ||
+      player.ways.some((way) => {
+        const there = nearest(way, x, z);
+        return there.d < way.half - 0.2 && Math.abs(there.floor - under.floor) < 1;
+      });
+    return floor && !player.inSolid(x, z, true);
   }
 
   /**
@@ -582,14 +609,6 @@ export function items(options: {
     player.camera.getWorldPosition(eye);
     player.camera.getWorldDirection(look);
     const { position: me, under } = player;
-    const open = under
-      ? (x: number, z: number) =>
-          Boolean(player.hallAt(x, z)) ||
-          player.ways.some((way) => {
-            const there = nearest(way, x, z);
-            return there.d < way.half - 0.2 && Math.abs(there.floor - under.floor) < 1;
-          })
-      : (x: number, z: number) => walkable(x, z) && player.clear(x, z, false, 0.05);
     // (What your gaze was already over, a step before: not what it goes into
     // the side of, or under.)
     const floorAt = (x: number, z: number, over: number) =>
