@@ -30,6 +30,20 @@ const LIFT = 0.04;
 // they keep this far from its wall.
 const FILL = 0.5;
 const WALL = 1;
+// Stuck: nothing taken and no obstacle overcome for this long (seconds).
+// Then each object you've never held hops, and glows, to catch your eye, as
+// you come to see it (this near, on the screen, nothing in the way): twice
+// over, a hop and a little one. Not again till you've looked away and back.
+const STUCK = 60;
+const NOTICE = 15;
+const HOPS = [
+  [0, 0.28, 0.25], // [from (seconds), how long, how high (metres)]
+  [0.28, 0.2, 0.1],
+  [0.75, 0.28, 0.25],
+  [1.03, 0.2, 0.1],
+];
+const GLOWS = 1.6; // and its glow, for this long
+const AGAIN = 3; // and at least this long before it hops again
 
 /** The ground an object covers: its middle, which way it lies, half its length and half its width. */
 interface Footprint {
@@ -485,6 +499,7 @@ export function items(options: {
     // (The first time you've found it, a twinkle.)
     if (!state.found?.includes(id)) sound("discover");
     sound("take");
+    stuck = 0;
     state = { ...result.state, room: state.room };
     scene.remove(thing.model);
     lying.delete(id);
@@ -507,9 +522,11 @@ export function items(options: {
       sound("nothing");
       return;
     }
+    const already = effects(world, state).includes(id);
     const result = act(world, state, { type: "use", item: id });
     state = result.state;
     if (effects(world, state).includes(id)) {
+      if (!already) stuck = 0; // (a way opened)
       // (What it does here, if it opens a way: "The ladder leans against the wall.")
       if (EXIT_ORDER.some((d) => world.rooms[state.room].exits[d]?.obstacle?.needs === id)) {
         say(result.events.at(-1)?.text ?? "");
@@ -667,6 +684,64 @@ export function items(options: {
 
   // ---- Each frame -----------------------------------------------------------
 
+  // Catching your eye (stuck): how long since you last took something or
+  // overcame an obstacle; the objects in sight; and those hopping (from
+  // where, and how long since they started).
+  let stuck = 0;
+  let then = performance.now();
+  const inSight = new Set<ItemId>();
+  const hopping = new Map<ItemId, { model: Object3D; y: number; t: number }>();
+  const seen = new Vector3();
+
+  function nudge() {
+    const now = performance.now();
+    const dt = Math.min(0.1, (now - then) / 1000); // (not counting while paused)
+    then = now;
+    stuck += dt;
+    for (const [id, hop] of hopping) {
+      const t = (hop.t += dt);
+      // (Taken, or dropped somewhere new: it's not hopping any more.)
+      if (lying.get(id)?.model !== hop.model) {
+        hopping.delete(id);
+        continue;
+      }
+      const up = HOPS.find(([from, long]) => t >= from && t < from + long);
+      hop.model.position.y =
+        hop.y + (up && !options.reducedMotion ? up[2] * Math.sin((Math.PI * (t - up[0])) / up[1]) : 0);
+      if (t >= GLOWS + AGAIN) hopping.delete(id);
+    }
+    if (stuck < STUCK) {
+      inSight.clear();
+      return;
+    }
+    // Each you've never held, coming into sight: it hops.
+    for (const [id, thing] of lying) {
+      const { x, z } = thing.model.position;
+      const y = hopping.get(id)?.y ?? thing.model.position.y;
+      seen.set(x, y, z).project(player.camera);
+      const sees =
+        !state.found?.includes(id) &&
+        hallOf(thing) === player.under?.hall &&
+        Math.hypot(x - eye.x, y - eye.y, z - eye.z) <= NOTICE &&
+        Math.abs(seen.x) < 0.9 &&
+        Math.abs(seen.y) < 0.9 &&
+        seen.z < 1 &&
+        player.between(eye.x, eye.z, x, z, Boolean(player.under));
+      if (sees && !inSight.has(id) && !hopping.has(id)) hopping.set(id, { model: thing.model, y, t: 0 });
+      if (sees) inSight.add(id);
+      else inSight.delete(id);
+    }
+  }
+
+  /** The nearest object hopping (still glowing), if any. */
+  function hopper() {
+    let best: Object3D | undefined;
+    for (const { model, t } of hopping.values()) {
+      if (t < GLOWS && (!best || model.position.distanceTo(eye) < best.position.distanceTo(eye))) best = model;
+    }
+    return best;
+  }
+
   const ray = new Ray();
   const mine = new Ray();
   const roomy = new Box3();
@@ -692,6 +767,10 @@ export function items(options: {
     lyingAt: (id) => lying.get(id)?.model,
     lying: () => [...lying.values()].map((thing) => thing.model),
     restart(game) {
+      for (const { model, y } of hopping.values()) model.position.y = y;
+      hopping.clear();
+      inSight.clear();
+      stuck = 0;
       state = game.state;
       layOut(game.three);
       glow.show(undefined);
@@ -700,6 +779,7 @@ export function items(options: {
     go(direction) {
       const result = act(world, state, { type: "go", direction });
       const went = result.state.room !== state.room;
+      if (went && world.rooms[state.room].exits[direction]?.obstacle) stuck = 0; // (an obstacle overcome)
       state = result.state;
       if (went) settle();
       draw();
@@ -754,7 +834,8 @@ export function items(options: {
           aimed = id;
         }
       }
-      glow.show(aimed ? lying.get(aimed)?.model : undefined);
+      nudge();
+      glow.show(aimed ? lying.get(aimed)?.model : hopper());
       glow.update(performance.now() / 1000);
       aim.classList.toggle("on", Boolean(aimed));
       prompt.classList.toggle("shown", Boolean(aimed));
