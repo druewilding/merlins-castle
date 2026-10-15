@@ -54,6 +54,8 @@ DEATHS = {k: at(v) for k, v in layout["deaths"].items() if k != "_"}
 
 X0, X1, Y0, Y1 = (round(v * K) for v in (-200, 200, -290, 260))  # (north, past the mountain, for its far side)
 STEP = 2.0
+INTO_THE_DARK = 8  # metres of tunnel past a dead end's last step, fading to black
+BLACK = (0.0, 0.0, 0.0, 1.0)
 
 GRASS = c.linear("#7c9f3a")  # (as the grass on it looks, from a little way off: plants.ts)
 BUTTERCUPS = c.linear("#a8a83a")  # and where the yellow flowers grow thick
@@ -2383,21 +2385,25 @@ for way in WAYS.values():
                 on = rows[min(max(k + 1 + step * 4, 0), len(rows) - 1)]  # 2 m on
                 if on[2] < hall.floor - 0.5:
                     DROPS.append((hall, edge_left[k + 1], edge_right[k + 1]))
-    # A dead end, deep under the land (off into the mist): a metre more of
-    # tunnel, and earth across the end of it.
+    # A dead end, deep under the land (off into the mist): more tunnel,
+    # darker and darker as it goes on, into black (so it doesn't look like
+    # an end), and black across the end of it.
     for row, edges, outward in ((rows[0], (edge_left[0], edge_right[0]), -1), (rows[-1], (edge_left[-1], edge_right[-1]), 1)):
         x, y, f, nx_, ny_, roofed = row
         if way.indoor or not roofed or in_a_hall(x, y, f, 1.3):
             continue
         ox, oy = ny_ * outward, -nx_ * outward
         (lx_, ly_), (rx_, ry_) = edges
-        el, er = (lx_ + ox, ly_ + oy), (rx_ + ox, ry_ + oy)
-        quad(tunnel, [(lx_, ly_, f), (rx_, ry_, f), (*er, f), (*el, f)], floor_colour)
-        quad(tunnel, [(lx_, ly_, f + TUNNEL_TALL), (rx_, ry_, f + TUNNEL_TALL), (*er, f + TUNNEL_TALL), (*el, f + TUNNEL_TALL)],
-             roof_colour)
-        for p, q in (((lx_, ly_), el), ((rx_, ry_), er)):
-            quad(tunnel, [(*p, f), (*q, f), (*q, f + TUNNEL_TALL), (*p, f + TUNNEL_TALL)], wall_colour)
-        quad(tunnel, [(*el, f), (*er, f), (*er, f + TUNNEL_TALL), (*el, f + TUNNEL_TALL)], LAYERS[3])
+        for k in range(INTO_THE_DARK):
+            dark = ((k + 1) / INTO_THE_DARK) ** 0.6
+            el, er = (lx_ + ox, ly_ + oy), (rx_ + ox, ry_ + oy)
+            quad(tunnel, [(lx_, ly_, f), (rx_, ry_, f), (*er, f), (*el, f)], c.mix(floor_colour, BLACK, dark))
+            quad(tunnel, [(lx_, ly_, f + TUNNEL_TALL), (rx_, ry_, f + TUNNEL_TALL), (*er, f + TUNNEL_TALL),
+                          (*el, f + TUNNEL_TALL)], c.mix(roof_colour, BLACK, dark))
+            for p, q in (((lx_, ly_), el), ((rx_, ry_), er)):
+                quad(tunnel, [(*p, f), (*q, f), (*q, f + TUNNEL_TALL), (*p, f + TUNNEL_TALL)], c.mix(wall_colour, BLACK, dark))
+            (lx_, ly_), (rx_, ry_) = el, er
+        quad(tunnel, [(lx_, ly_, f), (rx_, ry_, f), (rx_, ry_, f + TUNNEL_TALL), (lx_, ly_, f + TUNNEL_TALL)], BLACK)
 # A stone threshold at every mouth onto the land, over the ragged edge of the
 # hole in the ground (which comes in whole squares, so it reaches a little
 # past where the ramp begins, and shows the sky through the gap).
