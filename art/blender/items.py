@@ -2,10 +2,11 @@
 # data/world.json. Each lies as it would on the ground, its middle at the
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
-# The ladder, the plank, the key, the axe, the apple and the emerald so far;
-# the rest are to come (PLAN-V3.md).
+# The ladder, the plank, the key, the axe, the apple, the emerald and the
+# broom so far; the rest are to come (PLAN-V3.md).
 
 import math
+import random
 import sys
 from pathlib import Path
 
@@ -416,6 +417,225 @@ for ring_, (lo, hi) in enumerate(zip(rings, rings[1:])):
 emerald.add(rings[0][::-1], [tuple(range(8))], [c.linear("#0b4a24")] * 8)
 emerald.add(rings[-1], [tuple(range(8))], [c.linear("#34c26c")] * 8)
 outward(emerald.build("emerald", smooth=False))
+
+# The broom: as in its picture, a witch's besom. A long, knobbly handle,
+# bent a little, swelling to a knob at its end, and a bundle of twigs bound
+# round it with rope (their tops sticking out above it), spreading out and
+# a little flattened, as they would be from sweeping. 1.6 m long, lying on
+# its knob and its twigs.
+BROOM_WOOD = c.linear("#d29a52")
+BROOM_WOOD_DARK = c.linear("#7a4f27")
+BROOM_KNOT = c.linear("#3e2614")
+MOSS = c.linear("#8c8a48")
+TWIG = c.linear("#c8873e")
+TWIG_DARK = c.linear("#4f321a")
+ROPE = c.linear("#d9a650")
+ROPE_DARK = c.linear("#8f6428")
+broom_rng = random.Random(7)
+
+
+def round_tube(builder, path, radii, colour, sides=6):
+    """A round bar along any path (mostly along y, or mostly round it),
+    `radii` at each point, each point coloured by colour(p, k, a): how far
+    along it (0 to 1) and round it."""
+    n = len(path)
+    mean = (Vector(path[-1]) - Vector(path[0])).normalized()
+    ref = Vector((0, 0, 1)) if abs(mean.y) > 0.7 else Vector((0, 1, 0))
+    verts, colours = [], []
+    for k, p in enumerate(path):
+        tangent = (Vector(path[min(k + 1, n - 1)]) - Vector(path[max(k - 1, 0)])).normalized()
+        across = tangent.cross(ref).normalized()
+        up = across.cross(tangent).normalized()
+        for j in range(sides):
+            a = 2 * math.pi * j / sides
+            v = Vector(p) + (across * math.cos(a) + up * math.sin(a)) * radii[k]
+            verts.append(tuple(v))
+            colours.append(colour(v, k / (n - 1), a))
+    faces = [(k * sides + j, k * sides + (j + 1) % sides, (k + 1) * sides + (j + 1) % sides, (k + 1) * sides + j)
+             for k in range(n - 1) for j in range(sides)]
+    faces += [tuple(range(sides))[::-1], tuple((n - 1) * sides + j for j in range(sides))]
+    builder.add(verts, faces, colours)
+
+
+broom = c.Builder()
+
+# The handle: s is how far along it from its knob (0), the twigs bound from
+# BIND to BOUND. It bends gently this way and that, and has knots: bumps on
+# one side, dark at their middles.
+BIND, BOUND, TOP, TIPS = 1.06, 1.16, 0.95, 1.62  # and the twigs' tops, and their tips
+KNOTS_ALONG = [(0.12, 0.6, 0.016), (0.27, 3.5, 0.012), (0.38, 1.9, 0.015), (0.52, 4.6, 0.011),
+               (0.63, 0.2, 0.016), (0.77, 2.7, 0.013), (0.88, 5.4, 0.012)]  # s, round it, how big
+
+
+def handle_centre(s):
+    return Vector((0.055 * math.sin(s * 2.6 + 0.4) + 0.015 * math.sin(s * 8.3), -s,
+                   0.018 * math.sin(s * 3.3 + 1.1)))
+
+
+def handle_radius(s, a):
+    if s < 0:  # the knob's rounded end
+        r = 0.04 * math.sqrt(max(0.0, 1 - (s / 0.04) ** 2))
+    else:
+        r = 0.024 + 0.004 * s + 0.016 * math.exp(-((s / 0.06) ** 2))
+        r *= 1 + 0.08 * noise.noise(Vector((s * 9, math.cos(a), math.sin(a))))
+    for ks, ka, size in KNOTS_ALONG:
+        r += size * math.exp(-(((s - ks) / 0.025) ** 2)) * max(0.0, math.cos(a - ka)) ** 3
+    return r
+
+
+def handle_colour(p, s, a):
+    v = Vector(p)
+    t = 0.5 + noise.noise(Vector((v.x * 50, v.y * 4, v.z * 50))) * 0.8
+    colour = c.mix(BROOM_WOOD_DARK, BROOM_WOOD, t)
+    if noise.noise(v * 8 + Vector((4, 1, 7))) > 0.35 and s < 0.7:
+        colour = c.mix(colour, MOSS, 0.45)  # a little moss, up by the knob
+    for ks, ka, size in KNOTS_ALONG:
+        d = math.hypot((s - ks) / 0.02, (math.cos(a - ka) - 1) * 4)
+        colour = c.mix(colour, BROOM_KNOT, max(0.0, 1 - d) * 0.9)  # its eye
+        colour = c.mix(colour, BROOM_WOOD_DARK, max(0.0, 1 - abs(d - 1.4)) * 0.5)  # and a dark rim round it
+    return c.vary(colour, 0.08, v * 20)
+
+
+H_SIDES = 10
+ss = [-0.04 * math.cos(math.pi / 2 * k / 4) for k in range(4)]  # round the knob
+ss += [k / 100 for k in range(0, 126)]
+verts, colours = [], []
+for s in ss:
+    centre = handle_centre(max(s, 0))
+    for j in range(H_SIDES):
+        a = 2 * math.pi * j / H_SIDES
+        p = centre + Vector((math.cos(a), 0, math.sin(a))) * handle_radius(s, a) + Vector((0, -min(s, 0), 0))
+        verts.append(tuple(p))
+        colours.append(handle_colour(p, s, a))
+faces = [(k * H_SIDES + j, k * H_SIDES + (j + 1) % H_SIDES, (k + 1) * H_SIDES + (j + 1) % H_SIDES,
+          (k + 1) * H_SIDES + j) for k in range(len(ss) - 1) for j in range(H_SIDES)]
+faces += [tuple(range(H_SIDES)), tuple((len(ss) - 1) * H_SIDES + j for j in range(H_SIDES))]
+broom.add(verts, faces, colours)
+
+# The twigs: each from its top above the rope, squeezed in under it, then
+# spreading (the outer ones most), wandering a little as twigs do, a little
+# flattened (FLAT, up and down) the further they go. The middle ones longest.
+FLAT = 0.6
+TWIGS = 260
+
+
+def bundle_at(s, a, f, top_r, end_r, tip):
+    """Where a twig is at s: round the handle (a), f of the way out."""
+    bound_r = 0.03 + 0.036 * f
+    if s < BIND:
+        r = top_r + (bound_r - top_r) * (s - TOP) / (BIND - TOP)
+    elif s < BOUND:
+        r = bound_r
+    else:
+        r = bound_r + (end_r - bound_r) * ((s - BOUND) / (tip - BOUND)) ** 0.85
+    flat = 1 - (1 - FLAT) * max(0.0, (s - BOUND) / (tip - BOUND))
+    centre = handle_centre(min(s, 1.25))
+    return centre + Vector((math.cos(a) * r, 0, math.sin(a) * r * flat)) + Vector((0, -(s - min(s, 1.25)), 0))
+
+
+for i in range(TWIGS):
+    a = broom_rng.uniform(0, 2 * math.pi)
+    twist = broom_rng.uniform(-0.6, 0.6)  # (so they cross each other)
+    f = math.sqrt(broom_rng.random())
+    top = TOP + broom_rng.uniform(-0.03, 0.07)
+    tip = TIPS - 0.1 * f ** 2 + broom_rng.uniform(-0.12, 0.05)
+    top_r = 0.035 + 0.04 * f
+    end_r = (0.05 + 0.16 * f) * broom_rng.uniform(0.85, 1.25)
+    thick = broom_rng.uniform(0.003, 0.006)
+    shade = broom_rng.random()
+    seed = Vector((i * 1.7, i * 0.3, 5.0))
+    steps = 10
+    path, radii = [], []
+    for k in range(steps + 1):
+        s = top + (tip - top) * k / steps
+        u = max(0.0, (s - BOUND) / (tip - BOUND))
+        wander = Vector((noise.noise(seed + Vector((s * 6, 0, 0))), 0, noise.noise(seed + Vector((0, s * 6, 3)))))
+        p = bundle_at(s, a + twist * u, f, top_r, end_r, tip) + wander * 0.035 * u
+        path.append(tuple(p))
+        radii.append(thick * (1 - 0.65 * k / steps))
+
+    def twig_colour(p, along, around, shade=shade, seed=seed):
+        colour = c.mix(TWIG_DARK, TWIG, 0.15 + 0.75 * shade + 0.15 * along)
+        return c.vary(colour, 0.12, seed + Vector(p) * 30)
+
+    round_tube(broom, path, radii, twig_colour, sides=4)
+    # Some fork, a twiglet splaying off, outwards.
+    if f > 0.4 and broom_rng.random() < 0.45:
+        k = broom_rng.randint(5, 7)
+        start = Vector(path[k])
+        centre = handle_centre(1.25) + Vector((0, start.y - handle_centre(1.25).y, 0))
+        out_dir = Vector((start.x - centre.x, 0, (start.z - centre.z) * 0.6)).normalized()
+        long_ = broom_rng.uniform(0.1, 0.25)
+        ts = (0, 0.33, 0.66, 1)
+        branch = [tuple(start + Vector((0, -long_ * t, 0)) + out_dir * long_ * 0.35 * t ** 0.8) for t in ts]
+        round_tube(broom, branch, [radii[k] * 0.8 * (1 - 0.6 * t) for t in ts], twig_colour, sides=4)
+
+# And inside them, so you don't see through: a dark core, as if packed with
+# more twigs (streaked along).
+C_SIDES = 12
+cs = [TOP + 0.03 + (TIPS - 0.12 - TOP - 0.03) * k / 20 for k in range(21)]
+verts, colours = [], []
+for s in cs:
+    for j in range(C_SIDES):
+        a = 2 * math.pi * j / C_SIDES
+        u = max(0.0, min(1.0, (s - TOP - 0.03) / (TIPS - 0.12 - TOP - 0.03)))
+        p = bundle_at(s, a, 0.6, 0.05, 0.13, TIPS - 0.12)
+        # (Pulled in a little round its middle, and tapering at its end.)
+        squeeze = 0.2 * math.sin(math.pi * u) ** 4 + 0.75 * max(0.0, (u - 0.7) / 0.3) ** 1.5
+        p = p.lerp(handle_centre(min(s, 1.25)) + Vector((0, -(s - min(s, 1.25)), 0)), squeeze)
+        verts.append(tuple(p))
+        streak = noise.noise(Vector((math.cos(a) * 6, s * 1.5, math.sin(a) * 6)))
+        colours.append(c.mix(TWIG_DARK, TWIG, 0.2 + 0.25 * streak))
+faces = [(k * C_SIDES + j, k * C_SIDES + (j + 1) % C_SIDES, (k + 1) * C_SIDES + (j + 1) % C_SIDES,
+          (k + 1) * C_SIDES + j) for k in range(len(cs) - 1) for j in range(C_SIDES)]
+faces += [tuple(range(C_SIDES)), tuple((len(cs) - 1) * C_SIDES + j for j in range(C_SIDES))]
+broom.add(verts, faces, colours)
+
+# The rope: wound round and round the twigs, pale straw, its strands twisted.
+TURNS, ROPE_R = 5, 0.0095
+WOUND = 0.066 + 0.006 + ROPE_R  # round the twigs, and their thickness
+coil = []
+for k in range(TURNS * 16 + 1):
+    t = k / (TURNS * 16)
+    a = 2 * math.pi * TURNS * t
+    s = BIND + ROPE_R + (BOUND - BIND - 2 * ROPE_R) * t
+    coil.append(tuple(handle_centre(s) + Vector((math.cos(a) * WOUND, 0, math.sin(a) * WOUND))))
+
+
+def rope_colour(p, along, around):
+    strand = math.sin(along * TURNS * 16 * 1.3 + around * 3)
+    return c.vary(c.mix(ROPE_DARK, ROPE, 0.55 + 0.45 * strand), 0.06, Vector(p) * 40)
+
+
+round_tube(broom, coil, [ROPE_R] * len(coil), rope_colour, sides=7)
+
+# Lying on the ground: tilted so it rests on its knob and its twigs, its
+# middle at the origin.
+broom_object = broom.build("broom", smooth=True)
+mesh = broom_object.data
+points = [v.co.copy() for v in mesh.vertices]
+y_hi, y_lo = max(p.y for p in points), min(p.y for p in points)
+knob_end = [p for p in points if p.y > y_hi - 0.08]
+twig_end = [p for p in points if p.y < y_lo + 0.35]
+
+
+def lowest(group, angle):
+    return min(p.y * math.sin(angle) + p.z * math.cos(angle) for p in group)
+
+
+lo_angle, hi_angle = -0.4, 0.4
+for _ in range(40):
+    mid = (lo_angle + hi_angle) / 2
+    if lowest(knob_end, mid) > lowest(twig_end, mid):
+        hi_angle = mid
+    else:
+        lo_angle = mid
+mesh.transform(Matrix.Rotation(mid, 4, "X"))
+xs_ = [v.co.x for v in mesh.vertices]
+ys_ = [v.co.y for v in mesh.vertices]
+low = min(v.co.z for v in mesh.vertices)
+mesh.transform(Matrix.Translation((-(min(xs_) + max(xs_)) / 2, -(min(ys_) + max(ys_)) / 2, -low)))
+outward(broom_object)
 
 if out:
     c.export(out)

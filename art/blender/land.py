@@ -71,7 +71,6 @@ WATER = c.linear("#3d7fa8")
 GREY = c.linear("#b9b4a8")
 ROOF = c.linear("#6d6a78")
 GOLD = c.linear("#e8b84a")
-LEAVES = c.linear("#c46f2c")
 
 
 def smooth(t):
@@ -2017,9 +2016,11 @@ for k in range(12):
     log(built, (*ring_at(r, a0 - 0.05), hut_roof(r) + 0.05), (*ring_at(r, a1 + 0.05), hut_roof(r) + 0.05), 0.07, HUT_DARK)
 solid_circle(hx, hy, HUT_R)
 
-# The pile of leaves filling the mouth of the dragon's cave, just inside.
+# The pile of leaves filling the mouth of the dragon's cave, just inside (the
+# game heaps them up there, and sweeps them aside, leaves.ts): and where they
+# go, swept, in heaps either side of the mouth, outside.
 lx, ly = DRAGON_LIP[0] + 3, DRAGON_LIP[1]
-built.blob((lx, ly, WAYS["dragon-mouth"].nearest(lx, ly)[1] + 0.2), 2.6, LEAVES, squash=0.55, lumpy=0.35, seed=2)
+LEAF_HEAPS = [(DRAGON_LIP[0] - 1.2, DRAGON_LIP[1] + side * (TUNNEL_HALF + 1.4)) for side in (1, -1)]
 
 # The tunnels' mouths are obstacles on the land, 3 m down the ramp (where the
 # leaves are), reaching out over the top so you're stopped (and told why)
@@ -3636,6 +3637,8 @@ if out:
         "stone": {"r": STONE_R, **{k: [round(x, 2), round(-y, 2), round(z, 2)] for k, (x, y, z) in STONE_SPOTS.items()}},
         # The chest in the tower, where the emerald starts: its middle [x, z], and its tray.
         "chest": [round(CHEST["x"], 2), round(-CHEST["y"], 2), round(CHEST["floor"], 2)],
+        # The leaves in the dragon's mouth: where the pile is [x, z] (on the way's floor), and the heaps they're swept into.
+        "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
         # The fire in the charcoal burner's hut, its middle [x, z] and floor, and the smoke hole over it: how high, and how wide.
         "hut": {"fire": [round(HUT_FIRE["x"], 2), round(-HUT_FIRE["y"], 2), round(HUT_FIRE["floor"], 2)],
                 "hole": round(HUT_FIRE["hole"], 2), "r": HUT_FIRE["r"]},

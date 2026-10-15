@@ -59,6 +59,7 @@ import { haze } from "./haze";
 import { items as setUpItems, onPaths } from "./items";
 import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
+import { Leaves } from "./leaves";
 import { Lost } from "./lost";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
@@ -384,6 +385,35 @@ const shut = shapeOf.get("tower south");
 // The deep river, where it narrows, which the plank crosses (plank.ts), and
 // which (without it) sweeps you away from the north bank (swept.ts).
 const crossing = shapeOf.get("deep-river south");
+// The leaves filling the dragon's mouth, which the broom sweeps aside into
+// heaps (leaves.ts): lying on the way's floor in the mouth, and the ground
+// outside it.
+const heaped = shapeOf.get("cave-entrance east");
+const [[lipX, lipZ, lipFloor], [inX, inZ, inFloor]] = land.ways["dragon-mouth"].points;
+const pile = new Leaves(
+  scene,
+  land.leaves.at as [number, number],
+  land.leaves.heaps as [number, number][],
+  things.scene.getObjectByName("broom")!,
+  (x, z) => {
+    const t = ((x - lipX) * (inX - lipX) + (z - lipZ) * (inZ - lipZ)) / ((inX - lipX) ** 2 + (inZ - lipZ) ** 2);
+    return t < 0 ? drawn(x, z) : lipFloor + (inFloor - lipFloor) * Math.min(1, t);
+  },
+  player.camera,
+  reducedMotion,
+  () => ownSounds.play("sweep", { rate: 0.9 + Math.random() * 0.2 })
+);
+// They lie as the way is for you: swept while the broom's in use there (and
+// still, coming out of the mouth, till you're out); and gone, from inside
+// (in the dragon's cave: nothing stops you coming out). Back otherwise.
+const inside = heaped && exitOf(heaped.names[0])?.to;
+function heap(now: boolean) {
+  if (!heaped) return;
+  const broomed = opened.has(heaped);
+  const here = items.state.room;
+  const swept = broomed || here === inside || (here === heaped.names[0].split(" ")[0] && pile.inMouth(player.position));
+  pile.sweep(swept, now, broomed);
+}
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 // A way that kills you even with the object (the balcony) has no far side
@@ -546,7 +576,8 @@ let instantly = true; // (loading, what's in use is as it was: no gate swinging 
 function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
-  // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees, the snake, the river.)
+  // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees, the snake, the river,
+  // the leaves.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
     const shape = shapeOf.get(`${here} ${direction}`);
@@ -558,7 +589,8 @@ function inUse() {
         shape === dense ||
         shape === guarded ||
         shape === shut ||
-        shape === crossing)
+        shape === crossing ||
+        shape === heaped)
       ? [`${here} ${direction}`]
       : [];
   });
@@ -572,6 +604,7 @@ function inUse() {
     if (instantly) gate.open = gate.wants;
   }
   if (dense) felling.fell(opened.has(dense), instantly);
+  if (heaped) heap(instantly);
   // The apple thrown to the snake, from your hand (or, loading, it's gone,
   // or there).
   if (guarded && opened.has(guarded)) {
@@ -1082,6 +1115,8 @@ renderer.setAnimationLoop((time) => {
     else if (room === "mountain") parting = true;
   }
   felling.update(dt, player.position, parting);
+  heap(false);
+  pile.update(dt);
   // (The snake's back by the door once the apple's no longer in use there,
   // but not while you're in the tower: you'd come out through it.)
   snake.update(dt, player.camera.position, player.camera, room !== "tower" && !(guarded && opened.has(guarded)));
