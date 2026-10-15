@@ -3,7 +3,18 @@
 // them, spreading and thinning as they go. (With motion reduced, they hang
 // still in the air.)
 
-import { CanvasTexture, Color, Group, type Scene, Sprite, SpriteMaterial, type Texture, Vector3 } from "three";
+import {
+  Color,
+  DataTexture,
+  Group,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  type Scene,
+  Sprite,
+  SpriteMaterial,
+  type Texture,
+  Vector3,
+} from "three";
 
 /** The fire (land.json): its middle [x, z] and floor, and the smoke hole over it, how high and how wide. */
 export interface Hearth {
@@ -108,22 +119,33 @@ export class Smoke {
   }
 }
 
-/** A puff of smoke: soft, and a little uneven. */
+/**
+ * A puff of smoke: soft, and a little uneven. (Worked out here, white all
+ * over and only its alpha fading, rather than drawn on a canvas: a canvas's
+ * nearly clear edges come out speckled with colour.)
+ */
 function puff(): Texture {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 64;
-  const context = canvas.getContext("2d")!;
-  for (const [x, y, size, alpha] of [
-    [32, 32, 30, 0.55],
-    [24, 28, 18, 0.35],
-    [40, 36, 16, 0.35],
-    [34, 22, 14, 0.3],
-  ]) {
-    const glow = context.createRadialGradient(x, y, 0, x, y, size);
-    glow.addColorStop(0, `rgba(255,255,255,${alpha})`);
-    glow.addColorStop(1, "rgba(255,255,255,0)");
-    context.fillStyle = glow;
-    context.fillRect(0, 0, 64, 64);
+  const SIZE = 64;
+  const data = new Uint8Array(SIZE * SIZE * 4).fill(255);
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      // (Blobs, one over another: what shows through all of them.)
+      let clear = 1;
+      for (const [bx, by, size, alpha] of [
+        [32, 32, 30, 0.55],
+        [24, 28, 18, 0.35],
+        [40, 36, 16, 0.35],
+        [34, 22, 14, 0.3],
+      ]) {
+        clear *= 1 - alpha * Math.max(0, 1 - Math.hypot(x + 0.5 - bx, y + 0.5 - by) / size);
+      }
+      data[(y * SIZE + x) * 4 + 3] = Math.round((1 - clear) * 255);
+    }
   }
-  return new CanvasTexture(canvas);
+  const texture = new DataTexture(data, SIZE, SIZE);
+  texture.magFilter = LinearFilter;
+  texture.minFilter = LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
 }
