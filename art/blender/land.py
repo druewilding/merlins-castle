@@ -295,6 +295,10 @@ DRAGON_LIP = (DC[0] - 22, DC[1])
 paths += [[P["old-wall"], WEST_LIP], [P["cave-entrance"], EAST_LIP], [P["cave-entrance"], DRAGON_LIP]]
 # And to the tower's and the hut's doors.
 paths += [[P["mossy-steps"], TOWER_LIP], [P["forest-crossroads"], HUT_LIP]]
+# And down to the water's edge at the narrows, from both sides: trodden, as if
+# others had crossed there. (It goes on into the river: stopped where the
+# water is, at the edge of its bank.)
+paths += [[P["deep-river"], (NARROWS_X, -60 * K)], [P["river-south-bank"], (NARROWS_X, -60 * K)]]
 
 path_lines = Lines()
 for line in paths:
