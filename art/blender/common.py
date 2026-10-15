@@ -166,7 +166,7 @@ def collider(name, x, y, radius):
     return empty
 
 
-def export(path):
+def export(path, **options):
     # Meshopt compression shrinks the file several times over, and three.js
     # decodes it with no extra files to host. Blender keeps only 12 bits of
     # each point's position, shared by its x, y and z: 150 m out, that rounds
@@ -183,6 +183,7 @@ def export(path):
         export_extras=True,
         export_vertex_color="ACTIVE",
         export_meshopt_compression_enable=True,
+        **options,
     )
 
 

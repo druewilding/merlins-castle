@@ -61,10 +61,12 @@ import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
 import { Leaves } from "./leaves";
 import { Lost } from "./lost";
+import { Merlin } from "./merlin";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
+import merlinModel from "./models/merlin.glb?url";
 import snakeModel from "./models/snake.glb?url";
 import { Plank } from "./plank";
 import { type Growth, Plants } from "./plants";
@@ -167,11 +169,12 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky] = await Promise.all([
+const [model, file, things, snaky, wizard] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
   loader.loadAsync(snakeModel),
+  loader.loadAsync(merlinModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -476,6 +479,17 @@ for (const { x, z } of DEATHS) {
 
 // A place's name, from its id (for now; PLAN-V3.md).
 const name = (id: string) => id.replace(/-/g, " ").replace(/^./, (letter) => letter.toUpperCase());
+
+// Merlin, for now strolling about the grassy bank (merlin.ts): anywhere you
+// could walk, clear of the trees.
+const merlin = new Merlin(
+  scene,
+  wizard.scene,
+  wizard.animations,
+  PLACES.get("grassy-bank")!,
+  drawn,
+  (x, z) => walkable(x, z) && circles.every((c) => Math.hypot(x - c.x, z - c.z) > c.r + 0.4)
+);
 
 // A game loaded, or carried on from another version (or another language).
 const handoff = takeHandoff();
@@ -815,7 +829,7 @@ const was = player.position.clone(); // (and just where)
 const debugMode = new URLSearchParams(location.search).has("debug");
 if (debugMode) {
   Object.assign(window, {
-    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, restart, drawn },
+    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, merlin, restart, drawn },
   });
   const { debug } = await import("./debug");
   debug(
@@ -1120,6 +1134,7 @@ renderer.setAnimationLoop((time) => {
   // (The snake's back by the door once the apple's no longer in use there,
   // but not while you're in the tower: you'd come out through it.)
   snake.update(dt, player.camera.position, player.camera, room !== "tower" && !(guarded && opened.has(guarded)));
+  merlin.update(dt, player.position);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)
