@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.1](https://github.com/druewilding/merlins-castle/compare/v2.7.0...v2.7.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* Don't let the player take things through a wall ([#74](https://github.com/druewilding/merlins-castle/issues/74)) ([1f74e14](https://github.com/druewilding/merlins-castle/commit/1f74e14e8420eef86a413d8f58f2410033fc5869))
+
 ## [2.7.0](https://github.com/druewilding/merlins-castle/compare/v2.6.0...v2.7.0) (2026-10-14)
 
 
