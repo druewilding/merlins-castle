@@ -3,9 +3,9 @@
 // pile (a witch's broom), sweeps it in quick strokes, side to side, the leaves
 // flying up and out into heaps either side of the mouth (as in the picture of
 // it swept: a few left lying on the path), and flies back into your hand.
-// When the broom's no longer in use there (you've gone on, as in the
-// original), the wind blows them all back. With motion reduced, they're
-// swept (or back) at once.
+// Otherwise the wind blows them, back into the mouth (or away out of it): they
+// lie as the way is for you, wherever you are (main.ts). With motion reduced,
+// they're swept (or back) at once.
 
 import {
   Box3,
@@ -72,6 +72,7 @@ export class Leaves {
   private across: Vector3;
   private broom = new Group(); // its twigs' tip at its middle, its handle up along y
   private swept = false;
+  private broomed = false; // (swept by the broom, not blown)
   private time = 0; // since it was swept, or the wind got up
   private still = false; // (and they've settled)
   private stroke = -1; // the stroke the broom's on (for its swish)
@@ -186,10 +187,11 @@ export class Leaves {
     this.draw();
   }
 
-  /** Swept (the broom in use there), or blown back (or `now`, as they'd end up). */
-  sweep(swept: boolean, now = false) {
+  /** Swept (by the broom, or else blown away), or blown back (or `now`, as they'd end up). */
+  sweep(swept: boolean, now = false, broom = false) {
     if (swept === this.swept) return;
     this.swept = swept;
+    this.broomed = swept && broom;
     this.time = now || this.reducedMotion ? 1000 : 0;
     this.still = false;
     this.stroke = -1;
@@ -202,15 +204,21 @@ export class Leaves {
     this.time += dt;
     let moving = false;
     for (const leaf of this.leaves) {
-      const t = this.swept ? (this.time - leaf.launch) / leaf.flight : (this.time - leaf.blown) / (BLOWN * 0.5);
+      const t = this.broomed ? (this.time - leaf.launch) / leaf.flight : (this.time - leaf.blown) / (BLOWN * 0.5);
       const towards = this.swept ? 1 : 0;
       leaf.at = leaf.from + (towards - leaf.from) * Math.min(1, Math.max(0, t));
       if (t < 1) moving = true;
     }
-    const sweeping = this.swept && this.time < OUT + STROKES * STROKE + BACK;
+    const sweeping = this.broomed && this.time < OUT + STROKES * STROKE + BACK;
     this.fly(sweeping);
     this.still = !moving && !sweeping;
     this.draw();
+  }
+
+  /** Whether you're in the mouth, past where the pile's front would be (coming out of it). */
+  inMouth(p: Vector3) {
+    const d = p.clone().sub(this.centre);
+    return d.dot(this.out) < PILE.along + 1 && Math.abs(d.dot(this.across)) < PILE.across + 1;
   }
 
   // How big the pile is (0, swept away, to 1), and each heap.

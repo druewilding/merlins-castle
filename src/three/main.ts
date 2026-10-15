@@ -403,6 +403,17 @@ const pile = new Leaves(
   reducedMotion,
   () => ownSounds.play("sweep", { rate: 0.9 + Math.random() * 0.2 })
 );
+// They lie as the way is for you: swept while the broom's in use there (and
+// still, coming out of the mouth, till you're out); and gone, from inside
+// (in the dragon's cave: nothing stops you coming out). Back otherwise.
+const inside = heaped && exitOf(heaped.names[0])?.to;
+function heap(now: boolean) {
+  if (!heaped) return;
+  const broomed = opened.has(heaped);
+  const here = items.state.room;
+  const swept = broomed || here === inside || (here === heaped.names[0].split(" ")[0] && pile.inMouth(player.position));
+  pile.sweep(swept, now, broomed);
+}
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 // A way that kills you even with the object (the balcony) has no far side
@@ -593,7 +604,7 @@ function inUse() {
     if (instantly) gate.open = gate.wants;
   }
   if (dense) felling.fell(opened.has(dense), instantly);
-  if (heaped) pile.sweep(opened.has(heaped), instantly);
+  if (heaped) heap(instantly);
   // The apple thrown to the snake, from your hand (or, loading, it's gone,
   // or there).
   if (guarded && opened.has(guarded)) {
@@ -1104,6 +1115,7 @@ renderer.setAnimationLoop((time) => {
     else if (room === "mountain") parting = true;
   }
   felling.update(dt, player.position, parting);
+  heap(false);
   pile.update(dt);
   // (The snake's back by the door once the apple's no longer in use there,
   // but not while you're in the tower: you'd come out through it.)
