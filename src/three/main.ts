@@ -70,6 +70,7 @@ import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Wa
 import { River } from "./river";
 import { Shafts, speck, type Window } from "./shafts";
 import { sky } from "./sky";
+import { Smoke } from "./smoke";
 import { Snake } from "./snake";
 import OWN_SOUNDS from "./sounds.json";
 import { Swept } from "./swept";
@@ -207,9 +208,15 @@ if (emerald instanceof Mesh) {
 }
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
-  node.castShadow = !["paths", "water"].includes(node.name);
-  node.receiveShadow = node.name !== "water";
+  node.castShadow = !["paths", "water", "embers"].includes(node.name);
+  node.receiveShadow = !["water", "embers"].includes(node.name);
 });
+// The charcoal burner's fire: its embers glowing (not lit: they shine, even
+// in the hut's gloom, flickering with its light: lightFor), and its smoke.
+const embers = model.scene.getObjectByName("embers");
+const emberLook = new MeshBasicMaterial({ vertexColors: true });
+if (embers instanceof Mesh) embers.material = emberLook;
+const smoke = new Smoke(scene, land.hut, reducedMotion);
 scene.add(model.scene);
 const spots = land.trees as TreeSpots;
 const trees = new Trees(scene, model.scene, spots);
@@ -986,6 +993,7 @@ function lightFor(depth: number, time: number, dt: number) {
   const flicker = reducedMotion ? 1 : 0.92 + 0.05 * Math.sin(time / 90) + 0.03 * Math.sin(time / 37);
   lamp.intensity = 3.5 * Math.max(under, indoors * 0.4) * flicker * (1 - gloom);
   lamp.position.set(player.position.x, player.position.y + 1.4, player.position.z);
+  emberLook.color.setScalar(0.75 + 0.25 * flicker * flicker * (reducedMotion ? 1 : 0.9 + 0.1 * Math.sin(time / 23)));
 
   // The halls' lights nearest you.
   const away = (light: (typeof fixtures)[number]) =>
@@ -1005,6 +1013,7 @@ function lightFor(depth: number, time: number, dt: number) {
   fog.near = (HAZE_NEAR - (HAZE_NEAR - 2) * under) * (1 - murk) + 1.5 * murk;
   fog.far = (HAZE_FAR - (HAZE_FAR - 30) * under + 40 * caveLit) * (1 - murk) + 22 * murk;
   shafts?.update(dt, gloom, player.camera.position);
+  smoke.update(dt, player.camera.position);
   insideLook?.color.setScalar(0.25 + 0.75 * gloom);
 }
 
