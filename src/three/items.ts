@@ -492,6 +492,7 @@ export function items(options: {
     // You took it from where it lies, whichever place you're counted in.
     const result = act(world, { ...state, room: thing.room }, { type: "take", item: id });
     if (result.state.itemLocations[id] !== "carried") {
+      say(result.events.at(-1)?.text ?? ""); // ("You're carrying too much.")
       flash();
       sound("refuse");
       return;
