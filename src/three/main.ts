@@ -56,6 +56,7 @@ import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Caught } from "./caught";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
+import { Golden } from "./golden";
 import { haze } from "./haze";
 import { items as setUpItems, onPaths } from "./items";
 import { Ladder } from "./ladder";
@@ -92,7 +93,7 @@ import { Witches } from "./witches";
 const english = worldJson as unknown as World;
 const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
 
-const HAZE = new Color("#d9dcc4");
+const HAZE = new Color("#e4dab2"); // (golden: the air full of the low sun)
 // Where the light comes from: low in the west, a little north, as in the paintings.
 const SUN = new Vector3(-0.75, 0.42, -0.5).normalize();
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -117,8 +118,8 @@ const HAZE_FAR = 340;
 const fog = new Fog(HAZE, HAZE_NEAR, HAZE_FAR);
 scene.fog = fog;
 scene.add(sky(SUN, HAZE));
-const SKY = new Color("#c4d8ff");
-const SKY_GROUND = new Color("#6f7a3e");
+const SKY = new Color("#d6dccb");
+const SKY_GROUND = new Color("#867a36");
 const skylight = new HemisphereLight(SKY, SKY_GROUND, 1.25);
 // In the dark (the tower), what little of the sky's light there is is cold,
 // and a dark haze hangs in the air (thinning as you climb to the window).
@@ -143,9 +144,9 @@ const roomLights = Array.from({ length: ROOM_LIGHTS }, () => new PointLight("#ff
 scene.add(...roomLights);
 const DARK = new Color("#0b0806");
 
-// Golden: late afternoon (and the shadows, lit only by the sky, cool).
-const SUNLIGHT = 3.1;
-const sunlight = new DirectionalLight("#ffd497", SUNLIGHT);
+// Golden: late afternoon (and the shadows, lit only by the sky, soft; golden.ts warms them).
+const SUNLIGHT = 3.4;
+const sunlight = new DirectionalLight("#ffc472", SUNLIGHT);
 sunlight.castShadow = true;
 sunlight.shadow.mapSize.set(2048, 2048);
 Object.assign(sunlight.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 400 });
@@ -916,7 +917,7 @@ if (debugMode) {
       name,
       // A fresh frame, read straight away (before the browser clears it).
       picture: () => {
-        renderer.render(scene, player.camera);
+        golden.render(outdoors);
         return renderer.domElement;
       },
     },
@@ -1082,8 +1083,10 @@ document.addEventListener("pointerlockchange", () => {
   if (!player.locked && !debugging && !player.held && !matchMedia("(pointer: coarse)").matches) overlay.hidden = false;
 });
 
+const golden = new Golden(renderer, scene, player.camera, SUN);
 function resize() {
   renderer.setSize(innerWidth, innerHeight);
+  golden.setSize(innerWidth, innerHeight, renderer.getPixelRatio());
   player.camera.aspect = innerWidth / innerHeight;
   player.camera.updateProjectionMatrix();
 }
@@ -1097,6 +1100,7 @@ let caveLit = 0;
 let indoors = 0;
 let gloom = 0; // in a dark hall: 1
 let murk = 0; // and down in it, where its haze is: 1
+let outdoors = 1; // how golden the light is (out under the sky: 1)
 let dark = 0; // how dark it is round you (in a dark hall, or deep underground): 1
 let ownGlow = 1; // underground, the glow you see by: where it's dark, none (DIM)
 const DIM = 0.3;
@@ -1133,6 +1137,7 @@ function lightFor(depth: number, time: number, dt: number) {
   murk += ((hall?.dark ? 1 - climbed * climbed * (3 - 2 * climbed) : 0) - murk) * Math.min(1, dt * 2);
   const under = Math.min(1, Math.max(0, (depth - 0.5) / 3));
   dark = Math.max(gloom, under);
+  outdoors = 1 - Math.max(dark, indoors * 0.5);
   sunlight.intensity = SUNLIGHT * (1 - under);
   skylight.intensity = 1.25 * (1 - Math.max(under * 0.92, indoors * 0.55, gloom * 0.8));
   skylight.color.copy(SKY).lerp(COLD, gloom);
@@ -1291,5 +1296,5 @@ renderer.setAnimationLoop((time) => {
   // The sun's shadows follow you, so they're sharp wherever you are.
   sunlight.target.position.copy(player.position);
   sunlight.position.copy(player.position).addScaledVector(SUN, 200);
-  renderer.render(scene, player.camera);
+  golden.render(outdoors);
 });
