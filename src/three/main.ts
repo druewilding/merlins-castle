@@ -94,8 +94,8 @@ const english = worldJson as unknown as World;
 const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
 
 const HAZE = new Color("#e4dab2"); // (golden: the air full of the low sun)
-// Where the light comes from: low in the west, a little north, as in the paintings.
-const SUN = new Vector3(-0.75, 0.42, -0.5).normalize();
+// Where the light comes from: low in the south-west, late in the afternoon.
+const SUN = new Vector3(-0.7, 0.42, 0.62).normalize();
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const root = document.getElementById("world")!;

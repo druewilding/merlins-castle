@@ -1,5 +1,5 @@
 // The sky: a great dome, deep blue above and warm gold near the low summer
-// sun in the west, as in the paintings.
+// sun in the south-west, as in the paintings.
 
 import { BackSide, Color, Mesh, ShaderMaterial, SphereGeometry, type Vector3 } from "three";
 
