@@ -2,7 +2,9 @@
 // its steps, frame by frame) on flat open ground, with one obstacle in it.
 // An obstacle stops you going the way its exits go, and only that way: from
 // the other side you walk right through it (all the way, past its middle),
-// and once you're past its middle you can't turn back through it.
+// and once you're past its middle you can't turn back through it. Except a
+// way that kills you: come into it the free way, you can step back and forth
+// in it; only walking into it again from its far side kills you.
 
 import { describe, expect, it } from "vitest";
 
@@ -40,12 +42,12 @@ function standIn(obstacle: { circle?: Circle; box?: Box }) {
   return { player, bumps };
 }
 
-/** Walks (W held) facing a way, for some seconds or until `until` says stop. */
-function walk(player: Player, facing: number, seconds: number, until = () => false) {
+/** Walks (W held, or another key: A steps sideways) facing a way, for some seconds or until `until` says stop. */
+function walk(player: Player, facing: number, seconds: number, until = () => false, key = "KeyW") {
   player.yaw = facing;
-  press("keydown", "KeyW");
+  press("keydown", key);
   for (let t = 0; t < seconds && !until(); t += FRAME) player.update(FRAME, true);
-  press("keyup", "KeyW");
+  press("keyup", key);
   // (And stand still a moment: a bounce dies down.)
   for (let t = 0; t < 1; t += FRAME) player.update(FRAME, true);
 }
@@ -150,4 +152,87 @@ describe("a round one-way obstacle (west only)", () => {
       expect(bumps).toEqual([]);
     }
   );
+});
+
+describe("a way that kills you (the witches: west only)", () => {
+  const witches = (): Box => ({
+    x: 0,
+    z: 0,
+    halfX: 1,
+    halfZ: 5.5,
+    names: ["forest-witches west"],
+    ahead: AHEAD,
+    fatal: true,
+  });
+  // (Facing the witches, more or less: a little north of west, so stepping
+  // sideways (A) takes you south, and a little back west, towards its middle.)
+  const ROUGHLY_WEST = WEST - 0.15;
+
+  it("catches you walking into it from their clearing", () => {
+    const { player, bumps } = standIn({ box: witches() });
+    player.place(20, 0, WEST);
+    walk(player, WEST, 6);
+    expect(player.position.x).toBeGreaterThan(1);
+    expect(bumps).toContain("forest-witches west");
+  });
+
+  it("lets you walk right through it from the crossroads", () => {
+    const { player, bumps } = standIn({ box: witches() });
+    player.place(-20, 0, EAST);
+    walk(player, EAST, 10, () => player.position.x > 15);
+    expect(player.position.x).toBeGreaterThan(15);
+    expect(bumps).toEqual([]);
+  });
+
+  it("lets you step sideways, back towards its middle, just past it from the crossroads", () => {
+    const { player, bumps } = standIn({ box: witches() });
+    player.place(-20, 0, EAST);
+    walk(player, EAST, 10, () => player.position.x > 0.5);
+    walk(player, ROUGHLY_WEST, 1.5, () => false, "KeyA");
+    walk(player, ROUGHLY_WEST, 1.5, () => false, "KeyD");
+    expect(bumps).toEqual([]);
+  });
+
+  it("lets you turn back to the crossroads, past its middle", () => {
+    const { player, bumps } = standIn({ box: witches() });
+    player.place(-20, 0, EAST);
+    walk(player, EAST, 10, () => player.position.x > 3);
+    walk(player, WEST, 10, () => player.position.x < -15);
+    expect(player.position.x).toBeLessThan(-15);
+    expect(bumps).toEqual([]);
+  });
+
+  it("catches you once you've left it for their clearing and walk back into it", () => {
+    const { player, bumps } = standIn({ box: witches() });
+    player.place(-20, 0, EAST);
+    walk(player, EAST, 10, () => player.position.x > 10);
+    walk(player, WEST, 6);
+    expect(player.position.x).toBeGreaterThan(1);
+    expect(bumps).toContain("forest-witches west");
+  });
+
+  // The broom used, they've flown off (it's open); gone on to the
+  // crossroads, it closes round you, just past its middle; come back over
+  // its middle, you're still in it, going through it the free way.
+  it("lets you step about in it when it closes round you, as the broom stops working", () => {
+    const { player, bumps } = standIn({});
+    player.place(-0.3, 0, WEST);
+    player.solid([], [witches()]);
+    player.throughHere();
+    walk(player, EAST, 10, () => player.position.x > 0.4);
+    walk(player, ROUGHLY_WEST, 1.5, () => false, "KeyA");
+    walk(player, ROUGHLY_WEST, 1.5, () => false, "KeyD");
+    expect(bumps).toEqual([]);
+    walk(player, EAST, 10, () => player.position.x > 10);
+    walk(player, WEST, 6);
+    expect(bumps).toContain("forest-witches west");
+  });
+
+  it("still won't let you turn back through it once you're past its middle, if it doesn't kill you", () => {
+    const { player, bumps } = standIn({ box: { ...witches(), fatal: false } });
+    player.place(-20, 0, EAST);
+    walk(player, EAST, 10, () => player.position.x > 0.5);
+    walk(player, ROUGHLY_WEST, 1.5, () => false, "KeyA");
+    expect(bumps).toContain("forest-witches west");
+  });
 });
