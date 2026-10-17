@@ -67,14 +67,17 @@ import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import merlinModel from "./models/merlin.glb?url";
+import rabbitModel from "./models/rabbits.glb?url";
 import snakeModel from "./models/snake.glb?url";
 import witchModel from "./models/witches.glb?url";
 import { Plank } from "./plank";
 import { type Growth, Plants } from "./plants";
 import { type Box, type Circle, type Ground, type Hall, Player, type Walkable, wayThrough } from "./player";
 import { type PropSpots, stampProps } from "./props";
+import { Rabbits } from "./rabbits";
 import { River } from "./river";
 import { Shafts, speck, type Window } from "./shafts";
+import { paintSign, type SignSpot } from "./sign";
 import { sky } from "./sky";
 import { Smoke } from "./smoke";
 import { Snake } from "./snake";
@@ -172,13 +175,14 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky, wizard, hags] = await Promise.all([
+const [model, file, things, snaky, wizard, hags, bunnies] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
   loader.loadAsync(snakeModel),
   loader.loadAsync(merlinModel),
   loader.loadAsync(witchModel),
+  loader.loadAsync(rabbitModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -513,6 +517,21 @@ const witches = new Witches(
     { x: clearing.x - 19.3, z: clearing.z - 11.4 },
   ],
   clearing,
+  ground
+);
+// The sign warning you of them, on the corner by their clearing's crossing.
+void paintSign(scene, land.sign as SignSpot);
+// And the rabbits warning you of them, in the grass by it (rabbits.ts).
+const [signX, , signZ] = land.sign.at;
+const rabbits = new Rabbits(
+  scene,
+  bunnies.scene,
+  bunnies.animations,
+  [
+    { x: signX + 0.9, z: signZ + 0.9, yaw: Math.PI / 2 },
+    { x: signX + 0.2, z: signZ + 1.7, yaw: Math.PI / 2.4 },
+    { x: signX - 0.9, z: signZ + 1.3, yaw: Math.PI / 1.8 },
+  ],
   ground
 );
 
@@ -1161,6 +1180,7 @@ renderer.setAnimationLoop((time) => {
   snake.update(dt, player.camera.position, player.camera, room !== "tower" && !(guarded && opened.has(guarded)));
   merlin.update(dt, player.position, room === "merlins-lair");
   witches.update(dt, room === "forest-witches");
+  rabbits.update(dt, player.position);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)

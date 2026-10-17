@@ -1920,6 +1920,42 @@ obstacle(["mossy-steps east"], "circle", bx, -by, 2.6, reach=0.4)
 wx, wy = P["forest-witches"]
 obstacle(["forest-witches west"], "box", (wx + P["forest-crossroads"][0]) / 2, -wy, 1.0, 5.5)
 
+# A sign by the paths' crossing in the witches' clearing, on the corner
+# south of the way west, facing east: you read it looking west, towards the
+# witches; coming from them, you see only its back. A post, and two rough
+# planks nailed across it, one above the other, a little askew. Its words are
+# painted on in the game (sign.ts), in your language: here, only where they go
+# (SIGN, in land.json).
+SIGN_POST = (wx - 3.4, wy - 3.3)  # (south of the way west, just off its edge)
+SIGN_WOOD, SIGN_DARK = c.linear("#8d7457"), c.linear("#5c4a36")
+SIGN_TILT = math.radians(3)  # how askew its planks are nailed (the north end up)
+SIGN_FACE = (1.2, 0.54)  # the painted face, across and up: a little in from its planks' edges
+sx, sy = SIGN_POST
+s_ground = height(sx, sy)
+built.cylinder((sx, sy, s_ground - 0.3), (sx, sy, s_ground + 1.72), 0.08, 0.07, SIGN_DARK, sides=6)
+solid_circle(sx, sy, 0.2)
+SIGN_MIDDLE = Vector((sx + 0.08 + 0.03, sy, s_ground + 1.3))  # the planks' middle, in front of the post
+sign_across = Vector((0, math.cos(SIGN_TILT), math.sin(SIGN_TILT)))  # (to your right, reading it: north)
+sign_up = Vector((0, -math.sin(SIGN_TILT), math.cos(SIGN_TILT)))
+sign_rnd = random.Random("witches' sign")
+# Each plank: its middle, up from the sign's, and half its height.
+for k, (mid, half) in enumerate([(0.15, 0.135), (-0.15, 0.135)]):
+    # Its outline, roughly cut: each end a little uneven.
+    ends = [(-0.72 + sign_rnd.uniform(0, 0.05), -half), (0.72 - sign_rnd.uniform(0, 0.05), -half),
+            (0.74 - sign_rnd.uniform(0, 0.03), 0), (0.72 - sign_rnd.uniform(0, 0.05), half),
+            (-0.72 + sign_rnd.uniform(0, 0.05), half), (-0.74 + sign_rnd.uniform(0, 0.03), 0)]
+    face = [SIGN_MIDDLE + sign_across * s + sign_up * (mid + t * 0.96) for s, t in ends]
+    back = [p - Vector((0.04, 0, 0)) for p in face]
+    n = len(face)
+    shade = c.mix(SIGN_WOOD, c.linear("#000000"), 0.1 * k)
+    built.add([tuple(p) for p in face + back],
+              [tuple(range(n)), tuple(range(2 * n - 1, n - 1, -1))] +
+              [(i, n + i, n + (i + 1) % n, (i + 1) % n) for i in range(n)],
+              [c.vary(shade, 0.12, p * 4) for p in face + back])
+# (The face's middle, and which way it faces, for its words: in three.js's axes.)
+SIGN = {"at": [round(SIGN_MIDDLE.x + 0.004, 3), round(SIGN_MIDDLE.z, 3), round(-SIGN_MIDDLE.y, 3)],
+        "facing": [1, 0], "tilt": round(SIGN_TILT, 4), "size": list(SIGN_FACE)}
+
 
 def quad(builder, pts, colour, vary=0.12):
     # Anything lying flat faces up: facing down, the sun's shadows fall on it
@@ -3828,6 +3864,8 @@ if out:
         # The fire in the charcoal burner's hut, its middle [x, z] and floor, and the smoke hole over it: how high, and how wide.
         "hut": {"fire": [round(HUT_FIRE["x"], 2), round(-HUT_FIRE["y"], 2), round(HUT_FIRE["floor"], 2)],
                 "hole": round(HUT_FIRE["hole"], 2), "r": HUT_FIRE["r"]},
+        # The witches' sign: its painted face's middle [x, y, z], which way it faces [x, z], how askew, and how big.
+        "sign": SIGN,
         "bounds": [X0 + 4, X1 - 4, Y0 + 4, Y1 - 4],
         "circles": circles,
         "boxes": boxes,
