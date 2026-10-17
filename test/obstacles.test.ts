@@ -6,8 +6,10 @@
 // way that kills you: come into it the free way, you can step back and forth
 // in it; only walking into it again from its far side kills you.
 
+import { Object3D, Scene } from "three";
 import { describe, expect, it } from "vitest";
 
+import { Plank } from "../src/three/plank";
 import { type Box, type Circle, Player } from "../src/three/player";
 
 // The player listens for keys on the window (each test's new player too),
@@ -42,14 +44,29 @@ function standIn(obstacle: { circle?: Circle; box?: Box }) {
   return { player, bumps };
 }
 
-/** Walks (W held, or another key: A steps sideways) facing a way, for some seconds or until `until` says stop. */
-function walk(player: Player, facing: number, seconds: number, until = () => false, key = "KeyW") {
+/**
+ * Walks (W held, or another key: A steps sideways) facing a way, for some
+ * seconds or until `until` says stop; and each frame, anything else that
+ * goes on (the plank, say).
+ */
+function walk(
+  player: Player,
+  facing: number,
+  seconds: number,
+  until = () => false,
+  key = "KeyW",
+  each = (_dt: number) => {}
+) {
+  const frame = () => {
+    player.update(FRAME, true);
+    each(FRAME);
+  };
   player.yaw = facing;
   press("keydown", key);
-  for (let t = 0; t < seconds && !until(); t += FRAME) player.update(FRAME, true);
+  for (let t = 0; t < seconds && !until(); t += FRAME) frame();
   press("keyup", key);
   // (And stand still a moment: a bounce dies down.)
-  for (let t = 0; t < 1; t += FRAME) player.update(FRAME, true);
+  for (let t = 0; t < 1; t += FRAME) frame();
 }
 
 // Like the dense trees across the mountain path: one-way, going north.
@@ -234,5 +251,118 @@ describe("a way that kills you (the witches: west only)", () => {
     walk(player, EAST, 10, () => player.position.x > 0.5);
     walk(player, ROUGHLY_WEST, 1.5, () => false, "KeyA");
     expect(bumps).toContain("forest-witches west");
+  });
+});
+
+// Which way kills you is the game's (src/three/main.ts): walking into the
+// river from the north bank ("deep-river south") you're swept away; from the
+// south bank ("river-south-bank north") you fall in, but get out safely.
+describe("the deep river where it narrows (south: swept away; north: you get out)", () => {
+  // As in land.json (round the narrows' middle), and as main.ts puts it.
+  const river = (): Box => ({
+    x: 0,
+    z: 0,
+    halfX: 13,
+    halfZ: 3.2,
+    names: ["deep-river south", "river-south-bank north"],
+    ahead: 0.5,
+    fatal: true,
+  });
+  const PLANK = 7; // metres long (items.glb)
+
+  /**
+   * The plank used, laid across from the bank you're on, the river open (as
+   * main.ts does); across, it's no longer in use, and the river's back.
+   */
+  function withPlank(player: Player, south: boolean) {
+    const half = PLANK / 2;
+    const plank = new Plank(
+      new Scene(),
+      new Object3D(),
+      () => 0,
+      player,
+      true,
+      () => {},
+      () => {}
+    );
+    player.solid([], []);
+    plank.lay(
+      south ? "deep-river south" : "river-south-bank north",
+      [0, south ? -half : half],
+      [0, south ? half : -half],
+      true,
+      true
+    );
+    const crossed: string[] = [];
+    const each = (dt: number) =>
+      plank.update(dt, (exit) => {
+        crossed.push(exit);
+        plank.away();
+        player.solid([], [river()]);
+        player.throughHere();
+      });
+    return { each, crossed };
+  }
+
+  it("sweeps you away walking into it from the north bank", () => {
+    const { player, bumps } = standIn({ box: river() });
+    player.place(0, -15, SOUTH);
+    walk(player, SOUTH, 6);
+    expect(player.position.z).toBeLessThan(-3.2);
+    expect(bumps).toContain("deep-river south");
+    expect(bumps).not.toContain("river-south-bank north");
+  });
+
+  it("only bumps you back walking into it from the south bank", () => {
+    const { player, bumps } = standIn({ box: river() });
+    player.place(0, 15, NORTH);
+    walk(player, NORTH, 6);
+    expect(player.position.z).toBeGreaterThan(3.2);
+    expect(bumps).toContain("river-south-bank north");
+    expect(bumps).not.toContain("deep-river south");
+  });
+
+  // (It takes you up before you're in the river's reach: you're never in it.)
+  it("takes you across on the plank from the north bank", () => {
+    const { player, bumps } = standIn({});
+    const { each, crossed } = withPlank(player, true);
+    player.place(0, -15, SOUTH);
+    walk(player, SOUTH, 10, () => player.position.z > 4.5 && !player.busy, "KeyW", each);
+    expect(crossed).toEqual(["deep-river south"]);
+    expect(player.position.z).toBeGreaterThan(4.5);
+    expect(bumps).toEqual([]);
+  });
+
+  it("takes you across on the plank from the south bank", () => {
+    const { player, bumps } = standIn({});
+    const { each, crossed } = withPlank(player, false);
+    player.place(0, 15, NORTH);
+    walk(player, NORTH, 10, () => player.position.z < -4.5 && !player.busy, "KeyW", each);
+    expect(crossed).toEqual(["river-south-bank north"]);
+    expect(player.position.z).toBeLessThan(-4.5);
+    expect(bumps).toEqual([]);
+  });
+
+  // Off the plank's far end, you're already out of the river's reach: a step
+  // back is walking into it from the bank you're on now.
+  it("sweeps you away stepping back into it, across on the plank to the north bank", () => {
+    const { player, bumps } = standIn({});
+    const { each } = withPlank(player, false);
+    player.place(0, 15, NORTH);
+    walk(player, NORTH, 10, () => player.position.z < -4.5 && !player.busy, "KeyW", each);
+    walk(player, SOUTH, 3, () => false, "KeyW", each);
+    expect(player.position.z).toBeLessThan(-3.2);
+    expect(bumps).toContain("deep-river south");
+  });
+
+  it("only bumps you back stepping back into it, across on the plank to the south bank", () => {
+    const { player, bumps } = standIn({});
+    const { each } = withPlank(player, true);
+    player.place(0, -15, SOUTH);
+    walk(player, SOUTH, 10, () => player.position.z > 4.5 && !player.busy, "KeyW", each);
+    walk(player, NORTH, 3, () => false, "KeyW", each);
+    expect(player.position.z).toBeGreaterThan(3.2);
+    expect(bumps).toContain("river-south-bank north");
+    expect(bumps).not.toContain("deep-river south");
   });
 });
