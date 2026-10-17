@@ -1,20 +1,23 @@
-# The snake on the mossy steps, as in their picture: a big python, olive and
-# tan, with dark brown saddles edged in gold down its back and a cream belly,
-# a broad wedge of a head with yellow eyes, and a pink mouth that opens.
+# The snake on the mossy steps: a big snake, as in their picture, but
+# coloured like Quaternius's (Easy Enemy, art/models/), to stand out in the
+# grass: sea green, with pale green plates down its belly, a hood (which the
+# game spreads as it rears), a broad wedge of a head with big yellow eyes,
+# and a pink mouth that opens.
 #
 # It's made lying dead straight, its spine along y from the tip of its tail
 # (y = 0) to its nose (y = LENGTH), its middle at z = 0: the game bends it
 # along any curve it likes (coiled, rearing, slithering away), so each piece
 # is a separate object it can move on its own: the body (and the top of the
 # head), the lower jaw (which drops open on its hinge) and the tongue (which
-# flicks out of the front of the mouth).
+# flicks out of the front of the mouth). The body's hood is a shape key,
+# "hood": without it, its neck is round.
 
 import math
 import sys
 from pathlib import Path
 
 import bmesh
-from mathutils import Matrix, Vector, noise
+from mathutils import Matrix, Vector
 
 HERE = Path(__file__).parent
 sys.path.append(str(HERE))
@@ -24,22 +27,21 @@ out, preview = c.args()
 c.clear()
 
 LENGTH = 3.2  # from the tip of its tail to its nose
-THICK = 0.075  # its radius, at its fattest
+THICK = 0.08  # its radius, at its fattest
 HEAD = 0.21  # how long its head is, back to its hinge and the end of its neck
 MOUTH = -0.012  # the line of its mouth, a little under the middle of its head
-SIZE = 1.2  # (made as big as a real python, then scaled up: see the end)
+HEADY = 1.15  # (its head a little bigger than a real one's, for its size)
+SIZE = 1.5  # (made as big as a real python, then scaled up: see the end)
 
-OLIVE = c.linear("#8b7d46")
-TAN = c.linear("#b49a5c")
-SADDLE = c.linear("#3e2c17")
-GOLD = c.linear("#d0b263")
-BELLY = c.linear("#ddd2a2")
-PINK = c.linear("#8e4a50")
-THROAT = c.linear("#2e1012")
-FANG = c.linear("#f1ece0")
-EYE = c.linear("#e8c13a")
-PUPIL = c.linear("#120d08")
-TONGUE = c.linear("#8a1a2a")
+# (The pack's own colours, already linear.)
+GREEN = (0.192, 0.487, 0.332, 1)
+PALE = (0.378, 0.604, 0.449, 1)
+PINK = (1.0, 0.103, 0.156, 1)
+THROAT = (0.487, 0.091, 0.067, 1)
+FANG = (1.0, 0.626, 0.385, 1)
+EYE = (1.0, 0.602, 0.094, 1)
+PUPIL = (0.2, 0.03, 0.03, 1)
+TONGUE = (0.168, 0.054, 0.106, 1)
 
 
 def outward(obj):
@@ -64,28 +66,24 @@ def thickness(s):
     return max(0.006, THICK * tail * neck)
 
 
+def hood(s):
+    """How far its hood spreads at s along it (0 to 1): from a little behind
+    its head, widest a third of the way back, closing quickly to the head."""
+    u = (s - (LENGTH - HEAD - 0.6)) / 0.57
+    return math.sin(math.pi * u**1.4) if 0 < u < 1 else 0.0
+
+
 def skin(s, a, p):
     """Its colour at s along it and a round it (0 on its back, pi on its
-    belly): saddles down its back, blotches on its sides, a cream belly."""
+    belly): green, with pale plates across its belly, a darker line between
+    each."""
     up = math.cos(a)  # 1 on top, -1 underneath
-    side = abs(math.sin(a))
-    colour = c.mix(OLIVE, TAN, 0.4 + 0.3 * noise.noise(p * 9))
-    # The saddles: dark, wavy-edged patches across its back, one every 17 cm,
-    # each edged in gold.
-    wave = 0.025 * math.sin(a * 3 + s * 4)
-    phase = ((s + wave) / 0.17) % 1
-    saddle = 1 - abs(phase - 0.5) / 0.5  # 1 in the middle of a saddle
-    reach = smooth_step((up + 0.35) / 0.5)  # down to its sides
-    dark = smooth_step((saddle - 0.45) / 0.12) * reach
-    rim = smooth_step((saddle - 0.32) / 0.08) * (1 - smooth_step((saddle - 0.45) / 0.06)) * reach
-    # And smaller blotches lower on its sides, between them.
-    blotch = smooth_step((noise.noise(Vector((s * 7, side * 2, up * 2))) - 0.15) / 0.2) * side * (1 - reach)
-    colour = c.mix(colour, GOLD, rim * 0.8)
-    colour = c.mix(colour, SADDLE, max(dark, blotch * 0.8))
-    colour = c.mix(colour, BELLY, smooth_step((-up - 0.45) / 0.3))
-    # Fading a little paler towards the very tip of its tail.
-    colour = c.mix(colour, TAN, 0.4 * (1 - smooth_step(s / 0.4)))
-    return c.vary(colour, 0.08, p * 25)
+    colour = c.vary(GREEN, 0.05, p * 9)
+    under = smooth_step((-up - 0.3) / 0.25)
+    plate = (s / (0.055 + 0.02 * hood(s))) % 1
+    line = smooth_step((abs(plate - 0.5) - 0.42) / 0.05)
+    belly = c.mix(PALE, GREEN, 0.45 * line)
+    return c.mix(colour, belly, under)
 
 
 # ---- The body: rings of 18 round it, every 2 cm, from its tail to its neck
@@ -95,7 +93,7 @@ STEP = 0.02
 body = c.Builder()
 end = LENGTH - HEAD + 0.04
 rings = [k * STEP for k in range(int(end / STEP) + 1)]
-verts, colours = [], []
+verts, colours, hooded = [], [], []
 for s in rings:
     r = thickness(s)
     for j in range(AROUND):
@@ -106,11 +104,14 @@ for s in rings:
         p = Vector((x, s, z))
         verts.append(tuple(p))
         colours.append(skin(s, a, p))
+        # Its hood spread: flat, out to each side.
+        w = hood(s)
+        hooded.append((x * (1 + 1.0 * w), s, z * (1 - 0.35 * w)))
 faces = [(k * AROUND + j, k * AROUND + (j + 1) % AROUND, (k + 1) * AROUND + (j + 1) % AROUND, (k + 1) * AROUND + j)
          for k in range(len(rings) - 1) for j in range(AROUND)]
 tip = len(verts)
 verts.append((0, -0.01, 0))
-colours.append(TAN)
+colours.append(GREEN)
 faces += [(tip, (j + 1) % AROUND, j) for j in range(AROUND)]
 neck = (len(rings) - 1) * AROUND
 faces.append(tuple(neck + j for j in range(AROUND)))
@@ -126,28 +127,23 @@ H0 = LENGTH - HEAD  # its hinge, at the back of its jaws
 def head_shape(t):
     """Its half-width, the height of its crown above the mouth, and how deep
     its lower jaw is, t from the hinge (0) to the snout (1)."""
-    wide = 0.068 * (1 - 0.15 * t) * math.sqrt(max(0.0, 1 - max(0.0, (t - 0.72) / 0.28) ** 2) * 0.85 + 0.15)
+    wide = HEADY * 0.068 * (1 - 0.15 * t) * math.sqrt(max(0.0, 1 - max(0.0, (t - 0.72) / 0.28) ** 2) * 0.85 + 0.15)
     if t < 0.25:
         wide *= 0.86 + 0.14 * smooth_step(t / 0.25)  # the jowls, a little narrower than the skull behind
-    crown = 0.064 * (1 - 0.45 * smooth_step(t)) * math.sqrt(max(0.0, 1 - max(0.0, (t - 0.8) / 0.2) ** 2) * 0.9 + 0.1)
-    jaw = 0.036 * (1 - 0.5 * t) * math.sqrt(max(0.0, 1 - max(0.0, (t - 0.82) / 0.18) ** 2) * 0.9 + 0.1)
+    crown = HEADY * 0.064 * (1 - 0.45 * smooth_step(t)) * math.sqrt(max(0.0, 1 - max(0.0, (t - 0.8) / 0.2) ** 2) * 0.9 + 0.1)
+    jaw = HEADY * 0.036 * (1 - 0.5 * t) * math.sqrt(max(0.0, 1 - max(0.0, (t - 0.82) / 0.18) ** 2) * 0.9 + 0.1)
     return wide, crown, jaw
 
 
 def head_colour(p, a, t, top):
-    """Olive above, with a dark band from snout through the eye; cream lips
-    and chin."""
+    """Green above, with pale lips and a pale chin."""
     up = math.cos(a)
-    colour = c.mix(OLIVE, TAN, 0.4 + 0.3 * noise.noise(p * 12))
+    colour = c.vary(GREEN, 0.05, p * 12)
     if top:
-        # A dark arrow down the top of its head, and a stripe through each eye.
-        arrow = smooth_step((0.5 - abs(math.sin(a)) - 0.25 * (1 - t)) / 0.1) * smooth_step((0.75 - t) / 0.1)
-        stripe = smooth_step((0.25 - abs(up - 0.25)) / 0.1) * (1 - smooth_step((up - 0.6) / 0.1))
-        colour = c.mix(colour, SADDLE, max(arrow * up, stripe * 0.85))
-        colour = c.mix(colour, BELLY, smooth_step((0.15 - up) / 0.15) * 0.8)  # its lip
+        colour = c.mix(colour, PALE, smooth_step((0.15 - up) / 0.15) * 0.8)  # its lip
     else:
-        colour = c.mix(colour, BELLY, 0.75)
-    return c.vary(colour, 0.06, p * 30)
+        colour = c.mix(colour, PALE, 0.8)
+    return colour
 
 
 ALONG, ROUND = 14, 14
@@ -202,42 +198,54 @@ def wedge(top):
 
 
 upper = wedge(True)
-# Its eyes: yellow, round, each with a black slit, high on the sides of its
-# head, looking out and a little forward.
+# Its eyes: big, round and yellow, bulging high on the sides of its head,
+# looking out and a little forward and up, each with a dark upright slit
+# lying on the front of it.
+
+
+def ball(build, centre, axes, colour, n=10, m=16):
+    """A ball, stretched along each of its axes (three vectors) as far as
+    they go."""
+    ax, ay, az = axes
+    verts = []
+    for k in range(n + 1):
+        phi = math.pi * k / n
+        for j in range(m):
+            a = 2 * math.pi * j / m
+            verts.append(tuple(centre + ax * (math.sin(phi) * math.cos(a)) + ay * (math.sin(phi) * math.sin(a))
+                               + az * math.cos(phi)))
+    faces = [(k * m + j, k * m + (j + 1) % m, (k + 1) * m + (j + 1) % m, (k + 1) * m + j)
+             for k in range(n) for j in range(m)]
+    build.add(verts, faces, [colour] * len(verts))
+
+
+EYE_R = 0.03
 for side in (-1, 1):
     t = 0.56
     wide, crown, _ = head_shape(t)
-    centre = Vector((side * wide * 0.83, H0 + HEAD * t, MOUTH + crown * 0.62))
-    look = Vector((side * 0.9, 0.35, 0.25)).normalized()
-    verts, colours, faces = [], [], []
-    N, M = 8, 10
-    for k in range(N + 1):
-        phi = math.pi * k / N
-        for j in range(M):
-            a = 2 * math.pi * j / M
-            d = Vector((math.sin(phi) * math.cos(a), math.sin(phi) * math.sin(a), math.cos(phi)))
-            p = centre + d * 0.0125
-            verts.append(tuple(p))
-            facing = d.dot(look)
-            # The slit: narrow, upright, in the middle of the side that looks out.
-            across = d - look * facing
-            slit = facing > 0.55 and abs(across.dot(Vector((0, 1, -0.4)).normalized())) < 0.18
-            colours.append(PUPIL if slit else c.mix(EYE, c.linear("#8a6a12"), 0.6 * (1 - max(0.0, facing))))
-    for k in range(N):
-        for j in range(M):
-            faces.append((k * M + j, k * M + (j + 1) % M, (k + 1) * M + (j + 1) % M, (k + 1) * M + j))
-    upper.add(verts, faces, colours)
+    centre = Vector((side * wide * 0.72, H0 + HEAD * t, MOUTH + crown * 0.62))
+    look = Vector((side * 0.85, 0.4, 0.35)).normalized()
+    upright = (Vector((0, -0.4, 1)) - look * look.dot(Vector((0, -0.4, 1)))).normalized()
+    level = look.cross(upright)
+    # (A little flattened, front to back: a disc more than a ball.)
+    ball(upper, centre, (level * EYE_R, upright * EYE_R, look * EYE_R * 0.7), EYE)
+    ball(upper, centre + look * EYE_R * 0.66, (level * EYE_R * 0.16, upright * EYE_R * 0.72, look * EYE_R * 0.08),
+         PUPIL, n=6, m=10)
 # Its fangs: two little curved teeth hanging from the front of its upper jaw.
 for side in (-1, 1):
     t = 0.82
     wide = head_shape(t)[0]
     root = Vector((side * wide * 0.62, H0 + HEAD * t, MOUTH))
-    verts = [tuple(root + Vector((math.cos(a) * 0.004, math.sin(a) * 0.004, 0))) for a in (0, 2.1, 4.2)]
-    verts.append(tuple(root + Vector((0, -0.006, -0.02))))
+    verts = [tuple(root + Vector((math.cos(a) * 0.006, math.sin(a) * 0.006, 0))) for a in (0, 2.1, 4.2)]
+    verts.append(tuple(root + Vector((0, -0.008, -0.03))))
     upper.add(verts, [(0, 1, 2), (0, 3, 1), (1, 3, 2), (2, 3, 0)], [FANG] * 4)
 body.add(upper.verts, upper.faces, upper.colours)
 body_object = body.build("snake", smooth=True)
 outward(body_object)
+body_object.shape_key_add(name="Basis")
+spread = body_object.shape_key_add(name="hood", from_mix=False)
+for i, p in enumerate(hooded):  # (the rings come first in it)
+    spread.data[i].co = p
 
 jaw = wedge(False)
 jaw_object = jaw.build("snake-jaw", smooth=True)
@@ -252,7 +260,7 @@ k = 6
 for i in range(k + 1):
     t = i / k
     y = LENGTH - 0.05 + TONGUE_LONG * t
-    w = 0.005 * (1 - 0.5 * t)
+    w = 0.006 * (1 - 0.5 * t)
     verts += [(-w, y, MOUTH - 0.002), (w, y, MOUTH - 0.002), (0, y, MOUTH + 0.002)]
 for i in range(k):
     for a, b in ((0, 1), (1, 2), (2, 0)):
@@ -270,7 +278,7 @@ outward(tongue_object)
 
 # All of it a fifth bigger than a real one, to hold the apple in its jaws.
 for obj in (body_object, jaw_object, tongue_object):
-    obj.data.transform(Matrix.Scale(SIZE, 4))
+    obj.data.transform(Matrix.Scale(SIZE, 4), shape_keys=True)
 
 if out:
     c.export(out)

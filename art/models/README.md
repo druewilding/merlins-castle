@@ -17,6 +17,7 @@ the packs to rebuild those.
 | `medieval-village-megakit`      | [Medieval Village MegaKit](https://quaternius.com/packs/medievalvillagemegakit.html)                    | (None used yet)                                          |
 | `ultimate-monsters`             | [Ultimate Monsters](https://quaternius.com/packs/ultimatemonsters.html) (the Blender files)             | The rabbits, in `rabbits.py` (from `Blends/Bunny.blend`) |
 | `ultimate-crops`                | [Ultimate Crops](https://quaternius.com/packs/ultimatecrops.html) (the Blender files)                   | Toadstools, in `land.py` (from `Blends/`)                |
+| `easy-enemy`                    | [Easy Enemy](https://quaternius.com/packs/easyenemy.html) (the Blender files)                           | (None used yet: `snake.py` takes its snake's colours)    |
 
 The free (Standard) version of each is enough. Keep the folders inside each
 pack as they come: the scripts read files such as
