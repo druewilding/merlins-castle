@@ -739,6 +739,14 @@ def rocky(x, y):
     return crags(x, y) > 1 or peaks(x, y) > 3 or dragon_hill(x, y) > 1 or ridge(x, y) > 1
 
 
+def maze_meadow(x, y):
+    """The little meadow on the mountain top, round the maze and up the way
+    to it, where the crags let it be: 1 in it, fading out to 0."""
+    dx = max(0.0, abs(x - MZ[0]) - MAZE_HALF)
+    dy = max(0.0, abs(y - MZ[1]) - MAZE_HALF)
+    return smooth(1 - (math.hypot(dx, dy) - 6) / 4) * (1 - smooth((crags(x, y) - 0.3) / 1.2))
+
+
 for way in WAYS.values():
     way.settle()
 for place, door in (("tower", "tower-door"), ("charcoal-hut", "hut-door")):
@@ -917,7 +925,7 @@ def ground_colour(x, y, z):
         col = c.mix(col, CRAG, smooth((steep - 0.8) / 0.6) * smooth((z - 20) / 8))
         line = 62 + 6 * noise.noise(Vector((x / 10, y / 10, 13.0)))
         col = c.mix(col, SNOW, smooth((z - line) / 5) * (1 - 0.7 * smooth((steep - 1.2) / 0.8)))
-    return col
+    return c.mix(col, GRASS, maze_meadow(x, y))
 
 
 nx, ny = int((X1 - X0) / STEP) + 1, int((Y1 - Y0) / STEP) + 1
@@ -1387,6 +1395,9 @@ for gx in range(X0 + 3, X1 - 2, 5):
             continue
         tall = here.uniform(9, 14)
         r = here.uniform(2.2, 3.0)
+        # (Their branches clear of the maze's walls.)
+        if abs(x - MZ[0]) < MAZE_HALF + r + 0.8 and abs(y - MZ[1]) < MAZE_HALF + r + 0.8:
+            continue
         grow(x, y, tall, tree_kind(x, y, here), here)
         TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
 # Trees close in on both sides of the dragon's mouth, so the only way on is
@@ -4056,6 +4067,7 @@ tree_spots["at"] = [spot for k, spot in enumerate(tree_spots["at"]) if k not in 
 # by the place nearest (give or take, so they blend). The game scatters
 # grass, flowers, bushes and stones by it, round you (src/three/plants.ts).
 GROUND = {"meadow": 1, "verge": 2, "forest": 3, "bank": 4, "wall": 5, "path": 6}
+MOUNTAIN_TOP = 6  # the meadow round the maze: daisies and buttercups (growing high up, as nothing else does)
 MIXES = {
     # Daisies and buttercups, and foxgloves here and there.
     **dict.fromkeys(["old-wall", "old-stone-wall", "rusty-gate", "grassy-bank", "forest-edge", "deep-river",
@@ -4110,6 +4122,8 @@ def growth(x, y):
         ground = "meadow"
     else:
         ground = "forest"
+    if ground != "path" and maze_meadow(x, y) > 0.5:
+        return GROUND["meadow"] | MOUNTAIN_TOP << 3  # (grass and flowers, high up)
     jx, jy = noise.noise(Vector((x / 25, y / 25, 3))) * 14, noise.noise(Vector((x / 25, y / 25, 9))) * 14
     nearest = min(P, key=lambda p: math.hypot(x + jx - P[p][0], y + jy - P[p][1]))
     return GROUND[ground] | MIXES.get(nearest, 1) << 3
