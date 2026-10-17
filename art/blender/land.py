@@ -3014,7 +3014,7 @@ def lair(b, hall):
     prop("Shelf_Small_Bottles", east + wall, -0.6, 1.3, face=(-1, 0), ratio=0.25)
 
     # Candles on stands, and a chandelier.
-    for u, v in ((-2.6, 5.6), (2.6, 5.6), (-5.8, -5.4), (5.6, -2.0)):
+    for u, v in ((-2.6, 5.6), (2.6, 5.6), (-5.8, -5.4), (0.6, -5.6)):  # (clear of the doors)
         candles("CandleStick_Stand", u, v, scale=1.2)
     candles("Chandelier", 0, -0.5, hall.tall - 0.05, scale=1.5, solid=False)
 
@@ -3613,7 +3613,9 @@ for k in range(TREADS):
 # The lair's door, which slams and locks behind you.
 lx_, ly_ = ml.x + ml.w + 0.6, SR[1]
 block(rooms, lx_ - 0.15, ly_ - TUNNEL_HALF, ml.floor, lx_ + 0.15, ly_ + TUNNEL_HALF, ml.floor + TUNNEL_TALL, OAK, solid=False)
-obstacle(["merlins-lair east"], "box", lx_, -ly_, 0.5, TUNNEL_HALF + 0.3, under=True)
+# (Reaching only a little way into the lair: it's small, and he'd otherwise
+# keep you from its whole east end.)
+obstacle(["merlins-lair east"], "box", lx_, -ly_, 0.5, TUNNEL_HALF + 0.3, under=True, reach=1.0)
 rooms.build("rooms", smooth=False)
 webs.build("cobwebs", smooth=False)
 tower_inside.build("tower-inside", smooth=False)
