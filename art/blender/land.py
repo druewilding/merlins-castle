@@ -1966,6 +1966,83 @@ for key, spot in CLUES.items():
     thicket(key, spot)
 brambles.build("brambles", smooth=False)
 
+def quad(builder, pts, colour, vary=0.12):
+    # Anything lying flat faces up: facing down, the sun's shadows fall on it
+    # in stripes ("shadow acne").
+    (ax, ay, az), (bx, by, bz), (cx_, cy_, cz) = pts[0], pts[1], pts[2]
+    ux, uy, uz, vx, vy, vz = bx - ax, by - ay, bz - az, cx_ - ax, cy_ - ay, cz - az
+    nz = ux * vy - uy * vx
+    if nz < 0 and abs(nz) > 0.5 * math.sqrt((uy * vz - uz * vy) ** 2 + (uz * vx - ux * vz) ** 2 + nz * nz):
+        pts = pts[::-1]
+    builder.add(pts, [(0, 1, 2, 3)], [c.vary(colour, vary, Vector(pts[0])) for _ in pts])
+
+
+# The tower's stonework, inside and out: course on course of blocks, each
+# its own shade, damp and mossy near the floor (the dark mortar between is
+# the wall behind them).
+TOWER_BLOCK, TOWER_FLAG = c.linear("#6e6a62"), c.linear("#615d55")
+TOWER_DAMP, TOWER_MOSS = c.linear("#3f4434"), c.linear("#4a5a2c")
+TOWER_MORTAR = c.linear("#3a3732")  # (outside: inside, it's the hall's wall)
+COURSE, JOINT = (0.34, 0.48), 0.035  # how tall a course of blocks is, and the mortar between
+
+
+def stone_shade(rnd, base, z, foot):
+    """A stone's colour: its own shade, damp and sometimes mossy low down (above foot)."""
+    t = rnd.uniform(-0.2, 0.35)
+    colour = c.mix(base, c.linear("#000000"), t) if t > 0 else c.mix(base, c.linear("#a8a398"), -t)
+    low = max(0.0, 1 - (z - foot) / 1.4)
+    if rnd.random() < low * 0.8:
+        colour = c.mix(colour, TOWER_DAMP, rnd.uniform(0.3, 0.7))
+    if rnd.random() < low * 0.35:
+        colour = c.mix(colour, TOWER_MOSS, rnd.uniform(0.3, 0.6))
+    return colour
+
+
+def stone_courses(b, rnd, at, corners, r, z0, z1, holes, foot):
+    """The tower's wall in courses of blocks, from z0 to z1 (at: the point on
+    the wall's face at an angle; corners: its corners' angles, where a block
+    is split to lie flat on it; r: about how far out it is), each block a
+    little longer or shorter, the joints never in line with the course's
+    below, and none where the wall's open (holes: a0, a1, z0, z1, with
+    angles from 0 to 4 pi)."""
+
+    def on_wall(a0, a1, lo, hi, colour):
+        cuts = [a0] + [k for k in corners if a0 < k < a1] + [a1]
+        for b0, b1 in zip(cuts, cuts[1:]):
+            p0, p1 = at(b0), at(b1)
+            quad(b, [(*p0, lo), (*p1, lo), (*p1, hi), (*p0, hi)], colour, 0.05)
+
+    def clear(rect):
+        """The parts of a block (a0, a1, z0, z1) clear of the openings."""
+        out = [rect]
+        for lo, hi, h0, h1 in holes:
+            left = []
+            for a0, a1, za, zb in out:
+                if a1 <= lo or a0 >= hi or zb <= h0 or za >= h1:
+                    left.append((a0, a1, za, zb))
+                    continue
+                left += [(a0, a1, za, h0)] if za < h0 else []
+                left += [(a0, a1, h1, zb)] if zb > h1 else []
+                zl, zh = max(za, h0), min(zb, h1)
+                left += [(a0, lo, zl, zh)] if a0 < lo else []
+                left += [(hi, a1, zl, zh)] if a1 > hi else []
+            out = left
+        return out
+
+    z = z0
+    while z < z1 - 0.05:
+        h = min(rnd.uniform(*COURSE), z1 - z)
+        start = a = rnd.uniform(0.2, 0.7) / r
+        while a < start + 2 * math.pi - 0.3 / r:
+            a1 = min(a + rnd.uniform(0.55, 1.15) / r, start + 2 * math.pi)
+            colour = stone_shade(rnd, TOWER_BLOCK, z, foot)
+            for a0_, a1_, z0_, z1_ in clear((a + JOINT / r / 2, a1 - JOINT / r / 2, z + JOINT / 2, z + h - JOINT / 2)):
+                if (a1_ - a0_) * r > 0.04 and z1_ - z0_ > 0.04:
+                    on_wall(a0_, a1_, z0_, z1_, colour)
+            a = a1
+        z += h
+
+
 def porch(x, y_wall, y_lip, half, colour):
     """Where a building's doorway sticks out of its wall (to the lip, where
     you step in): its walls and roof are only its inside, seen from in it;
@@ -1996,7 +2073,7 @@ ring = [(TOWER[0] + math.cos(-math.pi / 2 + 2 * math.pi * k / SIDES) * TOWER_R,
 for k in range(SIDES):
     p0, p1 = ring[k], ring[(k + 1) % SIDES]
     door = k in (0, SIDES - 1)  # the two sides either side of due south
-    shade = [c.vary(GREY, 0.06, Vector((*p0, 1.0)))] * 4
+    shade = [c.vary(TOWER_MORTAR, 0.06, Vector((*p0, 1.0)))] * 4  # (the mortar: its stones go on in front)
     a0 = -math.pi / 2 + 2 * math.pi * k / SIDES
     for piece in wall_pieces(p0, p1, a0, a0 + 2 * math.pi / SIDES, door_top if door else tz0, tz1, HALLS["tower"].floor,
                              lambda a: polygon_at(a, TOWER_R, SIDES, -math.pi / 2)):
@@ -2016,7 +2093,45 @@ for a, half, z0, z1 in TOWER_WINDOWS:
         pts = [(*inside[k], sill), (*outside[k], sill), (*outside[k], lintel), (*inside[k], lintel)]
         built.add(pts if k else pts[::-1], [(0, 1, 2, 3)], [c.vary(GREY, 0.06, Vector(pts[0]))] * 4)
 built.add([(*p, tz1) for p in ring], [tuple(range(SIDES))], [GREY] * SIDES)
-built.cone((*TOWER, tz1), 9, TOWER_R * 1.15, ROOF, sides=SIDES, droop=0)
+# Its stones, outside as in, a little out from the wall (all round, but at
+# the doorway, where the porch is, and the windows).
+door_half = 2 * math.pi / SIDES
+outside_holes = [((-math.pi / 2 - door_half) % (2 * math.pi), (-math.pi / 2 - door_half) % (2 * math.pi) + 2 * door_half,
+                  tz0 - 1, door_top)]
+outside_holes += [((a - half) % (2 * math.pi), (a - half) % (2 * math.pi) + 2 * half, HALLS["tower"].floor + z0,
+                   HALLS["tower"].floor + z1) for a, half, z0, z1 in TOWER_WINDOWS]
+outside_holes += [(lo + 2 * math.pi, hi + 2 * math.pi, h0, h1) for lo, hi, h0, h1 in outside_holes]
+stone_courses(built, random.Random("tower's outside stones"), lambda a: polygon_at(a, TOWER_R + 0.03, SIDES, -math.pi / 2),
+              [-math.pi / 2 + 2 * math.pi * k / SIDES for k in range(2 * SIDES + 3)], TOWER_R, tz0, tz1, outside_holes,
+              height(*TOWER))
+# Its roof: a tall cone of slates, a little flared at its foot, out over the
+# wall at its eaves (an edge to them, and under them flat, so from below you
+# see them, not up inside it).
+EAVE_R = TOWER_R * 1.15
+ROOF_PROFILE = [(EAVE_R, tz1 - 0.3), (EAVE_R * 0.87, tz1 + 1.3), (EAVE_R * 0.6, tz1 + 4.6), (EAVE_R * 0.31, tz1 + 8.2)]
+
+
+def round_roof(r, z):
+    return [(*polygon_at(-math.pi / 2 + 2 * math.pi * k / SIDES, r, SIDES, -math.pi / 2), z) for k in range(SIDES)]
+
+
+rings = [round_roof(r, z) for r, z in ROOF_PROFILE]
+apex = (*TOWER, tz1 + 11.5)
+for n, (lower, upper) in enumerate(zip(rings, rings[1:] + [None])):
+    for k in range(SIDES):
+        k1 = (k + 1) % SIDES
+        shade = c.vary(c.mix(ROOF, c.linear("#000000"), 0.12 * (n == 0)), 0.07, Vector((*lower[k][:2], n)))
+        if upper:
+            built.add([lower[k], lower[k1], upper[k1], upper[k]], [(0, 1, 2, 3)], [shade] * 4)
+        else:
+            built.add([apex, lower[k], lower[k1]], [(0, 1, 2)], [shade] * 3)
+fascia = round_roof(EAVE_R, tz1 - 0.55)
+soffit = round_roof(TOWER_R + 0.02, tz1 - 0.55)
+for k in range(SIDES):
+    k1 = (k + 1) % SIDES
+    edge = c.mix(ROOF, c.linear("#000000"), 0.3)
+    built.add([fascia[k], fascia[k1], rings[0][k1], rings[0][k]], [(0, 1, 2, 3)], [edge] * 4)
+    built.add([fascia[k], soffit[k], soffit[k1], fascia[k1]], [(0, 1, 2, 3)], [c.mix(ROOF, c.linear("#000000"), 0.45)] * 4)
 solid_circle(*TOWER, TOWER_R)
 fl = HALLS["tower"].floor
 porch(TOWER[0], TOWER[1] - HALLS["tower"].r - 0.37, TOWER_LIP[1], WAYS["tower-door"].half, GREY)  # (from the round room's wall)
@@ -2034,7 +2149,7 @@ def balcony_block(u0, v0, u1, v1, z0, z1):
     """A box, square to the way the balcony faces."""
     corners = [out_from_tower(u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))]
     v = [(*p, z0) for p in corners] + [(*p, z1) for p in corners]
-    shade = [c.vary(GREY, 0.1, Vector((*corners[0], z0 + k))) for k in range(8)]
+    shade = [c.vary(TOWER_BLOCK, 0.1, Vector((*corners[0], z0 + k))) for k in range(8)]  # (the tower's stone)
     built.add(v, [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7), (0, 3, 2, 1)], shade)
 
 
@@ -2125,17 +2240,6 @@ for k, (mid, half) in enumerate([(0.15, 0.135), (-0.15, 0.135)]):
 # (The face's middle, and which way it faces, for its words: in three.js's axes.)
 SIGN = {"at": [round(SIGN_MIDDLE.x + 0.004, 3), round(SIGN_MIDDLE.z, 3), round(-SIGN_MIDDLE.y, 3)],
         "facing": [1, 0], "tilt": round(SIGN_TILT, 4), "size": list(SIGN_FACE)}
-
-
-def quad(builder, pts, colour, vary=0.12):
-    # Anything lying flat faces up: facing down, the sun's shadows fall on it
-    # in stripes ("shadow acne").
-    (ax, ay, az), (bx, by, bz), (cx_, cy_, cz) = pts[0], pts[1], pts[2]
-    ux, uy, uz, vx, vy, vz = bx - ax, by - ay, bz - az, cx_ - ax, cy_ - ay, cz - az
-    nz = ux * vy - uy * vx
-    if nz < 0 and abs(nz) > 0.5 * math.sqrt((uy * vz - uz * vy) ** 2 + (uz * vx - ux * vz) ** 2 + nz * nz):
-        pts = pts[::-1]
-    builder.add(pts, [(0, 1, 2, 3)], [c.vary(colour, vary, Vector(pts[0])) for _ in pts])
 
 
 # The charcoal burner's hut, as in its picture: round, a wall of upright
@@ -3523,9 +3627,7 @@ def room(b, hall):
 # foot of the wall, and heaped at the foot of the stairs. And cobwebs (their
 # own object, which the game makes see-through), in the doorway's top
 # corners, the narrow windows' and under the stairs.
-TOWER_BLOCK, TOWER_FLAG = c.linear("#6e6a62"), c.linear("#615d55")
-DAMP, MOSS, WEB = c.linear("#3f4434"), c.linear("#4a5a2c"), c.linear("#d8d8d4")
-COURSE, JOINT = (0.34, 0.48), 0.035  # how tall a course of blocks is, and the mortar between
+DAMP, MOSS, WEB = TOWER_DAMP, TOWER_MOSS, c.linear("#d8d8d4")
 webs = c.Builder()
 
 
@@ -3535,63 +3637,16 @@ def tower_stones(b, hall, sides):
     wall_r = R + 0.35  # (round_room's wall)
     corners = [2 * math.pi * k / sides for k in range(2 * sides + 1)]
 
-    def on_wall(a0, a1, z0, z1, colour):
-        """A block's face on the wall, between two angles, in front of the
-        mortar: split at the wall's corners, so it lies flat on it."""
-        cuts = [a0] + [k for k in corners if a0 < k < a1] + [a1]
-        for b0, b1 in zip(cuts, cuts[1:]):
-            p0, p1 = polygon_at(b0, wall_r - 0.03, sides, 0), polygon_at(b1, wall_r - 0.03, sides, 0)
-            quad(b, [(*p0, z0), (*p1, z0), (*p1, z1), (*p0, z1)], colour, 0.05)
-
     # Where the wall's open: the doorway, and the windows (once round, and
     # again past the start, where the courses end).
     holes = []
     for a, half, z0, z1 in [tower_door()] + TOWER_WINDOWS:
         holes.append(((a - half) % (2 * math.pi), (a - half) % (2 * math.pi) + 2 * half, f + z0, f + z1))
     holes += [(lo + 2 * math.pi, hi + 2 * math.pi, h0, h1) for lo, hi, h0, h1 in holes]
-
-    def clear(rect):
-        """The parts of a block (a0, a1, z0, z1) clear of the openings."""
-        out = [rect]
-        for lo, hi, h0, h1 in holes:
-            left = []
-            for a0, a1, z0, z1 in out:
-                if a1 <= lo or a0 >= hi or z1 <= h0 or z0 >= h1:
-                    left.append((a0, a1, z0, z1))
-                    continue
-                left += [(a0, a1, z0, h0)] if z0 < h0 else []
-                left += [(a0, a1, h1, z1)] if z1 > h1 else []
-                zl, zh = max(z0, h0), min(z1, h1)
-                left += [(a0, lo, zl, zh)] if a0 < lo else []
-                left += [(hi, a1, zl, zh)] if a1 > hi else []
-            out = left
-        return out
+    stone_courses(b, rnd, lambda a: polygon_at(a, wall_r - 0.03, sides, 0), corners, wall_r, f, f + tall, holes, f)
 
     def stone(base, z):
-        """A stone's colour: its own shade, damp and sometimes mossy low down."""
-        t = rnd.uniform(-0.2, 0.35)
-        colour = c.mix(base, c.linear("#000000"), t) if t > 0 else c.mix(base, c.linear("#a8a398"), -t)
-        low = max(0.0, 1 - (z - f) / 1.4)
-        if rnd.random() < low * 0.8:
-            colour = c.mix(colour, DAMP, rnd.uniform(0.3, 0.7))
-        if rnd.random() < low * 0.35:
-            colour = c.mix(colour, MOSS, rnd.uniform(0.3, 0.6))
-        return colour
-
-    # The wall: course on course, each block a little longer or shorter, the
-    # joints between them never in line with the course's below.
-    z = f
-    while z < f + tall - 0.05:
-        h = min(rnd.uniform(*COURSE), f + tall - z)
-        start = a = rnd.uniform(0.2, 0.7) / wall_r
-        while a < start + 2 * math.pi - 0.3 / wall_r:
-            a1 = min(a + rnd.uniform(0.55, 1.15) / wall_r, start + 2 * math.pi)
-            colour = stone(TOWER_BLOCK, z)
-            for a0_, a1_, z0_, z1_ in clear((a + JOINT / wall_r / 2, a1 - JOINT / wall_r / 2, z + JOINT / 2, z + h - JOINT / 2)):
-                if (a1_ - a0_) * wall_r > 0.04 and z1_ - z0_ > 0.04:
-                    on_wall(a0_, a1_, z0_, z1_, colour)
-            a = a1
-        z += h
+        return stone_shade(rnd, base, z, f)
 
     # The floor: flagstones on a jittered grid, some of them two together,
     # cut at the outer wall (it reaches out under the doorway).
