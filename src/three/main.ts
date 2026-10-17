@@ -432,6 +432,8 @@ let opened = new Set<Shape>(); // by an object in use
 // A way that kills you even with the object (the balcony) has no far side
 // you could have come from: it stops you from every side.
 const deadly = (names: string[]) => names.every((name) => exitOf(name)?.fatal);
+// (And one that kills you, going through it, you can step back in, having come the free way.)
+const fatal = (names: string[]) => names.some((name) => exitOf(name)?.obstacle?.fatal);
 function solidify() {
   for (const under of [false, true]) {
     const here = [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
@@ -442,7 +444,17 @@ function solidify() {
       [
         ...closed.flatMap(({ circle, names, reach = AHEAD, allRound }) =>
           circle
-            ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: reach, allRound: allRound || deadly(names) }]
+            ? [
+                {
+                  x: circle[0],
+                  z: circle[1],
+                  r: circle[2],
+                  names,
+                  ahead: reach,
+                  allRound: allRound || deadly(names),
+                  fatal: fatal(names),
+                },
+              ]
             : []
         ),
         ...(under ? underCircles : circles),
@@ -459,6 +471,7 @@ function solidify() {
                   names,
                   ahead: reach,
                   allRound: allRound || deadly(names),
+                  fatal: fatal(names),
                 },
               ]
             : []

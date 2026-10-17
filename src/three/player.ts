@@ -14,6 +14,11 @@ export interface Circle {
   ahead?: number;
   /** No far side to have come from (a way that kills you): it stops you all round. */
   allRound?: boolean;
+  /**
+   * Going through it kills you: come into it the free way, you can step back
+   * and forth in it (only walking into it again from its far side does).
+   */
+  fatal?: boolean;
   /** The height of its top, if it's low enough to climb onto. */
   top?: number;
   /** The height of its underside, if it's a slab you can walk under (once it's over your head). */
@@ -30,6 +35,11 @@ export interface Box {
   ahead?: number;
   /** No far side to have come from (a way that kills you): it stops you all round. */
   allRound?: boolean;
+  /**
+   * Going through it kills you: come into it the free way, you can step back
+   * and forth in it (only walking into it again from its far side does).
+   */
+  fatal?: boolean;
   top?: number;
 }
 
@@ -777,6 +787,7 @@ export class Player {
   // can't turn back through it: a step back towards it stops, and it says why
   // (no bounce: you're already in its reach, maybe right by it, landed over a wall).
   private turnedBack(thing: Circle | Box) {
+    if (thing.fatal) return;
     const p = this.position;
     const exit = thing.names && wayThrough(thing.names, thing.x, thing.z, p.x, p.z);
     if (!exit) return;
