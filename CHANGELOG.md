@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.11.0](https://github.com/druewilding/merlins-castle/compare/v2.10.0...v2.11.0) (2026-10-17)
+
+
+### Features
+
+* Add a walking, clothed Merlin and put him in the lair, which is now resized and decorated a bit ([#85](https://github.com/druewilding/merlins-castle/issues/85)) ([5c83df0](https://github.com/druewilding/merlins-castle/commit/5c83df02e4e967ef328ca62f8054263b27323ae6))
+* Add the lamp, lit in your hand, swinging and lighting the dark tunnels, and burning where you drop it ([#90](https://github.com/druewilding/merlins-castle/issues/90)) ([25d7f0e](https://github.com/druewilding/merlins-castle/commit/25d7f0e527fdd698ee52efca609b1eeab3a8b1aa))
+* Add the ring of toadstools ([#87](https://github.com/druewilding/merlins-castle/issues/87)) ([0ead9b8](https://github.com/druewilding/merlins-castle/commit/0ead9b8a8259d99628c7825d4c432698c7839c7c))
+* Add the witches, hiding, dancing, capturing and flying away ([#86](https://github.com/druewilding/merlins-castle/issues/86)) ([d9dc804](https://github.com/druewilding/merlins-castle/commit/d9dc80497a9702292c7886b210825adddad05b77))
+* Colour-grade like golden hour ([#92](https://github.com/druewilding/merlins-castle/issues/92)) ([08c252a](https://github.com/druewilding/merlins-castle/commit/08c252a5b1d459ffeeb5e4f65960104e51ad0883))
+* Improve the look of the outside of the tower ([#93](https://github.com/druewilding/merlins-castle/issues/93)) ([bfa6e8d](https://github.com/druewilding/merlins-castle/commit/bfa6e8d12dd432173754d18d7a6bb4315a221762))
+* Make the maze and surrounding area look way better ([#91](https://github.com/druewilding/merlins-castle/issues/91)) ([f367ed6](https://github.com/druewilding/merlins-castle/commit/f367ed607c8550da59640c49cb1ededceb088a28))
+* Move the sun to the south-west, for late afternoon light ([#94](https://github.com/druewilding/merlins-castle/issues/94)) ([907e7d2](https://github.com/druewilding/merlins-castle/commit/907e7d2dea652d492b35e2684a18ce004dd2ac2b))
+* Replace getting lost with notes at the dead ends: among the old stones in the forest, in the rock in the tunnels ([#89](https://github.com/druewilding/merlins-castle/issues/89)) ([96d3e91](https://github.com/druewilding/merlins-castle/commit/96d3e9124e7cfc4d341346c44033d1b28abdd8f1))
+* Restyle the snake: sea green, big eyes, a hood, and bigger overall ([#88](https://github.com/druewilding/merlins-castle/issues/88)) ([f326828](https://github.com/druewilding/merlins-castle/commit/f326828c80262001dba67a105b44c647d815052a))
+
+
+### Continuous Integration
+
+* Check types before running the tests ([#95](https://github.com/druewilding/merlins-castle/issues/95)) ([59f603c](https://github.com/druewilding/merlins-castle/commit/59f603ca7b2a6af029fdbe9e5edfb0fd2d63ef80))
+
 ## [2.10.0](https://github.com/druewilding/merlins-castle/compare/v2.9.0...v2.10.0) (2026-10-15)
 
 
