@@ -12,7 +12,7 @@ export function sky(sun: Vector3, horizon: Color): Mesh {
       sun: { value: sun.clone().normalize() },
       top: { value: new Color("#4f86c9") },
       horizon: { value: horizon },
-      glow: { value: new Color("#ffd28a") },
+      glow: { value: new Color("#ffc46a") },
     },
     vertexShader: /* glsl */ `
       varying vec3 direction;
@@ -33,7 +33,7 @@ export function sky(sun: Vector3, horizon: Color): Mesh {
         float toward = max(dot(direction, sun), 0.0);
         // (A wide warm glow round the sun, low in the sky, and the sun itself.)
         float low = 1.0 - smoothstep(0.0, 0.6, up);
-        colour = mix(colour, glow, pow(toward, 4.0) * 0.35 * low + pow(toward, 12.0) * 0.5 + pow(toward, 600.0));
+        colour = mix(colour, glow, pow(toward, 3.0) * 0.55 * low + pow(toward, 12.0) * 0.6 + pow(toward, 600.0));
         gl_FragColor = vec4(colour, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
