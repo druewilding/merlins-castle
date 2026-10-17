@@ -1,31 +1,32 @@
 {
   "name": "merlins-castle",
   "version": "2.10.0",
-  "private": true,
   "description": "A remake of Anita Straker's BBC Micro adventure Merlin's Castle",
   "license": "ISC",
   "author": "Drue Wilding",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "world": "cd original && python3 convert.py",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "lint": "eslint --fix",
-    "lint:check": "eslint",
-    "types:check": "tsc --noEmit",
-    "art:status": "node scripts/art.js --list",
     "art": "node scripts/art.js",
     "art:build": "node scripts/build-art.js",
-    "sounds": "node scripts/make-sounds.js",
+    "art:status": "node scripts/art.js --list",
+    "build": "tsc --noEmit && vite build",
+    "dev": "vite",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "gaps": "node scripts/gaps.js",
+    "lint": "eslint --fix",
+    "lint:check": "eslint",
     "models": "node scripts/models.js",
-    "gaps": "node scripts/gaps.js"
+    "preview": "vite preview",
+    "sounds": "node scripts/make-sounds.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "types:check": "tsc --noEmit",
+    "world": "cd original && python3 convert.py"
   },
-  "prettier": "eslint-config-plus-prettier/prettier",
+  "dependencies": {
+    "three": "^0.186.1"
+  },
   "devDependencies": {
     "@types/three": "^0.186.0",
     "eslint-config-plus-prettier": "4.3.3",
@@ -35,7 +36,6 @@
     "vite": "8.3.4",
     "vitest": "5.0.3"
   },
-  "dependencies": {
-    "three": "^0.186.1"
-  }
+  "private": true,
+  "prettier": "eslint-config-plus-prettier/prettier"
 }
