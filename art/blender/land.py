@@ -48,7 +48,8 @@ def at(col_row):
 
 P = {place: at(cr) for place, cr in layout["places"].items()}
 KIND = {place: kind for kind, places in layout["kinds"].items() if kind != "_" for place in places}
-# The forest's dead ends, where a path ends at brambles, with a clue on a post
+# The forest's dead ends, where a path comes into a clearing and goes on as a
+# trail, into the trees, to old stones, with a clue on a post among them
 # (each clears the forest round it, on the side you come from). Underground,
 # the clues are at the tunnels' dead ends (a Way's `clue`).
 CLUES = {k: at(v) for k, v in layout["clues"].items() if k != "_"}
@@ -303,15 +304,15 @@ path_lines = Lines()
 for line in paths:
     path_lines.add(line)
 
-# Past each dead end's brambles, the trail goes on into the trees, wandering,
-# overgrown, as if it led somewhere: to a glimpse of something old in a
-# sunlit gap (standing stones, a ruined arch). Only to look at: the brambles
-# are too thick to get through. (Its kind, how far it goes past the path's
-# end, and how far it turns off straight on: south of the witches, away from
-# the moat's bank.)
+# From each dead end's clearing, a trail goes on into the trees, wandering,
+# little trodden, to something old in a sunlit gap (standing stones, a
+# ruined arch), where the clue is hidden among the stones. (Its kind, how far
+# it goes past the path's end, and how far it turns off straight on: south
+# of the witches, away from the moat's bank.)
 LURE_KINDS = {"forest-crossroads west": ("ring", 20, 0), "forest-witches north": ("ruined arch", 10, 0),
               "forest-witches south": ("stones", 16, -0.7)}
 GAP = 4.5  # the sunlit gap round what's there
+TRAIL_WALK = 1.5  # how far either side of a trail's middle you can walk
 LURES = {}  # each dead end's trail on: [(x, y)], and where it ends
 trails = Lines()
 for key, spot in CLUES.items():
@@ -328,7 +329,7 @@ for key, spot in CLUES.items():
 
 
 def on_a_lure(x, y):
-    """Along a trail past a dead end's brambles, or in the gap at its end."""
+    """Along a trail on from a dead end's clearing, or in the gap at its end."""
     return trails.distance(x, y) < 2.6 or any(math.hypot(x - t[-1][0], y - t[-1][1]) < GAP for t in LURES.values())
 
 # ---------------------------------------------------------------- ways underground
@@ -862,9 +863,10 @@ def walkable(x, y):
     floor = open_to_the_sky(x, y, 2.0)
     if floor is not None and floor < height(x, y) - 0.35:
         return False  # over the ramp: you go in at the top
-    # (Not along the trails past the brambles: only to look at. Nor into the brambles.)
-    if in_the_brambles(x, y):
-        return False
+    # Along the trails to the old stones, and round them (under the trees'
+    # branches, in the middle: their trunks are off the trail).
+    if trails.distance(x, y) < TRAIL_WALK or any(math.hypot(x - t[-1][0], y - t[-1][1]) < GAP - 0.6 for t in LURES.values()):
+        return True
     return open_ground(x, y, lures=False) and not rocky(x, y) and not in_building(x, y) and not under_a_tree(x, y)
 
 
@@ -1837,7 +1839,14 @@ OLD_STONES = []  # (x, y, r): stones you can get to (nothing grows in them)
 lures = c.Builder()
 for key, trail in LURES.items():
     (ex, ey), (bx, by) = trail[-1], trail[-2]
-    old_stones(lures, LURE_KINDS[key][0], ex, ey, math.atan2(ey - by, ex - bx))
+    kind, yaw = LURE_KINDS[key][0], math.atan2(ey - by, ex - bx)
+    old_stones(lures, kind, ex, ey, yaw, solid=True)
+    # The clue among them, facing the way you come: in the middle (through
+    # the arch, a little past it).
+    on = 1.9 if "arch" in kind else 0.0
+    post_x, post_y = ex + math.cos(yaw) * on, ey + math.sin(yaw) * on
+    note_post(built, key, post_x, post_y, height(post_x, post_y), (-math.cos(yaw), -math.sin(yaw)))
+    solid_circle(post_x, post_y, 0.15)
 # And some where you can get to them, so there's something to them: a ring
 # in the meadow, between the grassy bank and the old stone wall; an arch at
 # the forest's edge, to walk through; and a few among the yellow flowers.
@@ -1847,30 +1856,15 @@ for kind, (x, y), yaw in VISITED:
     old_stones(lures, kind, x, y, yaw, solid=True)
 lures.build("old-stones", smooth=False)
 
-# At each of the forest's dead ends, the path runs into brambles: a thicket
-# right across the clearing, from the trees on one side to the trees on the
-# other, too thick to get through (the trail past them goes on, overgrown,
-# into the trees). Mounds of dark leaves, canes arching out of them, thorny
-# and purple-red, with blackberries on them (and a few still red), and here
-# and there a white flower. At the path's end, in front of them, a clue on a
-# post (note_post).
+# A few brambles round each of the forest's dead ends: either side of where
+# the trail goes on into the trees, and by the old stones. Mounds of leaves,
+# canes arching out of them, thorny and purple-red, with blackberries on them
+# (and a few still red), and here and there a white flower.
 BRAMBLE_LEAVES = [c.linear(h) for h in ("#4a6e2c", "#557a31", "#3f6128", "#5c7f36")]
 BRAMBLE_CANE = c.linear("#6d3b3f")
 BERRIES = [c.linear(h) for h in ("#1e1024", "#2c1433", "#4a1d3f", "#b0303a")]
 BRAMBLE_FLOWER = c.linear("#f1ece0")
-BRAMBLES_FROM, BRAMBLES_TO = 0.3, 3.8  # how far on past a path's end they are
-BRAMBLES_WIDE = 11.5  # how far to either side (to the trees)
 brambles = c.Builder()
-
-
-def in_the_brambles(x, y):
-    """In a dead end's brambles (or past them, in its clearing)."""
-    for key, spot in CLUES.items():
-        if math.hypot(x - spot[0], y - spot[1]) < 12:
-            ahead, _ = ahead_of(key, x, y)
-            if ahead > 0.1:
-                return True
-    return False
 
 
 def bramble_cane(b, rng, x, y, z, yaw, reach, tall):
@@ -1888,44 +1882,46 @@ def bramble_cane(b, rng, x, y, z, yaw, reach, tall):
                        0.024, rng.choice(BERRIES), subdivisions=1)
 
 
+def bramble(rng, x, y, size, squash):
+    """A mound of brambles at [x, y], `size` across (to its middle), and as
+    much taller or flatter as `squash` says: solid."""
+    tall = 2 * size * squash
+    z = height(x, y) - 0.15
+    brambles.blob((x, y, z + tall * 0.45), size, rng.choice(BRAMBLE_LEAVES), squash=squash, lumpy=0.22,
+                  seed=rng.random() * 100, subdivisions=2)
+    # Canes out of it, every which way.
+    for n in range(rng.randint(2, 4)):
+        bramble_cane(brambles, rng, x, y, z + tall * rng.uniform(0.5, 0.8), rng.uniform(0, 2 * math.pi),
+                     rng.uniform(0.6, 1.3), rng.uniform(0.25, 0.5))
+    # Berries in its leaves, and now and then a flower.
+    for n in range(rng.randint(4, 9)):
+        a, up = rng.uniform(0, 2 * math.pi), rng.uniform(0.2, 0.9)
+        r = size * 0.97 * math.sqrt(1 - up * up)
+        colour = BRAMBLE_FLOWER if rng.random() < 0.12 else rng.choice(BERRIES)
+        brambles.blob((x + math.cos(a) * r, y + math.sin(a) * r, z + tall * 0.45 + up * tall * 0.5),
+                      0.03 if colour is BRAMBLE_FLOWER else 0.025, colour, subdivisions=1)
+    solid_circle(x, y, size * 0.85)
+
+
 def thicket(key, spot):
-    """A dead end's brambles, and its clue in front of them."""
+    """A dead end's few brambles: in its clearing, either side of the trail
+    on, and at the edge of the gap round its old stones (never on the way)."""
     px, py = P[key.split(" ")[0]]
     run = math.hypot(spot[0] - px, spot[1] - py)
     dx, dy = (spot[0] - px) / run, (spot[1] - py) / run  # on, past the path's end
     sx, sy = -dy, dx  # to the side
     rng = random.Random(f"brambles {key}")
-    side = -BRAMBLES_WIDE
-    while side <= BRAMBLES_WIDE:
-        for row, on in enumerate((BRAMBLES_FROM + 0.8, BRAMBLES_FROM + 1.9, BRAMBLES_TO - 0.4)):
-            on += rng.uniform(-0.3, 0.3)
-            x, y = spot[0] + dx * on + sx * (side + rng.uniform(-0.3, 0.3)), spot[1] + dy * on + sy * (side + rng.uniform(-0.3, 0.3))
-            if math.hypot(x - spot[0], y - spot[1]) > 12.5:
-                continue
-            # (Rounded mounds, wider than they're tall: lower in front.)
-            size = rng.uniform(0.7, 0.95) * (0.85 + 0.12 * row)
-            squash = rng.uniform(0.62, 0.8) + 0.08 * row
-            tall = 2 * size * squash
-            z = height(x, y) - 0.15
-            brambles.blob((x, y, z + tall * 0.45), size, rng.choice(BRAMBLE_LEAVES), squash=squash, lumpy=0.22,
-                          seed=rng.random() * 100, subdivisions=2)
-            # Canes out of it, most of them reaching out towards you.
-            for n in range(rng.randint(1, 3)):
-                yaw = math.atan2(-dy, -dx) + rng.uniform(-1.4, 1.4) if rng.random() < 0.7 else rng.uniform(0, 2 * math.pi)
-                bramble_cane(brambles, rng, x, y, z + tall * rng.uniform(0.5, 0.8), yaw, rng.uniform(0.6, 1.3),
-                             rng.uniform(0.25, 0.5))
-            # Berries in its leaves, and now and then a flower.
-            for n in range(rng.randint(4, 9)):
-                a, up = rng.uniform(0, 2 * math.pi), rng.uniform(0.2, 0.9)
-                r = size * 0.97 * math.sqrt(1 - up * up)
-                colour = BRAMBLE_FLOWER if rng.random() < 0.12 else rng.choice(BERRIES)
-                brambles.blob((x + math.cos(a) * r, y + math.sin(a) * r, z + tall * 0.45 + up * tall * 0.5),
-                              0.03 if colour is BRAMBLE_FLOWER else 0.025, colour, subdivisions=1)
-        side += rng.uniform(0.9, 1.3)
-    # The clue, at the path's end.
-    post_x, post_y = spot[0] - dx * 0.4, spot[1] - dy * 0.4
-    note_post(built, key, post_x, post_y, height(post_x, post_y), (-dx, -dy))
-    solid_circle(post_x, post_y, 0.15)
+    (ex, ey) = LURES[key][-1]
+    spots = [(spot[0] + dx * rng.uniform(-0.5, 1.8) + sx * side * rng.uniform(3.5, 8),
+              spot[1] + dy * rng.uniform(-0.5, 1.8) + sy * side * rng.uniform(3.5, 8))
+             for side in (1, -1) for _ in range(3)]
+    spots += [(ex + math.cos(a) * (GAP - 0.4), ey + math.sin(a) * (GAP - 0.4))
+              for a in (rng.uniform(0, 2 * math.pi) for _ in range(3))]
+    for x, y in spots:
+        size = rng.uniform(0.6, 0.9)
+        if trails.distance(x, y) < TRAIL_WALK + size + 0.5 or path_lines.distance(x, y) < 3 + size:
+            continue
+        bramble(rng, x, y, size, rng.uniform(0.62, 0.85))
 
 
 for key, spot in CLUES.items():

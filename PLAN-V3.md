@@ -208,13 +208,14 @@ icons where they can be).
 
 ### Clues
 
-The six clue rooms are **dead ends**: three paths in the forest that run
-into a thicket too dense to get through, and three tunnels that end in the
-rock. In the original, going that way you got lost, and the game ended. In
-3D you can see exactly where you are, so being lost would ring false, and
-nothing should stop you finding them all: at each dead end, a note is nailed
-to a post. Look at it and press E, and it **unrolls on the screen**, the clue
-on it in your language; E again rolls it up, and you carry on.
+The six clue rooms are **dead ends**: three paths in the forest that peter
+out into trails, each to old stones in a sunlit gap among the trees, and
+three tunnels that end in the rock. In the original, going that way you got
+lost, and the game ended. In 3D you can see exactly where you are, so being
+lost would ring false, and nothing should stop you finding them all: at each
+dead end, hidden among the stones or at the tunnel's end, a note is nailed to
+a post. Look at it and press E, and it **unrolls on the screen**, the clue on
+it in your language; E again rolls it up, and you carry on.
 
 ## Things that undo themselves
 

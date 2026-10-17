@@ -62,7 +62,7 @@
     ]
   },
   "clues": {
-    "_": "Where the forest's dead ends are, each with a clue: the exit that leads there, and where its path ends at the brambles (underground, the clues are at the tunnels' dead ends)",
+    "_": "Where the forest's dead ends are: the exit that leads there, and where its path ends (a trail goes on from there to old stones, with the clue among them; underground, the clues are at the tunnels' dead ends)",
     "forest-crossroads west": [-1, 6],
     "forest-witches north": [1, 5.35],
     "forest-witches south": [1, 7]
