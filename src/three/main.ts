@@ -150,9 +150,7 @@ const sunlight = new DirectionalLight("#ffc472", SUNLIGHT);
 sunlight.castShadow = true;
 sunlight.shadow.mapSize.set(2048, 2048);
 Object.assign(sunlight.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 400 });
-// (Shadows are cast from things' far sides, so only a hair of bias: more, and
-// light leaks in where walls meet, through the near side of whatever shades it.)
-sunlight.shadow.bias = -0.00002;
+sunlight.shadow.bias = -0.0004;
 sunlight.shadow.normalBias = 0.05;
 scene.add(sunlight, sunlight.target);
 
