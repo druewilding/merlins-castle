@@ -8,6 +8,11 @@
 // The three of them are made from the one model: each wears her own robe
 // and hat (witch-robe-n, witch-hat-n), the others hidden.
 //
+// Use the broom and they stop dancing and fly off "to the moon", each on a
+// broom of her own, up and away over the trees. Once it's no longer in use
+// there (you've gone on), they're back in hiding the next time you're not
+// looking, ready to come out and dance again.
+//
 // Walk into them (without the broom) and they catch you: they run at you,
 // close round you, throw their ropes over you, and dance round you, tied
 // up (caught.ts plays it, from where you are).
@@ -18,10 +23,16 @@ import {
   type AnimationAction,
   type AnimationClip,
   AnimationMixer,
+  Box3,
+  type Camera,
+  Frustum,
+  Group,
   LoopOnce,
+  Matrix4,
   Mesh,
   type Object3D,
   type Scene,
+  Sphere,
   Vector3,
 } from "three";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
@@ -36,6 +47,17 @@ const SIZES = [1, 0.94, 0.97]; // each witch's size, from the model's
 const FACE = 1.5; // metres up, her face (standing, at the model's size)
 const STARTS = [0, 0.37, 0.71]; // how far into her dance each one is (of its length): not in step
 const CLOSE = 1.2; // metres from you, closed round you, catching you
+// Flying off: each one a little after the one before (seconds), crouching
+// to spring up; then how fast she rises and goes (metres a second, and more
+// each second), and how long till she's out of sight.
+const AFTER = 0.35;
+const SPRING = 0.5;
+const RISE = [1.2, 2.2];
+const AWAY = [2.5, 3.5];
+const GONE = 10;
+// Her broom, under her as she sits (in her model's metres: its middle, back
+// from her hips, and how far up).
+const SEAT = [0, -0.12, 0.5];
 const ROUND_YOU = 1.1; // radians a second, the ring turning as they dance round you, tied up
 
 export interface Ring {
@@ -44,22 +66,25 @@ export interface Ring {
   r: number;
 }
 
-type State = "hiding" | "coming" | "tying" | "dancing" | "going";
+type State = "hiding" | "coming" | "tying" | "dancing" | "going" | "flying" | "flown";
 
 class Witch {
   readonly model: Object3D;
   private mixer: AnimationMixer;
   private clips = new Map<string, AnimationAction>();
   private playing: AnimationAction | undefined;
+  readonly broom = new Group();
   state: State = "hiding";
   yaw = 0; // which way she faces (0 is +z)
+  flight = { t: 0, heading: 0, swing: 0 }; // flying off: how long since she was told to, and which way
 
   constructor(
     scene: Scene,
     source: Object3D,
     animations: AnimationClip[],
     n: number,
-    readonly hide: { x: number; z: number }
+    readonly hide: { x: number; z: number },
+    broom: Object3D
   ) {
     this.model = clone(source);
     this.model.traverse((o) => {
@@ -72,14 +97,28 @@ class Witch {
       }
     });
     this.model.scale.setScalar(SIZES[n % SIZES.length]);
+    // Her broom: lying along under her, its twigs behind.
+    const stick = broom.clone();
+    stick.position.set(0, 0, 0);
+    stick.rotation.set(0, 0, 0);
+    stick.traverse((o) => (o.castShadow = true));
+    const middle = new Box3().setFromObject(stick).getCenter(new Vector3());
+    stick.position.sub(middle);
+    this.broom.add(stick);
+    this.broom.position.set(SEAT[0], SEAT[2], SEAT[1]);
+    this.broom.scale.setScalar(1 / this.model.scale.x);
+    this.broom.visible = false;
+    this.model.add(this.broom);
     scene.add(this.model);
     this.mixer = new AnimationMixer(this.model);
     for (const clip of animations) this.clips.set(clip.name, this.mixer.clipAction(clip));
     const dance = this.clips.get("Dance_Loop");
     if (dance) dance.time = STARTS[n % STARTS.length] * dance.getClip().duration;
-    const rope = this.clips.get("OverhandThrow");
-    rope?.setLoop(LoopOnce, 1);
-    if (rope) rope.clampWhenFinished = true;
+    for (const once of ["OverhandThrow", "Jump_Start"]) {
+      const action = this.clips.get(once);
+      action?.setLoop(LoopOnce, 1);
+      if (action) action.clampWhenFinished = true;
+    }
   }
 
   /** Whether what she's doing once (throwing her rope) is done. */
@@ -132,6 +171,8 @@ export class Witches {
   private spot = new Vector3();
   private readonly home: Ring; // their own ring, across the way west
   private caught = false;
+  private frustum = new Frustum();
+  private matrix = new Matrix4();
 
   constructor(
     scene: Scene,
@@ -142,20 +183,44 @@ export class Witches {
     hides: { x: number; z: number }[],
     /** Where you look from, as they hide (they peek out that way). */
     private from: { x: number; z: number },
-    private ground: Ground
+    private ground: Ground,
+    broom: Object3D,
+    private reducedMotion: boolean
   ) {
     this.home = ring;
-    this.witches = hides.map((hide, n) => new Witch(scene, model, animations, n, hide));
+    this.witches = hides.map((hide, n) => new Witch(scene, model, animations, n, hide, broom));
     for (const witch of this.witches) this.hideNow(witch);
   }
 
   // Back behind her tree, crouching, peeking out at the clearing.
   private hideNow(witch: Witch) {
     witch.state = "hiding";
+    witch.model.visible = true;
+    witch.broom.visible = false;
     witch.model.position.set(witch.hide.x, 0, witch.hide.z);
     witch.yaw = Math.atan2(this.from.x - witch.hide.x, this.from.z - witch.hide.z);
     witch.model.rotation.y = witch.yaw;
     witch.play("Crouch_Idle_Loop");
+  }
+
+  /** You've used the broom here (you, where you are): they fly off, away from you. */
+  flyOff(you: Vector3) {
+    if (this.reducedMotion) return this.away();
+    this.witches.forEach((witch, n) => {
+      if (witch.state === "flying" || witch.state === "flown") return;
+      const { x, z } = witch.model.position;
+      const heading = Math.atan2(x - you.x, z - you.z) + (n - 1) * 0.35;
+      witch.flight = { t: 0, heading, swing: n * 2.1 };
+      witch.state = "flying";
+    });
+  }
+
+  /** Gone (a game loaded with the broom in use here). */
+  away() {
+    for (const witch of this.witches) {
+      witch.state = "flown";
+      witch.model.visible = false;
+    }
   }
 
   /** They catch you, standing here: they close round you. */
@@ -186,16 +251,26 @@ export class Witches {
     return this.spot.set(x + Math.sin(a) * r, 0, z + Math.cos(a) * r);
   }
 
-  /** Each frame: whether they're out (you're in their clearing). */
-  update(dt: number, out: boolean) {
+  /**
+   * Each frame: whether they're out (you're in their clearing); and, flown
+   * off, whether they may come back (the broom's no longer in use there): they
+   * do when you're not looking (camera: where you're looking from).
+   */
+  update(dt: number, out: boolean, camera: Camera, back: boolean) {
+    if (back && this.witches.every((witch) => witch.state === "flown") && !this.seen(camera)) {
+      for (const witch of this.witches) this.hideNow(witch);
+    }
     // (Catching you, the ring's still till they've all thrown their ropes.)
     const tied = this.witches.every((witch) => witch.state === "dancing");
     this.turned += (this.caught ? (tied ? ROUND_YOU : 0) : SPIN) * dt;
     this.witches.forEach((witch, n) => {
       const at = witch.model.position;
+      if (witch.state === "flown") return;
       // (Catching you, they're out, whatever: each throws her rope as she gets to you.)
-      if (!this.caught && out && witch.state !== "dancing") witch.state = "coming";
-      if (!this.caught && !out && witch.state !== "hiding") witch.state = "going";
+      const free = !this.caught && witch.state !== "flying";
+      if (free && out && witch.state !== "dancing") witch.state = "coming";
+      if (free && !out && witch.state !== "hiding") witch.state = "going";
+      if (witch.state === "flying") return this.fly(witch, n, dt);
       if (witch.state === "coming") {
         const { x, z } = this.place(n);
         if (witch.run(x, z, dt)) witch.state = this.caught ? "tying" : "dancing";
@@ -218,6 +293,45 @@ export class Witches {
       }
       at.y = this.ground(at.x, at.z) ?? at.y;
       witch.update(dt);
+    });
+  }
+
+  // Flying off: stopping, then, each in turn, springing up onto her broom,
+  // and up and away, swaying from side to side, faster and faster.
+  private fly(witch: Witch, n: number, dt: number) {
+    const flight = witch.flight;
+    flight.t += dt;
+    const s = flight.t - n * AFTER - SPRING; // (since she sprang up)
+    if (s < -SPRING) witch.play("Idle_Loop");
+    else if (s < 0) witch.play("Jump_Start");
+    else {
+      witch.broom.visible = true;
+      witch.play("Sitting_Idle_Loop");
+      const heading = flight.heading + 0.3 * Math.sin(s * 1.2 + flight.swing);
+      witch.yaw = heading;
+      witch.model.rotation.y = heading;
+      const at = witch.model.position;
+      const away = (AWAY[0] + AWAY[1] * s) * dt;
+      at.x += Math.sin(heading) * away;
+      at.z += Math.cos(heading) * away;
+      at.y += (RISE[0] + RISE[1] * s) * dt + 0.25 * Math.cos(s * 3 + flight.swing) * dt;
+      if (s > GONE) {
+        witch.state = "flown";
+        witch.model.visible = false;
+      }
+    }
+    witch.update(dt);
+  }
+
+  /** Whether you could see any of them, hiding, from where you are (roughly: whether it's in view at all). */
+  private seen(camera: Camera) {
+    camera.updateMatrixWorld();
+    this.matrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    this.frustum.setFromProjectionMatrix(this.matrix);
+    const near = (x: number, z: number) => Math.hypot(camera.position.x - x, camera.position.z - z) < 5;
+    return this.witches.some(({ hide: { x, z } }) => {
+      const y = (this.ground(x, z) ?? 0) + 0.8;
+      return near(x, z) || this.frustum.intersectsSphere(new Sphere(new Vector3(x, y, z), 1.2));
     });
   }
 }

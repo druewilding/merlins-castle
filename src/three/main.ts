@@ -505,7 +505,9 @@ const merlin = new Merlin(
 player.movers.push(merlin.body);
 
 // The witches (witches.ts): dancing in a ring across the way west to the
-// crossroads, or else hiding behind the trees either side of it.
+// crossroads, or else hiding behind the trees either side of it; flying
+// off, the broom used there.
+const dancers = shapeOf.get("forest-witches west");
 const clearing = PLACES.get("forest-witches")!;
 const witches = new Witches(
   scene,
@@ -518,7 +520,9 @@ const witches = new Witches(
     { x: clearing.x - 19.3, z: clearing.z - 11.4 },
   ],
   clearing,
-  ground
+  ground,
+  things.scene.getObjectByName("broom")!,
+  reducedMotion
 );
 // The sign warning you of them, on the corner by their clearing's crossing.
 void paintSign(scene, land.sign as SignSpot);
@@ -650,7 +654,8 @@ function inUse() {
         shape === guarded ||
         shape === shut ||
         shape === crossing ||
-        shape === heaped)
+        shape === heaped ||
+        shape === dancers)
       ? [`${here} ${direction}`]
       : [];
   });
@@ -671,6 +676,11 @@ function inUse() {
     if (instantly) snake.away();
     else snake.feed(player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
   } else if (instantly && here !== "tower") snake.back();
+  // The broom used on the witches: they fly off (or, loading, they've gone).
+  if (dancers && opened.has(dancers)) {
+    if (instantly) witches.away();
+    else witches.flyOff(player.position);
+  }
   const wall = exits.find((exit) => walls.has(shapeOf.get(exit)!));
   // (Or propped under the balcony, at the mossy steps: "propped up ready",
   // but it slips, so it opens nothing.)
@@ -1188,7 +1198,7 @@ renderer.setAnimationLoop((time) => {
   // but not while you're in the tower: you'd come out through it.)
   snake.update(dt, player.camera.position, player.camera, room !== "tower" && !(guarded && opened.has(guarded)));
   merlin.update(dt, player.position, room === "merlins-lair");
-  witches.update(dt, room === "forest-witches");
+  witches.update(dt, room === "forest-witches", player.camera, !(dancers && opened.has(dancers)));
   rabbits.update(dt, player.position);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
