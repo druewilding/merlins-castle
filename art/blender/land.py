@@ -1721,16 +1721,23 @@ NOTE_LEAN = math.radians(10)
 NOTES = []  # each: the exit that leads to its clue, where its note's middle is [x, y, z], which way it faces [x, z]
 
 
-def note_post(builder, key, x, y, ground, facing):
+def note_post(builder, key, x, y, ground, facing, earth=DIRT_EDGE):
     """A stake at [x, y] (standing on `ground`), its board facing `facing`
     (a unit [x, y]), with the note for the clue the exit `key` leads to."""
     fx, fy = facing
+    rng = random.Random(f"note {key}")
     builder.cylinder((x, y, ground - 0.3), (x, y, ground + NOTE_UP + 0.3), 0.055, 0.045, NOTE_DARK, sides=6)
+    # Bedded in: a little heap of earth round its foot, and stones wedged in
+    # it (so it's plainly in the ground, its shadow or not).
+    builder.blob((x, y, ground - 0.04), 0.24, earth, squash=0.5, lumpy=0.3, seed=rng.random() * 100, subdivisions=1)
+    for k in range(4):
+        a = k * math.pi / 2 + rng.uniform(-0.5, 0.5)
+        builder.blob((x + math.cos(a) * 0.12, y + math.sin(a) * 0.12, ground + 0.01), rng.uniform(0.04, 0.065),
+                     c.vary(STONE, 0.15, Vector((x, y, k))), squash=0.7, lumpy=0.35, seed=rng.random() * 100, subdivisions=1)
     across = Vector((-fy, fx, 0))  # (to your right, reading it)
     up = Vector((-fx * math.sin(NOTE_LEAN), -fy * math.sin(NOTE_LEAN), math.cos(NOTE_LEAN)))
     out = Vector((fx * math.cos(NOTE_LEAN), fy * math.cos(NOTE_LEAN), math.sin(NOTE_LEAN)))  # out of its face
     middle = Vector((x, y, ground + NOTE_UP)) + Vector((fx, fy, 0)) * 0.075  # (in front of the stake)
-    rng = random.Random(f"note {key}")
     w, h = NOTE_BOARD[0] / 2, NOTE_BOARD[1] / 2
     # Its outline, roughly cut: each corner a little off.
     ends = [(-w + rng.uniform(0, 0.03), -h + rng.uniform(0, 0.02)), (w - rng.uniform(0, 0.03), -h + rng.uniform(0, 0.02)),
@@ -1842,8 +1849,9 @@ for key, trail in LURES.items():
     kind, yaw = LURE_KINDS[key][0], math.atan2(ey - by, ex - bx)
     old_stones(lures, kind, ex, ey, yaw, solid=True)
     # The clue among them, facing the way you come: in the middle (through
-    # the arch, a little past it).
-    on = 1.9 if "arch" in kind else 0.0
+    # the arch, just past it: further, by the witches, it's on the river's
+    # bank).
+    on = 0.8 if "arch" in kind else 0.0
     post_x, post_y = ex + math.cos(yaw) * on, ey + math.sin(yaw) * on
     note_post(built, key, post_x, post_y, height(post_x, post_y), (-math.cos(yaw), -math.sin(yaw)))
     solid_circle(post_x, post_y, 0.15)
@@ -2818,7 +2826,7 @@ for way in WAYS.values():
         tunnel.add(feet, [tuple(range(len(feet)))[::1 if up else -1]], [c.vary(floor_colour, 0.12, Vector(p)) for p in feet])
         if way.clue:
             px, py = x + ox * NOTE_IN, y + oy * NOTE_IN
-            note_post(tunnel, way.clue, px, py, f, (-ox, -oy))
+            note_post(tunnel, way.clue, px, py, f, (-ox, -oy), TUNNEL_FLOOR)
 # A stone threshold at every mouth onto the land, over the ragged edge of the
 # hole in the ground (which comes in whole squares, so it reaches a little
 # past where the ramp begins, and shows the sky through the gap).
