@@ -16,6 +16,7 @@ the packs to rebuild those.
 | `fantasy-props-megakit`         | [Fantasy Props MegaKit](https://quaternius.com/packs/fantasypropsmegakit.html)                          | Furniture, in `land.py`                                  |
 | `medieval-village-megakit`      | [Medieval Village MegaKit](https://quaternius.com/packs/medievalvillagemegakit.html)                    | (None used yet)                                          |
 | `ultimate-monsters`             | [Ultimate Monsters](https://quaternius.com/packs/ultimatemonsters.html) (the Blender files)             | The rabbits, in `rabbits.py` (from `Blends/Bunny.blend`) |
+| `ultimate-crops`                | [Ultimate Crops](https://quaternius.com/packs/ultimatecrops.html) (the Blender files)                   | Toadstools, in `land.py` (from `Blends/`)                |
 
 The free (Standard) version of each is enough. Keep the folders inside each
 pack as they come: the scripts read files such as
