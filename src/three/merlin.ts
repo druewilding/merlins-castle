@@ -1,0 +1,172 @@
+// Merlin (his model: art/blender/merlin.py), in his lair: he strolls to
+// somewhere near, stands a while (his arms folded), and now and then casts a
+// spell. Come into his lair and he comes towards you ("The wizard comes
+// towards you!"); near you, he stops, turns to you and talks, now and then
+// giving you a thumbs-up.
+//
+// His clips are the Universal Animation Libraries', named as they are there.
+
+import {
+  type AnimationAction,
+  type AnimationClip,
+  AnimationMixer,
+  LoopOnce,
+  Mesh,
+  type Object3D,
+  type Scene,
+  Vector3,
+} from "three";
+
+import type { Circle, Ground } from "./player";
+
+const TALL = 1.15; // times the size he's made: tall, his face above yours, under his hat's brim
+const WALK = 0.975 * TALL; // metres a second: as far as his walk carries him (so his feet don't slide)
+const TURN = 2.5; // radians a second, turning
+const RANGE = 10; // metres from his spot he wanders, at most
+const STROLL = [2.5, 6]; // metres to the next place he walks to, between these
+const PAUSE = [2, 5]; // seconds he stands there, between these
+const SPELL = 0.25; // how often, coming to a stop, he casts a spell
+const CASTING = 2.5; // seconds he holds the spell
+const NEAR = 3; // metres: this near, he stops and turns to you
+const BLEND = 0.3; // seconds from one clip to the next
+const THUMBS = [3, 7]; // seconds between his thumbs-ups, talking to you
+const BODY = 0.42; // metres: his radius (his robe's hem), for bumping into him
+const HEAD = 2.1; // metres: his height (over him, as on the castle's ground above his lair, he doesn't stop you)
+
+const between = ([a, b]: number[]) => a + Math.random() * (b - a);
+
+export class Merlin {
+  private mixer: AnimationMixer;
+  private clips = new Map<string, AnimationAction>();
+  private playing: AnimationAction | undefined;
+  private state: "standing" | "walking" | "casting" = "standing";
+  private wait = between(PAUSE); // seconds, until he's done standing (or casting)
+  private thumbs = between(THUMBS); // seconds, until his next thumbs-up
+  private target = new Vector3();
+  private yaw = 0; // which way he faces (0 is +z)
+  /** Where he is, solid: you can't walk through him (player.movers). */
+  readonly body: Circle = { x: 0, z: 0, r: BODY };
+
+  constructor(
+    scene: Scene,
+    private model: Object3D,
+    clips: AnimationClip[],
+    private home: { x: number; z: number },
+    private ground: Ground,
+    /** Whether he could walk here (not into his furniture, or a wall). */
+    private clear: (x: number, z: number) => boolean
+  ) {
+    model.traverse((o) => {
+      if (o instanceof Mesh) {
+        o.castShadow = true;
+        o.frustumCulled = false; // (moved by his bones: his bounds don't follow)
+      }
+    });
+    model.scale.setScalar(TALL);
+    model.position.set(home.x, ground(home.x, home.z) ?? 0, home.z);
+    scene.add(model);
+    this.mixer = new AnimationMixer(model);
+    for (const clip of clips) this.clips.set(clip.name, this.mixer.clipAction(clip));
+    // (Raising his hands, lowering them, and a thumbs-up: each once, held at its end.)
+    for (const name of ["Spell_Simple_Enter", "Spell_Simple_Exit", "Yes"]) {
+      const once = this.clips.get(name);
+      once?.setLoop(LoopOnce, 1);
+      if (once) once.clampWhenFinished = true;
+    }
+    this.play("Idle_FoldArms_Loop");
+  }
+
+  private play(name: string) {
+    const next = this.clips.get(name);
+    if (!next || next === this.playing) return;
+    next.reset().play();
+    if (this.playing) next.crossFadeFrom(this.playing, BLEND, false);
+    this.playing = next;
+  }
+
+  /** Somewhere near to stroll to, that he can get to in a straight line. */
+  private pick(): boolean {
+    const at = this.model.position;
+    for (let tries = 0; tries < 12; tries++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = between(STROLL);
+      const x = at.x + Math.sin(a) * d;
+      const z = at.z + Math.cos(a) * d;
+      if (Math.hypot(x - this.home.x, z - this.home.z) > RANGE) continue;
+      let ok = true;
+      for (let s = 0.5; s <= d && ok; s += 0.5) ok = this.clear(at.x + Math.sin(a) * s, at.z + Math.cos(a) * s);
+      if (!ok) continue;
+      this.target.set(x, 0, z);
+      return true;
+    }
+    return false;
+  }
+
+  /** Turns him towards a direction, a little each frame: how far he's still to turn. */
+  private face(dx: number, dz: number, dt: number) {
+    const want = Math.atan2(dx, dz);
+    let turn = want - this.yaw;
+    turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+    this.yaw += Math.sign(turn) * Math.min(Math.abs(turn), TURN * dt);
+    this.model.rotation.y = this.yaw;
+    return Math.abs(turn);
+  }
+
+  /** Each frame: where you are, and whether you're in his lair (he comes to you). */
+  update(dt: number, you: Vector3, here: boolean) {
+    const at = this.model.position;
+    const near = Math.hypot(you.x - at.x, you.z - at.z) < NEAR;
+    if (here && !near && this.state !== "casting") {
+      this.state = "walking";
+      this.target.set(you.x, 0, you.z);
+    }
+    if (near && this.state === "walking") {
+      this.state = "standing";
+      this.wait = between(PAUSE);
+    }
+    if (this.state === "walking") {
+      const dx = this.target.x - at.x;
+      const dz = this.target.z - at.z;
+      const left = Math.hypot(dx, dz);
+      const off = this.face(dx, dz, dt);
+      // (Turning on the spot first, if he's far off his way.)
+      let step = off > 0.8 ? 0 : Math.min(left, WALK * dt);
+      // (Not into anything: there, he stops.)
+      if (step > 0 && !this.clear(at.x + Math.sin(this.yaw) * 0.3, at.z + Math.cos(this.yaw) * 0.3)) {
+        step = 0;
+        this.target.set(at.x, 0, at.z);
+      }
+      at.x += Math.sin(this.yaw) * step;
+      at.z += Math.cos(this.yaw) * step;
+      this.play(step > 0 ? "Walk_Formal_Loop" : "Idle_FoldArms_Loop");
+      if (left < 0.05) {
+        this.state = Math.random() < SPELL ? "casting" : "standing";
+        this.wait = this.state === "casting" ? CASTING : between(PAUSE);
+      }
+    } else {
+      if (near) this.face(you.x - at.x, you.z - at.z, dt);
+      this.wait -= dt;
+      if (this.state === "casting") {
+        this.play(this.wait > CASTING - 0.6 ? "Spell_Simple_Enter" : "Spell_Simple_Idle_Loop");
+        if (this.wait <= 0) {
+          this.play("Spell_Simple_Exit");
+          this.state = "standing";
+          this.wait = between(PAUSE);
+        }
+      } else {
+        // (A spell's end, or a thumbs-up, plays out before he goes on.)
+        const ending = this.playing?.loop === LoopOnce && this.playing.isRunning();
+        if (!ending) this.play(near ? "Idle_Talking_Loop" : "Idle_FoldArms_Loop");
+        this.thumbs -= near ? dt : 0;
+        if (this.thumbs <= 0 && !ending) {
+          this.play("Yes");
+          this.thumbs = between(THUMBS);
+        }
+        if (this.wait <= 0 && !near && this.pick()) this.state = "walking";
+      }
+    }
+    at.y = this.ground(at.x, at.z) ?? at.y;
+    Object.assign(this.body, { x: at.x, z: at.z, top: at.y + HEAD });
+    this.mixer.update(dt);
+  }
+}

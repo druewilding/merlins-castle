@@ -448,6 +448,9 @@ class Hall:
 
 
 TORCH = "#ffa24a"
+ROOM_EDGE = 0.35  # from a room's edge (its w and d) out to its walls
+LAIR_FLOOR = -1.6  # Merlin's lair, and the small room beside it
+LAIR_STAIRS = 6.0  # from the lair's north wall up to the grand hall's
 HALLS = {h.place: h for h in [
     Hall("trolls", CAVE, 8, 6, c.linear("#6e5a42"), c.linear("#7a6650"), TORCH, 9),
     Hall("oak-door", CAVE, 7, 5.5, c.linear("#6b5a46"), c.linear("#7d6a52"), TORCH, 5),
@@ -462,9 +465,13 @@ HALLS = {h.place: h for h in [
     Hall("wizards-kitchen", 0.4, 0, 6, c.linear("#b3a58a"), c.linear("#9a8e78"), "#ff9a4a", 10, w=7, d=6,
          at=(P["grand-hall"][0] - 10 - 1 - 7, P["grand-hall"][1])),
     Hall("dungeon", -3, 0, 6, c.linear("#5c5850"), c.linear("#6c675c"), "#a9c6ff", 7, w=7, d=7),
-    Hall("small-room", 0.4, 0, 4.5, c.linear("#7a4a2a"), c.linear("#8e2a26"), "#ffb070", 6, w=6, d=6),
-    Hall("merlins-lair", 0.4, 0, 8, c.linear("#6f6a62"), c.linear("#5d5868"), "#b8ff9a", 18, w=14.5, d=14,
-         at=((P["grand-hall"][0] - 6 + P["small-room"][0] - 6 - 1) / 2, P["grand-hall"][1] - 8 - 1 - 14)),
+    # Merlin's lair, sunk below the hall, south of it (up a flight of steps to
+    # the hidden door in its south wall); and the small room, as low, against
+    # the lair's east side, through the door that locks behind you.
+    Hall("small-room", LAIR_FLOOR, 0, 4.5, c.linear("#7a4a2a"), c.linear("#8e2a26"), "#ffb070", 6, w=6, d=6,
+         at=(P["grand-hall"][0] + 8 + 1 + 6, P["grand-hall"][1] - 8 - 1 - LAIR_STAIRS - 7 - 3)),
+    Hall("merlins-lair", LAIR_FLOOR, 0, 6.5, c.linear("#6f6a62"), c.linear("#5e3f7a"), "#cdf5b4", 12, w=8, d=7,
+         at=(P["grand-hall"][0], P["grand-hall"][1] - 8 - 1 - LAIR_STAIRS - 7)),
     Hall("coach-house", 0.4, 0, 6, c.linear("#b89a5a"), c.linear("#8a6a44"), "#ffd28a", 9, w=8, d=6),
     # Out in the land, on the ground where they stand (their floors are set
     # once the land's shape is known): the charcoal burner's hut, lit by its
@@ -479,7 +486,10 @@ HALLS = {h.place: h for h in [
 T, O, G, DM = P["trolls"], P["oak-door"], P["giant"], P["damp-tunnels"]
 TR, MZ, DK, BC = P["treasure-room"], P["maze"], P["dark-tunnels"], P["beautiful-chamber"]
 GH, WK, DU = P["grand-hall"], P["wizards-kitchen"], P["dungeon"]
-SR, ML, CH = P["small-room"], P["merlins-lair"], P["coach-house"]
+CH = P["coach-house"]
+SR, ML = ((HALLS[place].x, HALLS[place].y) for place in ("small-room", "merlins-lair"))
+LAIR_STAIRS_FOOT = ML[1] + HALLS["merlins-lair"].d + 0.3  # (just out through the lair's wall)
+LAIR_STAIRS_TOP = GH[1] - HALLS["grand-hall"].d - 1.0  # (just short of the hidden door)
 KEEP_NORTH = P["courtyard"][1] - 16  # the keep's front, across the south of the courtyard
 MAZE_CELLS, MAZE_CELL = 5, 4.4
 MAZE_HALF = MAZE_CELLS * MAZE_CELL / 2  # to the maze's outer wall
@@ -534,16 +544,18 @@ WAYS = {
     "dark-beautiful": Way([(*DK, -8), (DK[0], DK[1] - 10, -8), (BC[0], BC[1] + 12, -10), (*BC, -10)]),
     # The castle: in at the keep's door to the grand hall, and on: straight
     # through into the kitchen, east along the corridor and down the steps to
-    # the dungeon, south and up again to the small room, through the door
-    # that locks behind you into Merlin's lair, and through the hidden door
-    # back into the hall. (Rooms side by side still have a short way between
+    # the dungeon, south and up again, and west, to the small room, through
+    # the door that locks behind you into Merlin's lair, and up the stairs
+    # through the hidden door back into the hall. (Rooms side by side still have a short way between
     # them: the doorway through the wall.)
     "keep-door": Way([(GH[0], KEEP_NORTH + 1.2, None), (*GH, 0.4)], indoor=True),
     "hall-kitchen": Way([(*GH, 0.4), (HALLS["wizards-kitchen"].x, GH[1], 0.4)], indoor=True),
     "hall-dungeon": Way([(*GH, 0.4), (GH[0] + 13, GH[1], 0.4), (DU[0] - 9, DU[1], -3), (*DU, -3)], indoor=True),
-    "dungeon-small": Way([(*DU, -3), (DU[0], DU[1] - 9, -3), (SR[0], SR[1] + 9, 0.4), (*SR, 0.4)], indoor=True),
-    "small-lair": Way([(*SR, 0.4), (SR[0] - 14, SR[1], 0.4)], indoor=True),
-    "lair-hall": Way([(GH[0], HALLS["merlins-lair"].y, 0.4), (*GH, 0.4)], indoor=True),
+    "dungeon-small": Way([(*DU, -3), (DU[0], DU[1] - 9, -3), (DU[0], DU[1] - 15, LAIR_FLOOR),
+                          (SR[0], DU[1] - 15, LAIR_FLOOR), (*SR, LAIR_FLOOR)], indoor=True),
+    "small-lair": Way([(*SR, LAIR_FLOOR), (ML[0], SR[1], LAIR_FLOOR)], indoor=True),
+    "lair-hall": Way([(*ML, LAIR_FLOOR), (ML[0], LAIR_STAIRS_FOOT, LAIR_FLOOR), (GH[0], LAIR_STAIRS_TOP, 0.4), (*GH, 0.4)],
+                     indoor=True),
     # And in through the coach house's wide doors.
     "coach-door": Way([(CH[0] - HALLS["coach-house"].w - 1.8, CH[1], None), (*CH, 0.4)], half=2.4, indoor=True),
     # In at the tower's door, and the hut's.
@@ -2246,12 +2258,12 @@ def spike(builder, x, y, z, tall, radius, colour, sides=6):
     builder.add(verts, faces, [c.vary(colour, 0.15, Vector((x, y, z + k))) for k in range(sides + 1)])
 
 
-def opening(hall, x, y):
-    """Whether a way comes into the hall here, at its wall."""
+def opening(hall, x, y, margin=0.5):
+    """Whether a way comes into the hall here, at its wall (or within a margin of it)."""
     for way in WAYS.values():
         if way.near(x, y, way.half + 1):
             d, floor, beyond = way.nearest(x, y)
-            if not beyond and d < way.half + 0.5 and abs(floor - hall.floor) < 1.5:
+            if not beyond and d < way.half + margin and abs(floor - hall.floor) < 1.5:
                 return True
     return False
 
@@ -2561,6 +2573,20 @@ for way in WAYS.values():
             for p, jut in ((er_, 1.8), (el_, -1.8)):
                 q = (p[0] + nx_ * jut, p[1] + ny_ * jut)
                 quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
+            # (Into a room, the frame can stand a little out from its wall,
+            # where the way's walls begin: the sides of the doorway, back
+            # from the frame to the wall, so there's no gap to see out of.)
+            if hall.room:
+                ux, uy = (inner[0] - row[0]) / run, (inner[1] - row[1]) / run
+                for p in (el_, er_):
+                    ts = [(hall.x + sign * (hall.w + ROOM_EDGE) - p[0]) / ux for sign in (1, -1) if abs(ux) > 1e-6]
+                    ts += [(hall.y + sign * (hall.d + ROOM_EDGE) - p[1]) / uy for sign in (1, -1) if abs(uy) > 1e-6]
+                    t = min((t for t in ts if t > 0), default=0.0)
+                    if 0 < t < 1:
+                        q = (p[0] + ux * t, p[1] + uy * t)
+                        # (Facing both ways: one side's faces in, the other's out.)
+                        quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
+                        quad(tunnel, [(*p, top), (*q, top), (*q, f - 0.3), (*p, f - 0.3)], hall.wall)
             if not hall.indoor:
                 p, q = el_, er_
                 quad(tunnel, [(*p, f + TUNNEL_TALL), (*q, f + TUNNEL_TALL), (*q, top), (*p, top)], hall.wall)
@@ -2824,6 +2850,195 @@ def flame(b, x, y, z, size=0.35):
     b.cone((x, y, z), size, size * 0.3, FLAME, sides=6, droop=0)
 
 
+# Merlin's lair, furnished from Quaternius's Fantasy Props MegaKit
+# (art/models/fantasy-props-megakit), as in its painting: the cauldron
+# boiling green over its fire on a round step, on a purple rug; bookcases of
+# books (and now and then bottles) either side of the stairs up and round
+# the walls, but not across the doors; his desk with the crystal ball; a
+# bench of potions; candles on stands and in a chandelier; a chart of the
+# stars; and green banners on the purple walls.
+PROPS = c.Kit(HERE.parent / "models/fantasy-props-megakit/Exports/glTF")
+# What's furnished many times over (a bookcase full of books, a candle stand)
+# is kept once in land.glb, as "prop-<kind>", and land.json says where each
+# one stands: the game stamps them there (src/three/props.ts).
+prop_spots = {"kinds": [], "at": []}  # [kind, x, y, z, yaw], in three.js's axes
+prop_kinds = {}  # each kind's footprint (x0, y0, x1, y1) and top, as it's made
+
+
+def stamp(kind, make, at, yaw, solid=True):
+    """One of a kind (made, the first time, by make(builder), at the origin
+    facing -y: its footprint and top) at `at`, turned by yaw: solid, as
+    furniture, unless it's up out of the way."""
+    if kind not in prop_kinds:
+        made = c.Builder()
+        prop_kinds[kind] = make(made)
+        made.build(f"prop-{kind}", smooth=False)
+        prop_spots["kinds"].append(kind)
+    (x0, y0, x1, y1), top = prop_kinds[kind]
+    x, y, z = at
+    cos, sin = math.cos(yaw), math.sin(yaw)
+    corners = [(x + px * cos - py * sin, y + px * sin + py * cos) for px in (x0, x1) for py in (y0, y1)]
+    xs, ys = [p[0] for p in corners], [p[1] for p in corners]
+    if solid:
+        under_box((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, (max(xs) - min(xs)) / 2, (max(ys) - min(ys)) / 2,
+                  top=z + top)
+    prop_spots["at"].append([prop_spots["kinds"].index(kind), round(x, 2), round(z, 2), round(-y, 2), round(yaw, 3)])
+
+SHELVES = (0.77, 1.15, 1.53, 1.92)  # in the kit's bookcase, its shelves' heights
+BOOKCASE = 1.3  # times the kit's size: its bookcases as tall as the old ones (3.3 m)
+POTIONS = ["#5cff6a", "#c45cff", "#5cc4ff", "#ffb35c"]
+
+
+def lair(b, hall):
+    hx, hy, f, W, D = hall.x, hall.y, hall.floor, hall.w, hall.d
+    rng = random.Random(7)
+    wall = 0.3  # from the room's edge to its walls' faces
+
+    def prop(name, u, v, z=0.0, face=(0, -1), scale=1.0, ratio=None, solid=True, tint=None):
+        """One of the kit's models, at (u, v) from the room's middle, its front
+        facing `face`: solid (as furniture), and where its points go."""
+        yaw = math.atan2(face[0], -face[1])
+        at = (hx + u, hy + v, f + z)
+        (x0, y0, x1, y1), top = PROPS.put(b, name, at, yaw, scale, ratio, tint and (*c.linear(tint)[:3], 0.65))
+        if solid:
+            under_box((x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2, top=top)
+        return PROPS.placing(at, yaw, scale)
+
+    def lit(name, scale):
+        """Candlesticks, lit: to make, for stamp."""
+
+        def make(t):
+            made = PROPS.put(t, name, (0, 0, 0), 0, scale)  # (in full: made simpler, their thin stems break up)
+            for x, y, z in PROPS.tips(name):
+                flame(t, x * scale, y * scale, z * scale, 0.06 * scale)
+            return made
+
+        return make
+
+    def candles(name, u, v, z=0.0, scale=1.0, solid=True):
+        stamp(f"{name}-lit".lower().replace("_", "-"), lit(name, scale), (hx + u, hy + v, f + z), 0.0, solid)
+
+    def books(variant):
+        """A bookcase full of books (and on one shelf, bottles): to make, for stamp."""
+
+        def make(t):
+            shelves = random.Random(variant)
+            made = PROPS.put(t, "Bookcase_2", (0, 0, 0), 0, BOOKCASE, 0.35)
+            for k, shelf in enumerate(SHELVES):
+                z = (shelf + 0.005) * BOOKCASE
+                if k == variant % 4 and variant >= 2:
+                    for j in range(-2, 3):
+                        bottle = shelves.choice(["Potion_1", "Potion_2", "Potion_4", "Bottle_1"])
+                        tint = (*c.linear(shelves.choice(POTIONS))[:3], 0.5)
+                        PROPS.put(t, bottle, (j * 0.28, -0.04, z), 0, BOOKCASE * 0.9, 0.3, tint)
+                else:
+                    group = f"BookGroup_Medium_{shelves.randint(1, 3)}"
+                    PROPS.put(t, group, (0, -0.04, z), 0, BOOKCASE, 0.4)
+            return made
+
+        return make
+
+    def bookcase(u, v, face):
+        """A bookcase against the wall (one of a few, filled differently)."""
+        back = 0.21 * BOOKCASE + 0.02
+        u, v = u - face[0] * (wall - back), v - face[1] * (wall - back)  # (its back to the wall)
+        variant = rng.randrange(4)
+        stamp(f"bookcase-{variant + 1}", books(variant), (hx + u, hy + v, f), math.atan2(face[0], -face[1]))
+
+    # The cauldron, a little east of the middle, on its round step on the
+    # rug, over its fire, boiling.
+    du, dv = 2.2, 0.8
+    dx, dy = hx + du, hy + dv
+    rim = [(math.cos(2 * math.pi * k / 24), math.sin(2 * math.pi * k / 24)) for k in range(24)]
+    verts = [(dx, dy, f + 0.05)] + [(dx + ca * 3.0, dy + sa * 2.6, f + 0.05) for ca, sa in rim]
+    b.add(verts, [(0, 1 + k, 1 + (k + 1) % 24) for k in range(24)], [c.linear("#4a2a5e")] * 25)
+    R = 1.6  # the step's radius
+    b.cylinder((dx, dy, f), (dx, dy, f + 0.3), R, R, STONE, sides=20)
+    step = [(dx, dy, f + 0.3)] + [(dx + ca * R, dy + sa * R, f + 0.3) for ca, sa in rim]
+    b.add(step, [(0, 1 + k, 1 + (k + 1) % 24) for k in range(24)], [c.vary(STONE, 0.08, Vector(p)) for p in step])
+    under_circle(dx, dy, R)
+    SIZE = 1.6  # (its brew just below your eyes, so you see into it)
+    prop("Cauldron", du, dv, 0.3, scale=SIZE, ratio=0.5, solid=False)
+    for k in range(5):
+        a = 2 * math.pi * k / 5
+        flame(b, dx + math.cos(a) * 0.3, dy + math.sin(a) * 0.3, f + 0.3, 0.3)
+    brew = f + 0.3 + 0.8 * SIZE  # (just over the kit cauldron's own top, inside its rim)
+    verts = [(dx, dy, brew)] + [(dx + ca * 0.41 * SIZE, dy + sa * 0.41 * SIZE, brew) for ca, sa in rim]
+    b.add(verts, [(0, 1 + k, 1 + (k + 1) % 24) for k in range(24)], [c.linear("#5cff6a")] * 25)
+    for k in range(6):
+        a, r = rng.random() * 2 * math.pi, rng.random() * 0.4
+        b.blob((dx + math.cos(a) * r, dy + math.sin(a) * r, brew), 0.05 + 0.05 * rng.random(), c.linear("#8aff8a"),
+               squash=0.6, lumpy=0.1, seed=k)
+    # A stand beside it, for his book of spells.
+    prop("BookStand", du - 2.3, dv + 0.4, face=(1, 0), ratio=0.5)
+
+    # Bookcases: either side of the stairs up (and round the corners), and
+    # by the door he locks behind you.
+    west, east, south, north = -W, W, -D, D
+    for u in (-3.2, -5.1, -7.0, 3.2, 5.1, 7.0):
+        bookcase(u, north, (0, -1))
+    for v in (4.9, 3.0):
+        bookcase(west, v, (1, 0))
+    for v in (-5.6,):
+        bookcase(east, v, (-1, 0))
+    for u in (-7.0, -5.1, 5.1, 7.0):
+        bookcase(u, south, (0, 1))
+
+    # His desk, along the west wall: the crystal ball on it, candles, books
+    # and scrolls.
+    tu, tv = west + 0.9, -1.6
+    prop("Table_Large", tu, tv, face=(1, 0), ratio=0.5)
+    prop("Chair_1", tu - 0.05, tv + 1.9, face=(0, -1), ratio=0.5)
+    top = 0.81
+    b.cylinder((hx + tu, hy + tv, f + top), (hx + tu, hy + tv, f + top + 0.08), 0.14, 0.1, BRASS, sides=10)
+    b.blob((hx + tu, hy + tv, f + top + 0.28), 0.22, c.linear("#bfe6ff"), squash=1, lumpy=0.05, seed=3)
+    move = prop("CandleStick_Triple", tu - 0.1, tv - 1.0, top, face=(1, 0), ratio=0.3, solid=False)
+    for tip in PROPS.tips("CandleStick_Triple"):
+        flame(b, *move(tip), 0.06)
+    prop("Book_Stack_1", tu, tv + 0.9, top, face=(1, 0), solid=False)
+    prop("Scroll_1", tu + 0.25, tv + 0.4, top, face=(1, 0.3), solid=False)
+    prop("Pouch_Large", tu + 0.2, tv - 0.5, top, face=(1, 0), solid=False)
+    prop("Book_Stack_2", west + 0.5, tv - 2.3, ratio=0.6)
+
+    # His bench of potions, along the east wall north of the door, a stool,
+    # and bottles on a shelf by the door.
+    wu, wv = east - 0.75, 2.6
+    prop("Workbench", wu, wv, face=(-1, 0), ratio=0.5)
+    top = 0.89
+    for k in range(7):
+        name = ["Potion_1", "Potion_2", "Potion_4", "Bottle_1"][k % 4]
+        prop(name, wu + (k % 3 - 1) * 0.25, wv - 0.7 + k * 0.23, top, scale=1.3, ratio=0.3, solid=False,
+             tint=POTIONS[k % 4])
+    prop("SmallBottles_1", wu - 0.2, wv + 0.75, top, face=(-1, 0), ratio=0.3, solid=False)
+    prop("Stool", wu - 1.2, wv, ratio=0.5)
+    prop("Shelf_Small_Bottles", east + wall, -0.6, 1.3, face=(-1, 0), ratio=0.25)
+
+    # Candles on stands, and a chandelier.
+    for u, v in ((-2.6, 5.6), (2.6, 5.6), (-5.8, -5.4), (0.6, -5.6)):  # (clear of the doors)
+        candles("CandleStick_Stand", u, v, scale=1.2)
+    candles("Chandelier", 0, -0.5, hall.tall - 0.05, scale=1.5, solid=False)
+
+    # A cage, empty; vases, and a bag.
+    prop("Cage_Small", 3.0, -5.9, scale=1.2, ratio=0.25)
+    prop("Vase_2", -7.2, 6.2, ratio=0.5)
+    prop("Vase_4", -7.3, 1.9, ratio=0.5)
+    prop("Bag", 7.2, 6.2, face=(-1, -1), ratio=0.5)
+
+    # The chart of the stars, on the south wall.
+    wall_panel(b, hx, hy + south - wall + 0.01, (2.4, 0), f, f + 2.4, f + 4.6, c.linear("#1a2350"))
+    for k in range(24):
+        sx = hx - 2.1 + (k * 0.377) % 4.2
+        sz = f + 2.6 + (k * 0.613) % 1.8
+        wall_panel(b, sx, hy + south - wall + 0.02, (0.05, 0), f, sz, sz + 0.1, c.linear("#fff3b0"))
+    # Green banners on the purple walls: either side of the stairs, and on
+    # the west wall.
+    # (Each hangs from its rod, along it from its left end: half its width.)
+    half = 1.61 * 1.4 / 2
+    for u in (-3.6, 3.6):
+        prop("Banner_2", u - half, north + wall - 0.15, 5.0, face=(0, -1), scale=1.4, solid=False, tint="#2f8a3a")
+    prop("Banner_2", west - wall + 0.15, -4.4 - half, 5.0, face=(1, 0), scale=1.4, solid=False, tint="#2f8a3a")
+
+
 def room(b, hall):
     hx, hy, f, W, D, tall = hall.x, hall.y, hall.floor, hall.w, hall.d, hall.tall
     # The floor reaches just under the walls (and no further: the room next
@@ -2836,19 +3051,32 @@ def room(b, hall):
             colour, vary = floor_colour(hall, i, j, x0, y0)
             fl = f - 0.06  # (a shade lower than the corridors' floors, where they overlap)
             quad(b, [(x0, y0, fl), (x1, y0, fl), (x1, y1, fl), (x0, y1, fl)], colour, vary)
-    E = 0.35
+    E = ROOM_EDGE
     corners = [(hx - W - E, hy - D - E), (hx + W + E, hy - D - E), (hx + W + E, hy + D + E), (hx - W - E, hy + D + E)]
     band = c.mix(hall.wall, c.linear("#000000"), 0.3)
     for k in range(4):
         (ax, ay), (bx, by) = corners[k], corners[(k + 1) % 4]
         length = math.hypot(bx - ax, by - ay)
         ox, oy = (by - ay) / length, -(bx - ax) / length  # outward
-        n = max(1, round(length))
-        for m in range(n):
-            p0 = (ax + (bx - ax) * m / n, ay + (by - ay) * m / n)
-            p1 = (ax + (bx - ax) * (m + 1) / n, ay + (by - ay) * (m + 1) / n)
-            mx, my = (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2
-            if opening(hall, mx + ox * 0.6, my + oy * 0.6):
+        # Where ways come through it, exactly as wide as they are (to 5 cm),
+        # so their walls meet its edges; and the rest, in pieces of about a
+        # metre.
+        def along(t, ax=ax, ay=ay, bx=bx, by=by, length=length):
+            return ax + (bx - ax) * t / length, ay + (by - ay) * t / length
+
+        fine = 0.05
+        open_ = [opening(hall, *(v + o * 0.6 for v, o in zip(along((i + 0.5) * fine), (ox, oy))), margin=0.0)
+                 for i in range(int(length / fine))]
+        runs, start = [], 0
+        for i in range(1, len(open_) + 1):
+            if i == len(open_) or open_[i] != open_[start]:
+                t0, t1 = start * fine, (length if i == len(open_) else i * fine)
+                n = 1 if open_[start] else max(1, round(t1 - t0))
+                runs += [(t0 + (t1 - t0) * m / n, t0 + (t1 - t0) * (m + 1) / n, open_[start]) for m in range(n)]
+                start = i
+        for t0, t1, through in runs:
+            p0, p1 = along(t0), along(t1)
+            if through:
                 # (Down a little over the doorway's roof, which can slope down
                 # outward, as to the hut's door.)
                 low = f + TUNNEL_TALL - 0.3
@@ -2945,63 +3173,7 @@ def room(b, hall):
             px = hx - W + 0.6 + k * (2 * W - 1.2) / 7
             wall_panel(b, px, hy - D - 0.3, (0.35, 0), f, f, f + 4.4, c.linear("#7e1f1d"))
     elif hall.place == "merlins-lair":
-        # The cauldron bubbling green on its round step, on a purple rug;
-        # bookcases on every wall (but not across the doors), a table of
-        # potions, his desk with the crystal ball, a chart of the stars, and
-        # candles.
-        dx, dy = hx - 3, hy - 2
-        verts = [(dx, dy, f + 0.05)] + [(dx + math.cos(2 * math.pi * k / 24) * 4.2, dy + math.sin(2 * math.pi * k / 24) * 3.4,
-                                         f + 0.05) for k in range(24)]
-        b.add(verts, [(0, 1 + k, 1 + (k + 1) % 24) for k in range(24)], [c.linear("#4a2a5e")] * 25)
-        b.cylinder((dx, dy, f), (dx, dy, f + 0.3), 2.0, 2.0, STONE, sides=20)
-        b.cylinder((dx, dy, f + 0.3), (dx, dy, f + 1.3), 1.0, 1.2, IRON, sides=16)
-        verts = [(dx, dy, f + 1.25)] + [(dx + math.cos(2 * math.pi * k / 16) * 1.15, dy + math.sin(2 * math.pi * k / 16) * 1.15,
-                                         f + 1.25) for k in range(16)]
-        b.add(verts, [(0, 1 + k, 1 + (k + 1) % 16) for k in range(16)], [c.linear("#5cff6a")] * 17)
-        under_circle(dx, dy, 2.0)
-
-        def bookcase(x0, y0, x1, y1, face):
-            """Shelves of books, their spines facing into the room (+x, -x, +y or -y)."""
-            furniture(b, x0, y0, x1, y1, f, f + 3.4, DARK_WOOD)
-            across = abs(x1 - x0) > abs(y1 - y0)
-            length = abs(x1 - x0) if across else abs(y1 - y0)
-            for z in (f + 0.5, f + 1.3, f + 2.1, f + 2.9):
-                for k in range(int(length / 0.4)):
-                    colour = c.linear(["#7a2a2a", "#2a4a7a", "#4a6a2a", "#8a6a2a", "#5a2a6a"][(k * 7 + int(z * 3)) % 5])
-                    if across:
-                        bx_, by_ = x0 + 0.2 + k * 0.4, (y1 if face == "+y" else y0 - 0.05)
-                        block(b, bx_, by_, z, bx_ + 0.3, by_ + 0.05, z + 0.6, colour, solid=False)
-                    else:
-                        bx_, by_ = (x1 if face == "+x" else x0 - 0.05), y0 + 0.2 + k * 0.4
-                        block(b, bx_, by_, z, bx_ + 0.05, by_ + 0.3, z + 0.6, colour, solid=False)
-
-        west, east, south, north = hx - W, hx + W, hy - D, hy + D
-        bookcase(west - 0.3, hy - 9, west + 0.5, hy + 9, "+x")
-        bookcase(west + 2, south - 0.3, east - 2, south + 0.5, "+y")
-        bookcase(east - 0.5, hy - 3, east + 0.3, north - 2, "-x")
-        bookcase(east - 10, north - 0.5, east - 2, north + 0.3, "-y")
-        bookcase(west + 2, north - 0.5, P["grand-hall"][0] - 2.5, north + 0.3, "-y")  # (up to the hidden door)
-        # The desk, and a table of potions.
-        furniture(b, hx + 1, north - 2.6, hx + 4, north - 1.6, f + 0.8, f + 0.9, WOOD)
-        b.blob((hx + 2.5, north - 2.1, f + 1.15), 0.25, c.linear("#bfe6ff"), squash=1, lumpy=0.05, seed=3)  # crystal ball
-        for px in (hx + 1.2, hx + 3.8):
-            flame(b, px, north - 1.8, f + 0.9, 0.2)
-        tx, ty = hx + 6, hy - 6
-        furniture(b, tx - 1.6, ty - 0.6, tx + 1.6, ty + 0.6, f + 0.8, f + 0.9, WOOD)
-        for k in range(9):
-            b.cylinder((tx - 1.3 + k * 0.32, ty + (k % 3 - 1) * 0.3, f + 0.9), (tx - 1.3 + k * 0.32, ty + (k % 3 - 1) * 0.3, f + 1.25),
-                       0.09, 0.05, c.linear(["#5cff6a", "#c45cff", "#5cc4ff", "#ffb35c"][k % 4]), sides=6)
-        # The chart of the stars, over the bookcase on the south wall.
-        wall_panel(b, hx, south - 0.3 + 0.01, (3, 0), f, f + 4.0, f + 6.8, c.linear("#1a2350"))
-        for k in range(30):
-            sx = hx - 2.7 + (k * 0.377) % 5.4
-            sz = f + 4.2 + (k * 0.613) % 2.4
-            wall_panel(b, sx, south - 0.28, (0.05, 0), f, sz, sz + 0.1, c.linear("#fff3b0"))
-        # Candles on stands.
-        for px, py in ((hx - 9, hy + 4), (hx - 9, hy - 8), (hx + 9, hy + 6), (hx + 2, hy - 10), (hx - 3, hy + 9)):
-            block(b, px - 0.08, py - 0.08, f, px + 0.08, py + 0.08, f + 1.6, BRASS, solid=False)
-            flame(b, px, py, f + 1.6)
-            under_circle(px, py, 0.25)
+        lair(b, hall)
     elif hall.place == "coach-house":
         # The red coach on its four wheels, and hay.
         cxx, cyy = hx + 1.5, hy
@@ -3428,10 +3600,24 @@ obstacle(["dungeon south"], "box", du.x, -(du.y - du.d - 1.5), TUNNEL_HALF + 0.3
 hy_ = gh.y - gh.d - 0.6
 block(rooms, gh.x - TUNNEL_HALF, hy_ - 0.15, gh.floor, gh.x + TUNNEL_HALF, hy_ + 0.15, gh.floor + TUNNEL_TALL, gh.wall, solid=False)
 obstacle(["grand-hall south", "merlins-lair north"], "box", gh.x, -hy_, TUNNEL_HALF + 0.3, 0.5, under=True)
+# The stairs up to it from the lair, over the way's ramp (which is what you
+# walk on): each tread's top just over the ramp's floor at the tread's back,
+# so the ramp never shows through it.
+TREADS = 12
+rise, run = gh.floor - ml.floor, LAIR_STAIRS_TOP - LAIR_STAIRS_FOOT
+for k in range(TREADS):
+    # (Clear of the way's own faces: the bottom one a little out in front of
+    # the doorstep's edge, and each a shade narrower than its walls.)
+    y0, y1 = LAIR_STAIRS_FOOT + run * k / TREADS - (0.03 if k == 0 else 0), LAIR_STAIRS_FOOT + run * (k + 1) / TREADS
+    top = ml.floor + rise * (k + 1) / TREADS + 0.08  # (the ramp's floor is 4 cm up)
+    block(rooms, gh.x - TUNNEL_HALF + 0.01, y0, ml.floor - 0.1, gh.x + TUNNEL_HALF - 0.01, y1, top,
+          c.vary(c.linear("#7d7568"), 0.1, Vector((k, 0, 7))), solid=False)
 # The lair's door, which slams and locks behind you.
 lx_, ly_ = ml.x + ml.w + 0.6, SR[1]
 block(rooms, lx_ - 0.15, ly_ - TUNNEL_HALF, ml.floor, lx_ + 0.15, ly_ + TUNNEL_HALF, ml.floor + TUNNEL_TALL, OAK, solid=False)
-obstacle(["merlins-lair east"], "box", lx_, -ly_, 0.5, TUNNEL_HALF + 0.3, under=True)
+# (Reaching only a little way into the lair: it's small, and he'd otherwise
+# keep you from its whole east end.)
+obstacle(["merlins-lair east"], "box", lx_, -ly_, 0.5, TUNNEL_HALF + 0.3, under=True, reach=1.0)
 rooms.build("rooms", smooth=False)
 webs.build("cobwebs", smooth=False)
 tower_inside.build("tower-inside", smooth=False)
@@ -3646,6 +3832,7 @@ if out:
         "circles": circles,
         "boxes": boxes,
         "trees": tree_spots,
+        "props": prop_spots,
         # Steps on the land, for lying on: [x, z, half x, half z, top].
         "steps": STEPS,
         # The paths, lying a little above the ground (so what's dropped on

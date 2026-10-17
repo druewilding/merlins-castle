@@ -303,7 +303,7 @@ src/three/         the 3D version
   effects.ts       what each `use` does to the world
   moments.ts       deaths, mist and visions, winning
 art/blender/       Python scripts that build each area in Blender
-art/models/        the .blend sources and image-to-3D downloads
+art/models/        the model packs (downloaded, not in git) and image-to-3D downloads
 public/models/     the compressed .glb files the game loads
 ```
 
@@ -357,9 +357,10 @@ or free model.
    - **The castle** ✅: the courtyard (well, flowers) with the coach house
      as a barn; the keep across its south, entered from the courtyard into
      the grand hall. The kitchen opens straight off the hall's west side; a
-     corridor runs east and down steps to the dungeon, then south and up to
-     the small room. Merlin's lair is big enough to share a wall with both
-     the small room and the hall. Each room furnished after its painting,
+     corridor runs east and down steps to the dungeon, then south, up and
+     west to the small room. The small room and Merlin's lair sit lower
+     than the hall, side by side; from the lair, stairs climb north to the
+     hall. Each room furnished after its painting,
      with its own light.
    - **Indoors** ✅: the charcoal burner's hut (its door north to the
      crossroads; a hearth, a straw bed, sacks of charcoal) and the round room

@@ -21,3 +21,8 @@ gaps/
 __pycache__/
 
 docs/notes.md
+docs/models.md
+
+# The model packs (big): downloaded, see art/models/README.md
+art/models/*
+!art/models/README.md

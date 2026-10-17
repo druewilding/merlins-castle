@@ -61,14 +61,17 @@ import { Ladder } from "./ladder";
 import { DEATHS, LOST, placeAt, PLACES } from "./layout";
 import { Leaves } from "./leaves";
 import { Lost } from "./lost";
+import { Merlin } from "./merlin";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
+import merlinModel from "./models/merlin.glb?url";
 import snakeModel from "./models/snake.glb?url";
 import { Plank } from "./plank";
 import { type Growth, Plants } from "./plants";
 import { type Box, type Circle, type Ground, type Hall, Player, type Walkable, wayThrough } from "./player";
+import { type PropSpots, stampProps } from "./props";
 import { River } from "./river";
 import { Shafts, speck, type Window } from "./shafts";
 import { sky } from "./sky";
@@ -167,11 +170,12 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky] = await Promise.all([
+const [model, file, things, snaky, wizard] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
   loader.loadAsync(snakeModel),
+  loader.loadAsync(merlinModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -224,6 +228,7 @@ const smoke = new Smoke(scene, land.hut, reducedMotion);
 scene.add(model.scene);
 const spots = land.trees as TreeSpots;
 const trees = new Trees(scene, model.scene, spots);
+stampProps(scene, model.scene, land.props as PropSpots);
 const stump = model.scene.getObjectByName("stump") as Mesh;
 stump.removeFromParent();
 const felling = new Felling(scene, trees.models, spots.kinds, spots.dense, stump, reducedMotion);
@@ -476,6 +481,20 @@ for (const { x, z } of DEATHS) {
 
 // A place's name, from its id (for now; PLAN-V3.md).
 const name = (id: string) => id.replace(/-/g, " ").replace(/^./, (letter) => letter.toUpperCase());
+
+// Merlin, in his lair (merlin.ts): on its floor, anywhere clear of his
+// furniture, and not too near its walls.
+const lair = halls["merlins-lair"];
+const merlin = new Merlin(
+  scene,
+  wizard.scene,
+  wizard.animations,
+  lair,
+  () => lair.floor,
+  (x, z) =>
+    Math.abs(x - lair.x) < lair.w! - 1.2 && Math.abs(z - lair.z) < lair.d! - 1.2 && player.clear(x, z, true, 0.6)
+);
+player.movers.push(merlin.body);
 
 // A game loaded, or carried on from another version (or another language).
 const handoff = takeHandoff();
@@ -815,7 +834,7 @@ const was = player.position.clone(); // (and just where)
 const debugMode = new URLSearchParams(location.search).has("debug");
 if (debugMode) {
   Object.assign(window, {
-    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, restart, drawn },
+    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, merlin, restart, drawn },
   });
   const { debug } = await import("./debug");
   debug(
@@ -1120,6 +1139,7 @@ renderer.setAnimationLoop((time) => {
   // (The snake's back by the door once the apple's no longer in use there,
   // but not while you're in the tower: you'd come out through it.)
   snake.update(dt, player.camera.position, player.camera, room !== "tower" && !(guarded && opened.has(guarded)));
+  merlin.update(dt, player.position, room === "merlins-lair");
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)

@@ -217,6 +217,8 @@ export class Player {
   private ground: Ground = () => 0;
   private walkable: Walkable = () => true;
   private near = new Map<string, Near>();
+  /** Solid things that move about (Merlin): wherever they are, each frame. */
+  readonly movers: Circle[] = [];
   private nearUnder = new Map<string, Near>();
   private stick = { x: 0, y: 0 }; // the thumb's walking stick, -1 to 1
   private bob = 0;
@@ -705,7 +707,7 @@ export class Player {
     const below = (thing: Circle | Box) => thing.top !== undefined && feet >= thing.top - STEP;
     // (And a slab over your head, you go under.)
     const over = (thing: Circle) => thing.bottom !== undefined && feet + this.eye + HEADROOM <= thing.bottom;
-    for (const c of near.circles) {
+    for (const c of [...near.circles, ...this.movers]) {
       if (below(c) || over(c)) continue;
       const dx = p.x - c.x;
       const dz = p.z - c.z;
