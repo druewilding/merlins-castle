@@ -29,6 +29,9 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+      - name: Check types
+        run: npm run types:check
+
       # Vitest writes a test report into the step's summary on GitHub. Keep a
       # copy (even if tests fail) so it can be posted on the pull request.
       - name: Run tests

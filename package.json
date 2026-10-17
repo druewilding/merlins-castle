@@ -17,6 +17,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint --fix",
     "lint:check": "eslint",
+    "types:check": "tsc --noEmit",
     "art:status": "node scripts/art.js --list",
     "art": "node scripts/art.js",
     "art:build": "node scripts/build-art.js",
