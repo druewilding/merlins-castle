@@ -85,7 +85,9 @@ const MIXES: Record<number, Partial<Record<Name, number>>> = {
   3: { fern: 0.12, stone: 0.02, daisy: 0.03 }, // the mossy steps
   4: { fern: 0.08, daisy: 0.04 }, // under the firs
   5: { foxglove: 0.04, fern: 0.05, daisy: 0.1, buttercup: 0.05 }, // the woods
+  6: { daisy: 0.3, buttercup: 0.2, fern: 0.03 }, // the mountain top, round the maze
 };
+const MOUNTAIN_TOP = 6; // (where they grow high up, as nowhere else)
 const FLOWERS = new Set<Name>(["daisy", "buttercup", "foxglove"]);
 const IN_THE_FOREST = 0.3; // fewer flowers under the trees
 
@@ -230,8 +232,9 @@ export class Plants {
             const size = sort.size[0] + (sort.size[1] - sort.size[0]) * random();
             const shade = 0.85 + 0.25 * random();
             if (y === undefined || (sort.wild && this.walkable(px, pz))) continue;
-            // (Thinning out up the mountain, where the ground turns to rock.)
-            if (!sort.low && random() < (y - 8) / 8) continue;
+            // (Thinning out up the mountain, where the ground turns to rock: but
+            // for the meadow on its top.)
+            if (!sort.low && g >> 3 !== MOUNTAIN_TOP && random() < (y - 8) / 8) continue;
             matrix.compose(
               where.set(px, y + (kind === PATH ? ON_THE_PATH : -0.03), pz),
               turn.setFromAxisAngle(up, yaw),

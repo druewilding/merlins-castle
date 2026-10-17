@@ -739,6 +739,14 @@ def rocky(x, y):
     return crags(x, y) > 1 or peaks(x, y) > 3 or dragon_hill(x, y) > 1 or ridge(x, y) > 1
 
 
+def maze_meadow(x, y):
+    """The little meadow on the mountain top, round the maze and up the way
+    to it, where the crags let it be: 1 in it, fading out to 0."""
+    dx = max(0.0, abs(x - MZ[0]) - MAZE_HALF)
+    dy = max(0.0, abs(y - MZ[1]) - MAZE_HALF)
+    return smooth(1 - (math.hypot(dx, dy) - 6) / 4) * (1 - smooth((crags(x, y) - 0.3) / 1.2))
+
+
 for way in WAYS.values():
     way.settle()
 for place, door in (("tower", "tower-door"), ("charcoal-hut", "hut-door")):
@@ -917,7 +925,7 @@ def ground_colour(x, y, z):
         col = c.mix(col, CRAG, smooth((steep - 0.8) / 0.6) * smooth((z - 20) / 8))
         line = 62 + 6 * noise.noise(Vector((x / 10, y / 10, 13.0)))
         col = c.mix(col, SNOW, smooth((z - line) / 5) * (1 - 0.7 * smooth((steep - 1.2) / 0.8)))
-    return col
+    return c.mix(col, GRASS, maze_meadow(x, y))
 
 
 nx, ny = int((X1 - X0) / STEP) + 1, int((Y1 - Y0) / STEP) + 1
@@ -1387,8 +1395,30 @@ for gx in range(X0 + 3, X1 - 2, 5):
             continue
         tall = here.uniform(9, 14)
         r = here.uniform(2.2, 3.0)
+        # (Their branches clear of the maze's walls.)
+        if abs(x - MZ[0]) < MAZE_HALF + r + 0.8 and abs(y - MZ[1]) < MAZE_HALF + r + 0.8:
+            continue
         grow(x, y, tall, tree_kind(x, y, here), here)
         TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
+# A few firs in the meadow round the maze (on the mountain top, where the
+# grid finds none): their branches clear of its walls, the path and the
+# tunnels' mouths.
+here = random.Random("the maze's firs")
+maze_firs, tries = 0, 0
+while maze_firs < 7 and tries < 2000:
+    tries += 1
+    x, y = MZ[0] + here.uniform(-1, 1) * (MAZE_HALF + 10), MZ[1] + here.uniform(-1, 1) * (MAZE_HALF + 10)
+    r = here.uniform(2.2, 2.8)
+    if abs(x - MZ[0]) < MAZE_HALF + r + 0.8 and abs(y - MZ[1]) < MAZE_HALF + r + 0.8:
+        continue
+    if maze_meadow(x, y) < 0.6 or rocky(x, y) or path_lines.distance(x, y) < r + 2.5:
+        continue
+    if open_to_the_sky(x, y, 4.5) is not None or under_a_tree(x, y):
+        continue
+    grow(x, y, here.uniform(8, 12), here.choice(FIRS), here)
+    TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
+    maze_firs += 1
+print(f"{maze_firs} firs round the maze")
 # Trees close in on both sides of the dragon's mouth, so the only way on is
 # down into it (not round its side, past the leaves).
 here = random.Random("dragon's trees")
@@ -2240,14 +2270,68 @@ while stack:
     seen.add((ni, nj))
     stack.append((ni, nj))
 mx0, my0 = MZ[0] - MAZE_HALF, MZ[1] - MAZE_HALF
-MAZE_STONE = c.linear("#8d8a74")
+
+# What it looks like: the kit's stone (the game puts its texture on, by
+# where each face is: maze.ts), only shaded here, mossy at its foot, and
+# ivy hanging down from its tops, here and there. Its floor, flagstones
+# (the texture again), just over the ground.
+MAZE_THICK, MAZE_TALL = 0.35, 2.9  # half its thickness, and its height over the ground
+MAZE_MOSS = c.linear("#9fae7a")
+MAZE_LIGHT = c.linear("#ffffff")
+maze = c.Builder()
+maze_floor = c.Builder()
+runs = []  # (along x?, the line it's on, from, to), in cells
 
 
 def maze_wall(x0, y0, x1, y1):
-    x0, x1 = min(x0, x1) - 0.3, max(x0, x1) + 0.3
-    y0, y1 = min(y0, y1) - 0.3, max(y0, y1) + 0.3
-    base = height((x0 + x1) / 2, (y0 + y1) / 2)
-    block(built, x0, y0, base - 0.6, x1, y1, base + 2.8, MAZE_STONE)
+    if y0 == y1:
+        runs.append((True, round((y0 - my0) / MAZE_CELL), round((min(x0, x1) - mx0) / MAZE_CELL),
+                     round((max(x0, x1) - mx0) / MAZE_CELL)))
+    else:
+        runs.append((False, round((x0 - mx0) / MAZE_CELL), round((min(y0, y1) - my0) / MAZE_CELL),
+                     round((max(y0, y1) - my0) / MAZE_CELL)))
+
+
+def maze_run(along_x, line, a, b):
+    """One straight stretch of wall, from cell a to cell b along its line."""
+    lo, hi = a * MAZE_CELL - MAZE_THICK, b * MAZE_CELL + MAZE_THICK
+    at = line * MAZE_CELL
+    if along_x:
+        x0, x1, y0, y1 = mx0 + lo, mx0 + hi, my0 + at - MAZE_THICK, my0 + at + MAZE_THICK
+    else:
+        x0, x1, y0, y1 = mx0 + at - MAZE_THICK, mx0 + at + MAZE_THICK, my0 + lo, my0 + hi
+    grounds = [height(x0 + (x1 - x0) * k / 8, y0 + (y1 - y0) * k / 8) for k in range(9)]
+    # (Those along x a hair taller, so where two meet their tops don't fight.)
+    z0, z1 = min(grounds) - 0.6, max(grounds) + MAZE_TALL + (0.02 if along_x else 0)
+    v = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
+    shade = [c.mix(MAZE_LIGHT, MAZE_MOSS, 0.6 if k < 4 else 0.0) for k in range(8)]
+    maze.add(v, [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7)], shade)
+    solid_box((x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2)
+    # Ivy, hanging down from its top, here and there, either side.
+    length = hi - lo
+    for side in (1, -1):
+        t = maze_rng.uniform(0.5, 4)
+        while t < length - 0.8:
+            wide, drop = maze_rng.uniform(0.8, 2.2), maze_rng.uniform(0.8, 2.6)
+            for _ in range(int(wide * drop * 40)):
+                u = maze_rng.uniform(-1, 1)
+                reach = drop * (1 - 0.6 * u * u) * maze_rng.uniform(0.55, 1.0)
+                down = reach * maze_rng.random() ** 1.4
+                lt = min(max(lo + t + u * wide / 2, lo + 0.05), hi - 0.05)
+                size, spin = maze_rng.uniform(0.12, 0.2), maze_rng.uniform(0, 2 * math.pi)
+                out = MAZE_THICK + maze_rng.uniform(0.01, 0.06)
+                if along_x:
+                    cx, cy, d, n = mx0 + lt, my0 + at + out * side, (1, 0), (0, side)
+                else:
+                    cx, cy, d, n = mx0 + at + out * side, my0 + lt, (0, 1), (side, 0)
+                cz = z1 + 0.03 - size - down  # (its tip at the most just over the top)
+                corners = []
+                for ang, r in ((0, 1.0), (math.pi / 2, 0.6), (math.pi, 0.5), (3 * math.pi / 2, 0.6)):
+                    along_, up_ = math.cos(spin + ang) * size * r, math.sin(spin + ang) * size * r
+                    corners.append((cx + d[0] * along_, cy + d[1] * along_, cz + up_))
+                leaf = c.mix(*IVY, maze_rng.random())
+                facing(built, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf], (*n, 0))
+            t += wide + maze_rng.uniform(3, 9)
 
 
 gap = n // 2  # the openings, in the middle of every side
@@ -2265,6 +2349,46 @@ for i in range(n):
             maze_wall(x + MAZE_CELL, y, x + MAZE_CELL, y + MAZE_CELL)
         if j < n - 1 and north_wall[i][j]:
             maze_wall(x, y + MAZE_CELL, x + MAZE_CELL, y + MAZE_CELL)
+# The walls, joined into long straight runs.
+for along_x in (True, False):
+    lines = {}
+    for ax, line, a, b in runs:
+        if ax == along_x:
+            lines.setdefault(line, []).append((a, b))
+    for line, pieces in sorted(lines.items()):
+        pieces.sort()
+        a, b = pieces[0]
+        for pa, pb in pieces[1:]:
+            if pa == b:
+                b = pb
+            else:
+                maze_run(along_x, line, a, b)
+                a, b = pa, pb
+        maze_run(along_x, line, a, b)
+maze.build("maze", smooth=False)
+# Its floor, a little over the ground (and the tunnels' stone lips): on the ground's own grid (and split
+# the way it is), so the ground never comes up through it.
+def maze_lines(lo, hi, origin):
+    k = math.floor((lo - origin) / STEP) + 1
+    inside = [origin + i * STEP for i in range(k, math.ceil((hi - origin) / STEP))]
+    return [lo] + [v for v in inside if lo < v < hi] + [hi]
+
+
+xs, ys = maze_lines(mx0, mx0 + 2 * MAZE_HALF, X0), maze_lines(my0, my0 + 2 * MAZE_HALF, Y0)
+for i in range(len(xs) - 1):
+    for j in range(len(ys) - 1):
+        pts = [(xs[i], ys[j]), (xs[i + 1], ys[j]), (xs[i + 1], ys[j + 1]), (xs[i], ys[j + 1])]
+        maze_floor.add([(x, y, drawn_height(x, y, exactly=True) + 0.14) for x, y in pts], [(0, 1, 2), (0, 2, 3)],
+                       [MAZE_LIGHT] * 4)
+maze_floor.build("maze-floor", smooth=True)
+# Boulders at the foot of its south wall, either side of the way in: past
+# them, between the wall and the crags, there's only a narrow strip, which
+# you'd only get stuck in.
+for bx, by, size, seed in ((5.0, -0.95, 0.85, 1), (6.3, -0.75, 0.55, 2), (-5.6, -0.95, 0.85, 3), (-6.9, -0.7, 0.55, 4)):
+    x, y = MZ[0] + bx, my0 + by
+    built.blob((x, y, height(x, y) + size * 0.35), size, c.mix(ROCK, MOSS, 0.25 + 0.1 * (seed % 2)),
+               squash=0.75, lumpy=0.25, seed=40 + seed)
+    solid_circle(x, y, size * 0.95)
 # Where the river goes under (clear of the beautiful chamber, down below).
 built.blob((RIVER[-1][0] + 5, RIVER[-1][1] + 3, -1.5), 9, ROCK, squash=0.7, lumpy=0.3, seed=4)
 
@@ -3970,6 +4094,7 @@ tree_spots["at"] = [spot for k, spot in enumerate(tree_spots["at"]) if k not in 
 # by the place nearest (give or take, so they blend). The game scatters
 # grass, flowers, bushes and stones by it, round you (src/three/plants.ts).
 GROUND = {"meadow": 1, "verge": 2, "forest": 3, "bank": 4, "wall": 5, "path": 6}
+MOUNTAIN_TOP = 6  # the meadow round the maze: daisies and buttercups (growing high up, as nothing else does)
 MIXES = {
     # Daisies and buttercups, and foxgloves here and there.
     **dict.fromkeys(["old-wall", "old-stone-wall", "rusty-gate", "grassy-bank", "forest-edge", "deep-river",
@@ -3994,6 +4119,8 @@ def growth(x, y):
         return 0
     if CASTLE[0] - 1 <= x <= CASTLE[1] + 1 and CASTLE[2] - 1 <= y <= CASTLE[3] + 1:
         return 0
+    if abs(x - MZ[0]) <= MAZE_HALF + 0.4 and abs(y - MZ[1]) <= MAZE_HALF + 0.4:
+        return 0  # (nor up through the maze's floor)
     river = from_river(x, y)
     if river < BANK + 0.6 or open_to_the_sky(x, y, 1.0) is not None or over_an_opening(x, y):
         return 0
@@ -4022,6 +4149,8 @@ def growth(x, y):
         ground = "meadow"
     else:
         ground = "forest"
+    if ground != "path" and maze_meadow(x, y) > 0.5:
+        return GROUND["meadow"] | MOUNTAIN_TOP << 3  # (grass and flowers, high up)
     jx, jy = noise.noise(Vector((x / 25, y / 25, 3))) * 14, noise.noise(Vector((x / 25, y / 25, 9))) * 14
     nearest = min(P, key=lambda p: math.hypot(x + jx - P[p][0], y + jy - P[p][1]))
     return GROUND[ground] | MIXES.get(nearest, 1) << 3

@@ -62,6 +62,7 @@ import { Ladder } from "./ladder";
 import { dressLamp, Lantern } from "./lantern";
 import { DEATHS, placeAt, PLACES } from "./layout";
 import { Leaves } from "./leaves";
+import { dressMaze } from "./maze";
 import { Merlin } from "./merlin";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
@@ -229,6 +230,8 @@ model.scene.traverse((node) => {
   node.castShadow = !["paths", "water", "embers"].includes(node.name);
   node.receiveShadow = !["water", "embers"].includes(node.name);
 });
+// The maze, in stone.
+dressMaze(model.scene, renderer);
 // The charcoal burner's fire: its embers glowing (not lit: they shine, even
 // in the hut's gloom, flickering with its light: lightFor), and its smoke.
 const embers = model.scene.getObjectByName("embers");
