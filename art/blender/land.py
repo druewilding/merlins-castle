@@ -2381,6 +2381,14 @@ for i in range(len(xs) - 1):
         maze_floor.add([(x, y, drawn_height(x, y, exactly=True) + 0.14) for x, y in pts], [(0, 1, 2), (0, 2, 3)],
                        [MAZE_LIGHT] * 4)
 maze_floor.build("maze-floor", smooth=True)
+# Boulders at the foot of its south wall, either side of the way in: past
+# them, between the wall and the crags, there's only a narrow strip, which
+# you'd only get stuck in.
+for bx, by, size, seed in ((5.0, -0.95, 0.85, 1), (6.3, -0.75, 0.55, 2), (-5.6, -0.95, 0.85, 3), (-6.9, -0.7, 0.55, 4)):
+    x, y = MZ[0] + bx, my0 + by
+    built.blob((x, y, height(x, y) + size * 0.35), size, c.mix(ROCK, MOSS, 0.25 + 0.1 * (seed % 2)),
+               squash=0.75, lumpy=0.25, seed=40 + seed)
+    solid_circle(x, y, size * 0.95)
 # Where the river goes under (clear of the beautiful chamber, down below).
 built.blob((RIVER[-1][0] + 5, RIVER[-1][1] + 3, -1.5), 9, ROCK, squash=0.7, lumpy=0.3, seed=4)
 
