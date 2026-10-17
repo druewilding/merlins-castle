@@ -1400,6 +1400,25 @@ for gx in range(X0 + 3, X1 - 2, 5):
             continue
         grow(x, y, tall, tree_kind(x, y, here), here)
         TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
+# A few firs in the meadow round the maze (on the mountain top, where the
+# grid finds none): their branches clear of its walls, the path and the
+# tunnels' mouths.
+here = random.Random("the maze's firs")
+maze_firs, tries = 0, 0
+while maze_firs < 7 and tries < 2000:
+    tries += 1
+    x, y = MZ[0] + here.uniform(-1, 1) * (MAZE_HALF + 10), MZ[1] + here.uniform(-1, 1) * (MAZE_HALF + 10)
+    r = here.uniform(2.2, 2.8)
+    if abs(x - MZ[0]) < MAZE_HALF + r + 0.8 and abs(y - MZ[1]) < MAZE_HALF + r + 0.8:
+        continue
+    if maze_meadow(x, y) < 0.6 or rocky(x, y) or path_lines.distance(x, y) < r + 2.5:
+        continue
+    if open_to_the_sky(x, y, 4.5) is not None or under_a_tree(x, y):
+        continue
+    grow(x, y, here.uniform(8, 12), here.choice(FIRS), here)
+    TREES.setdefault((int(x // 10), int(y // 10)), []).append((x, y, r))
+    maze_firs += 1
+print(f"{maze_firs} firs round the maze")
 # Trees close in on both sides of the dragon's mouth, so the only way on is
 # down into it (not round its side, past the leaves).
 here = random.Random("dragon's trees")
