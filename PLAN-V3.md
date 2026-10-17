@@ -378,7 +378,8 @@ or free model.
      ✅; saving and loading ✅ (the same saves as the other versions, and
      switching between all three with the game carried over); the trees ✅
      (Quaternius's, a mix for each part of the land, `src/three/trees.ts`);
-     the clues, a note at each dead end ✅ (`src/three/notes.ts`). Still to
+     the clues, a note at each dead end ✅ (`src/three/notes.ts`); the dark
+     places, too dark to see your way until you light it ✅. Still to
      come: all the rest of the obstacles, their animations and the death
      scenes.
 3. **The first beautiful corner**: grassy bank, old stone wall and old wall

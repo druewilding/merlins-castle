@@ -59,6 +59,7 @@ import { Felling } from "./felling";
 import { haze } from "./haze";
 import { items as setUpItems, onPaths } from "./items";
 import { Ladder } from "./ladder";
+import { dressLamp, Lantern } from "./lantern";
 import { DEATHS, placeAt, PLACES } from "./layout";
 import { Leaves } from "./leaves";
 import { Merlin } from "./merlin";
@@ -125,11 +126,12 @@ const COLD_GROUND = new Color("#1c1d22");
 const GLOOM = new Color("#07080b");
 scene.add(skylight);
 
-// Underground, the daylight fades and a warm lamp glow takes over (one day,
-// only if you've lit the lamp). It falls off gently: a light this close
+// Underground, the daylight fades and a warm glow takes over (where it's
+// dark, only the lamp's, once it's lit: lightFor). It falls off gently: a light this close
 // would otherwise blaze on any wall you walk up to. (Warm, but only a little:
 // any more and the grey rock of the tunnels looks like brown earth.)
-const lamp = new PointLight("#ffdcb4", 0, 14, 0.6);
+const LAMP_REACH = 14;
+const lamp = new PointLight("#ffdcb4", 0, LAMP_REACH, 0.6);
 scene.add(lamp);
 // And caves and rooms have their own light (torches, the dragon's fire,
 // gold, a hearth), always on, so a lit room seen through a doorway is lit.
@@ -220,6 +222,8 @@ if (emerald instanceof Mesh) {
   });
   pmrem.dispose();
 }
+// The lamp: its glass see-through, and its flame (lit, lantern.ts) bright.
+dressLamp(things.scene.getObjectByName("lamp")!);
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
   node.castShadow = !["paths", "water", "embers"].includes(node.name);
@@ -379,6 +383,16 @@ const stone = model.scene.getObjectByName("stone");
 const { r: STONE_R, aside, door } = land.stone;
 let rolled: number | undefined; // 0 beside the door, 1 across it
 const ROLL = 0.45; // of the way, a second
+// The ways too dark to go without the lamp (the long tunnel's mouths, and on
+// from the dark tunnels), and the places they're from: dark, till it's lit.
+const unlit = new Set(
+  [...shapes.values()].filter((shape) => shape.names.some((name) => exitOf(name)?.obstacle?.needs === "lamp"))
+);
+const DARK_PLACES = new Set(
+  Object.entries(english.rooms)
+    .filter(([, place]) => Object.values(place.exits).some((exit) => exit?.obstacle?.needs === "lamp"))
+    .map(([id]) => id)
+);
 // The dense trees across the mountain path, which the axe fells (felling.ts).
 const dense = shapeOf.get("mountain-path north");
 // The snake coiled at the top of the mossy steps, which takes the apple (snake.ts).
@@ -627,6 +641,8 @@ const plank = new Plank(
   () => ownSounds.play("run", { rate: 0.92 + Math.random() * 0.16 })
 );
 let bridged: string | undefined; // the exit it's across for
+// And the lamp, lit, in your hand (or where you dropped it).
+const lantern = new Lantern(scene, things.scene.getObjectByName("lamp")!, player.camera, reducedMotion);
 const PLANK = new Box3().setFromObject(things.scene.getObjectByName("plank")!).getSize(new Vector3()).z;
 const items = setUpItems({
   world,
@@ -663,7 +679,7 @@ function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
   // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees, the snake, the river,
-  // the leaves.)
+  // the leaves, the witches, the dark.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
     const shape = shapeOf.get(`${here} ${direction}`);
@@ -677,7 +693,8 @@ function inUse() {
         shape === shut ||
         shape === crossing ||
         shape === heaped ||
-        shape === dancers)
+        shape === dancers ||
+        unlit.has(shape))
       ? [`${here} ${direction}`]
       : [];
   });
@@ -1078,6 +1095,9 @@ let indoors = 0;
 let gloom = 0; // in a dark hall: 1
 let murk = 0; // and down in it, where its haze is: 1
 let dark = 0; // how dark it is round you (in a dark hall, or deep underground): 1
+let ownGlow = 1; // underground, the glow you see by: where it's dark, none (DIM)
+const DIM = 0.3;
+const LANTERN = 1.25; // and the lamp's, lit, brighter
 // The lights in the halls: a lit hall's own, in its middle, up towards its
 // roof, flickering (torches, fire); a dark one's, coming in at its windows
 // and cracks, steady (daylight).
@@ -1115,8 +1135,16 @@ function lightFor(depth: number, time: number, dt: number) {
   skylight.color.copy(SKY).lerp(COLD, gloom);
   skylight.groundColor.copy(SKY_GROUND).lerp(COLD_GROUND, gloom);
   const flicker = reducedMotion ? 1 : 0.92 + 0.05 * Math.sin(time / 90) + 0.03 * Math.sin(time / 37);
-  lamp.intensity = 3.5 * Math.max(under, indoors * 0.4) * flicker * (1 - gloom);
-  lamp.position.set(player.position.x, player.position.y + 1.4, player.position.z);
+  // (Where it's dark, your own glow fades to almost nothing: but the lamp's,
+  // lit, flickers as a flame does, from its flame.)
+  ownGlow += ((DARK_PLACES.has(room) ? DIM : 1) - ownGlow) * Math.min(1, dt * 1.5);
+  const flame = reducedMotion ? 1 : 0.88 + 0.08 * Math.sin(time / 61) + 0.04 * Math.sin(time / 23);
+  const own = ownGlow * flicker;
+  const lamplit = lantern.light * LANTERN * flame;
+  lamp.intensity = 3.5 * Math.max(under, indoors * 0.4) * Math.max(own, lamplit) * (1 - gloom);
+  lamp.distance = LAMP_REACH + 6 * lantern.light; // (and further)
+  if (lamplit > own) lamp.position.copy(lantern.at);
+  else lamp.position.set(player.position.x, player.position.y + 1.4, player.position.z);
   emberLook.color.setScalar(0.75 + 0.25 * flicker * flicker * (reducedMotion ? 1 : 0.9 + 0.1 * Math.sin(time / 23)));
 
   // The halls' lights nearest you.
@@ -1246,6 +1274,13 @@ renderer.setAnimationLoop((time) => {
     told = undefined;
     lastRoom = room;
   }
+  const lampLit = effects(world, items.state).includes("lamp");
+  lantern.update(
+    dt,
+    time,
+    lampLit && items.state.itemLocations.lamp === "carried",
+    lampLit ? items.lyingAt("lamp") : undefined
+  );
   lightFor(player.depth, time, dt);
   items.update(room);
   here.textContent = name(room);
