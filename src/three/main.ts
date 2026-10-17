@@ -53,6 +53,7 @@ import {
   type ThreeSave,
 } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
+import { Caught } from "./caught";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
 import { haze } from "./haze";
@@ -713,10 +714,11 @@ if (handoff && !at) arrive(handoff);
 
 // Dying: walking into a way that kills you, its scene plays out (climbing
 // the ladder propped under the balcony, fall.ts; wading into the deep river,
-// swept.ts); then a curtain falls, with the original's words, and after it
+// swept.ts; walking into the witches, caught.ts); then a curtain falls, with the original's words, and after it
 // your score, as in the illustrated version.
 const BALCONY = "mossy-steps east";
 const RIVER = "deep-river south";
+const WITCHES = "forest-witches west";
 // (Each scene plays on behind the curtain, which starts to come down a
 // little before its end, so the end is seen through it, not cut off.)
 interface Scene3d {
@@ -750,6 +752,11 @@ const scenes: Record<string, () => Scene3d | undefined> = {
   // (Not with the plank across it: the way's open then.)
   [RIVER]: () =>
     effects(world, items.state).includes("plank") ? undefined : new Swept(player.camera, drawn, river, reducedMotion),
+  // (Not with the broom in use: they've flown off.)
+  [WITCHES]: () =>
+    effects(world, items.state).includes("broom")
+      ? undefined
+      : new Caught(player.camera, drawn, witches, reducedMotion),
 };
 
 /** Walking into a way that kills you: its scene (and true), or nothing to see (false). */
@@ -1023,6 +1030,7 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   leaning = undefined;
   plank.away();
   bridged = undefined;
+  witches.free();
   arrive(game);
   instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
   inUse();
