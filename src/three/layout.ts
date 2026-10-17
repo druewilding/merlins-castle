@@ -20,11 +20,6 @@ export function spot([col, row]: number[]): Spot {
 const entries = (record: object) => (Object.entries(record) as [string, number[]][]).filter(([key]) => key !== "_");
 
 export const PLACES = new Map<RoomId, Spot>(entries(layout.places).map(([id, cr]) => [id, spot(cr)]));
-const CAVES = new Set(layout.kinds.cave);
-const underground = (exit: string) => CAVES.has(exit.split(" ")[0]);
-
-/** Where you get lost in the mist: above ground, or along a way underground. */
-export const LOST = entries(layout.lost).map(([exit, cr]) => ({ exit, under: underground(exit), ...spot(cr) }));
 export const DEATHS = entries(layout.deaths).map(([exit, cr]) => ({ exit, ...spot(cr) }));
 
 /** How near a place's middle you have to be to be in it. */

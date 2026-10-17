@@ -36,7 +36,7 @@ import {
 } from "three";
 
 import type { RoomId } from "../engine/types";
-import { DEATHS, LOST, PLACES } from "./layout";
+import { DEATHS, PLACES } from "./layout";
 import { type Ground, nearest, type Player, type Walkable } from "./player";
 import { paintPage } from "./snapshot";
 
@@ -63,6 +63,8 @@ export interface DebugWorld {
   scene: Scene;
   ground: Ground;
   obstacles: DebugObstacle[];
+  /** Where the clues are (the notes at the dead ends). */
+  clues: { x: number; z: number }[];
   /** How far an obstacle in your way reaches out to bounce you back (unless it says). */
   ahead: number;
   /** Whether trying an exit kills you: without the right object (the goblins), or with it (the balcony). */
@@ -452,7 +454,7 @@ export function debug(world: DebugWorld, onOpen: () => void) {
       pen.arc(mx, my, r, 0, Math.PI * 2);
       pen.fill();
     };
-    for (const { x, z } of LOST) dot(x, z, "rgba(255,255,255,0.75)", 8);
+    for (const { x, z } of world.clues) dot(x, z, "rgba(255,255,255,0.75)", 6);
     for (const { x, z } of DEATHS) dot(x, z, "#e0614f", 4);
     for (const [id, { x, z }] of PLACES) dot(x, z, id === world.room() ? "#ffd75a" : "#fff7e2", 3.5);
     // Names only for where you are and where the mouse is: they'd crowd otherwise.
