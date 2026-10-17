@@ -494,6 +494,7 @@ const merlin = new Merlin(
   (x, z) =>
     Math.abs(x - lair.x) < lair.w! - 1.2 && Math.abs(z - lair.z) < lair.d! - 1.2 && player.clear(x, z, true, 0.6)
 );
+player.movers.push(merlin.body);
 
 // A game loaded, or carried on from another version (or another language).
 const handoff = takeHandoff();

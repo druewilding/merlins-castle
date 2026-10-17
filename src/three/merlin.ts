@@ -17,7 +17,7 @@ import {
   Vector3,
 } from "three";
 
-import type { Ground } from "./player";
+import type { Circle, Ground } from "./player";
 
 const TALL = 1.15; // times the size he's made: tall, his face above yours, under his hat's brim
 const WALK = 0.975 * TALL; // metres a second: as far as his walk carries him (so his feet don't slide)
@@ -30,6 +30,8 @@ const CASTING = 2.5; // seconds he holds the spell
 const NEAR = 3; // metres: this near, he stops and turns to you
 const BLEND = 0.3; // seconds from one clip to the next
 const THUMBS = [3, 7]; // seconds between his thumbs-ups, talking to you
+const BODY = 0.42; // metres: his radius (his robe's hem), for bumping into him
+const HEAD = 2.1; // metres: his height (over him, as on the castle's ground above his lair, he doesn't stop you)
 
 const between = ([a, b]: number[]) => a + Math.random() * (b - a);
 
@@ -42,6 +44,8 @@ export class Merlin {
   private thumbs = between(THUMBS); // seconds, until his next thumbs-up
   private target = new Vector3();
   private yaw = 0; // which way he faces (0 is +z)
+  /** Where he is, solid: you can't walk through him (player.movers). */
+  readonly body: Circle = { x: 0, z: 0, r: BODY };
 
   constructor(
     scene: Scene,
@@ -162,6 +166,7 @@ export class Merlin {
       }
     }
     at.y = this.ground(at.x, at.z) ?? at.y;
+    Object.assign(this.body, { x: at.x, z: at.z, top: at.y + HEAD });
     this.mixer.update(dt);
   }
 }
