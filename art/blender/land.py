@@ -448,6 +448,7 @@ class Hall:
 
 
 TORCH = "#ffa24a"
+ROOM_EDGE = 0.35  # from a room's edge (its w and d) out to its walls
 LAIR_FLOOR = -1.6  # Merlin's lair, and the small room beside it
 LAIR_STAIRS = 6.0  # from the lair's north wall up to the grand hall's
 HALLS = {h.place: h for h in [
@@ -2257,12 +2258,12 @@ def spike(builder, x, y, z, tall, radius, colour, sides=6):
     builder.add(verts, faces, [c.vary(colour, 0.15, Vector((x, y, z + k))) for k in range(sides + 1)])
 
 
-def opening(hall, x, y):
-    """Whether a way comes into the hall here, at its wall."""
+def opening(hall, x, y, margin=0.5):
+    """Whether a way comes into the hall here, at its wall (or within a margin of it)."""
     for way in WAYS.values():
         if way.near(x, y, way.half + 1):
             d, floor, beyond = way.nearest(x, y)
-            if not beyond and d < way.half + 0.5 and abs(floor - hall.floor) < 1.5:
+            if not beyond and d < way.half + margin and abs(floor - hall.floor) < 1.5:
                 return True
     return False
 
@@ -2572,6 +2573,20 @@ for way in WAYS.values():
             for p, jut in ((er_, 1.8), (el_, -1.8)):
                 q = (p[0] + nx_ * jut, p[1] + ny_ * jut)
                 quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
+            # (Into a room, the frame can stand a little out from its wall,
+            # where the way's walls begin: the sides of the doorway, back
+            # from the frame to the wall, so there's no gap to see out of.)
+            if hall.room:
+                ux, uy = (inner[0] - row[0]) / run, (inner[1] - row[1]) / run
+                for p in (el_, er_):
+                    ts = [(hall.x + sign * (hall.w + ROOM_EDGE) - p[0]) / ux for sign in (1, -1) if abs(ux) > 1e-6]
+                    ts += [(hall.y + sign * (hall.d + ROOM_EDGE) - p[1]) / uy for sign in (1, -1) if abs(uy) > 1e-6]
+                    t = min((t for t in ts if t > 0), default=0.0)
+                    if 0 < t < 1:
+                        q = (p[0] + ux * t, p[1] + uy * t)
+                        # (Facing both ways: one side's faces in, the other's out.)
+                        quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
+                        quad(tunnel, [(*p, top), (*q, top), (*q, f - 0.3), (*p, f - 0.3)], hall.wall)
             if not hall.indoor:
                 p, q = el_, er_
                 quad(tunnel, [(*p, f + TUNNEL_TALL), (*q, f + TUNNEL_TALL), (*q, top), (*p, top)], hall.wall)
@@ -3036,19 +3051,32 @@ def room(b, hall):
             colour, vary = floor_colour(hall, i, j, x0, y0)
             fl = f - 0.06  # (a shade lower than the corridors' floors, where they overlap)
             quad(b, [(x0, y0, fl), (x1, y0, fl), (x1, y1, fl), (x0, y1, fl)], colour, vary)
-    E = 0.35
+    E = ROOM_EDGE
     corners = [(hx - W - E, hy - D - E), (hx + W + E, hy - D - E), (hx + W + E, hy + D + E), (hx - W - E, hy + D + E)]
     band = c.mix(hall.wall, c.linear("#000000"), 0.3)
     for k in range(4):
         (ax, ay), (bx, by) = corners[k], corners[(k + 1) % 4]
         length = math.hypot(bx - ax, by - ay)
         ox, oy = (by - ay) / length, -(bx - ax) / length  # outward
-        n = max(1, round(length))
-        for m in range(n):
-            p0 = (ax + (bx - ax) * m / n, ay + (by - ay) * m / n)
-            p1 = (ax + (bx - ax) * (m + 1) / n, ay + (by - ay) * (m + 1) / n)
-            mx, my = (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2
-            if opening(hall, mx + ox * 0.6, my + oy * 0.6):
+        # Where ways come through it, exactly as wide as they are (to 5 cm),
+        # so their walls meet its edges; and the rest, in pieces of about a
+        # metre.
+        def along(t, ax=ax, ay=ay, bx=bx, by=by, length=length):
+            return ax + (bx - ax) * t / length, ay + (by - ay) * t / length
+
+        fine = 0.05
+        open_ = [opening(hall, *(v + o * 0.6 for v, o in zip(along((i + 0.5) * fine), (ox, oy))), margin=0.0)
+                 for i in range(int(length / fine))]
+        runs, start = [], 0
+        for i in range(1, len(open_) + 1):
+            if i == len(open_) or open_[i] != open_[start]:
+                t0, t1 = start * fine, (length if i == len(open_) else i * fine)
+                n = 1 if open_[start] else max(1, round(t1 - t0))
+                runs += [(t0 + (t1 - t0) * m / n, t0 + (t1 - t0) * (m + 1) / n, open_[start]) for m in range(n)]
+                start = i
+        for t0, t1, through in runs:
+            p0, p1 = along(t0), along(t1)
+            if through:
                 # (Down a little over the doorway's roof, which can slope down
                 # outward, as to the hut's door.)
                 low = f + TUNNEL_TALL - 0.3
