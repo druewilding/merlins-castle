@@ -1,5 +1,6 @@
-// The maze's stone: the Medieval Village MegaKit's uneven stone (by
-// Quaternius, CC0), on its walls and, as flagstones, on its floor. land.glb
+// The maze's stone: the Medieval Village MegaKit's (by Quaternius, CC0),
+// its uneven stone on the walls, and its dressed stone, laid flat as paving,
+// on the floor. land.glb
 // has them only shaded (mossy at the walls' foot); the stone goes on here,
 // by where each face is and which way it faces, so it lies the same way
 // right along a wall and across the floor, wherever the pieces join.
@@ -16,19 +17,22 @@ import {
   type WebGLRenderer,
 } from "three";
 
+import pavingUrl from "./textures/paving.jpg?url";
+import pavingNormalUrl from "./textures/paving-normal.jpg?url";
 import stoneUrl from "./textures/stone.jpg?url";
 import stoneNormalUrl from "./textures/stone-normal.jpg?url";
 
 const WALL_REPEAT = 2.4; // metres, across the stone once, on the walls
-const FLOOR_REPEAT = 3.2; // (and bigger flags on the floor)
+const FLOOR_REPEAT = 3.6; // (and across the paving)
 
 /** The stone on the maze's walls and floor (in land.glb: "maze" and "maze-floor"). */
 export function dressMaze(land: Object3D, renderer: WebGLRenderer) {
   const loader = new TextureLoader();
-  const stone = loader.load(stoneUrl);
-  stone.colorSpace = SRGBColorSpace;
-  const normal = loader.load(stoneNormalUrl);
-  for (const texture of [stone, normal]) {
+  const [stone, normal, paving, pavingNormal] = [stoneUrl, stoneNormalUrl, pavingUrl, pavingNormalUrl].map((url) =>
+    loader.load(url)
+  );
+  stone.colorSpace = paving.colorSpace = SRGBColorSpace;
+  for (const texture of [stone, normal, paving, pavingNormal]) {
     texture.wrapS = texture.wrapT = RepeatWrapping;
     texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   }
@@ -48,9 +52,9 @@ export function dressMaze(land: Object3D, renderer: WebGLRenderer) {
     mapped(floor, FLOOR_REPEAT);
     floor.material = new MeshStandardMaterial({
       vertexColors: true,
-      color: new Color(1.6, 1.45, 1.2), // (warmer, sunlit)
-      map: stone,
-      normalMap: normal,
+      color: new Color(1.5, 1.32, 1.02), // (warmer, sunlit)
+      map: paving,
+      normalMap: pavingNormal,
       roughness: 0.95,
     });
     floor.castShadow = false;
