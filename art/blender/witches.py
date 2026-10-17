@@ -48,7 +48,7 @@ WITCHES = [
     {"robe": "#48573f", "hat": "#2b3424", "band": "#6b3a2e", "bend": (0.04, 0.17), "tall": 0.54},
 ]
 
-WAIST = 1.06  # the robe hangs from here (over the foot of her bodice)...
+WAIST = 1.1  # the robe hangs from here (from under her bodice)...
 HEM = 0.03  # ...down to here, at its longest rags
 RAGS = 13  # points round its hem
 CUFF = (0.045, 0.11, 0.03)  # her sleeves' cuffs: how wide at her forearm, at their ends, and how far past her wrist
@@ -91,6 +91,14 @@ for v in hair.data.vertices:
 # ---- Their robes: from the waist to the ground, in rags at the hem ----------
 
 RINGS = 18
+FIT = 0.012  # metres the robe stands clear of her clothes under it, at its snuggest
+# (Round her as snug as her bodice and her breeches are, at each height: then
+# flaring out from that.)
+# (Her bodice's flared foot, and the pouch on it, go: hidden by her robe, and
+# they'd poke through it.)
+under = [o for o in skeleton.children if o.name.startswith(("Female_Peasant_Body", "Female_Peasant_Legs"))]
+c.cut_below(next(o for o in under if "Body" in o.name), WAIST - 0.03)
+snug = c.hang([c.girth(under, WAIST + (HEM - WAIST) * i / RINGS, SIDES, (0.0, 0.02)) for i in range(RINGS + 1)])
 robes = []
 for n, witch in enumerate(WITCHES):
     rng = random.Random(n)
@@ -98,10 +106,10 @@ for n, witch in enumerate(WITCHES):
     verts, colours, weights = [], [], []
     for i in range(RINGS + 1):
         t = i / RINGS  # 0 at the waist, 1 at the hem
-        radius = 0.19 + 0.19 * t**1.2
         for k in range(SIDES):
             a = 2 * math.pi * k / SIDES
-            r = radius * (1 + 0.06 * t * math.sin(a * 7 + n))
+            flare = 0.2 * t**1.2 * (1 + 0.3 * math.sin(a * 7 + n))
+            r = snug[i][k] + FIT + flare
             x, y = math.sin(a) * r, -math.cos(a) * r
             # The hem: pointed rags (each at its own length), between them cut up.
             u = a / (2 * math.pi) * RAGS
@@ -112,8 +120,8 @@ for n, witch in enumerate(WITCHES):
             patch = noise.noise(Vector((x * 9, y * 9, z * 5 + n * 10)))
             colours.append(c.vary(c.linear(witch["robe"]), 0.16 + 0.1 * patch, Vector((a * 3, t * 8, n))))
             # (Moved as Merlin's robe is: by her hips, and below by her legs.)
-            side = c.smooth((x / max(radius, 0.01) + 0.35) / 0.7)
-            back = c.smooth((y / max(radius, 0.01) + 0.3) / 1.0)
+            side = c.smooth((x / r + 0.35) / 0.7)
+            back = c.smooth((y / r + 0.3) / 1.0)
             hip = 1 - c.smooth(t * 2.5)
             calf = (0.25 + 0.5 * back) * c.smooth((t - 0.4) * 2)
             thigh = (1 - hip) - calf

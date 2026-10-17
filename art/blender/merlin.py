@@ -103,15 +103,21 @@ bm.free()
 # ---- His robe: from the belt to his ankles, flaring out ---------------------
 
 RINGS = 20
+FIT = 0.012  # metres the robe stands clear of his tunic under it, at its snuggest
+# (Round him as snug as his tunic and breeches are, at each height (under his
+# belt): then flaring out from that.)
+# (His tunic's skirt goes: hidden by his robe, and it'd poke through it.)
+under = [o for o in skeleton.children if o.name in ("Male_Ranger_Body", "Male_Ranger_Legs")]
+c.cut_below(next(o for o in under if o.name == "Male_Ranger_Body"), WAIST - 0.05)
+snug = c.hang([c.girth(under, WAIST + (HEM - WAIST) * i / RINGS, SIDES, (0.0, 0.02)) for i in range(RINGS + 1)])
 verts, colours, weights = [], [], []
 for i in range(RINGS + 1):
     t = i / RINGS  # 0 at the waist, 1 at the hem
     z = WAIST + (HEM - WAIST) * t
-    radius = 0.165 + 0.21 * t**1.1
     for k in range(SIDES):
         a = 2 * math.pi * k / SIDES
         # Soft folds, deeper towards the hem.
-        r = radius * (1 + 0.05 * t * math.sin(a * 9 + 1.3))
+        r = snug[i][k] + FIT + 0.21 * t**1.1 * (1 + 0.25 * math.sin(a * 9 + 1.3))
         x, y = math.sin(a) * r, -math.cos(a) * r
         verts.append((x, y + 0.02, z))
         # Gold trim round the hem and down the front.
@@ -121,8 +127,8 @@ for i in range(RINGS + 1):
         # own: mostly by his thigh, so the hem swings out in a wide arc with each
         # stride (and his knee stays inside), and at the back by his calf too, as
         # his heel lifts behind him.
-        side = c.smooth((x / max(radius, 0.01) + 0.35) / 0.7)  # 0 on his right, 1 on his left
-        back = c.smooth((y / max(radius, 0.01) + 0.3) / 1.0)  # 0 at his front, 1 at his back
+        side = c.smooth((x / r + 0.35) / 0.7)  # 0 on his right, 1 on his left
+        back = c.smooth((y / r + 0.3) / 1.0)  # 0 at his front, 1 at his back
         hip = 1 - c.smooth(t * 2.5)
         calf = (0.25 + 0.5 * back) * c.smooth((t - 0.4) * 2)
         thigh = (1 - hip) - calf

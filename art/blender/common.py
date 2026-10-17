@@ -478,3 +478,52 @@ def pose(skeleton, clip, frame):
     for track in skeleton.animation_data.nla_tracks:
         track.mute = track.name != clip
     bpy.context.scene.frame_set(frame)
+
+
+def girth(meshes, z, sides, centre=(0.0, 0.01), band=0.015):
+    """How far out the meshes reach at this height, all round: for each of
+    `sides` directions (at 2πk/sides, from facing -y, as the robes go round),
+    the furthest out of their points near that height and that way. For a
+    robe snug to what's under it."""
+    cx, cy = centre
+    reach = [None] * sides
+    for obj in meshes:
+        for v in obj.data.vertices:
+            p = obj.matrix_world @ v.co
+            if abs(p.z - z) > band:
+                continue
+            a = math.atan2(p.x - cx, -(p.y - cy)) % (2 * math.pi)
+            k = round(a / (2 * math.pi) * sides) % sides
+            r = math.hypot(p.x - cx, p.y - cy)
+            reach[k] = max(reach[k] or 0.0, r)
+    known = [k for k in range(sides) if reach[k] is not None]
+    if not known:
+        return [0.0] * sides
+    # (Where no point falls, as far out as the nearest that does; then each
+    # as far as either neighbour, so nothing between two points pokes out.)
+    filled = [reach[k] if reach[k] is not None else reach[min(known, key=lambda j: min(abs(j - k), sides - abs(j - k)))]
+              for k in range(sides)]
+    return [max(filled[k - 1], filled[k], filled[(k + 1) % sides]) for k in range(sides)]
+
+
+def hang(girths):
+    """A robe's shape, ring by ring from its top, from the girths of what's
+    under it (girth): never in from the ring above (it hangs down over what
+    it's passed), and smoothed round, so it doesn't follow every lump."""
+    sides = len(girths[0])
+    widest = list(girths[0])
+    rings = []
+    for g in girths:
+        widest = [max(w, r) for w, r in zip(widest, g)]
+        rings.append([sum(widest[(k + d) % sides] for d in (-2, -1, 0, 1, 2)) / 5 for k in range(sides)])
+    # (Smoothed, it mustn't come in anywhere past what it was fitted to.)
+    return [[max(r, w) for r, w in zip(ring, g)] for ring, g in zip(rings, girths)]
+
+
+def cut_below(obj, z):
+    """Takes away a mesh's points below this height (what a robe hides)."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < z], context="VERTS")
+    bm.to_mesh(obj.data)
+    bm.free()
