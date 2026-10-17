@@ -824,6 +824,10 @@ def open_ground(x, y, lures=True):
     for w, e, s, n in OPEN_ZONES:
         if w <= x <= e and s <= y <= n:
             return True
+    # (All round the grassy mound: its back reaches past the meadow, and you
+    # can walk round it.)
+    if math.hypot((x - MOUND.x) / (9 * 1.35 + 3.5), (y - MOUND.y) / (6.5 * 1.35 + 3.5)) < 1:
+        return True
     for spot in LOST.values():
         if math.hypot(x - spot[0], y - spot[1]) < 11 and not beyond_the_mist(x, y):
             return True
