@@ -10,8 +10,9 @@
 //
 // Use the broom and they stop dancing and fly off "to the moon", each on a
 // broom of her own, up and away over the trees. Once it's no longer in use
-// there (you've gone on), they're back in hiding the next time you're not
-// looking, ready to come out and dance again.
+// there (you've gone on), each is back in hiding the moment you're not
+// looking (at her, flying still, or where she hides), ready to come out and
+// dance again: even if you turn straight back.
 //
 // Walk into them (without the broom) and they catch you: they run at you,
 // close round you, throw their ropes over you, and dance round you, tied
@@ -58,6 +59,7 @@ const GONE = 10;
 // Her broom, under her as she sits (in her model's metres: its middle, back
 // from her hips, and how far up).
 const SEAT = [0, -0.12, 0.5];
+const SPECK = 18; // metres off, flying: no more than a speck in the sky
 const ROUND_YOU = 1.1; // radians a second, the ring turning as they dance round you, tied up
 
 export interface Ring {
@@ -173,6 +175,7 @@ export class Witches {
   private caught = false;
   private frustum = new Frustum();
   private matrix = new Matrix4();
+  private eye = new Vector3();
 
   constructor(
     scene: Scene,
@@ -227,7 +230,10 @@ export class Witches {
   catch(x: number, z: number) {
     this.caught = true;
     this.ring = { x, z, r: CLOSE };
-    for (const witch of this.witches) witch.state = "coming";
+    for (const witch of this.witches) {
+      if (witch.state === "flying" || witch.state === "flown") this.hideNow(witch); // (out from behind her tree)
+      witch.state = "coming";
+    }
   }
 
   /** You're free again (a new game): they're back in hiding, by their own ring. */
@@ -257,8 +263,17 @@ export class Witches {
    * do when you're not looking (camera: where you're looking from).
    */
   update(dt: number, out: boolean, camera: Camera, back: boolean) {
-    if (back && this.witches.every((witch) => witch.state === "flown") && !this.seen(camera)) {
-      for (const witch of this.witches) this.hideNow(witch);
+    if (back) this.seeing(camera);
+    for (const witch of this.witches) {
+      const away = witch.state === "flying" || witch.state === "flown";
+      if (!back || !away) continue;
+      // (Back in the clearing, they're back however you're looking at her
+      // tree: they'd be out from behind it before you could see anyway.)
+      // (Far off, she's a speck in the sky: gone, she'd hardly be missed.)
+      const at = witch.model.position;
+      const speck = at.distanceTo(this.eye) > SPECK;
+      const flying = witch.state === "flying" && !speck && this.seen(at, 1.5);
+      if (!flying && (out || !this.seen(witch.hide, 1.2))) this.hideNow(witch);
     }
     // (Catching you, the ring's still till they've all thrown their ropes.)
     const tied = this.witches.every((witch) => witch.state === "dancing");
@@ -323,15 +338,18 @@ export class Witches {
     witch.update(dt);
   }
 
-  /** Whether you could see any of them, hiding, from where you are (roughly: whether it's in view at all). */
-  private seen(camera: Camera) {
+  // What you can see, this frame.
+  private seeing(camera: Camera) {
     camera.updateMatrixWorld();
     this.matrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.matrix);
-    const near = (x: number, z: number) => Math.hypot(camera.position.x - x, camera.position.z - z) < 5;
-    return this.witches.some(({ hide: { x, z } }) => {
-      const y = (this.ground(x, z) ?? 0) + 0.8;
-      return near(x, z) || this.frustum.intersectsSphere(new Sphere(new Vector3(x, y, z), 1.2));
-    });
+    this.eye.copy(camera.position);
+  }
+
+  /** Whether you could see a spot (her, or where she hides) from where you are (roughly: whether it's in view at all). */
+  private seen(at: { x: number; y?: number; z: number }, r: number) {
+    const y = at.y ?? (this.ground(at.x, at.z) ?? 0) + 0.8;
+    const near = Math.hypot(this.eye.x - at.x, this.eye.z - at.z) < 5;
+    return near || this.frustum.intersectsSphere(new Sphere(new Vector3(at.x, y, at.z), r));
   }
 }
