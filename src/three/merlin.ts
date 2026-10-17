@@ -1,7 +1,8 @@
-// Merlin (his model: art/blender/merlin.py), for now just walking about the
-// grassy bank: he strolls to somewhere near, stands a while (his arms
-// folded), and now and then casts a spell. Come near and he stops, turns to
-// you and talks, now and then giving you a thumbs-up.
+// Merlin (his model: art/blender/merlin.py), in his lair: he strolls to
+// somewhere near, stands a while (his arms folded), and now and then casts a
+// spell. Come into his lair and he comes towards you ("The wizard comes
+// towards you!"); near you, he stops, turns to you and talks, now and then
+// giving you a thumbs-up.
 //
 // His clips are the Universal Animation Libraries', named as they are there.
 
@@ -21,7 +22,7 @@ import type { Ground } from "./player";
 const TALL = 1.15; // times the size he's made: tall, his face above yours, under his hat's brim
 const WALK = 0.975 * TALL; // metres a second: as far as his walk carries him (so his feet don't slide)
 const TURN = 2.5; // radians a second, turning
-const RANGE = 7; // metres from his spot he wanders, at most
+const RANGE = 10; // metres from his spot he wanders, at most
 const STROLL = [2.5, 6]; // metres to the next place he walks to, between these
 const PAUSE = [2, 5]; // seconds he stands there, between these
 const SPELL = 0.25; // how often, coming to a stop, he casts a spell
@@ -48,7 +49,7 @@ export class Merlin {
     clips: AnimationClip[],
     private home: { x: number; z: number },
     private ground: Ground,
-    /** Whether he could walk here (not in a tree, or off the land). */
+    /** Whether he could walk here (not into his furniture, or a wall). */
     private clear: (x: number, z: number) => boolean
   ) {
     model.traverse((o) => {
@@ -107,9 +108,14 @@ export class Merlin {
     return Math.abs(turn);
   }
 
-  update(dt: number, you: Vector3) {
+  /** Each frame: where you are, and whether you're in his lair (he comes to you). */
+  update(dt: number, you: Vector3, here: boolean) {
     const at = this.model.position;
     const near = Math.hypot(you.x - at.x, you.z - at.z) < NEAR;
+    if (here && !near && this.state !== "casting") {
+      this.state = "walking";
+      this.target.set(you.x, 0, you.z);
+    }
     if (near && this.state === "walking") {
       this.state = "standing";
       this.wait = between(PAUSE);
@@ -120,7 +126,12 @@ export class Merlin {
       const left = Math.hypot(dx, dz);
       const off = this.face(dx, dz, dt);
       // (Turning on the spot first, if he's far off his way.)
-      const step = off > 0.8 ? 0 : Math.min(left, WALK * dt);
+      let step = off > 0.8 ? 0 : Math.min(left, WALK * dt);
+      // (Not into anything: there, he stops.)
+      if (step > 0 && !this.clear(at.x + Math.sin(this.yaw) * 0.3, at.z + Math.cos(this.yaw) * 0.3)) {
+        step = 0;
+        this.target.set(at.x, 0, at.z);
+      }
       at.x += Math.sin(this.yaw) * step;
       at.z += Math.cos(this.yaw) * step;
       this.play(step > 0 ? "Walk_Formal_Loop" : "Idle_FoldArms_Loop");

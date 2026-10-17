@@ -157,6 +157,115 @@ class Builder:
 # from names when it loads a file.
 
 
+class Kit:
+    """Models from one of Quaternius's packs (art/models/), made ours: each a
+    list of faces, coloured at each corner from its texture (times its own
+    vertex colours, as the pack's materials have it), so they go into one
+    vertex-coloured mesh like everything else."""
+
+    def __init__(self, folder, texture=512):
+        self.folder, self.texture = folder, texture
+        self.models, self.images = {}, {}
+
+    def _image(self, image):
+        """A texture's colours, shrunk, as linear RGB."""
+        import numpy as np
+
+        if image.name not in self.images:
+            image.scale(self.texture, self.texture)
+            px = np.empty(len(image.pixels), dtype=np.float32)
+            image.pixels.foreach_get(px)
+            rgb = px.reshape(self.texture, self.texture, 4)[:, :, :3]
+            self.images[image.name] = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+        return self.images[image.name]
+
+    def faces(self, name, ratio=None):
+        """A model's faces: (corners, their colours, its material's name) for
+        each; simpler, given a ratio of its faces to keep."""
+        if (name, ratio) in self.models:
+            return self.models[name, ratio]
+        before = set(bpy.data.objects)
+        bpy.ops.import_scene.gltf(filepath=str(self.folder / f"{name}.gltf"))
+        new = [o for o in bpy.data.objects if o not in before]
+        faces = []
+        for obj in new:
+            if obj.type != "MESH":
+                continue
+            textures, names = [], []
+            for material in obj.data.materials:
+                nodes = material.node_tree.nodes if material and material.node_tree else []
+                images = [n.image for n in nodes if n.type == "TEX_IMAGE" and n.image]
+                image = next((i for i in images if "BaseColor" in i.name or "Page" in i.name), None)
+                textures.append(self._image(image) if image and image.size[0] else None)
+                names.append(material.name if material else "")
+            if ratio:
+                obj.modifiers.new("simpler", "DECIMATE").ratio = ratio
+            mesh = obj.evaluated_get(bpy.context.evaluated_depsgraph_get()).to_mesh()
+            uvs = mesh.uv_layers.active.data if mesh.uv_layers.active else None
+            tints = mesh.color_attributes.active_color
+            for poly in mesh.polygons:
+                texture = textures[poly.material_index] if textures else None
+                pts, colours = [], []
+                for li, vi in zip(poly.loop_indices, poly.vertices):
+                    pts.append(tuple(obj.matrix_world @ mesh.vertices[vi].co))
+                    colour = [1.0, 1.0, 1.0]
+                    if texture is not None and uvs:
+                        u, v = uvs[li].uv
+                        i = min(self.texture - 1, max(0, int((v % 1.0) * self.texture)))
+                        j = min(self.texture - 1, max(0, int((u % 1.0) * self.texture)))
+                        colour = list(texture[i, j])
+                    if tints:
+                        tint = tints.data[li if tints.domain == "CORNER" else vi].color
+                        colour = [a * b for a, b in zip(colour, tint)]
+                    colours.append((*colour, 1.0))
+                faces.append((pts, colours, names[poly.material_index] if names else ""))
+        for obj in new:
+            bpy.data.objects.remove(obj, do_unlink=True)
+        self.models[name, ratio] = faces
+        return faces
+
+    def tips(self, name):
+        """The tops of a model's candles (their wax is the props' material):
+        where their flames go."""
+        tips = []
+        for pts, _, material in self.faces(name):
+            if "Props" not in material:
+                continue
+            for p in pts:
+                near = next((i for i, t in enumerate(tips) if math.hypot(t[0] - p[0], t[1] - p[1]) < 0.08), None)
+                if near is None:
+                    tips.append(p)
+                elif p[2] > tips[near][2]:
+                    tips[near] = p
+        return tips
+
+    @staticmethod
+    def placing(at, yaw=0.0, scale=1.0):
+        """Where a point of a model goes, its origin at `at`, turned by yaw
+        (radians, anticlockwise: 0 faces -y, the way the packs face)."""
+        x, y, z = at
+        cos, sin = math.cos(yaw), math.sin(yaw)
+
+        def move(p):
+            return x + (p[0] * cos - p[1] * sin) * scale, y + (p[0] * sin + p[1] * cos) * scale, z + p[2] * scale
+
+        return move
+
+    def put(self, builder, name, at, yaw=0.0, scale=1.0, ratio=None, tint=None):
+        """A model into a builder (see placing; tint, an RGBA colour mixed in
+        by its alpha). Its footprint there, as (x0, y0, x1, y1), and its top."""
+        move = self.placing(at, yaw, scale)
+        xs, ys, top = [], [], at[2]
+        for pts, colours, _ in self.faces(name, ratio):
+            moved = [move(p) for p in pts]
+            xs += [p[0] for p in moved]
+            ys += [p[1] for p in moved]
+            top = max(top, *(p[2] for p in moved))
+            shades = [mix(colour, tint, tint[3]) for colour in colours] if tint else colours
+            builder.add(moved, [tuple(range(len(moved)))], [(*s[:3], 1.0) for s in shades])
+        return (min(xs), min(ys), max(xs), max(ys)), top
+
+
 def collider(name, x, y, radius):
     """An empty that tells the game where something solid stands: its scale is the radius."""
     empty = bpy.data.objects.new(name, None)

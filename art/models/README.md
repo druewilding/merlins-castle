@@ -12,7 +12,9 @@ the packs to rebuild those.
 | `universal-base-characters`     | [Universal Base Characters](https://quaternius.com/packs/universalbasecharacters.html)                  | Heads and hair, in `merlin.py`       |
 | `modular-character-outfits`     | [Modular Character Outfits – Fantasy](https://quaternius.com/packs/modularcharacteroutfitsfantasy.html) | Outfits, in `merlin.py`              |
 | `universal-animation-library-1` | [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html)              | Animations, in `merlin.py`           |
-| `universal-animation-library-2` | [Universal Animation Library 2](https://quaternius.com/packs/universalanimationlibrary2.html)           | Animations (none used yet)           |
+| `universal-animation-library-2` | [Universal Animation Library 2](https://quaternius.com/packs/universalanimationlibrary2.html)           | Animations, in `merlin.py`           |
+| `fantasy-props-megakit`         | [Fantasy Props MegaKit](https://quaternius.com/packs/fantasypropsmegakit.html)                          | Furniture, in `land.py`              |
+| `medieval-village-megakit`      | [Medieval Village MegaKit](https://quaternius.com/packs/medievalvillagemegakit.html)                    | (None used yet)                      |
 
 The free (Standard) version of each is enough. Keep the folders inside each
 pack as they come: the scripts read files such as

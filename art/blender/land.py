@@ -463,7 +463,7 @@ HALLS = {h.place: h for h in [
          at=(P["grand-hall"][0] - 10 - 1 - 7, P["grand-hall"][1])),
     Hall("dungeon", -3, 0, 6, c.linear("#5c5850"), c.linear("#6c675c"), "#a9c6ff", 7, w=7, d=7),
     Hall("small-room", 0.4, 0, 4.5, c.linear("#7a4a2a"), c.linear("#8e2a26"), "#ffb070", 6, w=6, d=6),
-    Hall("merlins-lair", 0.4, 0, 8, c.linear("#6f6a62"), c.linear("#5d5868"), "#b8ff9a", 18, w=14.5, d=14,
+    Hall("merlins-lair", 0.4, 0, 8, c.linear("#6f6a62"), c.linear("#5e3f7a"), "#cdf5b4", 18, w=14.5, d=14,
          at=((P["grand-hall"][0] - 6 + P["small-room"][0] - 6 - 1) / 2, P["grand-hall"][1] - 8 - 1 - 14)),
     Hall("coach-house", 0.4, 0, 6, c.linear("#b89a5a"), c.linear("#8a6a44"), "#ffd28a", 9, w=8, d=6),
     # Out in the land, on the ground where they stand (their floors are set
@@ -2824,6 +2824,187 @@ def flame(b, x, y, z, size=0.35):
     b.cone((x, y, z), size, size * 0.3, FLAME, sides=6, droop=0)
 
 
+# Merlin's lair, furnished from Quaternius's Fantasy Props MegaKit
+# (art/models/fantasy-props-megakit): the cauldron boiling green over its
+# fire on a round step, on a purple rug; bookcases of books (and now and then
+# bottles) round the walls, but not across the doors; his desk with the
+# crystal ball; a bench of potions; candles on stands and in chandeliers; a
+# chart of the stars; and green banners on the purple walls.
+PROPS = c.Kit(HERE.parent / "models/fantasy-props-megakit/Exports/glTF")
+# What's furnished many times over (a bookcase full of books, a candle stand)
+# is kept once in land.glb, as "prop-<kind>", and land.json says where each
+# one stands: the game stamps them there (src/three/props.ts).
+prop_spots = {"kinds": [], "at": []}  # [kind, x, y, z, yaw], in three.js's axes
+prop_kinds = {}  # each kind's footprint (x0, y0, x1, y1) and top, as it's made
+
+
+def stamp(kind, make, at, yaw, solid=True):
+    """One of a kind (made, the first time, by make(builder), at the origin
+    facing -y: its footprint and top) at `at`, turned by yaw: solid, as
+    furniture, unless it's up out of the way."""
+    if kind not in prop_kinds:
+        made = c.Builder()
+        prop_kinds[kind] = make(made)
+        made.build(f"prop-{kind}", smooth=False)
+        prop_spots["kinds"].append(kind)
+    (x0, y0, x1, y1), top = prop_kinds[kind]
+    x, y, z = at
+    cos, sin = math.cos(yaw), math.sin(yaw)
+    corners = [(x + px * cos - py * sin, y + px * sin + py * cos) for px in (x0, x1) for py in (y0, y1)]
+    xs, ys = [p[0] for p in corners], [p[1] for p in corners]
+    if solid:
+        under_box((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, (max(xs) - min(xs)) / 2, (max(ys) - min(ys)) / 2,
+                  top=z + top)
+    prop_spots["at"].append([prop_spots["kinds"].index(kind), round(x, 2), round(z, 2), round(-y, 2), round(yaw, 3)])
+
+SHELVES = (0.77, 1.15, 1.53, 1.92)  # in the kit's bookcase, its shelves' heights
+BOOKCASE = 1.3  # times the kit's size: its bookcases as tall as the old ones (3.3 m)
+POTIONS = ["#5cff6a", "#c45cff", "#5cc4ff", "#ffb35c"]
+
+
+def lair(b, hall):
+    hx, hy, f, W, D = hall.x, hall.y, hall.floor, hall.w, hall.d
+    rng = random.Random(7)
+    wall = 0.3  # from the room's edge to its walls' faces
+
+    def prop(name, u, v, z=0.0, face=(0, -1), scale=1.0, ratio=None, solid=True, tint=None):
+        """One of the kit's models, at (u, v) from the room's middle, its front
+        facing `face`: solid (as furniture), and where its points go."""
+        yaw = math.atan2(face[0], -face[1])
+        at = (hx + u, hy + v, f + z)
+        (x0, y0, x1, y1), top = PROPS.put(b, name, at, yaw, scale, ratio, tint and (*c.linear(tint)[:3], 0.65))
+        if solid:
+            under_box((x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2, top=top)
+        return PROPS.placing(at, yaw, scale)
+
+    def lit(name, scale):
+        """Candlesticks, lit: to make, for stamp."""
+
+        def make(t):
+            made = PROPS.put(t, name, (0, 0, 0), 0, scale, 0.3)
+            for x, y, z in PROPS.tips(name):
+                flame(t, x * scale, y * scale, z * scale, 0.06 * scale)
+            return made
+
+        return make
+
+    def candles(name, u, v, z=0.0, scale=1.0, solid=True):
+        stamp(f"{name}-lit".lower().replace("_", "-"), lit(name, scale), (hx + u, hy + v, f + z), 0.0, solid)
+
+    def books(variant):
+        """A bookcase full of books (and on one shelf, bottles): to make, for stamp."""
+
+        def make(t):
+            shelves = random.Random(variant)
+            made = PROPS.put(t, "Bookcase_2", (0, 0, 0), 0, BOOKCASE, 0.35)
+            for k, shelf in enumerate(SHELVES):
+                z = (shelf + 0.005) * BOOKCASE
+                if k == variant % 4 and variant >= 2:
+                    for j in range(-2, 3):
+                        bottle = shelves.choice(["Potion_1", "Potion_2", "Potion_4", "Bottle_1"])
+                        tint = (*c.linear(shelves.choice(POTIONS))[:3], 0.5)
+                        PROPS.put(t, bottle, (j * 0.28, -0.04, z), 0, BOOKCASE * 0.9, 0.3, tint)
+                else:
+                    group = f"BookGroup_Medium_{shelves.randint(1, 3)}"
+                    PROPS.put(t, group, (0, -0.04, z), 0, BOOKCASE, 0.4)
+            return made
+
+        return make
+
+    def bookcase(u, v, face):
+        """A bookcase against the wall (one of a few, filled differently)."""
+        back = 0.21 * BOOKCASE + 0.02
+        u, v = u - face[0] * (wall - back), v - face[1] * (wall - back)  # (its back to the wall)
+        variant = rng.randrange(4)
+        stamp(f"bookcase-{variant + 1}", books(variant), (hx + u, hy + v, f), math.atan2(face[0], -face[1]))
+
+    # The cauldron, on its round step on the rug, over its fire, boiling.
+    du, dv = -3, -2
+    dx, dy = hx + du, hy + dv
+    rim = [(math.cos(2 * math.pi * k / 24), math.sin(2 * math.pi * k / 24)) for k in range(24)]
+    verts = [(dx, dy, f + 0.05)] + [(dx + ca * 4.2, dy + sa * 3.4, f + 0.05) for ca, sa in rim]
+    b.add(verts, [(0, 1 + k, 1 + (k + 1) % 24) for k in range(24)], [c.linear("#4a2a5e")] * 25)
+    b.cylinder((dx, dy, f), (dx, dy, f + 0.3), 2.0, 2.0, STONE, sides=20)
+    step = [(dx, dy, f + 0.3)] + [(dx + math.cos(2 * math.pi * k / 20) * 2.0, dy + math.sin(2 * math.pi * k / 20) * 2.0,
+                                   f + 0.3) for k in range(20)]
+    b.add(step, [(0, 1 + k, 1 + (k + 1) % 20) for k in range(20)], [c.vary(STONE, 0.08, Vector(p)) for p in step])
+    under_circle(dx, dy, 2.0)
+    SIZE = 1.6  # (its brew just below your eyes, so you see into it)
+    prop("Cauldron", du, dv, 0.3, scale=SIZE, ratio=0.5, solid=False)
+    for k in range(5):
+        a = 2 * math.pi * k / 5
+        flame(b, dx + math.cos(a) * 0.3, dy + math.sin(a) * 0.3, f + 0.3, 0.3)
+    brew = f + 0.3 + 0.8 * SIZE  # (just over the kit cauldron's own top, inside its rim)
+    verts = [(dx, dy, brew)] + [(dx + math.cos(2 * math.pi * k / 16) * 0.41 * SIZE,
+                                 dy + math.sin(2 * math.pi * k / 16) * 0.41 * SIZE, brew) for k in range(16)]
+    b.add(verts, [(0, 1 + k, 1 + (k + 1) % 16) for k in range(16)], [c.linear("#5cff6a")] * 17)
+    for k in range(6):
+        a, r = rng.random() * 2 * math.pi, rng.random() * 0.4
+        b.blob((dx + math.cos(a) * r, dy + math.sin(a) * r, brew), 0.05 + 0.05 * rng.random(), c.linear("#8aff8a"),
+               squash=0.6, lumpy=0.1, seed=k)
+    # A stand beside it, for his book of spells.
+    prop("BookStand", du + 2.6, dv + 0.6, face=(-1, 0), ratio=0.5)
+
+    # Bookcases round the walls (but not across the doors: the one he locks
+    # behind you, on the east wall, and the hidden one, on the north).
+    west, east, south, north = -W, W, -D, D
+    for k in range(10):
+        bookcase(west, -8.55 + k * 1.9, (1, 0))
+        bookcase(-8.55 + k * 1.9, south, (0, 1))
+    for k in range(7):
+        bookcase(east, -2.05 + k * 1.9, (-1, 0))
+    for u in [-12.4] + [-4.05 + k * 1.9 for k in range(9)]:
+        bookcase(u, north, (0, -1))
+
+    # His desk: the crystal ball on it, candles, books and scrolls.
+    prop("Table_Large", 2.5, 11.2, ratio=0.5)
+    prop("Chair_1", 2.5, 12.4, ratio=0.5)
+    top = 0.81
+    b.cylinder((hx + 2.5, hy + 11.1, f + top), (hx + 2.5, hy + 11.1, f + top + 0.08), 0.14, 0.1, BRASS, sides=10)
+    b.blob((hx + 2.5, hy + 11.1, f + top + 0.28), 0.22, c.linear("#bfe6ff"), squash=1, lumpy=0.05, seed=3)
+    move = prop("CandleStick_Triple", 1.2, 11.4, top, ratio=0.3, solid=False)
+    for tip in PROPS.tips("CandleStick_Triple"):
+        flame(b, *move(tip), 0.06)
+    prop("Book_Stack_1", 3.7, 11.3, top, solid=False)
+    prop("Scroll_1", 2.0, 10.85, top, face=(0.3, -1), solid=False)
+    prop("Pouch_Large", 3.2, 10.9, top, solid=False)
+    prop("Book_Stack_2", 4.6, 12.3, ratio=0.6)
+
+    # His bench of potions, and a stool.
+    prop("Workbench", 6, -6, ratio=0.5)
+    top = 0.89
+    for k in range(7):
+        name = ["Potion_1", "Potion_2", "Potion_4", "Bottle_1"][k % 4]
+        prop(name, 5.3 + k * 0.23, -6 + (k % 3 - 1) * 0.25, top, scale=1.3, ratio=0.3, solid=False, tint=POTIONS[k % 4])
+    prop("SmallBottles_1", 6.6, -5.75, top, ratio=0.3, solid=False)
+    prop("Stool", 6, -7.1, ratio=0.5)
+    # Bottles on a shelf by the door he locks.
+    prop("Shelf_Small_Bottles", east + wall, -11.5, 1.3, face=(-1, 0), ratio=0.25)
+
+    # Candles on stands, and two chandeliers.
+    for u, v in ((-9, 4), (-9, -8), (9, 6), (2, -10), (-3, 9)):
+        candles("CandleStick_Stand", u, v, scale=1.2)
+    for u, v in ((3, 3), (-6, -3)):
+        candles("Chandelier", u, v, hall.tall - 0.05, scale=1.6, solid=False)
+
+    # A cage, empty; vases, and a bag.
+    prop("Cage_Small", -12.2, -11.6, scale=1.2, ratio=0.25)
+    prop("Vase_2", -12.9, 12.6, ratio=0.5)
+    prop("Vase_4", -12.0, 12.8, ratio=0.5)
+    prop("Bag", 12.9, 12.4, face=(-1, -1), ratio=0.5)
+
+    # The chart of the stars, over the bookcases on the south wall.
+    wall_panel(b, hx, hy + south - wall + 0.01, (3, 0), f, f + 4.0, f + 6.8, c.linear("#1a2350"))
+    for k in range(30):
+        sx = hx - 2.7 + (k * 0.377) % 5.4
+        sz = f + 4.2 + (k * 0.613) % 2.4
+        wall_panel(b, sx, hy + south - wall + 0.02, (0.05, 0), f, sz, sz + 0.1, c.linear("#fff3b0"))
+    # Green banners, high on the purple walls.
+    for v in (-6, 2, 9):
+        prop("Banner_2", west - wall + 0.15, v - 1.45, 5.8, face=(1, 0), scale=1.8, solid=False, tint="#2f8a3a")
+        prop("Banner_2", east + wall - 0.15, v + 1.45, 5.8, face=(-1, 0), scale=1.8, solid=False, tint="#2f8a3a")
+
+
 def room(b, hall):
     hx, hy, f, W, D, tall = hall.x, hall.y, hall.floor, hall.w, hall.d, hall.tall
     # The floor reaches just under the walls (and no further: the room next
@@ -2945,63 +3126,7 @@ def room(b, hall):
             px = hx - W + 0.6 + k * (2 * W - 1.2) / 7
             wall_panel(b, px, hy - D - 0.3, (0.35, 0), f, f, f + 4.4, c.linear("#7e1f1d"))
     elif hall.place == "merlins-lair":
-        # The cauldron bubbling green on its round step, on a purple rug;
-        # bookcases on every wall (but not across the doors), a table of
-        # potions, his desk with the crystal ball, a chart of the stars, and
-        # candles.
-        dx, dy = hx - 3, hy - 2
-        verts = [(dx, dy, f + 0.05)] + [(dx + math.cos(2 * math.pi * k / 24) * 4.2, dy + math.sin(2 * math.pi * k / 24) * 3.4,
-                                         f + 0.05) for k in range(24)]
-        b.add(verts, [(0, 1 + k, 1 + (k + 1) % 24) for k in range(24)], [c.linear("#4a2a5e")] * 25)
-        b.cylinder((dx, dy, f), (dx, dy, f + 0.3), 2.0, 2.0, STONE, sides=20)
-        b.cylinder((dx, dy, f + 0.3), (dx, dy, f + 1.3), 1.0, 1.2, IRON, sides=16)
-        verts = [(dx, dy, f + 1.25)] + [(dx + math.cos(2 * math.pi * k / 16) * 1.15, dy + math.sin(2 * math.pi * k / 16) * 1.15,
-                                         f + 1.25) for k in range(16)]
-        b.add(verts, [(0, 1 + k, 1 + (k + 1) % 16) for k in range(16)], [c.linear("#5cff6a")] * 17)
-        under_circle(dx, dy, 2.0)
-
-        def bookcase(x0, y0, x1, y1, face):
-            """Shelves of books, their spines facing into the room (+x, -x, +y or -y)."""
-            furniture(b, x0, y0, x1, y1, f, f + 3.4, DARK_WOOD)
-            across = abs(x1 - x0) > abs(y1 - y0)
-            length = abs(x1 - x0) if across else abs(y1 - y0)
-            for z in (f + 0.5, f + 1.3, f + 2.1, f + 2.9):
-                for k in range(int(length / 0.4)):
-                    colour = c.linear(["#7a2a2a", "#2a4a7a", "#4a6a2a", "#8a6a2a", "#5a2a6a"][(k * 7 + int(z * 3)) % 5])
-                    if across:
-                        bx_, by_ = x0 + 0.2 + k * 0.4, (y1 if face == "+y" else y0 - 0.05)
-                        block(b, bx_, by_, z, bx_ + 0.3, by_ + 0.05, z + 0.6, colour, solid=False)
-                    else:
-                        bx_, by_ = (x1 if face == "+x" else x0 - 0.05), y0 + 0.2 + k * 0.4
-                        block(b, bx_, by_, z, bx_ + 0.05, by_ + 0.3, z + 0.6, colour, solid=False)
-
-        west, east, south, north = hx - W, hx + W, hy - D, hy + D
-        bookcase(west - 0.3, hy - 9, west + 0.5, hy + 9, "+x")
-        bookcase(west + 2, south - 0.3, east - 2, south + 0.5, "+y")
-        bookcase(east - 0.5, hy - 3, east + 0.3, north - 2, "-x")
-        bookcase(east - 10, north - 0.5, east - 2, north + 0.3, "-y")
-        bookcase(west + 2, north - 0.5, P["grand-hall"][0] - 2.5, north + 0.3, "-y")  # (up to the hidden door)
-        # The desk, and a table of potions.
-        furniture(b, hx + 1, north - 2.6, hx + 4, north - 1.6, f + 0.8, f + 0.9, WOOD)
-        b.blob((hx + 2.5, north - 2.1, f + 1.15), 0.25, c.linear("#bfe6ff"), squash=1, lumpy=0.05, seed=3)  # crystal ball
-        for px in (hx + 1.2, hx + 3.8):
-            flame(b, px, north - 1.8, f + 0.9, 0.2)
-        tx, ty = hx + 6, hy - 6
-        furniture(b, tx - 1.6, ty - 0.6, tx + 1.6, ty + 0.6, f + 0.8, f + 0.9, WOOD)
-        for k in range(9):
-            b.cylinder((tx - 1.3 + k * 0.32, ty + (k % 3 - 1) * 0.3, f + 0.9), (tx - 1.3 + k * 0.32, ty + (k % 3 - 1) * 0.3, f + 1.25),
-                       0.09, 0.05, c.linear(["#5cff6a", "#c45cff", "#5cc4ff", "#ffb35c"][k % 4]), sides=6)
-        # The chart of the stars, over the bookcase on the south wall.
-        wall_panel(b, hx, south - 0.3 + 0.01, (3, 0), f, f + 4.0, f + 6.8, c.linear("#1a2350"))
-        for k in range(30):
-            sx = hx - 2.7 + (k * 0.377) % 5.4
-            sz = f + 4.2 + (k * 0.613) % 2.4
-            wall_panel(b, sx, south - 0.28, (0.05, 0), f, sz, sz + 0.1, c.linear("#fff3b0"))
-        # Candles on stands.
-        for px, py in ((hx - 9, hy + 4), (hx - 9, hy - 8), (hx + 9, hy + 6), (hx + 2, hy - 10), (hx - 3, hy + 9)):
-            block(b, px - 0.08, py - 0.08, f, px + 0.08, py + 0.08, f + 1.6, BRASS, solid=False)
-            flame(b, px, py, f + 1.6)
-            under_circle(px, py, 0.25)
+        lair(b, hall)
     elif hall.place == "coach-house":
         # The red coach on its four wheels, and hay.
         cxx, cyy = hx + 1.5, hy
@@ -3646,6 +3771,7 @@ if out:
         "circles": circles,
         "boxes": boxes,
         "trees": tree_spots,
+        "props": prop_spots,
         # Steps on the land, for lying on: [x, z, half x, half z, top].
         "steps": STEPS,
         # The paths, lying a little above the ground (so what's dropped on
