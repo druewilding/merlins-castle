@@ -10,7 +10,7 @@
 // The model lies dead straight, along its spine from the tip of its tail to
 // its nose: each frame, it's bent along a curve (coiled, rearing, or the
 // track it's slithering along), its head kept rigid from the hinge of its
-// jaws forward.
+// jaws forward, and its hood spread (as it rears) or folded.
 
 import {
   BufferAttribute,
@@ -31,13 +31,13 @@ import type { Ground } from "./player";
 
 const UP = new Vector3(0, 1, 0);
 const STEP = 0.03; // metres between the points along its spine
-const PITCH = 0.2; // metres from one turn of its coil to the next
-const COIL = 0.5; // the radius of its coil, round the outside
+const PITCH = 0.25; // metres from one turn of its coil to the next
+const COIL = 0.62; // the radius of its coil, round the outside
 const NEAR = 7.5; // metres: this near, it rears up and hisses
-const NECK = 0.6; // metres of its neck that curve up to its head, lifted off the ground
+const NECK = 0.75; // metres of its neck that curve up to its head, lifted off the ground
 const FAR = 80; // metres: further off than this, it's left as it is
-const SPEED = 3.4; // metres a second, slithering away
-const APPLE = 0.65; // the apple's size in its jaws, for the one you carry (made big, to see in the grass)
+const SPEED = 3.8; // metres a second, slithering away
+const APPLE = 0.8; // the apple's size in its jaws, for the one you carry (made big, to see in the grass)
 
 type Point = { at: Vector3; grounded: number }; // grounded: 1 lying on the ground, 0 up in the air
 
@@ -55,6 +55,8 @@ interface Piece {
   across: Float32Array; // and out to its right
   up: Float32Array; // and up
   normal: Float32Array; // (along, across, up) for each point
+  hood?: Float32Array; // and how far each point (along, across, up) moves, and its normal turns, its hood spread
+  hoodNormal?: Float32Array;
 }
 
 const smooth = (t: number) => {
@@ -72,6 +74,7 @@ export class Snake {
   private state: "guarding" | "feeding" | "leaving" | "away" = "guarding";
   private time = 0;
   private alert = 0; // 0 coiled and watching, 1 reared up hissing
+  private spread = 0; // its hood, 0 folded to 1 spread
   private fed = 0; // seconds since you threw the apple
   private flight = 1; // seconds the apple takes to reach it
   private from = new Vector3(); // where the apple left your hand
@@ -132,6 +135,21 @@ export class Snake {
         piece.up[i] = p.y;
         piece.normal.set([-q.z, q.x, q.y], i * 3);
       }
+      // Its hood (the body's shape key, as it moves each point and turns its
+      // normal).
+      const [moved] = geometry.morphAttributes.position ?? [];
+      const [turned] = geometry.morphAttributes.normal ?? [];
+      if (moved && turned) {
+        piece.hood = new Float32Array(n * 3);
+        piece.hoodNormal = new Float32Array(n * 3);
+        const linear = new Matrix4().copy(source.matrixWorld).setPosition(0, 0, 0); // (a move: turned and scaled, not shifted)
+        for (let i = 0; i < n; i++) {
+          p.fromBufferAttribute(moved, i).applyMatrix4(linear);
+          q.fromBufferAttribute(turned, i).applyMatrix4(normals);
+          piece.hood.set([-p.z, p.x, p.y], i * 3);
+          piece.hoodNormal.set([-q.z, q.x, q.y], i * 3);
+        }
+      }
       const colours = new Float32Array(n * 4);
       for (let i = 0; i < n; i++) {
         colours.set([colour.getX(i), colour.getY(i), colour.getZ(i), colour.itemSize > 3 ? colour.getW(i) : 1], i * 4);
@@ -191,11 +209,11 @@ export class Snake {
     this.from.copy(from);
     const hiss = this.hissing(from);
     const facing = hiss.facing.clone();
-    this.lunge = { head: hiss.head.clone().addScaledVector(facing, 0.28), facing, raised: 1 };
+    this.lunge = { head: hiss.head.clone().addScaledVector(facing, 0.35), facing, raised: 1 };
     this.catchAt
       .copy(this.lunge.head)
-      .addScaledVector(facing, 0.15)
-      .addScaledVector(UP, this.mouth - 0.01);
+      .addScaledVector(facing, 0.19)
+      .addScaledVector(UP, this.mouth - 0.012);
     this.flight = Math.min(1.4, Math.max(0.55, from.distanceTo(this.catchAt) / 7));
     this.apple.visible = true;
   }
@@ -232,6 +250,7 @@ export class Snake {
       this.alert +=
         Math.sign(Number(near) - this.alert) * Math.min(Math.abs(Number(near) - this.alert), dt * (near ? 3 : 1));
       const a = smooth(this.alert);
+      this.spread = 0.2 + 0.8 * a;
       const rest = this.rest(eye);
       const hiss = this.hissing(eye);
       // Its mouth opens as it rears; its tongue flickers now and then, and
@@ -253,7 +272,7 @@ export class Snake {
     const t = this.fed;
     const T = this.flight;
     const lunge = this.lunge!;
-    const hiss = { ...lunge, head: lunge.head.clone().addScaledVector(lunge.facing, -0.28) };
+    const hiss = { ...lunge, head: lunge.head.clone().addScaledVector(lunge.facing, -0.35) };
     if (t < T) {
       // The apple in the air, along an arc, turning over; the snake opens
       // its jaws wide for it, and strikes just as it comes.
@@ -272,6 +291,7 @@ export class Snake {
     const back = smooth((t - T - 0.05) / 0.3);
     const lower = smooth((t - T - 0.1) / 0.4);
     const pose = this.blend(this.blend(lunge, hiss, back), this.down, lower);
+    this.spread = 1 - lower; // (folding its hood as it goes down)
     this.pose(pose, 1.1 - 0.75 * smooth((t - T) / 0.12), 0);
     if (t > T + 0.5) this.slither();
   }
@@ -291,7 +311,7 @@ export class Snake {
     const c = this.centre;
     const ways = [
       nose,
-      nose.clone().addScaledVector(ahead, 0.7),
+      nose.clone().addScaledVector(ahead, 0.9),
       new Vector3(c.x - 1.5, 0, c.z + 3.5),
       new Vector3(c.x - 4.7, 0, c.z + 6.3),
       new Vector3(c.x - 8.7, 0, c.z + 6.5),
@@ -316,7 +336,7 @@ export class Snake {
       const side = new Vector3().subVectors(point, last).cross(UP).normalize();
       const p = point
         .clone()
-        .addScaledVector(side, 0.15 * smooth((travelled - 0.5) / 3) * Math.sin((travelled / 1.9) * 2 * Math.PI));
+        .addScaledVector(side, 0.19 * smooth((travelled - 0.5) / 3) * Math.sin((travelled / 2.4) * 2 * Math.PI));
       p.y = this.ground(p.x, p.z) ?? nose.y;
       return p;
     });
@@ -341,21 +361,21 @@ export class Snake {
   /** Coiled, its head up a little, watching you. */
   private rest(eye: Vector3): Pose {
     const c = this.centre;
-    const head = new Vector3(c.x + 0.12 + 0.02 * Math.sin(this.time * 0.9), c.y + 0.42, c.z + 0.3);
+    const head = new Vector3(c.x + 0.15 + 0.025 * Math.sin(this.time * 0.9), c.y + 0.55, c.z + 0.38);
     return { head, facing: this.towards(eye, head, -0.12, 0.05), raised: 1 };
   }
 
   /** Reared up higher, drawn back to strike, its head turned to your eyes. */
   private hissing(eye: Vector3): Pose {
     const c = this.centre;
-    const head = new Vector3(c.x + 0.05 + 0.015 * Math.sin(this.time * 5), c.y + 0.68, c.z + 0.12);
+    const head = new Vector3(c.x + 0.06 + 0.02 * Math.sin(this.time * 5), c.y + 0.9, c.z + 0.15);
     return { head, facing: this.towards(eye, head, -0.6, 0.35), raised: 1 };
   }
 
   /** Its head down on the ground ahead of its coil, turned south-west to go. */
   private lowered(): Pose {
     const c = this.centre;
-    const head = new Vector3(c.x - 0.2, c.y, c.z + 1);
+    const head = new Vector3(c.x - 0.25, c.y, c.z + 1.25);
     head.y = this.ground(head.x, head.z) ?? c.y;
     return { head, facing: new Vector3(-0.8, 0, 0.6).normalize(), raised: 0 };
   }
@@ -393,9 +413,9 @@ export class Snake {
     const out = new Vector3(0, 0, 1); // (the coil's way round, where its neck leaves it)
     const p1 = start
       .clone()
-      .addScaledVector(out, 0.3)
-      .addScaledVector(UP, 0.22 * raised);
-    const p2 = head.clone().addScaledVector(facing, -0.35);
+      .addScaledVector(out, 0.38)
+      .addScaledVector(UP, 0.28 * raised);
+    const p2 = head.clone().addScaledVector(facing, -0.45);
     p2.y = Math.max(p2.y, c.y);
     for (let i = 0; i <= 40; i++) {
       const t = 1 - i / 40;
@@ -404,7 +424,7 @@ export class Snake {
     }
     // ...and round and round its coil, inwards.
     for (let a = 0; ; a += 0.05) {
-      const r = Math.max(0.24, COIL - (PITCH * a) / (2 * Math.PI)); // (not so tight it bunches up, uncoiling)
+      const r = Math.max(0.3, COIL - (PITCH * a) / (2 * Math.PI)); // (not so tight it bunches up, uncoiling)
       line.push({ at: new Vector3(c.x + Math.cos(-a) * r, c.y, c.z + Math.sin(-a) * r), grounded: 1 });
       if (a > 30) break;
     }
@@ -464,7 +484,7 @@ export class Snake {
     const hr = new Vector3().crossVectors(ht, hu);
     // (Low down, it lifts its head a little, its neck curving up to it:
     // more, with the apple in its jaws, to clear the ground.)
-    const raise = this.caught ? 0.07 : 0.01;
+    const raise = this.caught ? 0.09 : 0.012;
     const neck = (s: number) => raise * smooth((s - this.hinge + NECK) / NECK);
     const lift =
       this.grounded[hi] * (this.belly[Math.min(this.belly.length - 1, Math.round(this.hinge / STEP))] + raise);
@@ -483,8 +503,18 @@ export class Snake {
         let x = piece.across[i];
         let y = piece.up[i];
         let ns = piece.normal[i * 3];
-        const nx = piece.normal[i * 3 + 1];
+        let nx = piece.normal[i * 3 + 1];
         let ny = piece.normal[i * 3 + 2];
+        if (piece.hood && piece.hoodNormal) {
+          // Its hood, spread as far as it is.
+          const h = this.spread;
+          s += h * piece.hood[i * 3];
+          x += h * piece.hood[i * 3 + 1];
+          y += h * piece.hood[i * 3 + 2];
+          ns += h * piece.hoodNormal[i * 3];
+          nx += h * piece.hoodNormal[i * 3 + 1];
+          ny += h * piece.hoodNormal[i * 3 + 2];
+        }
         if (which === 1) {
           // The lower jaw, dropped open on its hinge.
           const u = s - this.hinge;
@@ -494,8 +524,8 @@ export class Snake {
           [ns, ny] = [ns * cos + ny * sin, -ns * sin + ny * cos];
         } else if (which === 2) {
           // The tongue, slid out (or in), flickering up and down.
-          const out = (tongue - 1) * 0.16;
-          const tip = Math.max(0, s - this.length + 0.06);
+          const out = (tongue - 1) * 0.2;
+          const tip = Math.max(0, s - this.length + 0.075);
           s += out;
           y += tongue * tip * 0.5 * Math.sin(this.time * 40);
           if (tongue < 0.05) x *= 0.01; // (and out of sight)
@@ -529,8 +559,8 @@ export class Snake {
     if (this.caught && this.apple.visible) {
       this.apple.position
         .copy(hinge)
-        .addScaledVector(ht, 0.17)
-        .addScaledVector(hu, this.mouth - 0.015);
+        .addScaledVector(ht, 0.21)
+        .addScaledVector(hu, this.mouth - 0.019);
       this.matrix.makeBasis(hr, hu, ht.clone().negate());
       this.apple.quaternion.setFromRotationMatrix(this.matrix).multiply(new Quaternion().setFromAxisAngle(UP, 0.6));
     }
@@ -541,7 +571,7 @@ export class Snake {
     camera.updateMatrixWorld();
     this.matrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.matrix);
-    return this.frustum.intersectsSphere(new Sphere(this.centre.clone().addScaledVector(UP, 0.4), 1.2));
+    return this.frustum.intersectsSphere(new Sphere(this.centre.clone().addScaledVector(UP, 0.5), 1.5));
   }
 }
 
