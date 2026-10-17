@@ -515,7 +515,6 @@ const witches = new Witches(
   clearing,
   ground
 );
-let passing = false; // come from the crossroads, going east: the witches stay hidden
 
 // A game loaded, or carried on from another version (or another language).
 const handoff = takeHandoff();
@@ -1161,7 +1160,7 @@ renderer.setAnimationLoop((time) => {
   // but not while you're in the tower: you'd come out through it.)
   snake.update(dt, player.camera.position, player.camera, room !== "tower" && !(guarded && opened.has(guarded)));
   merlin.update(dt, player.position, room === "merlins-lair");
-  witches.update(dt, room === "forest-witches" && !passing);
+  witches.update(dt, room === "forest-witches");
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)
@@ -1233,7 +1232,6 @@ renderer.setAnimationLoop((time) => {
     );
     if (exit && exit !== told) tell(exit);
     told = undefined;
-    if (room === "forest-witches") passing = lastRoom === "forest-crossroads";
     lastRoom = room;
   }
   lightFor(player.depth, time, dt);

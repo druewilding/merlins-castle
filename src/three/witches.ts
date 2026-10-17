@@ -2,9 +2,8 @@
 // way west to the crossroads ("Some rabbits warn you of some witches dancing
 // in the West"). While you're elsewhere, they hide, crouching behind the
 // trees west of their clearing, almost out of sight. Come into the clearing
-// and they run out and dance in a ring, across the way west. Come through
-// from the crossroads, though, and they stay hidden (going east, they don't
-// bother you). Gone, they slip back into hiding.
+// (from any way, the crossroads too) and they run out and dance in a ring,
+// across the way west. Gone, they slip back into hiding.
 //
 // The three of them are made from the one model: each wears her own robe
 // and hat (witch-robe-n, witch-hat-n), the others hidden.
@@ -147,7 +146,7 @@ export class Witches {
     return this.spot.set(x + Math.sin(a) * r, 0, z + Math.cos(a) * r);
   }
 
-  /** Each frame: whether they're out (you're in their clearing, not passing through from the crossroads). */
+  /** Each frame: whether they're out (you're in their clearing). */
   update(dt: number, out: boolean) {
     this.turned += SPIN * dt;
     this.witches.forEach((witch, n) => {
