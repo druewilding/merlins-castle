@@ -2324,7 +2324,7 @@ def maze_run(along_x, line, a, b):
                     cx, cy, d, n = mx0 + lt, my0 + at + out * side, (1, 0), (0, side)
                 else:
                     cx, cy, d, n = mx0 + at + out * side, my0 + lt, (0, 1), (side, 0)
-                cz = z1 + 0.1 - down
+                cz = z1 + 0.03 - size - down  # (its tip at the most just over the top)
                 corners = []
                 for ang, r in ((0, 1.0), (math.pi / 2, 0.6), (math.pi, 0.5), (3 * math.pi / 2, 0.6)):
                     along_, up_ = math.cos(spin + ang) * size * r, math.sin(spin + ang) * size * r
