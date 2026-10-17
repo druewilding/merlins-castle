@@ -3601,14 +3601,16 @@ hy_ = gh.y - gh.d - 0.6
 block(rooms, gh.x - TUNNEL_HALF, hy_ - 0.15, gh.floor, gh.x + TUNNEL_HALF, hy_ + 0.15, gh.floor + TUNNEL_TALL, gh.wall, solid=False)
 obstacle(["grand-hall south", "merlins-lair north"], "box", gh.x, -hy_, TUNNEL_HALF + 0.3, 0.5, under=True)
 # The stairs up to it from the lair, over the way's ramp (which is what you
-# walk on: each tread's top is a little over it at its front, under it at
-# its back).
+# walk on): each tread's top just over the ramp's floor at the tread's back,
+# so the ramp never shows through it.
 TREADS = 12
 rise, run = gh.floor - ml.floor, LAIR_STAIRS_TOP - LAIR_STAIRS_FOOT
 for k in range(TREADS):
-    y0, y1 = LAIR_STAIRS_FOOT + run * k / TREADS, LAIR_STAIRS_FOOT + run * (k + 1) / TREADS
-    top = ml.floor + rise * (k + 0.75) / TREADS
-    block(rooms, gh.x - TUNNEL_HALF, y0, ml.floor - 0.1, gh.x + TUNNEL_HALF, y1, top,
+    # (Clear of the way's own faces: the bottom one a little out in front of
+    # the doorstep's edge, and each a shade narrower than its walls.)
+    y0, y1 = LAIR_STAIRS_FOOT + run * k / TREADS - (0.03 if k == 0 else 0), LAIR_STAIRS_FOOT + run * (k + 1) / TREADS
+    top = ml.floor + rise * (k + 1) / TREADS + 0.08  # (the ramp's floor is 4 cm up)
+    block(rooms, gh.x - TUNNEL_HALF + 0.01, y0, ml.floor - 0.1, gh.x + TUNNEL_HALF - 0.01, y1, top,
           c.vary(c.linear("#7d7568"), 0.1, Vector((k, 0, 7))), solid=False)
 # The lair's door, which slams and locks behind you.
 lx_, ly_ = ml.x + ml.w + 0.6, SR[1]
