@@ -1,8 +1,9 @@
 // Merlin (his model: art/blender/merlin.py), for now just walking about the
-// grassy bank: he strolls to somewhere near, stands a while, and now and
-// then casts a spell. Come near and he stops, and turns to you.
+// grassy bank: he strolls to somewhere near, stands a while (his arms
+// folded), and now and then casts a spell. Come near and he stops, turns to
+// you and talks, now and then giving you a thumbs-up.
 //
-// His clips are the Universal Animation Library's, named as they are there.
+// His clips are the Universal Animation Libraries', named as they are there.
 
 import {
   type AnimationAction,
@@ -27,6 +28,7 @@ const SPELL = 0.25; // how often, coming to a stop, he casts a spell
 const CASTING = 2.5; // seconds he holds the spell
 const NEAR = 3; // metres: this near, he stops and turns to you
 const BLEND = 0.3; // seconds from one clip to the next
+const THUMBS = [3, 7]; // seconds between his thumbs-ups, talking to you
 
 const between = ([a, b]: number[]) => a + Math.random() * (b - a);
 
@@ -36,6 +38,7 @@ export class Merlin {
   private playing: AnimationAction | undefined;
   private state: "standing" | "walking" | "casting" = "standing";
   private wait = between(PAUSE); // seconds, until he's done standing (or casting)
+  private thumbs = between(THUMBS); // seconds, until his next thumbs-up
   private target = new Vector3();
   private yaw = 0; // which way he faces (0 is +z)
 
@@ -59,13 +62,13 @@ export class Merlin {
     scene.add(model);
     this.mixer = new AnimationMixer(model);
     for (const clip of clips) this.clips.set(clip.name, this.mixer.clipAction(clip));
-    // (Raising his hands, and lowering them: each once, held at its end.)
-    for (const name of ["Spell_Simple_Enter", "Spell_Simple_Exit"]) {
+    // (Raising his hands, lowering them, and a thumbs-up: each once, held at its end.)
+    for (const name of ["Spell_Simple_Enter", "Spell_Simple_Exit", "Yes"]) {
       const once = this.clips.get(name);
       once?.setLoop(LoopOnce, 1);
       if (once) once.clampWhenFinished = true;
     }
-    this.play("Idle_Loop");
+    this.play("Idle_FoldArms_Loop");
   }
 
   private play(name: string) {
@@ -120,7 +123,7 @@ export class Merlin {
       const step = off > 0.8 ? 0 : Math.min(left, WALK * dt);
       at.x += Math.sin(this.yaw) * step;
       at.z += Math.cos(this.yaw) * step;
-      this.play(step > 0 ? "Walk_Formal_Loop" : "Idle_Loop");
+      this.play(step > 0 ? "Walk_Formal_Loop" : "Idle_FoldArms_Loop");
       if (left < 0.05) {
         this.state = Math.random() < SPELL ? "casting" : "standing";
         this.wait = this.state === "casting" ? CASTING : between(PAUSE);
@@ -136,9 +139,14 @@ export class Merlin {
           this.wait = between(PAUSE);
         }
       } else {
-        // (After a spell, its end plays out before he stands at ease.)
-        const ending = this.playing === this.clips.get("Spell_Simple_Exit") && this.playing?.isRunning();
-        if (!ending) this.play("Idle_Loop");
+        // (A spell's end, or a thumbs-up, plays out before he goes on.)
+        const ending = this.playing?.loop === LoopOnce && this.playing.isRunning();
+        if (!ending) this.play(near ? "Idle_Talking_Loop" : "Idle_FoldArms_Loop");
+        this.thumbs -= near ? dt : 0;
+        if (this.thumbs <= 0 && !ending) {
+          this.play("Yes");
+          this.thumbs = between(THUMBS);
+        }
         if (this.wait <= 0 && !near && this.pick()) this.state = "walking";
       }
     }

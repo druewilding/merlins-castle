@@ -1,11 +1,11 @@
-# Merlin, as in his pictures: tall, a long silver beard and hair, a deep blue
+# Merlin, as in his pictures: tall, long silver hair, a moustache, a deep blue
 # starry robe and a pointed hat.
 #
 # Made from Quaternius's kits (CC0, art/models/): the Ranger outfit's tunic,
 # arms and boots (its cloth turned from green to Merlin's blue), the head of a
-# Universal Base Character, its long hair, and its beard drawn out long. The
+# Universal Base Character, its long hair, and the moustache of its beard. The
 # robe and the hat are made here. All of it shares the kits' one humanoid
-# skeleton, so every clip of the Universal Animation Library plays on him: the
+# skeleton, so every clip of the Universal Animation Libraries plays on him: the
 # ones he needs are copied in (ANIMS), named as they are there.
 #
 # He stands in a T-pose, his feet at z = 0, facing -y (the way the kits face).
@@ -32,11 +32,12 @@ MODELS = HERE.parent / "models"
 OUTFIT = MODELS / "modular-character-outfits/Exports/glTF (Godot-Unreal)/Outfits/Male_Ranger.gltf"
 BODY = MODELS / "universal-base-characters/Base Characters/Godot - UE/Superhero_Male_FullBody.gltf"
 HAIR = MODELS / "universal-base-characters/Hairstyles/Rigged to Head Bone/glTF (Godot -Unreal)"
-LIBRARY = MODELS / "universal-animation-library-1/Unreal-Godot/UAL1_Standard.glb"
+LIBRARIES = [MODELS / f"universal-animation-library-{n}/Unreal-Godot/UAL{n}_Standard.glb" for n in (1, 2)]
 
 ANIMS = [
-    "Idle_Loop",
-    "Walk_Loop",
+    "Idle_FoldArms_Loop",
+    "Idle_Talking_Loop",
+    "Yes",
     "Walk_Formal_Loop",
     "Spell_Simple_Enter",
     "Spell_Simple_Idle_Loop",
@@ -51,9 +52,14 @@ HAT_BAND = "#4a2f7a"
 
 WAIST = 1.16  # the robe hangs from here (the belt)...
 HEM = 0.035  # ...down to here
-HEAD = (0.0, 0.0, 1.735)  # the middle of the hat's brim
+# Of the kit's beard, what's kept: above this, this near the middle, this far
+# forward; and in the middle, only above his lip.
+MOUSTACHE = (1.595, 0.055, -0.06, 1.625)
+HEAD = (0.0, 0.015, 1.76)  # the middle of the hat's brim: on his hair, above his forehead
+CROWN = (0.098, 0.122)  # the hat's foot, across and front to back: just over his hair
 SIDES = 28  # round the robe and the hat
-TIP = 14  # degrees the hat's tipped back
+TIP = 6  # degrees the hat's tipped back
+BROWS = 0.006  # metres his eyebrows are lifted in the middle (and lowered at their ends)
 
 
 def load(path):
@@ -122,27 +128,47 @@ for o in body:
         onto(o)
 remove([o for o in body if o.parent != skeleton])
 
-# ---- His hair, and a long beard ----------------------------------------------
+# His eyebrows, tilted kindly: up in the middle, down at their ends (they
+# come frowning).
+brows = next(o for o in skeleton.children if o.name.startswith("Eyebrows"))
+for v in brows.data.vertices:
+    v.co.z += BROWS * (1 - 2 * min(1.0, abs(v.co.x) / 0.062))
+
+# ---- His hair, and a moustache -----------------------------------------------
 
 hair = []
 for name in ("Hair_Long", "Hair_Beard"):
-    parts, _ = load(HAIR / f"{name}.gltf")
+    parts, rig = load(HAIR / f"{name}.gltf")
     mesh = next(o for o in parts if o.type == "MESH")
+    # (The long hair's made for the shorter base characters: up onto his head,
+    # by as much as his head's higher than theirs.)
+    ours, theirs = (s.matrix_world @ s.data.bones["Head"].head_local for s in (skeleton, rig))
+    up = ours - theirs
+    for v in mesh.data.vertices:
+        v.co += mesh.matrix_world.inverted().to_3x3() @ up
     onto(mesh)
     remove([o for o in parts if o is not mesh])
     hair.append(mesh)
-long_hair, beard = hair
+long_hair, moustache = hair
 
-# The beard drawn down from his chin to the middle of his chest (and out a
-# little, over it), and his hair down past his shoulders.
-for mesh, start, stretch, forward in ((beard, 1.64, 4.5, 0.25), (long_hair, 1.6, 1.7, 0.0)):
-    for v in mesh.data.vertices:
-        if v.co.z < start:
-            drop = (start - v.co.z) * (stretch - 1)
-            v.co.z -= drop
-            v.co.y -= drop * forward
-            if mesh is beard:
-                v.co.x *= 1 + drop * 4  # (and wider, not drawn into a string)
+# His hair down past his shoulders.
+for v in long_hair.data.vertices:
+    if v.co.z < 1.65:
+        v.co.z -= (1.65 - v.co.z) * 0.7
+
+# Of the kit's beard, only its moustache: the front of it, over his lip (and
+# not the tuft under it).
+low, wide, forward, lip = MOUSTACHE
+bm = bmesh.new()
+bm.from_mesh(moustache.data)
+cut = [
+    v
+    for v in bm.verts
+    if v.co.z < low or abs(v.co.x) > wide or v.co.y > forward or (abs(v.co.x) < 0.022 and v.co.z < lip)
+]
+bmesh.ops.delete(bm, geom=cut, context="VERTS")
+bm.to_mesh(moustache.data)
+bm.free()
 
 # ---- His robe: from the belt to his ankles, flaring out ---------------------
 
@@ -195,20 +221,24 @@ hx, hy, hz = HEAD
 
 def on_cone(t, a, lift=0.0):
     """A point on the hat's cone, t from its foot (0) to its tip (1), round it by a."""
-    r = 0.115 * (1 - t) ** 1.15 + 0.004 + lift
-    return Vector((hx + math.sin(a) * r, hy - math.cos(a) * r + 0.16 * t**2.2, hz + 0.5 * t - 0.12 * t**3))
+    rx, ry = ((r - 0.004) * (1 - t) ** 1.15 + 0.004 + lift for r in CROWN)
+    return Vector((hx + math.sin(a) * rx, hy - math.cos(a) * ry + 0.13 * t**2.2, hz + 0.42 * t - 0.1 * t**3))
 
 
-# The brim: a flat ring, drooping a little at its edge.
-for ring, (r, dz) in enumerate([(0.11, 0.0), (0.2, -0.01), (0.27, -0.035)]):
+# The brim: a flat disc (its middle hidden in the cone, so from below you
+# see it meet his hair), drooping a little at its edge.
+for ring, (rx, ry, dz) in enumerate([(*CROWN, 0.0), (0.17, 0.18, -0.008), (0.215, 0.225, -0.028)]):
     for k in range(SIDES):
         a = 2 * math.pi * k / SIDES
-        verts.append((hx + math.sin(a) * r, hy - math.cos(a) * r, hz + dz))
+        verts.append((hx + math.sin(a) * rx, hy - math.cos(a) * ry, hz + dz))
         colours.append(c.vary(c.linear(ROBE), 0.12, Vector((a, ring, 3))))
 for ring in range(2):
     for k in range(SIDES):
         a, b = ring * SIDES + k, ring * SIDES + (k + 1) % SIDES
         faces.append((a, a + SIDES, b + SIDES, b))
+verts.append((hx, hy, hz))
+colours.append(c.linear(ROBE))
+faces += [(len(verts) - 1, (k + 1) % SIDES, k) for k in range(SIDES)]
 # The cone, bending back (+y) as it rises, with a band round its foot.
 CONE = 12
 base = len(verts)
@@ -241,13 +271,23 @@ verts = [tuple(tip @ (Vector(v) - pivot) + pivot) for v in verts]
 hat = skinned("merlin-hat", verts, faces, colours, [{"Head": 1.0}] * len(verts))
 hat.data.materials.append(c.vertex_material())
 
+# His hair, inside the hat: drawn in where it would poke through the cone.
+untip = tip.inverted()
+for v in long_hair.data.vertices:
+    p = untip @ (v.co - pivot) + pivot  # (as if the hat weren't tipped)
+    t = (p.z - hz) / 0.42
+    if t < -0.01:
+        continue
+    middle = on_cone(max(t, 0.0), 0.0)
+    rx, ry = ((r - 0.004) * (1 - max(t, 0.0)) ** 1.15 + 0.004 for r in CROWN)
+    dx, dy = p.x - hx, p.y - (middle.y + ry)
+    beyond = math.hypot(dx / rx, dy / ry) / 0.92
+    if beyond > 1:
+        p.x, p.y = hx + dx / beyond, middle.y + ry + dy / beyond
+        v.co = tip @ (p - pivot) + pivot
+
 # Robe and hat, seen from inside too (the brim from below, the hem lifting).
 c.vertex_material().use_backface_culling = False
-
-# His hair, under the hat: none pokes out through its crown.
-for v in long_hair.data.vertices:
-    if v.co.z > hz - 0.01:
-        v.co.z = hz - 0.01 + (v.co.z - hz) * 0.2
 
 # ---- Textures: shrunk, his cloth turned blue, his hair silver ----------------
 
@@ -288,7 +328,7 @@ for image in bpy.data.images:
 # ---- His animations ------------------------------------------------------------
 
 before = set(bpy.data.actions)
-library, _ = load(LIBRARY)
+library = [o for path in LIBRARIES for o in load(path)[0]]
 actions = [a for a in bpy.data.actions if a not in before]
 skeleton.animation_data_create()
 for name in ANIMS:
@@ -314,7 +354,7 @@ if preview:
             track.mute = track.name != clip
         bpy.context.scene.frame_set(frame)
 
-    pose("Idle_Loop", 10)
+    pose("Idle_FoldArms_Loop", 10)
     c.preview(preview, (1.2, -4.2, 1.3), (0, 0, 0.95), (0.4, 0.8, -1), lens=40)
     pose("Walk_Formal_Loop", 8)
     c.preview(preview.replace(".png", "-stride.png"), (4.3, 0.3, 1.0), (0, 0, 0.85), (0.4, 0.8, -1), lens=40)
