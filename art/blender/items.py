@@ -2,8 +2,8 @@
 # data/world.json. Each lies as it would on the ground, its middle at the
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
-# The ladder, the plank, the key, the axe, the apple, the emerald and the
-# broom so far; the rest are to come (PLAN-V3.md).
+# The ladder, the plank, the key, the axe, the apple, the emerald, the
+# broom and the lamp so far; the rest are to come (PLAN-V3.md).
 
 import math
 import random
@@ -636,6 +636,231 @@ ys_ = [v.co.y for v in mesh.vertices]
 low = min(v.co.z for v in mesh.vertices)
 mesh.transform(Matrix.Translation((-(min(xs_) + max(xs_)) / 2, -(min(ys_) + max(ys_)) / 2, -low)))
 outward(broom_object)
+
+# The lamp: as in its picture, an old brass lantern. A round foot flaring
+# out under a square body, its four panes of glass crossed by wires, a
+# little latch on its door; a sloping roof, and on it a round chimney with
+# holes round it for the smoke, a domed cap and a knob; and its handle
+# arching over it all. Inside, an oil lamp: its font, its burner, and its
+# glass chimney round the wick. Its glass (`lamp-glass`) and its flame
+# (`lamp-flame`, shown only once it's lit) are their own, inside it, for the
+# game to make see-through and bright. Standing up, 77 cm high to the top of
+# its handle (big, like the key, so you can spot it).
+LAMP_SIZE = 1.4
+BRASS = c.linear("#cf9f48")
+BRASS_LIGHT = c.linear("#f7dc8e")
+BRASS_DARK = c.linear("#7d5824")
+PATINA = c.linear("#6f5b34")
+SOOT = c.linear("#1d140b")
+GLASS = c.linear("#f4ecd6")
+lamp, lamp_glass, lamp_flame = c.Builder(), c.Builder(), c.Builder()
+
+
+def brass(p, shine=0.5):
+    """Mottled brass: rubbed bright in places, dull and dark in others."""
+    v = Vector(p) * 40
+    colour = c.mix(BRASS_DARK, BRASS_LIGHT, shine + noise.noise(v) * 0.3)
+    if noise.noise(v * 0.4 + Vector((3, 8, 2))) > 0.4:
+        colour = c.mix(colour, PATINA, 0.35)  # tarnished
+    return c.vary(colour, 0.05, v)
+
+
+def lathe(builder, profile, colour, sides=28):
+    """Turned round its middle (up z): a profile of (radius, z), from the
+    bottom up, a radius of 0 closing it there. colour(p, t): t along it."""
+    rings, colours = [], []
+    for k, (r, z) in enumerate(profile):
+        t = k / (len(profile) - 1)
+        ring = [(math.cos(2 * math.pi * j / sides) * r, math.sin(2 * math.pi * j / sides) * r, z)
+                for j in range(1 if r == 0 else sides)]
+        rings.append(ring)
+        colours.append([colour(p, t) for p in ring])
+    verts, cols, starts = [], [], []
+    for ring, ring_colours in zip(rings, colours):
+        starts.append(len(verts))
+        verts += ring
+        cols += ring_colours
+    faces = []
+    for k in range(len(rings) - 1):
+        a, b = starts[k], starts[k + 1]
+        if len(rings[k]) == 1:
+            faces += [(a, b + (j + 1) % sides, b + j) for j in range(sides)]
+        elif len(rings[k + 1]) == 1:
+            faces += [(a + j, a + (j + 1) % sides, b) for j in range(sides)]
+        else:
+            faces += [(a + j, a + (j + 1) % sides, b + (j + 1) % sides, b + j) for j in range(sides)]
+    builder.add(verts, faces, cols)
+
+
+def shaded(top, bottom=0.25):
+    """Brass lighter going up a turned part (catching the light above it)."""
+    return lambda p, t: brass(p, bottom + (top - bottom) * t)
+
+
+# The foot: a broad base, a bead, then sweeping in and up to a rim under the body.
+lathe(lamp, [(0, 0), (0.122, 0), (0.125, 0.008), (0.125, 0.016)], shaded(0.35, 0.2))
+lathe(lamp, [(0.125, 0.016), (0.119, 0.021), (0.113, 0.026)], shaded(0.75, 0.5))  # (its bead)
+foot = [(0.113 - 0.012 * math.sin(math.pi / 2 * k / 8), 0.026 + 0.034 * (1 - math.cos(math.pi / 2 * k / 8)))
+        for k in range(9)]
+lathe(lamp, foot + [(0.104, 0.064), (0.106, 0.072), (0.1, 0.078), (0, 0.078)], shaded(0.7, 0.3))
+# (A ring of rivets round its rim.)
+for k in range(16):
+    a = 2 * math.pi * (k + 0.5) / 16
+    lamp.blob((math.cos(a) * 0.104, math.sin(a) * 0.104, 0.067), 0.0045, BRASS_LIGHT, subdivisions=1, lumpy=0)
+
+# The body: square, its frame of brass bars, from the plate it stands on to
+# the one under its roof.
+HALF, POST = 0.086, 0.009  # half its width (to its posts' middles), and half a post's thickness
+BODY_LOW, BODY_HIGH = 0.078, 0.29
+
+
+def lamp_box(x0, y0, z0, x1, y1, z1, shine=0.5):
+    corners = [(x, y, z) for z in (z0, z1) for y in (y0, y1) for x in (x0, x1)]
+    for face in [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]:
+        pts = [corners[i] for i in face]
+        up = sum(p[2] for p in pts) / 4 > (z0 + z1) / 2 + 1e-6
+        lamp.add(pts, [(0, 1, 2, 3)], [brass(p, shine + (0.15 if up else 0)) for p in pts])
+
+
+def square_frame(z0, z1, half, thick):
+    """A square ring of bars, half wide round its middle, `thick` across."""
+    for s in (-1, 1):
+        lamp_box(-half - thick, s * half - thick, z0, half + thick, s * half + thick, z1)
+        lamp_box(s * half - thick, -half + thick, z0, s * half + thick, half - thick, z1)
+
+
+lamp_box(-HALF - POST, -HALF - POST, BODY_LOW, HALF + POST, HALF + POST, BODY_LOW + 0.014, 0.4)  # its floor
+for sx in (-1, 1):
+    for sy in (-1, 1):
+        x, y = sx * HALF, sy * HALF
+        lamp_box(x - POST, y - POST, BODY_LOW, x + POST, y + POST, BODY_HIGH, 0.55)  # its posts
+        for z in (BODY_LOW + 0.03, BODY_HIGH - 0.03):  # riveted top and bottom
+            for dx, dy in ((sx * POST, 0), (0, sy * POST)):
+                lamp.blob((x + dx, y + dy, z), 0.0035, BRASS_LIGHT, subdivisions=1, lumpy=0)
+square_frame(BODY_LOW + 0.014, BODY_LOW + 0.026, HALF, POST * 0.8)
+square_frame(BODY_HIGH - 0.016, BODY_HIGH, HALF + 0.002, POST * 1.1)
+
+# Its panes, set in a little from the posts' fronts, each crossed corner to
+# corner by two wires (in front of it).
+PANE = HALF - 0.002
+WIRE = 0.0022
+low, high = BODY_LOW + 0.026, BODY_HIGH - 0.016
+for side in range(4):
+    a = math.pi / 2 * side
+    out_, along = Vector((math.cos(a), math.sin(a), 0)), Vector((-math.sin(a), math.cos(a), 0))
+    pane = [out_ * PANE + along * s * (HALF - POST) + Vector((0, 0, z)) for s, z in
+            ((-1, low), (1, low), (1, high), (-1, high))]
+    lamp_glass.add([tuple(p) for p in pane], [(0, 1, 2, 3)], [GLASS] * 4)
+    front = out_ * (PANE + POST * 0.6)
+    for s in (-1, 1):
+        ends = [front + along * (-s * (HALF - POST)) + Vector((0, 0, low)),
+                front + along * (s * (HALF - POST)) + Vector((0, 0, high))]
+        wire = [tuple(ends[0].lerp(ends[1], t / 6)) for t in range(7)]
+        round_tube(lamp, wire, [WIRE] * 7, lambda p, along_, around: brass(p, 0.45), sides=5)
+# The door's latch, on the front (towards -y), by its right-hand post: a
+# little hinged catch, and its knob.
+lamp_box(HALF - 0.03, -HALF - POST - 0.006, 0.17, HALF - POST, -HALF - POST, 0.2, 0.6)
+lamp.blob((HALF - 0.032, -HALF - POST - 0.01, 0.185), 0.006, BRASS_LIGHT, subdivisions=1, lumpy=0)
+
+# The roof: sloping up from the body on all four sides to the chimney.
+ROOF_LOW, ROOF_HIGH = BODY_HIGH, 0.345
+roof_low, roof_high = HALF + POST + 0.008, 0.05
+for side in range(4):
+    a0, a1 = math.pi / 2 * side - math.pi / 4, math.pi / 2 * side + math.pi / 4
+    pts = [(math.cos(a) * r * math.sqrt(2), math.sin(a) * r * math.sqrt(2), z)
+           for r, z, a in ((roof_low, ROOF_LOW, a0), (roof_low, ROOF_LOW, a1),
+                           (roof_high, ROOF_HIGH, a1), (roof_high, ROOF_HIGH, a0))]
+    lamp.add(pts, [(0, 1, 2, 3)], [brass(p, 0.45 + 0.25 * (p[2] - ROOF_LOW) / (ROOF_HIGH - ROOF_LOW)) for p in pts])
+    lamp.add([pts[1], pts[0], (pts[0][0], pts[0][1], ROOF_LOW - 0.006), (pts[1][0], pts[1][1], ROOF_LOW - 0.006)],
+             [(0, 1, 2, 3)], [brass(p, 0.3) for p in pts[:2]] * 2)  # (its edge)
+# The chimney on top: a drum with a ring of holes, a rim, a domed cap and a knob.
+CHIM_R = 0.044
+holes = [(2 * math.pi * k / 10, 0.372) for k in range(10)]
+
+
+def drum(p, t):
+    """Brass, with dark holes round it (for the smoke), sooty round them."""
+    a = math.atan2(p[1], p[0])
+    colour = brass(p, 0.45 + 0.25 * t)
+    for ha, hz in holes:
+        d = math.hypot((((a - ha + math.pi) % (2 * math.pi)) - math.pi) * CHIM_R / 0.008, (p[2] - hz) / 0.009)
+        colour = c.mix(colour, SOOT, max(0.0, min(1.0, 1.6 - d)))
+    return colour
+
+
+lathe(lamp, [(roof_high + 0.004, ROOF_HIGH - 0.004), (CHIM_R, ROOF_HIGH)], shaded(0.5, 0.4), sides=40)
+lathe(lamp, [(CHIM_R, ROOF_HIGH + z / 20 * 0.055) for z in range(21)], drum, sides=60)
+cap = [(CHIM_R + 0.006, 0.4), (CHIM_R + 0.008, 0.404), (CHIM_R + 0.004, 0.409)]
+cap += [((CHIM_R + 0.002) * math.cos(math.pi / 2 * k / 6), 0.409 + 0.03 * math.sin(math.pi / 2 * k / 6))
+        for k in range(1, 7)]
+lathe(lamp, [(CHIM_R, 0.4)] + cap[:-1] + [(0.008, 0.439), (0.006, 0.444)], shaded(0.9, 0.4), sides=40)
+knob = [(0.006, 0.444)] + [(0.013 * math.sin(math.pi * k / 8), 0.452 - 0.012 * math.cos(math.pi * k / 8))
+                           for k in range(1, 9)]
+lathe(lamp, knob[:-1] + [(0, knob[-1][1])], shaded(0.95, 0.6), sides=16)
+
+# The handle: a brass bail, from a pivot either side of the chimney,
+# hooking out, then arching up high over the knob.
+PIVOT_Z = 0.372
+for s in (-1, 1):
+    round_tube(lamp, [(s * (CHIM_R - 0.002), 0, PIVOT_Z), (s * (CHIM_R + 0.01), 0, PIVOT_Z)], [0.011, 0.011],
+               lambda p, along_, around: brass(p, 0.65), sides=12)  # (its pivots)
+bail = []
+for k in range(33):
+    t = k / 32
+    a = math.pi * (1 - t)
+    # (Out from each pivot first, then up and over: wider than the chimney.)
+    wide = 0.07 + 0.022 * math.sin(math.pi * t)
+    x = math.cos(a) * wide
+    z = PIVOT_Z + 0.006 + math.sin(a) * 0.15 + 0.02 * max(0.0, math.sin(a)) ** 0.5
+    bail.append((x, 0.0, z))
+bail = [(-(CHIM_R + 0.01), 0, PIVOT_Z)] + bail + [(CHIM_R + 0.01, 0, PIVOT_Z)]
+round_tube(lamp, bail, [0.0055] * len(bail), lambda p, along_, around: brass(p, 0.4 + 0.3 * math.sin(around)),
+           sides=8)
+
+# Inside: the lamp's font (where its oil is), round and squat, on the floor;
+# its burner, a little crown with holes round it; and its glass chimney,
+# bulging round the flame, and up to the roof.
+font = [(0, BODY_LOW + 0.014)] + [(0.05 + 0.008 * math.sin(math.pi * k / 8), BODY_LOW + 0.014 + 0.045 * k / 8)
+                                  for k in range(9)]
+lathe(lamp, font + [(0.026, BODY_LOW + 0.064), (0.024, BODY_LOW + 0.074)], shaded(0.8, 0.3))
+BURNER = BODY_LOW + 0.074
+lathe(lamp, [(0.024, BURNER), (0.031, BURNER + 0.004), (0.031, BURNER + 0.018), (0.027, BURNER + 0.02),
+             (0.027, BURNER + 0.024)], lambda p, t: c.mix(brass(p, 0.6), SOOT, 0.5 if 0.3 < t < 0.6 else 0))
+WICK = BURNER + 0.024
+lathe(lamp, [(0, WICK - 0.002), (0.009, WICK - 0.002), (0.009, WICK + 0.006), (0, WICK + 0.006)],
+      lambda p, t: SOOT, sides=8)
+chimney = [(0.028, WICK), (0.03, WICK + 0.01)]
+chimney += [(0.031 + 0.017 * math.sin(math.pi * k / 10), WICK + 0.012 + 0.08 * k / 10) for k in range(1, 11)]
+chimney += [(0.024, WICK + 0.11), (0.022, BODY_HIGH - 0.02)]
+lathe(lamp_glass, chimney, lambda p, t: GLASS, sides=24)
+
+# The flame: a long teardrop, blue at its root, white-gold in its heart, and
+# orange to its tip.
+FLAME_LOW, FLAME_HIGH, FLAME_R = WICK + 0.004, WICK + 0.07, 0.011
+flame = [(0, FLAME_LOW)]
+flame += [(FLAME_R * math.sin(math.pi * k / 16) ** 0.6 * (1 - k / 16) ** 0.8 * 1.6,
+           FLAME_LOW + (FLAME_HIGH - FLAME_LOW) * (k / 16) ** 1.2) for k in range(1, 16)]
+flame += [(0, FLAME_HIGH)]
+
+
+def flame_colour(p, t):
+    if t < 0.15:
+        return c.mix(c.linear("#4b6cff"), c.linear("#fff3c4"), t / 0.15)
+    if t < 0.5:
+        return c.mix(c.linear("#fff3c4"), c.linear("#ffd25e"), (t - 0.15) / 0.35)
+    return c.mix(c.linear("#ffd25e"), c.linear("#ff8a22"), (t - 0.5) / 0.5)
+
+
+lathe(lamp_flame, flame, flame_colour, sides=12)
+
+lamp_object = lamp.build("lamp", smooth=True)
+glass_object = lamp_glass.build("lamp-glass", smooth=True)
+flame_object = lamp_flame.build("lamp-flame", smooth=True)
+for part in (lamp_object, glass_object, flame_object):
+    part.data.transform(Matrix.Scale(LAMP_SIZE, 4))
+outward(lamp_object)
+outward(flame_object)
+glass_object.parent = flame_object.parent = lamp_object
 
 if out:
     c.export(out)
