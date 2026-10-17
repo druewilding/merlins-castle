@@ -157,6 +157,9 @@ class Builder:
 # from names when it loads a file.
 
 
+PROUD = 0.008  # metres the kits' metal fittings stand clear of what they're on
+
+
 class Kit:
     """Models from one of Quaternius's packs (art/models/), made ours: each a
     list of faces, coloured at each corner from its texture (times its own
@@ -203,11 +206,19 @@ class Kit:
             mesh = obj.evaluated_get(bpy.context.evaluated_depsgraph_get()).to_mesh()
             uvs = mesh.uv_layers.active.data if mesh.uv_layers.active else None
             tints = mesh.color_attributes.active_color
+            turn = obj.matrix_world.to_3x3()
             for poly in mesh.polygons:
                 texture = textures[poly.material_index] if textures else None
+                # (Metal laid over wood, as straps and hinges, only a millimetre or
+                # two proud of it: lifted clear, or the two flicker, one through
+                # the other, once land.glb rounds where they are.)
+                material = names[poly.material_index] if names else ""
+                fitting = "Metal" in material and len(set(names)) > 1
+                lift = (turn @ poly.normal).normalized() * PROUD if fitting else Vector()
                 pts, colours = [], []
                 for li, vi in zip(poly.loop_indices, poly.vertices):
-                    pts.append(tuple(obj.matrix_world @ mesh.vertices[vi].co))
+                    p = obj.matrix_world @ mesh.vertices[vi].co
+                    pts.append(tuple(p + lift))
                     colour = [1.0, 1.0, 1.0]
                     if texture is not None and uvs:
                         u, v = uvs[li].uv
