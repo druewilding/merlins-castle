@@ -53,6 +53,7 @@ import {
   type ThreeSave,
 } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
+import { Caught } from "./caught";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
 import { haze } from "./haze";
@@ -67,19 +68,24 @@ import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import merlinModel from "./models/merlin.glb?url";
+import rabbitModel from "./models/rabbits.glb?url";
 import snakeModel from "./models/snake.glb?url";
+import witchModel from "./models/witches.glb?url";
 import { Plank } from "./plank";
 import { type Growth, Plants } from "./plants";
 import { type Box, type Circle, type Ground, type Hall, Player, type Walkable, wayThrough } from "./player";
 import { type PropSpots, stampProps } from "./props";
+import { Rabbits } from "./rabbits";
 import { River } from "./river";
 import { Shafts, speck, type Window } from "./shafts";
+import { paintSign, type SignSpot } from "./sign";
 import { sky } from "./sky";
 import { Smoke } from "./smoke";
 import { Snake } from "./snake";
 import OWN_SOUNDS from "./sounds.json";
 import { Swept } from "./swept";
 import { Trees, type TreeSpots } from "./trees";
+import { Witches } from "./witches";
 
 const english = worldJson as unknown as World;
 const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
@@ -170,12 +176,14 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky, wizard] = await Promise.all([
+const [model, file, things, snaky, wizard, hags, bunnies] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
   loader.loadAsync(snakeModel),
   loader.loadAsync(merlinModel),
+  loader.loadAsync(witchModel),
+  loader.loadAsync(rabbitModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -424,6 +432,8 @@ let opened = new Set<Shape>(); // by an object in use
 // A way that kills you even with the object (the balcony) has no far side
 // you could have come from: it stops you from every side.
 const deadly = (names: string[]) => names.every((name) => exitOf(name)?.fatal);
+// (And one that kills you, going through it, you can step back in, having come the free way.)
+const fatal = (names: string[]) => names.some((name) => exitOf(name)?.obstacle?.fatal);
 function solidify() {
   for (const under of [false, true]) {
     const here = [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
@@ -434,7 +444,17 @@ function solidify() {
       [
         ...closed.flatMap(({ circle, names, reach = AHEAD, allRound }) =>
           circle
-            ? [{ x: circle[0], z: circle[1], r: circle[2], names, ahead: reach, allRound: allRound || deadly(names) }]
+            ? [
+                {
+                  x: circle[0],
+                  z: circle[1],
+                  r: circle[2],
+                  names,
+                  ahead: reach,
+                  allRound: allRound || deadly(names),
+                  fatal: fatal(names),
+                },
+              ]
             : []
         ),
         ...(under ? underCircles : circles),
@@ -451,6 +471,7 @@ function solidify() {
                   names,
                   ahead: reach,
                   allRound: allRound || deadly(names),
+                  fatal: fatal(names),
                 },
               ]
             : []
@@ -495,6 +516,43 @@ const merlin = new Merlin(
     Math.abs(x - lair.x) < lair.w! - 1.2 && Math.abs(z - lair.z) < lair.d! - 1.2 && player.clear(x, z, true, 0.6)
 );
 player.movers.push(merlin.body);
+
+// The witches (witches.ts): dancing in a ring across the way west to the
+// crossroads, or else hiding behind the trees either side of it; flying
+// off, the broom used there.
+const dancers = shapeOf.get("forest-witches west");
+const clearing = PLACES.get("forest-witches")!;
+const witches = new Witches(
+  scene,
+  hags.scene,
+  hags.animations,
+  { x: clearing.x - 17, z: clearing.z + 1, r: 1.8 },
+  [
+    { x: clearing.x - 13.4, z: clearing.z + 7.4 },
+    { x: clearing.x - 12.9, z: clearing.z - 12.4 },
+    { x: clearing.x - 19.3, z: clearing.z - 11.4 },
+  ],
+  clearing,
+  ground,
+  things.scene.getObjectByName("broom")!,
+  reducedMotion
+);
+// The sign warning you of them, on the corner by their clearing's crossing.
+void paintSign(scene, land.sign as SignSpot);
+// And the rabbits warning you of them, in the grass by it (rabbits.ts).
+const [signX, , signZ] = land.sign.at;
+const rabbits = new Rabbits(
+  scene,
+  bunnies.scene,
+  bunnies.animations,
+  [
+    { x: signX + 0.9, z: signZ + 0.9, yaw: Math.PI / 2 },
+    { x: signX + 0.2, z: signZ + 1.7, yaw: Math.PI / 2.4 },
+    { x: signX - 0.9, z: signZ + 1.3, yaw: Math.PI / 1.8 },
+    { x: signX + 0.5, z: signZ - 0.8, yaw: Math.PI / 2.2 }, // (the other side of it, by the way west)
+  ],
+  ground
+);
 
 // A game loaded, or carried on from another version (or another language).
 const handoff = takeHandoff();
@@ -609,7 +667,8 @@ function inUse() {
         shape === guarded ||
         shape === shut ||
         shape === crossing ||
-        shape === heaped)
+        shape === heaped ||
+        shape === dancers)
       ? [`${here} ${direction}`]
       : [];
   });
@@ -630,6 +689,11 @@ function inUse() {
     if (instantly) snake.away();
     else snake.feed(player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
   } else if (instantly && here !== "tower") snake.back();
+  // The broom used on the witches: they fly off (or, loading, they've gone).
+  if (dancers && opened.has(dancers)) {
+    if (instantly) witches.away();
+    else witches.flyOff(player.position);
+  }
   const wall = exits.find((exit) => walls.has(shapeOf.get(exit)!));
   // (Or propped under the balcony, at the mossy steps: "propped up ready",
   // but it slips, so it opens nothing.)
@@ -673,10 +737,11 @@ if (handoff && !at) arrive(handoff);
 
 // Dying: walking into a way that kills you, its scene plays out (climbing
 // the ladder propped under the balcony, fall.ts; wading into the deep river,
-// swept.ts); then a curtain falls, with the original's words, and after it
+// swept.ts; walking into the witches, caught.ts); then a curtain falls, with the original's words, and after it
 // your score, as in the illustrated version.
 const BALCONY = "mossy-steps east";
 const RIVER = "deep-river south";
+const WITCHES = "forest-witches west";
 // (Each scene plays on behind the curtain, which starts to come down a
 // little before its end, so the end is seen through it, not cut off.)
 interface Scene3d {
@@ -710,6 +775,11 @@ const scenes: Record<string, () => Scene3d | undefined> = {
   // (Not with the plank across it: the way's open then.)
   [RIVER]: () =>
     effects(world, items.state).includes("plank") ? undefined : new Swept(player.camera, drawn, river, reducedMotion),
+  // (Not with the broom in use: they've flown off.)
+  [WITCHES]: () =>
+    effects(world, items.state).includes("broom")
+      ? undefined
+      : new Caught(player.camera, drawn, witches, reducedMotion),
 };
 
 /** Walking into a way that kills you: its scene (and true), or nothing to see (false). */
@@ -834,7 +904,7 @@ const was = player.position.clone(); // (and just where)
 const debugMode = new URLSearchParams(location.search).has("debug");
 if (debugMode) {
   Object.assign(window, {
-    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, merlin, restart, drawn },
+    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, merlin, witches, restart, drawn },
   });
   const { debug } = await import("./debug");
   debug(
@@ -983,6 +1053,7 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   leaning = undefined;
   plank.away();
   bridged = undefined;
+  witches.free();
   arrive(game);
   instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
   inUse();
@@ -1140,6 +1211,8 @@ renderer.setAnimationLoop((time) => {
   // but not while you're in the tower: you'd come out through it.)
   snake.update(dt, player.camera.position, player.camera, room !== "tower" && !(guarded && opened.has(guarded)));
   merlin.update(dt, player.position, room === "merlins-lair");
+  witches.update(dt, room === "forest-witches", player.camera, !(dancers && opened.has(dancers)));
+  rabbits.update(dt, player.position);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)

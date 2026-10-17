@@ -28,11 +28,8 @@ import common as c  # noqa: E402
 out, preview = c.args()
 c.clear()
 
-MODELS = HERE.parent / "models"
-OUTFIT = MODELS / "modular-character-outfits/Exports/glTF (Godot-Unreal)/Outfits/Male_Ranger.gltf"
-BODY = MODELS / "universal-base-characters/Base Characters/Godot - UE/Superhero_Male_FullBody.gltf"
-HAIR = MODELS / "universal-base-characters/Hairstyles/Rigged to Head Bone/glTF (Godot -Unreal)"
-LIBRARIES = [MODELS / f"universal-animation-library-{n}/Unreal-Godot/UAL{n}_Standard.glb" for n in (1, 2)]
+OUTFIT = c.OUTFITS / "Male_Ranger.gltf"
+BODY = c.BODIES / "Superhero_Male_FullBody.gltf"
 
 ANIMS = [
     "Idle_FoldArms_Loop",
@@ -62,71 +59,16 @@ TIP = 6  # degrees the hat's tipped back
 BROWS = 0.006  # metres his eyebrows are lifted in the middle (and lowered at their ends)
 
 
-def load(path):
-    """A glTF file's objects, and its skeleton."""
-    before = set(bpy.data.objects)
-    bpy.ops.import_scene.gltf(filepath=str(path))
-    new = [o for o in bpy.data.objects if o not in before]
-    return new, next((o for o in new if o.type == "ARMATURE"), None)
-
-
-def remove(objects):
-    for o in objects:
-        bpy.data.objects.remove(o, do_unlink=True)
-
-
-def onto(obj):
-    """A skinned mesh from another file, moved onto Merlin's skeleton (the same
-    bones, in the same places, so it fits as it is)."""
-    obj.parent = skeleton
-    for m in obj.modifiers:
-        if m.type == "ARMATURE":
-            m.object = skeleton
-
-
-def skinned(name, verts, faces, colours, weights):
-    """A mesh of our own, moved by his bones: weights is a {bone: weight} for each vertex."""
-    obj = c.mesh_object(name, verts, faces, colours)
-    for i, w in enumerate(weights):
-        total = sum(w.values())
-        for bone, amount in w.items():
-            if amount <= 0:
-                continue
-            group = obj.vertex_groups.get(bone) or obj.vertex_groups.new(name=bone)
-            group.add([i], amount / total, "REPLACE")
-    obj.parent = skeleton
-    obj.modifiers.new("skeleton", "ARMATURE").object = skeleton
-    return obj
-
-
-def smooth(t):
-    t = max(0.0, min(1.0, t))
-    return t * t * (3 - 2 * t)
-
-
 # ---- The outfit: his skeleton, tunic, arms and boots -------------------------
 
-outfit, skeleton = load(OUTFIT)
+outfit, skeleton = c.load(OUTFIT)
 skeleton.name = "merlin"
 keep = ("Body", "Arms", "Feet", "Legs")
-remove([o for o in outfit if o.type == "MESH" and (not any(k in o.name for k in keep) or "Bracer" in o.name)])
+c.remove([o for o in outfit if o.type == "MESH" and (not any(k in o.name for k in keep) or "Bracer" in o.name)])
 
 # ---- His head: from the base character, cut off at the neck ------------------
 
-body, _ = load(BODY)
-head = next(o for o in body if o.name.startswith("SuperHero"))
-groups = {g.index: g.name for g in head.vertex_groups}
-bm = bmesh.new()
-bm.from_mesh(head.data)
-deform = bm.verts.layers.deform.active
-cut = [v for v in bm.verts if sum(w for g, w in v[deform].items() if groups[g] in ("Head", "neck_01")) < 0.5]
-bmesh.ops.delete(bm, geom=cut, context="VERTS")
-bm.to_mesh(head.data)
-bm.free()
-for o in body:
-    if o is head or o.name.startswith(("Eyes", "Eyebrows")):
-        onto(o)
-remove([o for o in body if o.parent != skeleton])
+c.head(BODY, skeleton, "SuperHero")
 
 # His eyebrows, tilted kindly: up in the middle, down at their ends (they
 # come frowning).
@@ -136,19 +78,7 @@ for v in brows.data.vertices:
 
 # ---- His hair, and a moustache -----------------------------------------------
 
-hair = []
-for name in ("Hair_Long", "Hair_Beard"):
-    parts, rig = load(HAIR / f"{name}.gltf")
-    mesh = next(o for o in parts if o.type == "MESH")
-    # (The long hair's made for the shorter base characters: up onto his head,
-    # by as much as his head's higher than theirs.)
-    ours, theirs = (s.matrix_world @ s.data.bones["Head"].head_local for s in (skeleton, rig))
-    up = ours - theirs
-    for v in mesh.data.vertices:
-        v.co += mesh.matrix_world.inverted().to_3x3() @ up
-    onto(mesh)
-    remove([o for o in parts if o is not mesh])
-    hair.append(mesh)
+hair = [c.hairstyle(name, skeleton) for name in ("Hair_Long", "Hair_Beard")]
 long_hair, moustache = hair
 
 # His hair down past his shoulders.
@@ -173,15 +103,21 @@ bm.free()
 # ---- His robe: from the belt to his ankles, flaring out ---------------------
 
 RINGS = 20
+FIT = 0.012  # metres the robe stands clear of his tunic under it, at its snuggest
+# (Round him as snug as his tunic and breeches are, at each height (under his
+# belt): then flaring out from that.)
+# (His tunic's skirt goes: hidden by his robe, and it'd poke through it.)
+under = [o for o in skeleton.children if o.name in ("Male_Ranger_Body", "Male_Ranger_Legs")]
+c.cut_below(next(o for o in under if o.name == "Male_Ranger_Body"), WAIST - 0.05)
+snug = c.hang([c.girth(under, WAIST + (HEM - WAIST) * i / RINGS, SIDES, (0.0, 0.02)) for i in range(RINGS + 1)])
 verts, colours, weights = [], [], []
 for i in range(RINGS + 1):
     t = i / RINGS  # 0 at the waist, 1 at the hem
     z = WAIST + (HEM - WAIST) * t
-    radius = 0.165 + 0.21 * t**1.1
     for k in range(SIDES):
         a = 2 * math.pi * k / SIDES
         # Soft folds, deeper towards the hem.
-        r = radius * (1 + 0.05 * t * math.sin(a * 9 + 1.3))
+        r = snug[i][k] + FIT + 0.21 * t**1.1 * (1 + 0.25 * math.sin(a * 9 + 1.3))
         x, y = math.sin(a) * r, -math.cos(a) * r
         verts.append((x, y + 0.02, z))
         # Gold trim round the hem and down the front.
@@ -191,10 +127,10 @@ for i in range(RINGS + 1):
         # own: mostly by his thigh, so the hem swings out in a wide arc with each
         # stride (and his knee stays inside), and at the back by his calf too, as
         # his heel lifts behind him.
-        side = smooth((x / max(radius, 0.01) + 0.35) / 0.7)  # 0 on his right, 1 on his left
-        back = smooth((y / max(radius, 0.01) + 0.3) / 1.0)  # 0 at his front, 1 at his back
-        hip = 1 - smooth(t * 2.5)
-        calf = (0.25 + 0.5 * back) * smooth((t - 0.4) * 2)
+        side = c.smooth((x / r + 0.35) / 0.7)  # 0 on his right, 1 on his left
+        back = c.smooth((y / r + 0.3) / 1.0)  # 0 at his front, 1 at his back
+        hip = 1 - c.smooth(t * 2.5)
+        calf = (0.25 + 0.5 * back) * c.smooth((t - 0.4) * 2)
         thigh = (1 - hip) - calf
         weights.append(
             {
@@ -210,7 +146,7 @@ for i in range(RINGS):
     for k in range(SIDES):
         a, b = i * SIDES + k, i * SIDES + (k + 1) % SIDES
         faces.append((a, b, b + SIDES, a + SIDES))
-robe = skinned("merlin-robe", verts, faces, colours, weights)
+robe = c.skinned("merlin-robe", verts, faces, colours, weights, skeleton)
 robe.data.materials.append(c.vertex_material())
 
 # ---- His hat: a tall cone, its tip bent back, on a wide brim ----------------
@@ -268,7 +204,7 @@ for _ in range(16):
 tip = Matrix.Rotation(math.radians(-TIP), 4, "X")
 pivot = Vector((hx, hy + 0.05, hz - 0.06))
 verts = [tuple(tip @ (Vector(v) - pivot) + pivot) for v in verts]
-hat = skinned("merlin-hat", verts, faces, colours, [{"Head": 1.0}] * len(verts))
+hat = c.skinned("merlin-hat", verts, faces, colours, [{"Head": 1.0}] * len(verts), skeleton)
 hat.data.materials.append(c.vertex_material())
 
 # His hair, inside the hat: drawn in where it would poke through the cone.
@@ -291,13 +227,7 @@ c.vertex_material().use_backface_culling = False
 
 # ---- Textures: shrunk, his cloth turned blue, his hair silver ----------------
 
-# (The base character's file names two normal maps it doesn't come with: those
-# go, or they'd be empty textures, which three.js can't load.)
-for material in bpy.data.materials:
-    if material.node_tree:
-        for node in list(material.node_tree.nodes):
-            if node.type == "TEX_IMAGE" and node.image and not node.image.size[0]:
-                material.node_tree.nodes.remove(node)
+c.drop_missing_textures()
 
 for image in bpy.data.images:
     if not image.size[0]:
@@ -327,19 +257,7 @@ for image in bpy.data.images:
 
 # ---- His animations ------------------------------------------------------------
 
-before = set(bpy.data.actions)
-library = [o for path in LIBRARIES for o in load(path)[0]]
-actions = [a for a in bpy.data.actions if a not in before]
-skeleton.animation_data_create()
-for name in ANIMS:
-    action = next(a for a in actions if a.name == name or a.name.startswith(name + "_"))
-    track = skeleton.animation_data.nla_tracks.new()
-    track.name = name
-    strip = track.strips.new(name, int(action.frame_range[0]), action)
-    if hasattr(strip, "action_slot") and action.slots:
-        strip.action_slot = action.slots[0]
-skeleton.animation_data.action = None
-remove(library)
+c.clips(skeleton, ANIMS)
 
 if out:
     for o in bpy.data.objects:
@@ -349,13 +267,8 @@ if out:
 if preview:
     # Standing idle, seen from the front, a little to one side; and mid-stride,
     # from the side and the front (-stride.png, -stride-front.png).
-    def pose(clip, frame):
-        for track in skeleton.animation_data.nla_tracks:
-            track.mute = track.name != clip
-        bpy.context.scene.frame_set(frame)
-
-    pose("Idle_FoldArms_Loop", 10)
+    c.pose(skeleton, "Idle_FoldArms_Loop", 10)
     c.preview(preview, (1.2, -4.2, 1.3), (0, 0, 0.95), (0.4, 0.8, -1), lens=40)
-    pose("Walk_Formal_Loop", 8)
+    c.pose(skeleton, "Walk_Formal_Loop", 8)
     c.preview(preview.replace(".png", "-stride.png"), (4.3, 0.3, 1.0), (0, 0, 0.85), (0.4, 0.8, -1), lens=40)
     c.preview(preview.replace(".png", "-stride-front.png"), (0.8, -4.3, 1.0), (0, 0, 0.85), (0.4, 0.8, -1), lens=40)

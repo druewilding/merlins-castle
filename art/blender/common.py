@@ -9,10 +9,13 @@
 import math
 import random
 import sys
+from pathlib import Path
 
 import bmesh
 import bpy
 from mathutils import Vector, noise
+
+HERE = Path(__file__).parent
 
 
 def args():
@@ -353,3 +356,174 @@ def preview(path, camera_at, look_at, sun_dir, lens=24):
     ] else "Filmic"
     scene.render.filepath = path
     bpy.ops.render.render(write_still=True)
+
+
+# ---- People: made from Quaternius's kits, on their one humanoid skeleton ------
+
+MODELS = HERE.parent / "models"
+OUTFITS = MODELS / "modular-character-outfits/Exports/glTF (Godot-Unreal)/Outfits"
+BODIES = MODELS / "universal-base-characters/Base Characters/Godot - UE"
+HAIR = MODELS / "universal-base-characters/Hairstyles/Rigged to Head Bone/glTF (Godot -Unreal)"
+LIBRARIES = [MODELS / f"universal-animation-library-{n}/Unreal-Godot/UAL{n}_Standard.glb" for n in (1, 2)]
+
+
+def load(path):
+    """A glTF file's objects, and its skeleton."""
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=str(path))
+    new = [o for o in bpy.data.objects if o not in before]
+    return new, next((o for o in new if o.type == "ARMATURE"), None)
+
+
+def remove(objects):
+    for o in objects:
+        bpy.data.objects.remove(o, do_unlink=True)
+
+
+def onto(obj, skeleton):
+    """A skinned mesh from another file, moved onto this skeleton (the same
+    bones, in the same places, so it fits as it is)."""
+    obj.parent = skeleton
+    for m in obj.modifiers:
+        if m.type == "ARMATURE":
+            m.object = skeleton
+
+
+def skinned(name, verts, faces, colours, weights, skeleton):
+    """A mesh of our own, moved by the skeleton's bones: weights is a {bone:
+    weight} for each vertex."""
+    obj = mesh_object(name, verts, faces, colours)
+    for i, w in enumerate(weights):
+        total = sum(w.values())
+        for bone, amount in w.items():
+            if amount <= 0:
+                continue
+            group = obj.vertex_groups.get(bone) or obj.vertex_groups.new(name=bone)
+            group.add([i], amount / total, "REPLACE")
+    obj.parent = skeleton
+    obj.modifiers.new("skeleton", "ARMATURE").object = skeleton
+    return obj
+
+
+def smooth(t):
+    t = max(0.0, min(1.0, t))
+    return t * t * (3 - 2 * t)
+
+
+def head(path, skeleton, prefix):
+    """A base character's head (the mesh named starting with prefix), cut off
+    at the neck, with its eyes and eyebrows, onto this skeleton."""
+    body, _ = load(path)
+    mesh = next(o for o in body if o.name.startswith(prefix))
+    groups = {g.index: g.name for g in mesh.vertex_groups}
+    bm = bmesh.new()
+    bm.from_mesh(mesh.data)
+    deform = bm.verts.layers.deform.active
+    cut = [v for v in bm.verts if sum(w for g, w in v[deform].items() if groups[g] in ("Head", "neck_01")) < 0.5]
+    bmesh.ops.delete(bm, geom=cut, context="VERTS")
+    bm.to_mesh(mesh.data)
+    bm.free()
+    for o in body:
+        if o is mesh or o.name.startswith(("Eyes", "Eyebrows")):
+            onto(o, skeleton)
+    remove([o for o in body if o.parent != skeleton])
+    return mesh
+
+
+def hairstyle(name, skeleton):
+    """One of the kit's hairstyles, onto this skeleton."""
+    parts, rig = load(HAIR / f"{name}.gltf")
+    mesh = next(o for o in parts if o.type == "MESH")
+    # (Some are made for the shorter base characters: up onto the head, by as
+    # much as this one's higher than theirs.)
+    ours, theirs = (s.matrix_world @ s.data.bones["Head"].head_local for s in (skeleton, rig))
+    up = ours - theirs
+    for v in mesh.data.vertices:
+        v.co += mesh.matrix_world.inverted().to_3x3() @ up
+    onto(mesh, skeleton)
+    remove([o for o in parts if o is not mesh])
+    return mesh
+
+
+def drop_missing_textures():
+    """The base characters' files name normal maps they don't come with: those
+    go, or they'd be empty textures, which three.js can't load."""
+    for material in bpy.data.materials:
+        if material.node_tree:
+            for node in list(material.node_tree.nodes):
+                if node.type == "TEX_IMAGE" and node.image and not node.image.size[0]:
+                    material.node_tree.nodes.remove(node)
+
+
+def clips(skeleton, names):
+    """The Universal Animation Libraries' clips, onto the skeleton, each its
+    own NLA track (so each is exported as a clip), named as they are there."""
+    before = set(bpy.data.actions)
+    library = [o for path in LIBRARIES for o in load(path)[0]]
+    actions = [a for a in bpy.data.actions if a not in before]
+    skeleton.animation_data_create()
+    for name in names:
+        action = next(a for a in actions if a.name == name or a.name.startswith(name + "_"))
+        track = skeleton.animation_data.nla_tracks.new()
+        track.name = name
+        strip = track.strips.new(name, int(action.frame_range[0]), action)
+        if hasattr(strip, "action_slot") and action.slots:
+            strip.action_slot = action.slots[0]
+    skeleton.animation_data.action = None
+    remove(library)
+
+
+def pose(skeleton, clip, frame):
+    """Shows the skeleton at a frame of one of its clips (for previews)."""
+    for track in skeleton.animation_data.nla_tracks:
+        track.mute = track.name != clip
+    bpy.context.scene.frame_set(frame)
+
+
+def girth(meshes, z, sides, centre=(0.0, 0.01), band=0.015):
+    """How far out the meshes reach at this height, all round: for each of
+    `sides` directions (at 2πk/sides, from facing -y, as the robes go round),
+    the furthest out of their points near that height and that way. For a
+    robe snug to what's under it."""
+    cx, cy = centre
+    reach = [None] * sides
+    for obj in meshes:
+        for v in obj.data.vertices:
+            p = obj.matrix_world @ v.co
+            if abs(p.z - z) > band:
+                continue
+            a = math.atan2(p.x - cx, -(p.y - cy)) % (2 * math.pi)
+            k = round(a / (2 * math.pi) * sides) % sides
+            r = math.hypot(p.x - cx, p.y - cy)
+            reach[k] = max(reach[k] or 0.0, r)
+    known = [k for k in range(sides) if reach[k] is not None]
+    if not known:
+        return [0.0] * sides
+    # (Where no point falls, as far out as the nearest that does; then each
+    # as far as either neighbour, so nothing between two points pokes out.)
+    filled = [reach[k] if reach[k] is not None else reach[min(known, key=lambda j: min(abs(j - k), sides - abs(j - k)))]
+              for k in range(sides)]
+    return [max(filled[k - 1], filled[k], filled[(k + 1) % sides]) for k in range(sides)]
+
+
+def hang(girths):
+    """A robe's shape, ring by ring from its top, from the girths of what's
+    under it (girth): never in from the ring above (it hangs down over what
+    it's passed), and smoothed round, so it doesn't follow every lump."""
+    sides = len(girths[0])
+    widest = list(girths[0])
+    rings = []
+    for g in girths:
+        widest = [max(w, r) for w, r in zip(widest, g)]
+        rings.append([sum(widest[(k + d) % sides] for d in (-2, -1, 0, 1, 2)) / 5 for k in range(sides)])
+    # (Smoothed, it mustn't come in anywhere past what it was fitted to.)
+    return [[max(r, w) for r, w in zip(ring, g)] for ring, g in zip(rings, girths)]
+
+
+def cut_below(obj, z):
+    """Takes away a mesh's points below this height (what a robe hides)."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < z], context="VERTS")
+    bm.to_mesh(obj.data)
+    bm.free()

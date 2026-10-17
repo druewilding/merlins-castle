@@ -6,15 +6,16 @@ each one and unzip it into a folder of that name here. The game itself only
 needs the `.glb` files already built into `src/three/models/`, so you only need
 the packs to rebuild those.
 
-| Folder                          | Pack                                                                                                    | Used for                             |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `ultimate-nature`               | [Ultimate Nature](https://quaternius.com/packs/ultimatenature.html) (the Blender files)                 | Trees, in `land.py` (from `Blends/`) |
-| `universal-base-characters`     | [Universal Base Characters](https://quaternius.com/packs/universalbasecharacters.html)                  | Heads and hair, in `merlin.py`       |
-| `modular-character-outfits`     | [Modular Character Outfits – Fantasy](https://quaternius.com/packs/modularcharacteroutfitsfantasy.html) | Outfits, in `merlin.py`              |
-| `universal-animation-library-1` | [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html)              | Animations, in `merlin.py`           |
-| `universal-animation-library-2` | [Universal Animation Library 2](https://quaternius.com/packs/universalanimationlibrary2.html)           | Animations, in `merlin.py`           |
-| `fantasy-props-megakit`         | [Fantasy Props MegaKit](https://quaternius.com/packs/fantasypropsmegakit.html)                          | Furniture, in `land.py`              |
-| `medieval-village-megakit`      | [Medieval Village MegaKit](https://quaternius.com/packs/medievalvillagemegakit.html)                    | (None used yet)                      |
+| Folder                          | Pack                                                                                                    | Used for                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `ultimate-nature`               | [Ultimate Nature](https://quaternius.com/packs/ultimatenature.html) (the Blender files)                 | Trees, in `land.py` (from `Blends/`)                     |
+| `universal-base-characters`     | [Universal Base Characters](https://quaternius.com/packs/universalbasecharacters.html)                  | Heads and hair, in `merlin.py`, `witches.py`             |
+| `modular-character-outfits`     | [Modular Character Outfits – Fantasy](https://quaternius.com/packs/modularcharacteroutfitsfantasy.html) | Outfits, in `merlin.py`, `witches.py`                    |
+| `universal-animation-library-1` | [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html)              | Animations, in `merlin.py`, `witches.py`                 |
+| `universal-animation-library-2` | [Universal Animation Library 2](https://quaternius.com/packs/universalanimationlibrary2.html)           | Animations, in `merlin.py`, `witches.py`                 |
+| `fantasy-props-megakit`         | [Fantasy Props MegaKit](https://quaternius.com/packs/fantasypropsmegakit.html)                          | Furniture, in `land.py`                                  |
+| `medieval-village-megakit`      | [Medieval Village MegaKit](https://quaternius.com/packs/medievalvillagemegakit.html)                    | (None used yet)                                          |
+| `ultimate-monsters`             | [Ultimate Monsters](https://quaternius.com/packs/ultimatemonsters.html) (the Blender files)             | The rabbits, in `rabbits.py` (from `Blends/Bunny.blend`) |
 
 The free (Standard) version of each is enough. Keep the folders inside each
 pack as they come: the scripts read files such as

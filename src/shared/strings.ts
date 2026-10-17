@@ -120,6 +120,9 @@ const en = {
   backTt: "back",
   pageOfTt: (page: number, pages: number) => `page ${page} of ${pages}`,
   todaysScores: "Today's scores",
+
+  // The 3D version's sign in the forest, a line on each of its planks.
+  witchesSign: ["Beware", "of witches!"],
 };
 
 export type Strings = typeof en;
@@ -233,6 +236,8 @@ const da: Strings = {
   backTt: "tilbage",
   pageOfTt: (page, pages) => `side ${page} af ${pages}`,
   todaysScores: "Dagens point",
+
+  witchesSign: ["Pas på", "hekse!"],
 };
 
 export const LANGUAGE = getLanguage();
