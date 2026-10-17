@@ -14,6 +14,7 @@ import {
   RepeatWrapping,
   SRGBColorSpace,
   TextureLoader,
+  Vector2,
   type WebGLRenderer,
 } from "three";
 
@@ -24,6 +25,8 @@ import stoneNormalUrl from "./textures/stone-normal.jpg?url";
 
 const WALL_REPEAT = 2.4; // metres, across the stone once, on the walls
 const FLOOR_REPEAT = 3.6; // (and across the paving)
+// (The kit's normal maps have green pointing down, not up as three.js reads them.)
+const UPRIGHT = new Vector2(1, -1);
 
 /** The stone on the maze's walls and floor (in land.glb: "maze" and "maze-floor"). */
 export function dressMaze(land: Object3D, renderer: WebGLRenderer) {
@@ -44,6 +47,7 @@ export function dressMaze(land: Object3D, renderer: WebGLRenderer) {
       color: new Color(1.5, 1.45, 1.35), // (the kit's stone is dark, for a sunny mountain top)
       map: stone,
       normalMap: normal,
+      normalScale: UPRIGHT,
       roughness: 0.9,
     });
   }
@@ -55,6 +59,7 @@ export function dressMaze(land: Object3D, renderer: WebGLRenderer) {
       color: new Color(1.5, 1.32, 1.02), // (warmer, sunlit)
       map: paving,
       normalMap: pavingNormal,
+      normalScale: UPRIGHT,
       roughness: 0.95,
     });
     floor.castShadow = false;
