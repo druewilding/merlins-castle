@@ -1071,8 +1071,9 @@ def solid_box(x, y, half_x, half_y):
     boxes.append([round(x, 2), round(-y, 2), round(half_x, 2), round(half_y, 2)])
 
 
-def solid_circle(x, y, r):
-    circles.append([round(x, 2), round(-y, 2), round(r, 2)])
+def solid_circle(x, y, r, top=None):
+    """Solid, up from the ground (or to a top you can stand on)."""
+    circles.append([round(x, 2), round(-y, 2), round(r, 2)] + ([round(top, 2)] if top is not None else []))
 
 
 def block(builder, x0, y0, z0, x1, y1, z1, colour, solid=True):
@@ -3693,8 +3694,9 @@ rocks.build("rocks", smooth=True)
 # The evergreen glade's "red spotted toadstools growing in a ring": on the
 # grass north of the path, as in its picture, big and small, here and there
 # two or three together. Quaternius's (Ultimate Crops, art/models/), their
-# caps already spotted, made a brighter red. Not solid: you can walk through
-# the ring, over them.
+# caps already spotted, made a brighter red. Solid (nothing can be dropped
+# into them), but you can step up onto the little ones, and jump onto the
+# big ones.
 CROPS = HERE.parent / "models/ultimate-crops/Blends"
 TOADSTOOL_COLOURS = {"Red": c.linear("#c7261c"), "Mushroom1": c.linear("#efe6d2")}
 RING = (P["evergreen-glade"][0] + 1.5, P["evergreen-glade"][1] + 6.0, 3.4)  # its middle, and how far round
@@ -3732,8 +3734,11 @@ for n in range(SPOTS):
         x, y = RING[0] + math.cos(a + k * 0.05) * r, RING[1] + math.sin(a + k * 0.05) * r
         assert out_on_the_path(x, y) > 1.4, (x, y)  # (on the grass, clear of the path)
         size = here.randrange(4) if not k else here.randrange(2)
-        stamp(f"toadstool-{size}", toadstool(KINDS_OF_TOADSTOOL[size], TOADSTOOL_TALL[size]),
-              (x, y, drawn_height(x, y) - 0.03), here.uniform(0, 2 * math.pi), solid=False)
+        z = drawn_height(x, y) - 0.03
+        stamp(f"toadstool-{size}", toadstool(KINDS_OF_TOADSTOOL[size], TOADSTOOL_TALL[size]), (x, y, z),
+              here.uniform(0, 2 * math.pi), solid=False)
+        (_, _, wide, _), tall = prop_kinds[f"toadstool-{size}"]
+        solid_circle(x, y, wide * 0.9, top=z + tall)
 
 # ---------------------------------------------------------------- what grows where
 
