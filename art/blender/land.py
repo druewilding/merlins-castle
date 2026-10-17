@@ -2240,14 +2240,68 @@ while stack:
     seen.add((ni, nj))
     stack.append((ni, nj))
 mx0, my0 = MZ[0] - MAZE_HALF, MZ[1] - MAZE_HALF
-MAZE_STONE = c.linear("#8d8a74")
+
+# What it looks like: the kit's stone (the game puts its texture on, by
+# where each face is: maze.ts), only shaded here, mossy at its foot, and
+# ivy hanging down from its tops, here and there. Its floor, flagstones
+# (the texture again), just over the ground.
+MAZE_THICK, MAZE_TALL = 0.35, 2.9  # half its thickness, and its height over the ground
+MAZE_MOSS = c.linear("#9fae7a")
+MAZE_LIGHT = c.linear("#ffffff")
+maze = c.Builder()
+maze_floor = c.Builder()
+runs = []  # (along x?, the line it's on, from, to), in cells
 
 
 def maze_wall(x0, y0, x1, y1):
-    x0, x1 = min(x0, x1) - 0.3, max(x0, x1) + 0.3
-    y0, y1 = min(y0, y1) - 0.3, max(y0, y1) + 0.3
-    base = height((x0 + x1) / 2, (y0 + y1) / 2)
-    block(built, x0, y0, base - 0.6, x1, y1, base + 2.8, MAZE_STONE)
+    if y0 == y1:
+        runs.append((True, round((y0 - my0) / MAZE_CELL), round((min(x0, x1) - mx0) / MAZE_CELL),
+                     round((max(x0, x1) - mx0) / MAZE_CELL)))
+    else:
+        runs.append((False, round((x0 - mx0) / MAZE_CELL), round((min(y0, y1) - my0) / MAZE_CELL),
+                     round((max(y0, y1) - my0) / MAZE_CELL)))
+
+
+def maze_run(along_x, line, a, b):
+    """One straight stretch of wall, from cell a to cell b along its line."""
+    lo, hi = a * MAZE_CELL - MAZE_THICK, b * MAZE_CELL + MAZE_THICK
+    at = line * MAZE_CELL
+    if along_x:
+        x0, x1, y0, y1 = mx0 + lo, mx0 + hi, my0 + at - MAZE_THICK, my0 + at + MAZE_THICK
+    else:
+        x0, x1, y0, y1 = mx0 + at - MAZE_THICK, mx0 + at + MAZE_THICK, my0 + lo, my0 + hi
+    grounds = [height(x0 + (x1 - x0) * k / 8, y0 + (y1 - y0) * k / 8) for k in range(9)]
+    # (Those along x a hair taller, so where two meet their tops don't fight.)
+    z0, z1 = min(grounds) - 0.6, max(grounds) + MAZE_TALL + (0.02 if along_x else 0)
+    v = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
+    shade = [c.mix(MAZE_LIGHT, MAZE_MOSS, 0.6 if k < 4 else 0.0) for k in range(8)]
+    maze.add(v, [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7)], shade)
+    solid_box((x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2)
+    # Ivy, hanging down from its top, here and there, either side.
+    length = hi - lo
+    for side in (1, -1):
+        t = maze_rng.uniform(0.5, 4)
+        while t < length - 0.8:
+            wide, drop = maze_rng.uniform(0.8, 2.2), maze_rng.uniform(0.8, 2.6)
+            for _ in range(int(wide * drop * 40)):
+                u = maze_rng.uniform(-1, 1)
+                reach = drop * (1 - 0.6 * u * u) * maze_rng.uniform(0.55, 1.0)
+                down = reach * maze_rng.random() ** 1.4
+                lt = min(max(lo + t + u * wide / 2, lo + 0.05), hi - 0.05)
+                size, spin = maze_rng.uniform(0.12, 0.2), maze_rng.uniform(0, 2 * math.pi)
+                out = MAZE_THICK + maze_rng.uniform(0.01, 0.06)
+                if along_x:
+                    cx, cy, d, n = mx0 + lt, my0 + at + out * side, (1, 0), (0, side)
+                else:
+                    cx, cy, d, n = mx0 + at + out * side, my0 + lt, (0, 1), (side, 0)
+                cz = z1 + 0.1 - down
+                corners = []
+                for ang, r in ((0, 1.0), (math.pi / 2, 0.6), (math.pi, 0.5), (3 * math.pi / 2, 0.6)):
+                    along_, up_ = math.cos(spin + ang) * size * r, math.sin(spin + ang) * size * r
+                    corners.append((cx + d[0] * along_, cy + d[1] * along_, cz + up_))
+                leaf = c.mix(*IVY, maze_rng.random())
+                facing(built, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf], (*n, 0))
+            t += wide + maze_rng.uniform(3, 9)
 
 
 gap = n // 2  # the openings, in the middle of every side
@@ -2265,6 +2319,38 @@ for i in range(n):
             maze_wall(x + MAZE_CELL, y, x + MAZE_CELL, y + MAZE_CELL)
         if j < n - 1 and north_wall[i][j]:
             maze_wall(x, y + MAZE_CELL, x + MAZE_CELL, y + MAZE_CELL)
+# The walls, joined into long straight runs.
+for along_x in (True, False):
+    lines = {}
+    for ax, line, a, b in runs:
+        if ax == along_x:
+            lines.setdefault(line, []).append((a, b))
+    for line, pieces in sorted(lines.items()):
+        pieces.sort()
+        a, b = pieces[0]
+        for pa, pb in pieces[1:]:
+            if pa == b:
+                b = pb
+            else:
+                maze_run(along_x, line, a, b)
+                a, b = pa, pb
+        maze_run(along_x, line, a, b)
+maze.build("maze", smooth=False)
+# Its floor, a little over the ground (and the tunnels' stone lips): on the ground's own grid (and split
+# the way it is), so the ground never comes up through it.
+def maze_lines(lo, hi, origin):
+    k = math.floor((lo - origin) / STEP) + 1
+    inside = [origin + i * STEP for i in range(k, math.ceil((hi - origin) / STEP))]
+    return [lo] + [v for v in inside if lo < v < hi] + [hi]
+
+
+xs, ys = maze_lines(mx0, mx0 + 2 * MAZE_HALF, X0), maze_lines(my0, my0 + 2 * MAZE_HALF, Y0)
+for i in range(len(xs) - 1):
+    for j in range(len(ys) - 1):
+        pts = [(xs[i], ys[j]), (xs[i + 1], ys[j]), (xs[i + 1], ys[j + 1]), (xs[i], ys[j + 1])]
+        maze_floor.add([(x, y, drawn_height(x, y, exactly=True) + 0.14) for x, y in pts], [(0, 1, 2), (0, 2, 3)],
+                       [MAZE_LIGHT] * 4)
+maze_floor.build("maze-floor", smooth=True)
 # Where the river goes under (clear of the beautiful chamber, down below).
 built.blob((RIVER[-1][0] + 5, RIVER[-1][1] + 3, -1.5), 9, ROCK, squash=0.7, lumpy=0.3, seed=4)
 
@@ -3994,6 +4080,8 @@ def growth(x, y):
         return 0
     if CASTLE[0] - 1 <= x <= CASTLE[1] + 1 and CASTLE[2] - 1 <= y <= CASTLE[3] + 1:
         return 0
+    if abs(x - MZ[0]) <= MAZE_HALF + 0.4 and abs(y - MZ[1]) <= MAZE_HALF + 0.4:
+        return 0  # (nor up through the maze's floor)
     river = from_river(x, y)
     if river < BANK + 0.6 or open_to_the_sky(x, y, 1.0) is not None or over_an_opening(x, y):
         return 0
