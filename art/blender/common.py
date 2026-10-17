@@ -207,18 +207,23 @@ class Kit:
             uvs = mesh.uv_layers.active.data if mesh.uv_layers.active else None
             tints = mesh.color_attributes.active_color
             turn = obj.matrix_world.to_3x3()
+            # Metal laid over wood, as straps and hinges, is only a millimetre
+            # or two proud of it: lifted clear, or the two flicker, one through
+            # the other, once land.glb rounds where they are. Only on what's
+            # mostly not metal (a table's straps, not a candle stand's legs,
+            # too thin to swell), and each corner along its own normal, so the
+            # fitting's faces stay joined.
+            metal = [poly for poly in mesh.polygons if "Metal" in (names[poly.material_index] if names else "")]
+            fitted = 0 < len(metal) < len(mesh.polygons) / 2
+            lifted = {v for poly in metal for v in poly.vertices} if fitted else set()
             for poly in mesh.polygons:
                 texture = textures[poly.material_index] if textures else None
-                # (Metal laid over wood, as straps and hinges, only a millimetre or
-                # two proud of it: lifted clear, or the two flicker, one through
-                # the other, once land.glb rounds where they are.)
-                material = names[poly.material_index] if names else ""
-                fitting = "Metal" in material and len(set(names)) > 1
-                lift = (turn @ poly.normal).normalized() * PROUD if fitting else Vector()
                 pts, colours = [], []
                 for li, vi in zip(poly.loop_indices, poly.vertices):
                     p = obj.matrix_world @ mesh.vertices[vi].co
-                    pts.append(tuple(p + lift))
+                    if vi in lifted:
+                        p = p + (turn @ mesh.vertices[vi].normal).normalized() * PROUD
+                    pts.append(tuple(p))
                     colour = [1.0, 1.0, 1.0]
                     if texture is not None and uvs:
                         u, v = uvs[li].uv

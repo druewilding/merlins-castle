@@ -2908,7 +2908,7 @@ def lair(b, hall):
         """Candlesticks, lit: to make, for stamp."""
 
         def make(t):
-            made = PROPS.put(t, name, (0, 0, 0), 0, scale, 0.3)
+            made = PROPS.put(t, name, (0, 0, 0), 0, scale)  # (in full: made simpler, their thin stems break up)
             for x, y, z in PROPS.tips(name):
                 flame(t, x * scale, y * scale, z * scale, 0.06 * scale)
             return made
