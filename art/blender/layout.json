@@ -61,14 +61,11 @@
       "dragon-cave"
     ]
   },
-  "lost": {
-    "_": "Where you get lost: the exit that leads there, and where its mist is",
+  "clues": {
+    "_": "Where the forest's dead ends are: the exit that leads there, and where its path ends (a trail goes on from there to old stones, with the clue among them; underground, the clues are at the tunnels' dead ends)",
     "forest-crossroads west": [-1, 6],
     "forest-witches north": [1, 5.35],
-    "forest-witches south": [1, 7],
-    "dark-tunnels west": [5, 5],
-    "dark-tunnels east": [7, 5],
-    "giant east": [5, 1]
+    "forest-witches south": [1, 7]
   },
   "deaths": {
     "_": "Ways through that kill you",

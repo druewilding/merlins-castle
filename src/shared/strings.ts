@@ -123,6 +123,9 @@ const en = {
 
   // The 3D version's sign in the forest, a line on each of its planks.
   witchesSign: ["Beware", "of witches!"],
+  // Looking at a clue's note; and, unrolled, how to roll it up again.
+  readNote: "Read the note",
+  rollUp: "to roll it up",
 };
 
 export type Strings = typeof en;
@@ -238,6 +241,8 @@ const da: Strings = {
   todaysScores: "Dagens point",
 
   witchesSign: ["Pas på", "hekse!"],
+  readNote: "Læs sedlen",
+  rollUp: "for at rulle den sammen",
 };
 
 export const LANGUAGE = getLanguage();

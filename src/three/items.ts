@@ -3,10 +3,11 @@
 // with E when you're not looking at one (or a click) and dropped with G. The engine stays the judge (PLAN-V3.md):
 // these are its `take`, `use` and `drop`, and what it says decides what
 // happens. An object in use (opening a way out of the place) has a tick.
+// Looking at a clue's note instead, E reads it (notes.ts).
 //
 // Only objects with a model (art/blender/items.py) are in the world so far.
 
-import { Box3, Matrix4, type Object3D, Ray, type Scene, Vector3 } from "three";
+import { Box3, Matrix4, type Mesh, type Object3D, Ray, type Scene, Vector3 } from "three";
 
 import { act, effects, newGame } from "../engine/engine";
 import { type Direction, EXIT_ORDER, type GameState, type ItemId, type RoomId, type World } from "../engine/types";
@@ -188,6 +189,9 @@ export function items(options: {
   begin?: { state: GameState; three?: ThreeSave };
   /** Where an object always starts in a place, rather than anywhere in it (the emerald, in the tower's chest): [x, z, floor]. */
   starts?: Partial<Record<ItemId, { room: RoomId; at: [number, number, number] }>>;
+  /** The clues' notes (notes.ts): looked at, E reads one (its number). */
+  notes?: Mesh[];
+  read?: (k: number) => void;
   reducedMotion: boolean;
 }): Items {
   const { world, scene, player, models, ground, walkable, root, say, sound, changed, stays, begin } = options;
@@ -199,6 +203,9 @@ export function items(options: {
   const carrying = () => slots.some(Boolean);
   const free = () => slots.findIndex((id) => !id); // (there's always one: you can only take five)
   let aimed: ItemId | undefined;
+  let reading: number | undefined; // (or the note you're looking at)
+  const notes = options.notes ?? [];
+  for (const note of notes) note.geometry.computeBoundingBox();
   const eye = new Vector3(); // where you're looking from, and which way
   const look = new Vector3();
 
@@ -676,9 +683,10 @@ export function items(options: {
       held = Number(event.code.slice(5)) - 1;
       draw();
     } else if (player.busy) return;
-    // E takes what you're looking at, or else uses what's in your hand.
+    // E takes what you're looking at (or reads it), or else uses what's in your hand.
     else if (event.code === "KeyE") {
-      if (aimed) take(aimed);
+      if (reading !== undefined) options.read?.(reading);
+      else if (aimed) take(aimed);
       else use();
     } else if (event.code === "KeyG") drop();
   });
@@ -749,6 +757,34 @@ export function items(options: {
   const on = new Vector3();
   const inverse = new Matrix4();
   const hit = new Vector3();
+  const front = new Vector3();
+
+  /**
+   * How near your gaze comes to something (its box, square to it: 0 if it
+   * hits it), and how far off: or nothing, out of reach, or from the far
+   * side of a wall from [x, z] (where it's seen from).
+   */
+  function gaze(model: Object3D, box: Box3, x: number, z: number) {
+    // (Your gaze, as the object sees it: then its box is square to it.)
+    model.updateMatrixWorld();
+    mine.copy(ray).applyMatrix4(inverse.copy(model.matrixWorld).invert());
+    const room = roomy.copy(box).expandByScalar(AIM_SLACK);
+    if (!mine.intersectBox(room, hit)) return undefined;
+    // On through the room round it, how near it comes to it (0: it hits it).
+    // (From where it comes into that room, or from your eye if you're in it.)
+    const from = room.containsPoint(mine.origin) ? 0 : mine.origin.distanceTo(hit);
+    let miss = Infinity;
+    let at = 0;
+    for (let s = 0; s < 8 && miss > 0; s += 0.02) {
+      mine.at(from + s, on);
+      if (s > 0 && !room.containsPoint(on)) break;
+      const m = box.distanceToPoint(on);
+      if (m < miss) [miss, at] = [m, s];
+    }
+    const d = from + at;
+    if (d > REACH || !player.between(eye.x, eye.z, x, z, Boolean(player.under))) return undefined;
+    return { miss, d };
+  }
 
   return {
     get state() {
@@ -804,46 +840,41 @@ export function items(options: {
       // each). Not just the first room round something it comes to: lying
       // side by side, the room round one would cover the next.
       aimed = undefined;
+      reading = undefined;
       let best = { miss: AIM_SLACK, d: REACH };
+      // (Is it nearer your gaze than the best so far?)
+      const better = (gazed: { miss: number; d: number } | undefined) =>
+        gazed &&
+        (gazed.miss < best.miss - 0.01 || (Math.abs(gazed.miss - best.miss) <= 0.01 && gazed.d < best.d)) &&
+        (best = gazed);
       for (const [id, thing] of lying) {
         // (Not through a wall: what's in a hall or a room only from in it,
         // and from in one only what's in it.)
         if (hallOf(thing) !== player.under?.hall) continue;
-        // (Your gaze, as the object sees it: then its box is square to it.)
-        thing.model.updateMatrixWorld();
-        mine.copy(ray).applyMatrix4(inverse.copy(thing.model.matrixWorld).invert());
-        const room = roomy.copy(thing.box).expandByScalar(AIM_SLACK);
-        if (!mine.intersectBox(room, hit)) continue;
-        // On through the room round it, how near it comes to it (0: it hits it).
-        // (From where it comes into that room, or from your eye if you're in it.)
-        const from = room.containsPoint(mine.origin) ? 0 : mine.origin.distanceTo(hit);
-        let miss = Infinity;
-        let at = 0;
-        for (let s = 0; s < 8 && miss > 0; s += 0.02) {
-          mine.at(from + s, on);
-          if (s > 0 && !room.containsPoint(on)) break;
-          const m = thing.box.distanceToPoint(on);
-          if (m < miss) [miss, at] = [m, s];
-        }
-        const d = from + at;
-        if (d > REACH) continue;
         // (Nor through anything solid: from the far side of a wall.)
         const { x, z } = thing.model.position;
-        if (!player.between(eye.x, eye.z, x, z, Boolean(player.under))) continue;
-        if (miss < best.miss - 0.01 || (Math.abs(miss - best.miss) <= 0.01 && d < best.d)) {
-          best = { miss, d };
-          aimed = id;
-        }
+        if (better(gaze(thing.model, thing.box, x, z))) aimed = id;
       }
+      // And the notes (from their side of a wall: in front of them, along
+      // the way, in the dead end of a tunnel).
+      notes.forEach((note, k) => {
+        if (player.under?.hall) return;
+        front.set(0, 0, 1).applyQuaternion(note.quaternion).add(note.position);
+        if (better(gaze(note, note.geometry.boundingBox!, front.x, front.z))) {
+          aimed = undefined;
+          reading = k;
+        }
+      });
       nudge();
       glow.show(aimed ? lying.get(aimed)?.model : hopper());
       glow.update(performance.now() / 1000);
-      aim.classList.toggle("on", Boolean(aimed));
-      prompt.classList.toggle("shown", Boolean(aimed));
-      if (aimed) {
+      const pointing = Boolean(aimed) || reading !== undefined;
+      aim.classList.toggle("on", pointing);
+      prompt.classList.toggle("shown", pointing);
+      if (pointing) {
         const key = document.createElement("kbd");
         key.textContent = "E";
-        prompt.replaceChildren(key, ` ${T.take(the(aimed))}`);
+        prompt.replaceChildren(key, ` ${aimed ? T.take(the(aimed)) : T.readNote}`);
       }
     },
   };

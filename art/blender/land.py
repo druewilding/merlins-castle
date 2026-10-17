@@ -48,14 +48,15 @@ def at(col_row):
 
 P = {place: at(cr) for place, cr in layout["places"].items()}
 KIND = {place: kind for kind, places in layout["kinds"].items() if kind != "_" for place in places}
-# The mist above ground clears the forest round it (underground, it's in a tunnel).
-LOST = {k: at(v) for k, v in layout["lost"].items() if k != "_" and KIND.get(k.split(" ")[0]) != "cave"}
+# The forest's dead ends, where a path comes into a clearing and goes on as a
+# trail, into the trees, to old stones, with a clue on a post among them
+# (each clears the forest round it, on the side you come from). Underground,
+# the clues are at the tunnels' dead ends (a Way's `clue`).
+CLUES = {k: at(v) for k, v in layout["clues"].items() if k != "_"}
 DEATHS = {k: at(v) for k, v in layout["deaths"].items() if k != "_"}
 
 X0, X1, Y0, Y1 = (round(v * K) for v in (-200, 200, -290, 260))  # (north, past the mountain, for its far side)
 STEP = 2.0
-INTO_THE_DARK = 8  # metres of tunnel past a dead end's last step, fading to black
-BLACK = (0.0, 0.0, 0.0, 1.0)
 
 GRASS = c.linear("#7c9f3a")  # (as the grass on it looks, from a little way off: plants.ts)
 BUTTERCUPS = c.linear("#a8a83a")  # and where the yellow flowers grow thick
@@ -278,11 +279,11 @@ for place, room in world["rooms"].items():
             paths.append(shape or [P[place], P[to]])
         else:
             paths.append(windy([P[place], P[to]], pair))
-# Into the mist, and to Merlin's trap.
-for key, spot in {**LOST, **DEATHS}.items():
+# To the brambles, and to Merlin's trap.
+for key, spot in {**CLUES, **DEATHS}.items():
     place = key.split(" ")[0]
     if KIND.get(place) != "cave" and key != "mossy-steps east":
-        paths.append(windy([P[place], spot], key) if key in LOST else [P[place], spot])
+        paths.append(windy([P[place], spot], key) if key in CLUES else [P[place], spot])
 
 # Up to the lamp tunnel's mouths: in the rocky bank west of the old wall, and
 # down the steps south of the cave entrance.
@@ -303,18 +304,18 @@ path_lines = Lines()
 for line in paths:
     path_lines.add(line)
 
-# Past each mist above ground, a trail on into the trees, wandering, as if it
-# led somewhere: to a glimpse of something old in a sunlit gap (standing
-# stones, a ruined arch). Only to look at: you'd be lost before you got
-# there, and coming by the mist another way (round the moat), it's no way
-# on. (Its kind, how far it goes past the mist's middle, and how far it
-# turns off straight on: south of the witches, away from the moat's bank.)
+# From each dead end's clearing, a trail goes on into the trees, wandering,
+# little trodden, to something old in a sunlit gap (standing stones, a
+# ruined arch), where the clue is hidden among the stones. (Its kind, how far
+# it goes past the path's end, and how far it turns off straight on: south
+# of the witches, away from the moat's bank.)
 LURE_KINDS = {"forest-crossroads west": ("ring", 20, 0), "forest-witches north": ("ruined arch", 10, 0),
               "forest-witches south": ("stones", 16, -0.7)}
 GAP = 4.5  # the sunlit gap round what's there
-LURES = {}  # each mist's way in: the trail [(x, y)], and where it ends
+TRAIL_WALK = 1.5  # how far either side of a trail's middle you can walk
+LURES = {}  # each dead end's trail on: [(x, y)], and where it ends
 trails = Lines()
-for key, spot in LOST.items():
+for key, spot in CLUES.items():
     px, py = P[key.split(" ")[0]]
     ax, ay = spot[0] - px, spot[1] - py
     run = math.hypot(ax, ay)
@@ -328,7 +329,7 @@ for key, spot in LOST.items():
 
 
 def on_a_lure(x, y):
-    """Along a trail past a mist, or in the gap at its end."""
+    """Along a trail on from a dead end's clearing, or in the gap at its end."""
     return trails.distance(x, y) < 2.6 or any(math.hypot(x - t[-1][0], y - t[-1][1]) < GAP for t in LURES.values())
 
 # ---------------------------------------------------------------- ways underground
@@ -344,9 +345,10 @@ class Way:
     """A way underground: a line of points, each with its floor's height.
     A floor of None is the ground's height there: a mouth."""
 
-    def __init__(self, points, half=TUNNEL_HALF, indoor=False, open=False):
+    def __init__(self, points, half=TUNNEL_HALF, indoor=False, open=False, clue=None):
         self.points = points
         self.half = half
+        self.clue = clue  # (a dead end at its far end, with this clue: the exit that leads there)
         self.indoor = indoor  # a corridor in a building: walls and a roof all the way
         self.open = open  # (or just a floor, through an opening in a wall: no walls, roof or door frame of its own)
         self.segments = list(zip(points, points[1:]))
@@ -495,7 +497,7 @@ MAZE_CELLS, MAZE_CELL = 5, 4.4
 MAZE_HALF = MAZE_CELLS * MAZE_CELL / 2  # to the maze's outer wall
 
 # The long way from the dragon's cave up under the ridge into the giant's
-# cave, by its east side. Coming back the other way, you get lost.
+# cave, by its east side (and back down again).
 DRAGON_TUNNEL = Way([
     (*DC, 0.2),
     (DC[0], DC[1] + 9, 0.2),
@@ -534,13 +536,16 @@ WAYS = {
     "oak-treasure": Way([(*O, CAVE), (*TR, CAVE)]),
     "treasure-giant": Way([(*TR, CAVE), (*G, CAVE)]),
     "giant-damp": Way([(*G, CAVE), (*DM, CAVE)]),
+    # The giant's way east, north-east into the ridge, away from the long
+    # tunnel (and deep under it, so it comes out nowhere): a dead end.
+    "giant-east": Way([(*G, CAVE), (G[0] + 7, G[1] + 10, CAVE), (G[0] + 18, G[1] + 19, CAVE)], clue="giant east"),
     # Into the dragon's hill, past the leaves; and the dragon's way south,
     # down into the dark tunnels, which go on west, east and south.
     "dragon-mouth": Way([(*DRAGON_LIP, None), (DC[0] - 12, DC[1], 0.2), (*DC, 0.2)]),
     "dragon-giant": DRAGON_TUNNEL,
     "dragon-dark": Way([(*DC, 0.2), (DC[0], DC[1] - 10, 0.2), (DK[0], DK[1] + 8, -8), (*DK, -8)]),
-    "dark-west": Way([(*DK, -8), (DK[0] - 34, DK[1], -8)]),
-    "dark-east": Way([(*DK, -8), (DK[0] + 34, DK[1], -8)]),
+    "dark-west": Way([(*DK, -8), (DK[0] - 34, DK[1], -8)], clue="dark-tunnels west"),
+    "dark-east": Way([(*DK, -8), (DK[0] + 34, DK[1], -8)], clue="dark-tunnels east"),
     "dark-beautiful": Way([(*DK, -8), (DK[0], DK[1] - 10, -8), (BC[0], BC[1] + 12, -10), (*BC, -10)]),
     # The castle: in at the keep's door to the grand hall, and on: straight
     # through into the kitchen, east along the corridor and down the steps to
@@ -642,10 +647,10 @@ CLEARING = {"grassy-bank": 17, "deep-river": 15, "river-south-bank": 15}
 
 
 def clear_of_paths(x, y):
-    """0 near a path, a clearing or a mist, to 1 well away from them: where
+    """0 near a path, a clearing or a dead end, to 1 well away from them: where
     the mountain can be rougher, and no one will ever walk."""
     clear = min([path_lines.distance(x, y) - 5.5]
-                + [math.hypot(x - sx, y - sy) - 11 for sx, sy in LOST.values()]
+                + [math.hypot(x - sx, y - sy) - 11 for sx, sy in CLUES.values()]
                 + [math.hypot(x - px, y - py) - CLEARING.get(place, 12)
                    for place, (px, py) in P.items() if KIND.get(place) != "cave"])
     return smooth((clear - 4) / 12)
@@ -797,22 +802,28 @@ OPEN_ZONES = [(w * K, e * K, s * K, n * K) for w, e, s, n in [
 AXE_TREES = (-14, 14, 49 * K, 58 * K)  # the dense trees across the mountain path
 
 
-def beyond_the_mist(x, y):
-    """On the far side of a mist from the place you go into it from: forest
-    again (its clearing is only on the near side), so from beyond (across the
-    river from the old stone wall) you only glimpse it through the trees."""
-    for key, spot in LOST.items():
-        px, py = P[key.split(" ")[0]]
-        ax, ay = spot[0] - px, spot[1] - py
-        ahead = ((x - spot[0]) * ax + (y - spot[1]) * ay) / (math.hypot(ax, ay) or 1)
-        if math.hypot(x - spot[0], y - spot[1]) < 11 and ahead > 2:
-            return True
-    return False
+def ahead_of(key, x, y):
+    """How far on a point is past a dead end's spot, along the way you come
+    to it (and how far to the side: to your left, negative)."""
+    spot = CLUES[key]
+    px, py = P[key.split(" ")[0]]
+    ax, ay = spot[0] - px, spot[1] - py
+    run = math.hypot(ax, ay) or 1
+    ax, ay = ax / run, ay / run
+    return (x - spot[0]) * ax + (y - spot[1]) * ay, (x - spot[0]) * ay - (y - spot[1]) * ax
+
+
+def beyond_the_dead_end(x, y):
+    """On the far side of a dead end from the place you come to it from:
+    forest again (its clearing is only on the near side), so from beyond
+    (across the river from the old stone wall) you only glimpse it through
+    the trees."""
+    return any(math.hypot(x - spot[0], y - spot[1]) < 11 and ahead_of(key, x, y)[0] > 2 for key, spot in CLUES.items())
 
 
 def open_ground(x, y, lures=True):
     """Ground with no forest on it: round the places, along the paths and the
-    river, and round the mists (on the side you come into them from). And
+    river, and round the dead ends (on the side you come to them from). And
     (unless not) along the trails past them."""
     if lures and on_a_lure(x, y):
         return True
@@ -828,8 +839,8 @@ def open_ground(x, y, lures=True):
     # can walk round it.)
     if math.hypot((x - MOUND.x) / (9 * 1.35 + 3.5), (y - MOUND.y) / (6.5 * 1.35 + 3.5)) < 1:
         return True
-    for spot in LOST.values():
-        if math.hypot(x - spot[0], y - spot[1]) < 11 and not beyond_the_mist(x, y):
+    for spot in CLUES.values():
+        if math.hypot(x - spot[0], y - spot[1]) < 11 and not beyond_the_dead_end(x, y):
             return True
     return path_lines.distance(x, y) < 5.5 or from_river(x, y) < BANK or in_moat(x, y)
 
@@ -852,7 +863,10 @@ def walkable(x, y):
     floor = open_to_the_sky(x, y, 2.0)
     if floor is not None and floor < height(x, y) - 0.35:
         return False  # over the ramp: you go in at the top
-    # (Not along the trails past the mists: only to look at.)
+    # Along the trails to the old stones, and round them (under the trees'
+    # branches, in the middle: their trunks are off the trail).
+    if trails.distance(x, y) < TRAIL_WALK or any(math.hypot(x - t[-1][0], y - t[-1][1]) < GAP - 0.6 for t in LURES.values()):
+        return True
     return open_ground(x, y, lures=False) and not rocky(x, y) and not in_building(x, y) and not under_a_tree(x, y)
 
 
@@ -989,7 +1003,7 @@ def out_on_the_path(x, y):
     the edge of its dirt): wandering, and frayed."""
     half = HALF + WANDERS * noise.noise(Vector((x / 7, y / 7, 0.5)))
     fray = 0.13 * noise.noise(Vector((x / 1.2, y / 1.2, 4.0))) + 0.05 * noise.noise(Vector((x / 0.4, y / 0.4, 6.0)))
-    # (The trails past the mists narrower: less trodden. And at the narrows,
+    # (The trails past the brambles narrower: less trodden. And at the narrows,
     # going down to the water, it peters out into the grass of the bank,
     # raggedly: no one's trodden the last of it.)
     out = min(path_lines.distance(x, y), trails.distance(x, y) * 1.4) / half + fray
@@ -1695,7 +1709,48 @@ for run in ((WX, -18 * K, WX, WY + 0.6), (WW - 0.6, WY, GATE[0], WY), (GATE[1], 
 wall.build("old-stone-wall", smooth=False)
 
 
-# What's at the end of each trail past a mist: old stones, grey and mossy,
+# A clue at each dead end: a note, nailed to a rough board on a stake, the
+# board leaning back a little, to read. Its words are written on in the game
+# (notes.ts), in your language: here, only where they go (NOTES, in
+# land.json).
+NOTE_WOOD, NOTE_DARK = c.linear("#7d654b"), c.linear("#4f3f2e")
+NOTE_BOARD = (0.46, 0.38)  # across and up
+NOTE_PAPER = (0.34, 0.28)  # the note on it
+NOTE_UP = 1.15  # the board's middle, above the ground
+NOTE_LEAN = math.radians(10)
+NOTES = []  # each: the exit that leads to its clue, where its note's middle is [x, y, z], which way it faces [x, z]
+
+
+def note_post(builder, key, x, y, ground, facing, earth=DIRT_EDGE):
+    """A stake at [x, y] (standing on `ground`), its board facing `facing`
+    (a unit [x, y]), with the note for the clue the exit `key` leads to."""
+    fx, fy = facing
+    rng = random.Random(f"note {key}")
+    builder.cylinder((x, y, ground - 0.3), (x, y, ground + NOTE_UP + 0.3), 0.055, 0.045, NOTE_DARK, sides=6)
+    # Bedded in: a little heap of earth round its foot, and stones wedged in
+    # it (so it's plainly in the ground, its shadow or not).
+    builder.blob((x, y, ground - 0.04), 0.24, earth, squash=0.5, lumpy=0.3, seed=rng.random() * 100, subdivisions=1)
+    for k in range(4):
+        a = k * math.pi / 2 + rng.uniform(-0.5, 0.5)
+        builder.blob((x + math.cos(a) * 0.12, y + math.sin(a) * 0.12, ground + 0.01), rng.uniform(0.04, 0.065),
+                     c.vary(STONE, 0.15, Vector((x, y, k))), squash=0.7, lumpy=0.35, seed=rng.random() * 100, subdivisions=1)
+    across = Vector((-fy, fx, 0))  # (to your right, reading it)
+    up = Vector((-fx * math.sin(NOTE_LEAN), -fy * math.sin(NOTE_LEAN), math.cos(NOTE_LEAN)))
+    out = Vector((fx * math.cos(NOTE_LEAN), fy * math.cos(NOTE_LEAN), math.sin(NOTE_LEAN)))  # out of its face
+    middle = Vector((x, y, ground + NOTE_UP)) + Vector((fx, fy, 0)) * 0.075  # (in front of the stake)
+    w, h = NOTE_BOARD[0] / 2, NOTE_BOARD[1] / 2
+    # Its outline, roughly cut: each corner a little off.
+    ends = [(-w + rng.uniform(0, 0.03), -h + rng.uniform(0, 0.02)), (w - rng.uniform(0, 0.03), -h + rng.uniform(0, 0.02)),
+            (w - rng.uniform(0, 0.03), h - rng.uniform(0, 0.02)), (-w + rng.uniform(0, 0.03), h - rng.uniform(0, 0.02))]
+    face = [middle + across * u + up * v for u, v in ends]
+    back = [p - out * 0.03 for p in face]
+    builder.add([tuple(p) for p in face + back], [(0, 1, 2, 3), (7, 6, 5, 4)] + [(i, 4 + i, 4 + (i + 1) % 4, (i + 1) % 4) for i in range(4)],
+                [c.vary(NOTE_WOOD, 0.12, p * 4) for p in face + back])
+    paper = middle + out * 0.004
+    NOTES.append({"clue": key, "at": [round(paper.x, 3), round(paper.z, 3), round(-paper.y, 3)],
+                  "facing": [round(fx, 3), round(-fy, 3)], "lean": round(NOTE_LEAN, 4), "size": list(NOTE_PAPER)})
+
+# What's at the end of each trail past the brambles: old stones, grey and mossy,
 # standing in the sunlit gap. A ring of them; an arch, fallen in on one
 # side; or a few left standing.
 OLD_STONE = c.linear("#a5a196")
@@ -1791,7 +1846,15 @@ OLD_STONES = []  # (x, y, r): stones you can get to (nothing grows in them)
 lures = c.Builder()
 for key, trail in LURES.items():
     (ex, ey), (bx, by) = trail[-1], trail[-2]
-    old_stones(lures, LURE_KINDS[key][0], ex, ey, math.atan2(ey - by, ex - bx))
+    kind, yaw = LURE_KINDS[key][0], math.atan2(ey - by, ex - bx)
+    old_stones(lures, kind, ex, ey, yaw, solid=True)
+    # The clue among them, facing the way you come: in the middle (through
+    # the arch, just past it: further, by the witches, it's on the river's
+    # bank).
+    on = 0.8 if "arch" in kind else 0.0
+    post_x, post_y = ex + math.cos(yaw) * on, ey + math.sin(yaw) * on
+    note_post(built, key, post_x, post_y, height(post_x, post_y), (-math.cos(yaw), -math.sin(yaw)))
+    solid_circle(post_x, post_y, 0.15)
 # And some where you can get to them, so there's something to them: a ring
 # in the meadow, between the grassy bank and the old stone wall; an arch at
 # the forest's edge, to walk through; and a few among the yellow flowers.
@@ -1800,6 +1863,78 @@ VISITED = [("ring", (-38, 13), math.pi / 2), ("arch", (-30, -70), math.pi / 2), 
 for kind, (x, y), yaw in VISITED:
     old_stones(lures, kind, x, y, yaw, solid=True)
 lures.build("old-stones", smooth=False)
+
+# A few brambles round each of the forest's dead ends: either side of where
+# the trail goes on into the trees, and by the old stones. Mounds of leaves,
+# canes arching out of them, thorny and purple-red, with blackberries on them
+# (and a few still red), and here and there a white flower.
+BRAMBLE_LEAVES = [c.linear(h) for h in ("#4a6e2c", "#557a31", "#3f6128", "#5c7f36")]
+BRAMBLE_CANE = c.linear("#6d3b3f")
+BERRIES = [c.linear(h) for h in ("#1e1024", "#2c1433", "#4a1d3f", "#b0303a")]
+BRAMBLE_FLOWER = c.linear("#f1ece0")
+brambles = c.Builder()
+
+
+def bramble_cane(b, rng, x, y, z, yaw, reach, tall):
+    """A cane arching out of a mound at [x, y, z], towards yaw: up, over and
+    down again, `reach` metres out, with berries along it."""
+    dx, dy = math.cos(yaw), math.sin(yaw)
+    pts = [(x + dx * reach * t, y + dy * reach * t, z + tall * math.sin(math.pi * min(1.0, t * 0.85)) - 0.25 * t)
+           for t in (0, 0.25, 0.5, 0.75, 1.0)]
+    for k, (p, q) in enumerate(zip(pts, pts[1:])):
+        b.cylinder(p, q, 0.016 * (1 - k * 0.18), 0.016 * (1 - (k + 1) * 0.18), BRAMBLE_CANE, sides=4)
+    for p in pts[1:]:
+        if rng.random() < 0.7:
+            for n in range(rng.randint(1, 3)):
+                b.blob((p[0] + rng.uniform(-0.06, 0.06), p[1] + rng.uniform(-0.06, 0.06), p[2] - rng.uniform(0.02, 0.07)),
+                       0.024, rng.choice(BERRIES), subdivisions=1)
+
+
+def bramble(rng, x, y, size, squash):
+    """A mound of brambles at [x, y], `size` across (to its middle), and as
+    much taller or flatter as `squash` says: solid."""
+    tall = 2 * size * squash
+    z = height(x, y) - 0.15
+    brambles.blob((x, y, z + tall * 0.45), size, rng.choice(BRAMBLE_LEAVES), squash=squash, lumpy=0.22,
+                  seed=rng.random() * 100, subdivisions=2)
+    # Canes out of it, every which way.
+    for n in range(rng.randint(2, 4)):
+        bramble_cane(brambles, rng, x, y, z + tall * rng.uniform(0.5, 0.8), rng.uniform(0, 2 * math.pi),
+                     rng.uniform(0.6, 1.3), rng.uniform(0.25, 0.5))
+    # Berries in its leaves, and now and then a flower.
+    for n in range(rng.randint(4, 9)):
+        a, up = rng.uniform(0, 2 * math.pi), rng.uniform(0.2, 0.9)
+        r = size * 0.97 * math.sqrt(1 - up * up)
+        colour = BRAMBLE_FLOWER if rng.random() < 0.12 else rng.choice(BERRIES)
+        brambles.blob((x + math.cos(a) * r, y + math.sin(a) * r, z + tall * 0.45 + up * tall * 0.5),
+                      0.03 if colour is BRAMBLE_FLOWER else 0.025, colour, subdivisions=1)
+    solid_circle(x, y, size * 0.85)
+
+
+def thicket(key, spot):
+    """A dead end's few brambles: in its clearing, either side of the trail
+    on, and at the edge of the gap round its old stones (never on the way)."""
+    px, py = P[key.split(" ")[0]]
+    run = math.hypot(spot[0] - px, spot[1] - py)
+    dx, dy = (spot[0] - px) / run, (spot[1] - py) / run  # on, past the path's end
+    sx, sy = -dy, dx  # to the side
+    rng = random.Random(f"brambles {key}")
+    (ex, ey) = LURES[key][-1]
+    spots = [(spot[0] + dx * rng.uniform(-0.5, 1.8) + sx * side * rng.uniform(3.5, 8),
+              spot[1] + dy * rng.uniform(-0.5, 1.8) + sy * side * rng.uniform(3.5, 8))
+             for side in (1, -1) for _ in range(3)]
+    spots += [(ex + math.cos(a) * (GAP - 0.4), ey + math.sin(a) * (GAP - 0.4))
+              for a in (rng.uniform(0, 2 * math.pi) for _ in range(3))]
+    for x, y in spots:
+        size = rng.uniform(0.6, 0.9)
+        if trails.distance(x, y) < TRAIL_WALK + size + 0.5 or path_lines.distance(x, y) < 3 + size:
+            continue
+        bramble(rng, x, y, size, rng.uniform(0.62, 0.85))
+
+
+for key, spot in CLUES.items():
+    thicket(key, spot)
+brambles.build("brambles", smooth=False)
 
 def porch(x, y_wall, y_lip, half, colour):
     """Where a building's doorway sticks out of its wall (to the lip, where
@@ -2336,6 +2471,8 @@ DROPS = []  # (cave, and the two sides of where a way drops away out of it)
 VAULT = [(-1, -0.1), (-1, 0.6), (-1, 1.3), (-1, 2.0), (-0.96, 2.45), (-0.8, 2.82), (-0.45, 3.08), (0, TUNNEL_TALL)]
 VAULT += [(-u, h) for u, h in reversed(VAULT[:-1])]
 SPRING = 2.3  # where the roof springs from the walls (the middle of its curve)
+DOME_RINGS, DOME_DEEP = 5, 1.5  # a dead end's dome: rings of rock, and how far on it's dug
+NOTE_IN = 0.75  # its clue's post, on in the dome
 PROP_EVERY = 8  # rows (half a metre each) between the timber props
 PROP_TALL = 2.95  # up to its beam: over your head even jumping (its ends go into the rock)
 TIMBER = c.linear("#4a3420")
@@ -2449,6 +2586,11 @@ for way in WAYS.values():
 
     # The stretches dug through rock (under cover, underground).
     rocky_ = [not way.indoor and a[5] and b[5] and drawn(a, b) for a, b in zip(rows, rows[1:])]
+    # Its dead ends, deep under the land: where it stops in the rock, not in
+    # a hall or out at a mouth (each end's row, and which way is on past it).
+    dead_ends = [(i, outward) for i, outward in ((0, -1), (len(rows) - 1, 1))
+                 if not way.indoor and rows[i][5] and not in_a_hall(*rows[i][:3], 1.3)]
+    dead_rows = {i for i, _ in dead_ends}
     rubble = random.Random(f"rubble {way.points[0]}")
     for k, (a, b) in enumerate(zip(rows, rows[1:])):
         mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
@@ -2500,8 +2642,8 @@ for way in WAYS.values():
             # (The door frames and lintels stand a shade out from it, or the
             # two would flicker against each other.)
             for row, pts_, ends in ((a, pa, k == 0 or not rocky_[k - 1]), (b, pb, k == len(rocky_) - 1 or not rocky_[k + 1])):
-                if not ends:
-                    continue
+                if not ends or (row is a and k in dead_rows) or (row is b and k + 1 in dead_rows):
+                    continue  # (a dead end: the rock closes round it, below)
                 square = [(*side(row, u * half), row[2] + (h if h <= SPRING else TUNNEL_TALL)) for u, h in VAULT]
                 for i in range(len(VAULT) - 1):
                     quad(tunnel, [pts_[i], pts_[i + 1], square[i + 1], square[i]], rock_colour(*pts_[i]), 0.1)
@@ -2646,25 +2788,45 @@ for way in WAYS.values():
                 on = rows[min(max(k + 1 + step * 4, 0), len(rows) - 1)]  # 2 m on
                 if on[2] < hall.floor - 0.5:
                     DROPS.append((hall, edge_left[k + 1], edge_right[k + 1]))
-    # A dead end, deep under the land (off into the mist): more tunnel,
-    # darker and darker as it goes on, into black (so it doesn't look like
-    # an end), and black across the end of it.
-    for row, edges, outward in ((rows[0], (edge_left[0], edge_right[0]), -1), (rows[-1], (edge_left[-1], edge_right[-1]), 1)):
-        x, y, f, nx_, ny_, roofed = row
-        if way.indoor or not roofed or in_a_hall(x, y, f, 1.3):
-            continue
-        ox, oy = ny_ * outward, -nx_ * outward
-        (lx_, ly_), (rx_, ry_) = edges
-        for k in range(INTO_THE_DARK):
-            dark = ((k + 1) / INTO_THE_DARK) ** 0.6
-            el, er = (lx_ + ox, ly_ + oy), (rx_ + ox, ry_ + oy)
-            quad(tunnel, [(lx_, ly_, f), (rx_, ry_, f), (*er, f), (*el, f)], c.mix(floor_colour, BLACK, dark))
-            quad(tunnel, [(lx_, ly_, f + TUNNEL_TALL), (rx_, ry_, f + TUNNEL_TALL), (*er, f + TUNNEL_TALL),
-                          (*el, f + TUNNEL_TALL)], c.mix(roof_colour, BLACK, dark))
-            for p, q in (((lx_, ly_), el), ((rx_, ry_), er)):
-                quad(tunnel, [(*p, f), (*q, f), (*q, f + TUNNEL_TALL), (*p, f + TUNNEL_TALL)], c.mix(wall_colour, BLACK, dark))
-            (lx_, ly_), (rx_, ry_) = el, er
-        quad(tunnel, [(lx_, ly_, f), (rx_, ry_, f), (rx_, ry_, f + TUNNEL_TALL), (lx_, ly_, f + TUNNEL_TALL)], BLACK)
+    # A dead end, deep under the land: the rock closes round it, a rough
+    # half dome dug on a little past where you can walk (as if they'd given
+    # up digging there), with the floor going on under it. In it, on a post,
+    # the clue (note_post).
+    for i, outward in dead_ends:
+        row = rows[i]
+        x, y, f, nx_, ny_, _ = row
+        ox, oy = ny_ * outward, -nx_ * outward  # on, past the end
+        ring = [vault_point(row, u, h, half) for u, h in VAULT]
+        foot = (x, y, f - 0.1)  # (the middle of its floor, where the dome shrinks to)
+        rings = [ring]
+        for j in range(1, DOME_RINGS + 1):
+            s_ = 1 - j / DOME_RINGS
+            on = DOME_DEEP * math.sqrt(1 - s_ * s_)
+            next_ring = []
+            for px, py, pz in ring:
+                qx, qy, qz = foot[0] + (px - foot[0]) * s_, foot[1] + (py - foot[1]) * s_, foot[2] + (pz - foot[2]) * s_
+                # (Rough: pushed on, never back, by noise; but not at its foot, nor its back, where it all meets.)
+                bump = 0.3 * max(0.0, noise.noise(Vector((qx / 0.9, qy / 0.9, qz / 0.9))) + 0.2) * s_ * (1 - s_) * 4
+                next_ring.append((qx + ox * (on + bump), qy + oy * (on + bump), qz))
+            rings.append(next_ring)
+        for j in range(DOME_RINGS):
+            near, far = (rings[j], rings[j + 1]) if outward > 0 else (rings[j + 1], rings[j])
+            for k in range(len(VAULT) - 1):
+                face = [near[k], near[k + 1], far[k + 1], far[k]]
+                colour = rock_colour(*face[0][:2], face[0][2] - f)
+                if j == DOME_RINGS - 1:  # (at its back, where the ring's shrunk to a point: a triangle)
+                    tri = [p for n, p in enumerate(face) if p != face[n - 1]]
+                    tunnel.add(tri, [(0, 1, 2)], [c.vary(colour, 0.1, Vector(tri[0]))] * 3)
+                else:
+                    quad(tunnel, face, colour, 0.1)
+        # Its floor, out to the dome's foot all round.
+        feet = [(r[0][0], r[0][1], f) for r in rings] + [(r[-1][0], r[-1][1], f) for r in reversed(rings[:-1])]
+        (ax_, ay_, _), (bx_, by_, _), (cx_, cy_, _) = feet[0], feet[len(rings) - 1], feet[-1]
+        up = (bx_ - ax_) * (cy_ - ay_) - (by_ - ay_) * (cx_ - ax_) > 0  # (facing up)
+        tunnel.add(feet, [tuple(range(len(feet)))[::1 if up else -1]], [c.vary(floor_colour, 0.12, Vector(p)) for p in feet])
+        if way.clue:
+            px, py = x + ox * NOTE_IN, y + oy * NOTE_IN
+            note_post(tunnel, way.clue, px, py, f, (-ox, -oy), TUNNEL_FLOOR)
 # A stone threshold at every mouth onto the land, over the ragged edge of the
 # hole in the ground (which comes in whole squares, so it reaches a little
 # past where the ramp begins, and shows the sky through the gap).
@@ -2674,7 +2836,7 @@ for way in WAYS.values():
     for end, nextp in ((way.points[0], way.points[1]), (way.points[-1], way.points[-2])):
         ex, ey, ef = end
         if abs(ef - height(ex, ey)) > 0.6:
-            continue  # (an end deep underground, into the mist)
+            continue  # (a dead end deep underground)
         dx, dy = ex - nextp[0], ey - nextp[1]
         dd = math.hypot(dx, dy) or 1
         dx, dy = dx / dd, dy / dd  # outward, onto the land
@@ -3920,6 +4082,9 @@ if out:
                 "hole": round(HUT_FIRE["hole"], 2), "r": HUT_FIRE["r"]},
         # The witches' sign: its painted face's middle [x, y, z], which way it faces [x, z], how askew, and how big.
         "sign": SIGN,
+        # The clues, a note on a post at each dead end: the exit that leads there, the note's middle [x, y, z],
+        # which way it faces [x, z], how far it leans back, and how big it is.
+        "notes": NOTES,
         "bounds": [X0 + 4, X1 - 4, Y0 + 4, Y1 - 4],
         "circles": circles,
         "boxes": boxes,

@@ -20,8 +20,8 @@ Classic and Illustrated stay as they are. v3 is a third way to play.
 Status: **step 2 under way.** The whole land, above ground, underground and
 indoors, is built in grey boxes (`art/blender/land.py`) and you can walk it
 at `/3d`. It's built and deployed with the site, but not linked from
-anywhere yet. Next: all the obstacles, their animations, the lost scenes and
-the death scenes.
+anywhere yet. Next: all the obstacles, their animations and the death
+scenes.
 
 ## Keep the engine
 
@@ -118,7 +118,7 @@ does this:
 | dragon-cave north → giant (one-way)                           | **A long tunnel** under the mountain that comes into the giant's cave through its east entrance.                                                                                                                                  |
 | small-room west → merlins-lair (one-way)                      | A door that only opens one way.                                                                                                                                                                                                   |
 | merlins-lair north → grand-hall (one-way)                     | A hidden door into the hall, that only opens one way.                                                                                                                                                                             |
-| The six clue rooms                                            | **The mist** (see below): the edges of the world where you get lost.                                                                                                                                                              |
+| The six clue rooms                                            | **Dead ends** (see below): paths and tunnels that go nowhere, with a clue at the end of each.                                                                                                                                     |
 
 `scripts/map-check.js` (to write) checks this grid against `world.json` and
 lists the clashes, so the table stays true.
@@ -149,9 +149,9 @@ to the south.
 - **The forest bridge**: the long path south from the old wall crosses it
   halfway along, on an old wooden bridge among the trees. This is the
   original's map, not an addition.
-- **It bends north** between the bridge and the deep river, round the misty
-  wood north of the witches, so getting lost that way never reaches the
-  water and needs no second bridge.
+- **It bends north** between the bridge and the deep river, round the wood
+  north of the witches, so the dead end that way never reaches the water and
+  needs no second bridge.
 - **The deep river** is where it's narrowest and fastest, with rapids.
 - **It goes underground** in the east, past the evergreen glade, plunging
   into a dark hole in the rocks. Somewhere in the tunnels below you can hear
@@ -206,14 +206,16 @@ So there's little to translate: the obstacles' messages (already in
 data/da.json), the title, the credit to Anita Straker and the menus (with
 icons where they can be).
 
-### Clues without words
+### Clues
 
-The six clue rooms are where you get lost: the mist at the edges of the world
-(the forest's west and south, the tunnels' far ends).
-The mist thickens, the world fades, and the clue appears **as a vision**: a
-ghostly little scene in the mist, then the game ends. The v2 effect
-paintings already show most of them, so they're the concept art for the
-visions.
+The six clue rooms are **dead ends**: three paths in the forest that peter
+out into trails, each to old stones in a sunlit gap among the trees, and
+three tunnels that end in the rock. In the original, going that way you got
+lost, and the game ended. In 3D you can see exactly where you are, so being
+lost would ring false, and nothing should stop you finding them all: at each
+dead end, hidden among the stones or at the tunnel's end, a note is nailed to
+a post. Look at it and press E, and it **unrolls on the screen**, the clue on
+it in your language; E again rolls it up, and you carry on.
 
 ## Things that undo themselves
 
@@ -274,12 +276,12 @@ the weapon in Counter-Strike.
   lie where you drop them, resting on the bumps of the ground.
 - The grassy bank's pile of treasure grows as you score, as now.
 
-## Dying, getting lost, winning
+## Dying, clues, winning
 
 - **Deaths** are short scenes from where you stand. The 11 death paintings
   say what each one shows. Then the curtain falls, with no words, and the
   menu.
-- **Lost**: the mist and a vision (above).
+- **Clues**: a note at each dead end (above), and the game goes on.
 - **Winning**: a scene of its own, then the tune.
 
 ## Controls everywhere
@@ -301,7 +303,7 @@ src/three/         the 3D version
   player.ts        Rapier character controller, mouse look, touch sticks
   places.ts        per place: open/closed states, object spots, barriers
   effects.ts       what each `use` does to the world
-  moments.ts       deaths, mist and visions, winning
+  moments.ts       deaths and winning
 art/blender/       Python scripts that build each area in Blender
 art/models/        the model packs (downloaded, not in git) and image-to-3D downloads
 public/models/     the compressed .glb files the game loads
@@ -353,7 +355,7 @@ or free model.
      room over a deep hole, giant, damp tunnels); the dragon's cave inside a
      rocky hill, its long tunnel up under a ridge into the giant's east
      side, and its way down to the dark tunnels (which run out west and east
-     into the mist) and the beautiful chamber.
+     to dead ends) and the beautiful chamber.
    - **The castle** ✅: the courtyard (well, flowers) with the coach house
      as a barn; the keep across its south, entered from the courtyard into
      the grand hall. The kitchen opens straight off the hall's west side; a
@@ -375,18 +377,19 @@ or free model.
      models are made by `art/blender/items.py`); the first obstacles opening
      ✅; saving and loading ✅ (the same saves as the other versions, and
      switching between all three with the game carried over); the trees ✅
-     (Quaternius's, a mix for each part of the land, `src/three/trees.ts`).
-     Still to come: all the rest of the obstacles, their animations, the
-     lost scenes and the death scenes.
+     (Quaternius's, a mix for each part of the land, `src/three/trees.ts`);
+     the clues, a note at each dead end ✅ (`src/three/notes.ts`). Still to
+     come: all the rest of the obstacles, their animations and the death
+     scenes.
 3. **The first beautiful corner**: grassy bank, old stone wall and old wall
    (where v2 began), fully modelled, textured and lit. **Then decide**
    whether the look works and how long a place takes.
-4. **The meadows and forest**: the witches' clearing, the mist.
+4. **The meadows and forest**: the witches' clearing, the dead ends.
 5. **Underground**: the long tunnel, the dragon's cave, the long tunnel to
    the giant, the maze, the treasure room.
 6. **The castle**: moat, courtyard, grand hall, kitchen, dungeon, Merlin's
    lair.
-7. **Deaths, visions, winning, sound**: music and fx carry over, plus
+7. **Deaths, winning, sound**: music and fx carry over, plus
    footsteps and creaks.
 8. **Phones and iPads**: performance pass, touch controls polished.
 
@@ -403,7 +406,7 @@ or free model.
   minute's walk.
 - **`art/blender/layout.json` says where everything is**, for both Blender
   and the game: each place's square on the grid, which are buildings and
-  caves, and where the mists and deadly ways are.
+  caves, and where the forest's dead ends and the deadly ways are.
 - **Forest is the barrier.** Trees grow wherever the ground isn't a place, a
   path, the meadow, the mountain top or the castle grounds. A walkability map
   (a square metre at a time) keeps you out of the forest, the river and the
