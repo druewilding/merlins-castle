@@ -2104,7 +2104,34 @@ outside_holes += [(lo + 2 * math.pi, hi + 2 * math.pi, h0, h1) for lo, hi, h0, h
 stone_courses(built, random.Random("tower's outside stones"), lambda a: polygon_at(a, TOWER_R + 0.03, SIDES, -math.pi / 2),
               [-math.pi / 2 + 2 * math.pi * k / SIDES for k in range(2 * SIDES + 3)], TOWER_R, tz0, tz1, outside_holes,
               height(*TOWER))
-built.cone((*TOWER, tz1), 9, TOWER_R * 1.15, ROOF, sides=SIDES, droop=0)
+# Its roof: a tall cone of slates, a little flared at its foot, out over the
+# wall at its eaves (an edge to them, and under them flat, so from below you
+# see them, not up inside it).
+EAVE_R = TOWER_R * 1.15
+ROOF_PROFILE = [(EAVE_R, tz1 - 0.3), (EAVE_R * 0.87, tz1 + 1.3), (EAVE_R * 0.6, tz1 + 4.6), (EAVE_R * 0.31, tz1 + 8.2)]
+
+
+def round_roof(r, z):
+    return [(*polygon_at(-math.pi / 2 + 2 * math.pi * k / SIDES, r, SIDES, -math.pi / 2), z) for k in range(SIDES)]
+
+
+rings = [round_roof(r, z) for r, z in ROOF_PROFILE]
+apex = (*TOWER, tz1 + 11.5)
+for n, (lower, upper) in enumerate(zip(rings, rings[1:] + [None])):
+    for k in range(SIDES):
+        k1 = (k + 1) % SIDES
+        shade = c.vary(c.mix(ROOF, c.linear("#000000"), 0.12 * (n == 0)), 0.07, Vector((*lower[k][:2], n)))
+        if upper:
+            built.add([lower[k], lower[k1], upper[k1], upper[k]], [(0, 1, 2, 3)], [shade] * 4)
+        else:
+            built.add([apex, lower[k], lower[k1]], [(0, 1, 2)], [shade] * 3)
+fascia = round_roof(EAVE_R, tz1 - 0.55)
+soffit = round_roof(TOWER_R + 0.02, tz1 - 0.55)
+for k in range(SIDES):
+    k1 = (k + 1) % SIDES
+    edge = c.mix(ROOF, c.linear("#000000"), 0.3)
+    built.add([fascia[k], fascia[k1], rings[0][k1], rings[0][k]], [(0, 1, 2, 3)], [edge] * 4)
+    built.add([fascia[k], soffit[k], soffit[k1], fascia[k1]], [(0, 1, 2, 3)], [c.mix(ROOF, c.linear("#000000"), 0.45)] * 4)
 solid_circle(*TOWER, TOWER_R)
 fl = HALLS["tower"].floor
 porch(TOWER[0], TOWER[1] - HALLS["tower"].r - 0.37, TOWER_LIP[1], WAYS["tower-door"].half, GREY)  # (from the round room's wall)
@@ -2122,7 +2149,7 @@ def balcony_block(u0, v0, u1, v1, z0, z1):
     """A box, square to the way the balcony faces."""
     corners = [out_from_tower(u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))]
     v = [(*p, z0) for p in corners] + [(*p, z1) for p in corners]
-    shade = [c.vary(GREY, 0.1, Vector((*corners[0], z0 + k))) for k in range(8)]
+    shade = [c.vary(TOWER_BLOCK, 0.1, Vector((*corners[0], z0 + k))) for k in range(8)]  # (the tower's stone)
     built.add(v, [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7), (0, 3, 2, 1)], shade)
 
 
