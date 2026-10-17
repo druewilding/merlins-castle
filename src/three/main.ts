@@ -302,7 +302,7 @@ const halls = land.halls as Record<
 player.halls = new Map(Object.entries(halls));
 
 // Solid things, and the obstacles: closed, until an object in use opens one.
-const circles: Circle[] = land.circles.map(([x, z, r]) => ({ x, z, r }));
+const circles: Circle[] = land.circles.map(([x, z, r, top]) => ({ x, z, r, top }));
 const boxes: Box[] = land.boxes.map(([x, z, halfX, halfZ]) => ({ x, z, halfX, halfZ }));
 type Obstacle = { box?: number[]; circle?: number[]; under?: boolean; reach?: number; allRound?: boolean };
 const obstacles = land.obstacles as Record<string, Obstacle>;

@@ -561,8 +561,7 @@ export class Player {
   // The top of the highest thing under you that you could stand on (up to a
   // step above your feet).
   private topUnder(feet: number) {
-    if (!this.under) return -Infinity;
-    return this.topAt(this.position.x, this.position.z, feet + STEP);
+    return this.topAt(this.position.x, this.position.z, feet + STEP, !!this.under);
   }
 
   // The underside of the lowest slab over your head (standing, or jumping).
@@ -577,11 +576,12 @@ export class Player {
   }
 
   /**
-   * Off the land, the top of the highest thing at a spot you could stand on
-   * (or put something on: a step, a table, the chest's tray), up to a height.
+   * The top of the highest thing at a spot you could stand on (or, off the
+   * land, put something on: a step, a table, the chest's tray), up to a
+   * height: off the land unless not (on it, a toadstool to jump onto).
    */
-  topAt(x: number, z: number, most = Infinity) {
-    const near = this.nearUnder.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
+  topAt(x: number, z: number, most = Infinity, under = true) {
+    const near = (under ? this.nearUnder : this.near).get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
     let best = -Infinity;
     for (const c of near?.circles ?? []) {
       if (c.top !== undefined && c.top <= most && Math.hypot(x - c.x, z - c.z) < c.r) best = Math.max(best, c.top);

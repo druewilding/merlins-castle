@@ -824,6 +824,10 @@ def open_ground(x, y, lures=True):
     for w, e, s, n in OPEN_ZONES:
         if w <= x <= e and s <= y <= n:
             return True
+    # (All round the grassy mound: its back reaches past the meadow, and you
+    # can walk round it.)
+    if math.hypot((x - MOUND.x) / (9 * 1.35 + 3.5), (y - MOUND.y) / (6.5 * 1.35 + 3.5)) < 1:
+        return True
     for spot in LOST.values():
         if math.hypot(x - spot[0], y - spot[1]) < 11 and not beyond_the_mist(x, y):
             return True
@@ -1071,8 +1075,9 @@ def solid_box(x, y, half_x, half_y):
     boxes.append([round(x, 2), round(-y, 2), round(half_x, 2), round(half_y, 2)])
 
 
-def solid_circle(x, y, r):
-    circles.append([round(x, 2), round(-y, 2), round(r, 2)])
+def solid_circle(x, y, r, top=None):
+    """Solid, up from the ground (or to a top you can stand on)."""
+    circles.append([round(x, 2), round(-y, 2), round(r, 2)] + ([round(top, 2)] if top is not None else []))
 
 
 def block(builder, x0, y0, z0, x1, y1, z1, colour, solid=True):
@@ -3689,6 +3694,55 @@ for x, y, r in ((WEST_LIP[0] - 6, WEST_LIP[1] + 6.5, 4.2), (WEST_LIP[0] - 6, WES
     rocks.blob((x, y, height(x, y) - 0.5), r, ROCK, squash=0.7, lumpy=0.25, seed=x + y)
     solid_circle(x, y, r * 0.85)
 rocks.build("rocks", smooth=True)
+
+# The evergreen glade's "red spotted toadstools growing in a ring": on the
+# grass north of the path, as in its picture, big and small, here and there
+# two or three together. Quaternius's (Ultimate Crops, art/models/), their
+# caps already spotted, made a brighter red. Solid (nothing can be dropped
+# into them), but you can step up onto the little ones, and jump onto the
+# big ones.
+CROPS = HERE.parent / "models/ultimate-crops/Blends"
+TOADSTOOL_COLOURS = {"Red": c.linear("#c7261c"), "Mushroom1": c.linear("#efe6d2")}
+RING = (P["evergreen-glade"][0] + 1.5, P["evergreen-glade"][1] + 6.0, 3.4)  # its middle, and how far round
+
+
+def toadstool(kind, tall):
+    """One of the pack's mushrooms, `tall` metres high: to make, for stamp."""
+
+    def make(b):
+        with bpy.data.libraries.load(str(CROPS / f"{kind}.blend")) as (src, dst):
+            dst.objects = [name for name in src.objects if name == kind]
+        obj = dst.objects[0]
+        mesh = obj.data
+        scale = tall / max(v.co.z for v in mesh.vertices)
+        colours = [TOADSTOOL_COLOURS.get(m.name.split(".")[0], (0.5, 0.5, 0.5, 1)) for m in mesh.materials]
+        for poly in mesh.polygons:
+            pts = [tuple(mesh.vertices[i].co * scale) for i in poly.vertices]
+            b.add(pts, [tuple(range(len(pts)))], [c.vary(colours[poly.material_index], 0.1, Vector(p) * 8) for p in pts])
+        wide = max(abs(v.co.x) for v in mesh.vertices) * scale
+        bpy.data.objects.remove(obj)
+        return (-wide, -wide, wide, wide), tall
+
+    return make
+
+
+here = random.Random("the toadstool ring")
+KINDS_OF_TOADSTOOL = ["Mushroom_1", "Mushroom_2", "Mushroom_3", "Mushroom_4"]
+TOADSTOOL_TALL = [0.36, 0.46, 0.6, 0.75]  # metres, each kind
+SPOTS = 26
+for n in range(SPOTS):
+    a = 2 * math.pi * (n + here.uniform(-0.3, 0.3)) / SPOTS
+    # (Now and then a little one or two beside a bigger one.)
+    for k in range(1 if here.random() < 0.6 else here.choice((2, 3))):
+        r = RING[2] + here.uniform(-0.25, 0.25) + (here.uniform(-0.45, 0.45) if k else 0)
+        x, y = RING[0] + math.cos(a + k * 0.05) * r, RING[1] + math.sin(a + k * 0.05) * r
+        assert out_on_the_path(x, y) > 1.4, (x, y)  # (on the grass, clear of the path)
+        size = here.randrange(4) if not k else here.randrange(2)
+        z = drawn_height(x, y) - 0.03
+        stamp(f"toadstool-{size}", toadstool(KINDS_OF_TOADSTOOL[size], TOADSTOOL_TALL[size]), (x, y, z),
+              here.uniform(0, 2 * math.pi), solid=False)
+        (_, _, wide, _), tall = prop_kinds[f"toadstool-{size}"]
+        solid_circle(x, y, wide * 0.9, top=z + tall)
 
 # ---------------------------------------------------------------- what grows where
 
