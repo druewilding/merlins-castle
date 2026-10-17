@@ -26,7 +26,7 @@ out, preview = c.args()
 bpy.ops.wm.open_mainfile(filepath=str(HERE.parent / "models/ultimate-monsters/Blends/Bunny.blend"))
 
 ANIMS = ["Idle", "No", "Yes", "Duck", "Jump"]
-TALL = 0.58  # metres, from its feet to its ears' tips (big for a rabbit: so it shows over the grass)
+TALL = 0.7  # metres, from its feet to its ears' tips (big for a rabbit: so it shows over the grass)
 ARMS = 0.45  # its arms (and paws), as long as they were
 SHOULDER = 0.37  # out from its middle, where its arms begin
 # Its colours, for each of the Bunny's: its fur, round its eyes (dark: a rabbit's big eyes), its belly

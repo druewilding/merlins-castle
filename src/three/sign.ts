@@ -9,6 +9,10 @@ import { T } from "../shared/strings";
 const PX = 512; // the painting's pixels across (its height in proportion)
 const PAINT = "#ebe2c6";
 const FONT = '"IM Fell English", Georgia, serif';
+// Each plank's middle, down the painted face (as a share of its height), as
+// land.py nails them; and how much of the face's height a line may fill.
+const PLANKS = [0.22, 0.78];
+const INK = 0.34;
 
 export interface SignSpot {
   at: number[]; // its face's middle [x, y, z]
@@ -32,20 +36,25 @@ export async function paintSign(scene: Scene, spot: SignSpot, lines: string[] = 
 
   const h = canvas.height;
   pen.fillStyle = PAINT;
-  pen.textBaseline = "middle";
+  pen.textBaseline = "alphabetic";
   lines.forEach((line, k) => {
-    const middle = (h * (k + 0.5)) / lines.length;
-    let size = h * 0.44;
+    const middle = h * (PLANKS[k] ?? (k + 0.5) / lines.length);
+    // As big as fits on its plank, along it, and up it from the bottom of
+    // its lowest letter to the top of its tallest (not the font's own
+    // height: "f" and "h" reach above that).
+    let size = 100;
     pen.font = `${size}px ${FONT}`;
-    // (As big as fits along its plank.)
-    const fits = (PX * 0.92) / pen.measureText(line).width;
-    if (fits < 1) size *= fits;
+    let ink = pen.measureText(line);
+    size *= Math.min((PX * 0.92) / ink.width, (h * INK) / (ink.actualBoundingBoxAscent + ink.actualBoundingBoxDescent));
     pen.font = `${size}px ${FONT}`;
-    let x = (PX - pen.measureText(line).width) / 2;
+    ink = pen.measureText(line);
+    // (Its ink centred on the plank.)
+    const baseline = middle + (ink.actualBoundingBoxAscent - ink.actualBoundingBoxDescent) / 2;
+    let x = (PX - ink.width) / 2;
     for (const letter of line) {
       pen.save();
-      pen.translate(x, middle + wobble() * size * 0.05);
-      pen.rotate(wobble() * 0.06);
+      pen.translate(x, baseline + wobble() * size * 0.02);
+      pen.rotate(wobble() * 0.05);
       pen.fillText(letter, 0, 0);
       pen.restore();
       x += pen.measureText(letter).width;

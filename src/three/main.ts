@@ -531,6 +531,7 @@ const rabbits = new Rabbits(
     { x: signX + 0.9, z: signZ + 0.9, yaw: Math.PI / 2 },
     { x: signX + 0.2, z: signZ + 1.7, yaw: Math.PI / 2.4 },
     { x: signX - 0.9, z: signZ + 1.3, yaw: Math.PI / 1.8 },
+    { x: signX + 0.5, z: signZ - 0.8, yaw: Math.PI / 2.2 }, // (the other side of it, by the way west)
   ],
   ground
 );

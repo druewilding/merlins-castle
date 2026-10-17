@@ -24,7 +24,9 @@ const WARN = 12; // metres: this near, they shake their heads at you
 const SHAKES = [2.5, 6]; // seconds between one's head-shakes, between these
 const TURN = 1.8; // radians a second, turning
 const BLEND = 0.25; // seconds from one clip to the next
-const SIZES = [1, 0.88, 0.94];
+const SIZES = [1, 0.88, 0.94, 0.82];
+// Radians each looks off from straight at you: not all of them square on.
+const ASKANCE = [0.5, -0.35, 0.15, -0.6];
 
 const between = ([a, b]: number[]) => a + Math.random() * (b - a);
 
@@ -35,6 +37,7 @@ class Rabbit {
   private playing: AnimationAction | undefined;
   private wait = between(SHAKES);
   private yaw: number;
+  private askance: number;
 
   constructor(
     scene: Scene,
@@ -52,6 +55,7 @@ class Rabbit {
       }
     });
     this.model.scale.multiplyScalar(SIZES[n % SIZES.length]);
+    this.askance = ASKANCE[n % ASKANCE.length];
     this.model.position.set(at.x, ground(at.x, at.z) ?? 0, at.z);
     this.yaw = at.yaw;
     this.model.rotation.y = at.yaw;
@@ -77,7 +81,7 @@ class Rabbit {
     const at = this.model.position;
     const far = Math.hypot(you.x - at.x, you.z - at.z);
     if (far < WATCH) {
-      let turn = Math.atan2(you.x - at.x, you.z - at.z) - this.yaw;
+      let turn = Math.atan2(you.x - at.x, you.z - at.z) + this.askance - this.yaw;
       turn = Math.atan2(Math.sin(turn), Math.cos(turn));
       this.yaw += Math.sign(turn) * Math.min(Math.abs(turn), TURN * dt);
       this.model.rotation.y = this.yaw;
