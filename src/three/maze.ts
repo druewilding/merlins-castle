@@ -8,6 +8,7 @@
 import {
   BufferAttribute,
   Color,
+  FrontSide,
   Mesh,
   MeshStandardMaterial,
   type Object3D,
@@ -49,6 +50,9 @@ export function dressMaze(land: Object3D, renderer: WebGLRenderer) {
       normalMap: normal,
       normalScale: UPRIGHT,
       roughness: 0.9,
+      // (Shading by their sunny sides: by their shady ones, the sun leaks in
+      // round them where they meet, the shady side right there in the corner.)
+      shadowSide: FrontSide,
     });
   }
   const floor = land.getObjectByName("maze-floor");
