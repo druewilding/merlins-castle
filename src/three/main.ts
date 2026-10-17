@@ -68,6 +68,7 @@ import landModel from "./models/land.glb?url";
 import land from "./models/land.json";
 import merlinModel from "./models/merlin.glb?url";
 import snakeModel from "./models/snake.glb?url";
+import witchModel from "./models/witches.glb?url";
 import { Plank } from "./plank";
 import { type Growth, Plants } from "./plants";
 import { type Box, type Circle, type Ground, type Hall, Player, type Walkable, wayThrough } from "./player";
@@ -80,6 +81,7 @@ import { Snake } from "./snake";
 import OWN_SOUNDS from "./sounds.json";
 import { Swept } from "./swept";
 import { Trees, type TreeSpots } from "./trees";
+import { Witches } from "./witches";
 
 const english = worldJson as unknown as World;
 const world = LANGUAGE === "da" ? localise(english, daJson as WorldText) : english;
@@ -170,12 +172,13 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky, wizard] = await Promise.all([
+const [model, file, things, snaky, wizard, hags] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
   loader.loadAsync(snakeModel),
   loader.loadAsync(merlinModel),
+  loader.loadAsync(witchModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -495,6 +498,24 @@ const merlin = new Merlin(
     Math.abs(x - lair.x) < lair.w! - 1.2 && Math.abs(z - lair.z) < lair.d! - 1.2 && player.clear(x, z, true, 0.6)
 );
 player.movers.push(merlin.body);
+
+// The witches (witches.ts): dancing in a ring across the way west to the
+// crossroads, or else hiding behind the trees either side of it.
+const clearing = PLACES.get("forest-witches")!;
+const witches = new Witches(
+  scene,
+  hags.scene,
+  hags.animations,
+  { x: clearing.x - 17, z: clearing.z + 1, r: 1.8 },
+  [
+    { x: clearing.x - 13.4, z: clearing.z + 7.4 },
+    { x: clearing.x - 12.9, z: clearing.z - 12.4 },
+    { x: clearing.x - 19.3, z: clearing.z - 11.4 },
+  ],
+  clearing,
+  ground
+);
+let passing = false; // come from the crossroads, going east: the witches stay hidden
 
 // A game loaded, or carried on from another version (or another language).
 const handoff = takeHandoff();
@@ -834,7 +855,7 @@ const was = player.position.clone(); // (and just where)
 const debugMode = new URLSearchParams(location.search).has("debug");
 if (debugMode) {
   Object.assign(window, {
-    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, merlin, restart, drawn },
+    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, merlin, witches, restart, drawn },
   });
   const { debug } = await import("./debug");
   debug(
@@ -1140,6 +1161,7 @@ renderer.setAnimationLoop((time) => {
   // but not while you're in the tower: you'd come out through it.)
   snake.update(dt, player.camera.position, player.camera, room !== "tower" && !(guarded && opened.has(guarded)));
   merlin.update(dt, player.position, room === "merlins-lair");
+  witches.update(dt, room === "forest-witches" && !passing);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)
@@ -1211,6 +1233,7 @@ renderer.setAnimationLoop((time) => {
     );
     if (exit && exit !== told) tell(exit);
     told = undefined;
+    if (room === "forest-witches") passing = lastRoom === "forest-crossroads";
     lastRoom = room;
   }
   lightFor(player.depth, time, dt);
