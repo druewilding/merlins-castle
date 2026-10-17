@@ -108,7 +108,7 @@ class Witch {
     // Her broom: lying along under her, its twigs behind.
     const stick = broom.clone();
     stick.position.set(0, 0, 0);
-    stick.rotation.set(0, 0, 0);
+    stick.rotation.set(0, Math.PI, 0); // (made with its twigs ahead)
     stick.traverse((o) => (o.castShadow = true));
     const middle = new Box3().setFromObject(stick).getCenter(new Vector3());
     stick.position.sub(middle);
