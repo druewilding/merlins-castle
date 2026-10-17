@@ -29,6 +29,7 @@ import {
   Frustum,
   Group,
   LoopOnce,
+  type Material,
   Matrix4,
   Mesh,
   type Object3D,
@@ -50,16 +51,17 @@ const STARTS = [0, 0.37, 0.71]; // how far into her dance each one is (of its le
 const CLOSE = 1.2; // metres from you, closed round you, catching you
 // Flying off: each one a little after the one before (seconds), crouching
 // to spring up; then how fast she rises and goes (metres a second, and more
-// each second), and how long till she's out of sight.
+// each second), and when she fades away, from and to (seconds from springing
+// up: then she's gone).
 const AFTER = 0.35;
 const SPRING = 0.5;
 const RISE = [1.2, 2.2];
 const AWAY = [2.5, 3.5];
-const GONE = 10;
+const FADING = [3.5, 7.5];
 // Her broom, under her as she sits (in her model's metres: its middle, back
 // from her hips, and how far up).
 const SEAT = [0, -0.12, 0.5];
-const SPECK = 18; // metres off, flying: no more than a speck in the sky
+const HURRY = 0.7; // seconds she takes to fade, the broom no longer in use while you can still see her
 const ROUND_YOU = 1.1; // radians a second, the ring turning as they dance round you, tied up
 
 export interface Ring {
@@ -76,9 +78,13 @@ class Witch {
   private clips = new Map<string, AnimationAction>();
   private playing: AnimationAction | undefined;
   readonly broom = new Group();
+  private materials: Material[] = []; // her own (so she fades alone)
+  private fading = false;
   state: State = "hiding";
   yaw = 0; // which way she faces (0 is +z)
-  flight = { t: 0, heading: 0, swing: 0 }; // flying off: how long since she was told to, and which way
+  // Flying off: how long since she was told to, which way, and how much of
+  // her there's still to see at most (less and less, hurrying back).
+  flight = { t: 0, heading: 0, swing: 0, most: 1 };
 
   constructor(
     scene: Scene,
@@ -111,6 +117,15 @@ class Witch {
     this.broom.scale.setScalar(1 / this.model.scale.x);
     this.broom.visible = false;
     this.model.add(this.broom);
+    this.model.traverse((o) => {
+      if (!(o instanceof Mesh)) return;
+      const own = (m: Material) => {
+        const copy = m.clone();
+        this.materials.push(copy);
+        return copy;
+      };
+      o.material = Array.isArray(o.material) ? o.material.map(own) : own(o.material);
+    });
     scene.add(this.model);
     this.mixer = new AnimationMixer(this.model);
     for (const clip of animations) this.clips.set(clip.name, this.mixer.clipAction(clip));
@@ -121,6 +136,23 @@ class Witch {
       action?.setLoop(LoopOnce, 1);
       if (action) action.clampWhenFinished = true;
     }
+  }
+
+  /** How much of her there is to see (1: all of her; 0: she's faded away). */
+  fade(opacity: number) {
+    const fading = opacity < 1;
+    for (const m of this.materials) m.opacity = opacity;
+    if (fading === this.fading) return;
+    this.fading = fading;
+    for (const m of this.materials) {
+      m.transparent = fading;
+      m.depthWrite = !fading;
+      m.needsUpdate = true;
+    }
+    // (No shadow, fading: a shadow doesn't fade.)
+    this.model.traverse((o) => {
+      if (o instanceof Mesh) o.castShadow = !fading;
+    });
   }
 
   /** Whether what she's doing once (throwing her rope) is done. */
@@ -199,6 +231,7 @@ export class Witches {
   private hideNow(witch: Witch) {
     witch.state = "hiding";
     witch.model.visible = true;
+    witch.fade(1);
     witch.broom.visible = false;
     witch.model.position.set(witch.hide.x, 0, witch.hide.z);
     witch.yaw = Math.atan2(this.from.x - witch.hide.x, this.from.z - witch.hide.z);
@@ -213,7 +246,7 @@ export class Witches {
       if (witch.state === "flying" || witch.state === "flown") return;
       const { x, z } = witch.model.position;
       const heading = Math.atan2(x - you.x, z - you.z) + (n - 1) * 0.35;
-      witch.flight = { t: 0, heading, swing: n * 2.1 };
+      witch.flight = { t: 0, heading, swing: n * 2.1, most: 1 };
       witch.state = "flying";
     });
   }
@@ -267,13 +300,19 @@ export class Witches {
     for (const witch of this.witches) {
       const away = witch.state === "flying" || witch.state === "flown";
       if (!back || !away) continue;
-      // (Back in the clearing, they're back however you're looking at her
+      // (Flying still, where you can see her, she fades away quickly first.
+      // Back in the clearing, they're back however you're looking at her
       // tree: they'd be out from behind it before you could see anyway.)
-      // (Far off, she's a speck in the sky: gone, she'd hardly be missed.)
-      const at = witch.model.position;
-      const speck = at.distanceTo(this.eye) > SPECK;
-      const flying = witch.state === "flying" && !speck && this.seen(at, 1.5);
-      if (!flying && (out || !this.seen(witch.hide, 1.2))) this.hideNow(witch);
+      const { x, y, z } = witch.model.position;
+      const flying = witch.state === "flying" && this.seen({ x, y: y + 0.9, z }, 1.5);
+      if (flying) {
+        witch.flight.most -= dt / HURRY;
+        continue;
+      }
+      // (Out of sight, she's gone; and back behind her tree when that is too.)
+      witch.state = "flown";
+      witch.model.visible = false;
+      if (out || !this.seen(witch.hide, 1.2)) this.hideNow(witch);
     }
     // (Catching you, the ring's still till they've all thrown their ropes.)
     const tied = this.witches.every((witch) => witch.state === "dancing");
@@ -317,6 +356,15 @@ export class Witches {
     const flight = witch.flight;
     flight.t += dt;
     const s = flight.t - n * AFTER - SPRING; // (since she sprang up)
+    // (Fading as she goes, or hurrying back.)
+    const left = Math.min(1, Math.max(0, 1 - (s - FADING[0]) / (FADING[1] - FADING[0])));
+    const opacity = Math.max(0, Math.min(left * left * (3 - 2 * left), flight.most));
+    witch.fade(opacity);
+    if (opacity <= 0) {
+      witch.state = "flown";
+      witch.model.visible = false;
+      return;
+    }
     if (s < -SPRING) witch.play("Idle_Loop");
     else if (s < 0) witch.play("Jump_Start");
     else {
@@ -330,10 +378,6 @@ export class Witches {
       at.x += Math.sin(heading) * away;
       at.z += Math.cos(heading) * away;
       at.y += (RISE[0] + RISE[1] * s) * dt + 0.25 * Math.cos(s * 3 + flight.swing) * dt;
-      if (s > GONE) {
-        witch.state = "flown";
-        witch.model.visible = false;
-      }
     }
     witch.update(dt);
   }
