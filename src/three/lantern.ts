@@ -1,9 +1,9 @@
 // The lamp, lit: in use where it's dark (the long tunnel's mouths, the dark
 // tunnels), its flame burns, and it lights the way. Carried, you hold it up
-// by its handle, out in front of you and to the right, hanging and swinging
-// as you walk and turn; dropped, it stands where it is, still burning (as
-// in the original, dropping it doesn't stop it being in use), till you've
-// gone on from there.
+// by its handle, straight out in front of you, just under where you look,
+// hanging and swinging as you walk and turn; dropped, it stands where it
+// is, still burning (as in the original, dropping it doesn't stop it being
+// in use), till you've gone on from there.
 
 import {
   AdditiveBlending,
@@ -28,8 +28,8 @@ import { speck } from "./shafts";
 
 // Where your hand is, holding it up (from your eyes, as you look), and how
 // big it is in your hand (the one lying about is big, so you can spot it).
-const HAND = new Vector3(0.2, -0.06, -0.42);
-const HELD = 0.32;
+const HAND = new Vector3(0, -0.025, -0.45);
+const HELD = 0.26;
 const RAISE = 0.45; // seconds, lifting it up (or putting it away)
 const DOWN = 0.35; // metres it comes up from, below where you hold it
 // Swinging from your hand, like a pendulum: how quickly it settles.

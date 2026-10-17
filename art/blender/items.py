@@ -644,9 +644,9 @@ outward(broom_object)
 # arching over it all. Inside, an oil lamp: its font, its burner, and its
 # glass chimney round the wick. Its glass (`lamp-glass`) and its flame
 # (`lamp-flame`, shown only once it's lit) are their own, inside it, for the
-# game to make see-through and bright. Standing up, 55 cm high to the top of
+# game to make see-through and bright. Standing up, 77 cm high to the top of
 # its handle (big, like the key, so you can spot it).
-LAMP_SIZE = 1.0
+LAMP_SIZE = 1.4
 BRASS = c.linear("#cf9f48")
 BRASS_LIGHT = c.linear("#f7dc8e")
 BRASS_DARK = c.linear("#7d5824")
