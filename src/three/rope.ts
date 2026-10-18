@@ -38,8 +38,7 @@ const STRAND = new Color("#c99a5a");
 const GROOVE = new Color("#7c5730");
 
 const GRIP = 2.0; // your hands over your feet, hanging on (reaching up)
-const CATCH = 0.05; // how far back from the edge your hands catch it
-const BEHIND = 0.3; // and how far behind them you are (so you see it, in front of you)
+const CATCH = 0.15; // how far back from the edge you stand to catch it
 const NEAR = 0.7; // walking towards the hole this near its edge, you catch it
 const SWING = 2.2; // seconds, from catching it to landing on the far side
 const CAUGHT = 0.18; // (of that: reaching out and catching it)
@@ -57,7 +56,8 @@ export class Rope {
         model?: Group; // (gone once you've dropped it there: it's lying there then)
         angle: number; // swinging, towards the south (radians), and how fast
         speed: number;
-        held: boolean; // you're swinging on it
+        held: boolean; // you're swinging on it (reaching out to catch it, or holding on)
+        holding: boolean; // (caught: from then on, till it's back in your hands)
         armed: boolean; // you've stepped away since it went up, so walking in swings
       }
     | undefined;
@@ -97,7 +97,7 @@ export class Rope {
     this.away();
     const side = exit === "maze north" ? 1 : -1;
     const angle = instantly || this.reducedMotion ? 0 : side * 0.9;
-    this.hung = { exit, side, angle, speed: 0, held: false, armed: false };
+    this.hung = { exit, side, angle, speed: 0, held: false, holding: false, armed: false };
     if (show) this.show();
   }
 
@@ -189,20 +189,16 @@ export class Rope {
   private across(h: NonNullable<Rope["hung"]>) {
     const [x, z, , halfZ] = this.hole.box;
     const start = this.player.position.clone();
-    const grip = new Vector3(x, 0, z + h.side * (halfZ + CATCH + BEHIND));
+    const grip = new Vector3(x, 0, z + h.side * (halfZ + CATCH));
     grip.y = this.floor(grip.x, grip.z);
-    const hands = new Vector3(x, grip.y + GRIP, z + h.side * (halfZ + CATCH));
+    const hands = grip.clone().setY(grip.y + GRIP);
     const reach = hands.distanceTo(this.pivot);
     const widest = Math.asin(Math.min(1, Math.abs(hands.z - this.pivot.z) / reach)); // (towards you)
     const from = h.angle;
     const land = new Vector3(x, 0, z - h.side * (halfZ + LAND));
     land.y = this.floor(land.x, land.z);
     const feet = (angle: number) =>
-      new Vector3(
-        x,
-        this.pivot.y - reach * Math.cos(angle) - GRIP,
-        this.pivot.z + reach * Math.sin(angle) + h.side * BEHIND
-      );
+      new Vector3(x, this.pivot.y - reach * Math.cos(angle) - GRIP, this.pivot.z + reach * Math.sin(angle));
     const at = new Vector3();
     let past = false;
     return (t: number) => {
@@ -216,6 +212,7 @@ export class Rope {
         return at.lerpVectors(start, grip, u);
       }
       if (t < LET_GO) {
+        h.holding = true;
         h.angle = h.side * widest * Math.cos((Math.PI * (t - CAUGHT)) / (LET_GO - CAUGHT));
         return at.copy(feet(h.angle));
       }
@@ -237,6 +234,10 @@ export class Rope {
     const h = this.hung;
     const hanging = h?.model?.getObjectByName("hanging");
     if (!h || !hanging) return;
+    // (Holding on, you don't see it: it's right over your head, in your hands,
+    // and so near, it only looks wrong. Only reaching out to catch it: once
+    // you've let go, it's back in your hands a moment later.)
+    hanging.visible = !h.holding;
     const sway = h.held || this.reducedMotion ? 0 : SWAY * Math.sin(this.time * 1.1);
     // (Turned about the beam, x: its foot towards +z by angle.)
     hanging.rotation.x = -(h.angle + sway);
