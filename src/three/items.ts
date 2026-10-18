@@ -101,11 +101,12 @@ export function onPaths(ground: Ground, paths: Path[], steps: Step[] = []): Grou
   };
 }
 
-/** Where an object stands, and which way it lies when it falls. */
+/** Where an object stands, and which way it lies when it falls (and on what floor, underground). */
 export interface Footing {
   x: number;
   z: number;
   yaw: number;
+  floor?: number;
 }
 
 // Where a dropped object can go, nearest first: aside (to your right, or
@@ -183,8 +184,8 @@ export function items(options: {
   sound: (name: Shared) => void;
   /** What's in use has changed: an object used, or the place left. */
   changed: () => void;
-  /** Dropping an object where it's in use, it stays as it is (the ladder against the wall): its model, if so. */
-  stays: (id: ItemId) => { model: Object3D; fallsTo: Footing } | undefined;
+  /** Dropping an object where it's in use, it stays as it is (the ladder against the wall): its model, if so (and its own box, if it's not as it lies). */
+  stays: (id: ItemId) => { model: Object3D; fallsTo: Footing; box?: Box3 } | undefined;
   /** A game loaded (or carried on from another version), and, saved in 3D, where things lie. */
   begin?: { state: GameState; three?: ThreeSave };
   /** Where an object always starts in a place, rather than anywhere in it (the emerald, in the tower's chest): [x, z, floor]. */
@@ -571,11 +572,11 @@ export function items(options: {
     const staying = inUse ? stays(id) : undefined;
     changed();
     if (staying) {
-      const { model, fallsTo } = staying;
+      const { model, fallsTo, box } = staying;
       lying.set(id, {
         room: state.room,
         model,
-        box: boxOf(id),
+        box: box ?? boxOf(id),
         fallsTo,
       });
       return;
@@ -665,8 +666,8 @@ export function items(options: {
       if (!thing.fallsTo) continue;
       scene.remove(thing.model);
       lying.delete(id);
-      const { x, z, yaw } = thing.fallsTo;
-      lay(id, thing.room, x, z, yaw);
+      const { x, z, yaw, floor } = thing.fallsTo;
+      lay(id, thing.room, x, z, yaw, floor);
     }
   }
 
@@ -795,7 +796,7 @@ export function items(options: {
       for (const [id, thing] of lying) {
         const { x, z, yaw } = thing.fallsTo ?? thing.footprint!;
         const round = (v: number) => Math.round(v * 100) / 100;
-        const floor = thing.fallsTo ? undefined : thing.floor;
+        const floor = thing.fallsTo ? thing.fallsTo.floor : thing.floor;
         spots[id] = floor === undefined ? [round(x), round(z), round(yaw)] : [round(x), round(z), round(yaw), floor];
       }
       return { slots: slots.map((id) => id ?? null), lying: spots };

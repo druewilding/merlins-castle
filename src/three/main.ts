@@ -77,10 +77,11 @@ import witchModel from "./models/witches.glb?url";
 import { Notes, type NoteSpot } from "./notes";
 import { Plank } from "./plank";
 import { type Growth, Plants } from "./plants";
-import { type Box, type Circle, type Ground, type Hall, Player, type Walkable, wayThrough } from "./player";
+import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable, wayThrough } from "./player";
 import { type PropSpots, stampProps } from "./props";
 import { Rabbits } from "./rabbits";
 import { River } from "./river";
+import { Rope } from "./rope";
 import { Shafts, speck, type Window } from "./shafts";
 import { paintSign, type SignSpot } from "./sign";
 import { sky } from "./sky";
@@ -418,6 +419,8 @@ const shut = shapeOf.get("tower south");
 // The deep river, where it narrows, which the plank crosses (plank.ts), and
 // which (without it) sweeps you away from the north bank (swept.ts).
 const crossing = shapeOf.get("deep-river south");
+// The deep hole between the maze and the treasure room, which the rope swings you over (rope.ts).
+const holed = shapeOf.get("maze north");
 // The leaves filling the dragon's mouth, which the broom sweeps aside into
 // heaps (leaves.ts): lying on the way's floor in the mouth, and the ground
 // outside it.
@@ -458,7 +461,8 @@ function solidify() {
   for (const under of [false, true]) {
     const here = [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
     const closed = allOpen ? [] : here.filter((shape) => !opened.has(shape));
-    const plain = allOpen ? [] : here.filter((shape) => walls.has(shape));
+    // (And the deep hole, with the rope over it: you swing across it, not walk.)
+    const plain = allOpen ? [] : here.filter((shape) => walls.has(shape) || (shape === holed && opened.has(shape)));
     // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
@@ -659,6 +663,16 @@ let bridged: string | undefined; // the exit it's across for
 // And the lamp, lit, in your hand (or where you dropped it).
 const lantern = new Lantern(scene, things.scene.getObjectByName("lamp")!, player.camera, reducedMotion);
 const PLANK = new Box3().setFromObject(things.scene.getObjectByName("plank")!).getSize(new Vector3()).z;
+// And the rope, hanging from the beam over the deep hole (from either side of it).
+const rope = new Rope(
+  scene,
+  hole,
+  (x, z) => nearest(land.ways["maze-treasure"], x, z).floor,
+  player,
+  reducedMotion,
+  () => ownSounds.play("sweep", { rate: 0.8 })
+);
+let hanging: string | undefined; // the exit it's hanging for
 const items = setUpItems({
   world,
   scene,
@@ -676,6 +690,8 @@ const items = setUpItems({
     if (id === "ladder" && ladder.shown) return { model: ladder.handOver()!, fallsTo: ladder.footing! };
     // (Leaving, it falls where it lay: across the river, bridging it.)
     if (id === "plank" && plank.shown) return { model: plank.handOver()!, fallsTo: plank.footing! };
+    // (Hanging from the beam, as it was.)
+    if (id === "rope" && rope.shown) return { ...rope.handOver()!, fallsTo: rope.footing! };
     return undefined;
   },
   begin: handoff ?? undefined,
@@ -709,6 +725,7 @@ function inUse() {
         shape === crossing ||
         shape === heaped ||
         shape === dancers ||
+        shape === holed ||
         unlit.has(shape))
       ? [`${here} ${direction}`]
       : [];
@@ -765,6 +782,13 @@ function inUse() {
     }
     bridged = across;
   } else if (across && itemLocations.plank === "carried") plank.show();
+  // The rope over the deep hole, from the side you're on.
+  const hung = exits.find((exit) => shapeOf.get(exit) === holed);
+  if (hung !== hanging) {
+    rope.away();
+    if (hung) rope.hang(hung, itemLocations.rope === "carried", instantly);
+    hanging = hung;
+  } else if (hung && itemLocations.rope === "carried") rope.show();
 }
 
 // A game loaded: you're where you were in it (or, saved in another version,
@@ -1080,6 +1104,8 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   leaning = undefined;
   plank.away();
   bridged = undefined;
+  rope.away();
+  hanging = undefined;
   witches.free();
   net.reset();
   arrive(game);
@@ -1300,6 +1326,9 @@ renderer.setAnimationLoop((time) => {
     if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
   });
   plank.update(dt, (exit) => {
+    if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
+  });
+  rope.update(dt, (exit) => {
     if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
   });
   // Through what was in the way (over the wall, through the felled trees or
