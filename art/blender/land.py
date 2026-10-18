@@ -3458,8 +3458,10 @@ for way in WAYS.values():
                 quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
             # (Into a room, the frame can stand a little out from its wall,
             # where the way's walls begin: the sides of the doorway, back
-            # from the frame to the wall, so there's no gap to see out of.)
-            if hall.room:
+            # from the frame to the wall, so there's no gap to see out of. Not
+            # where the way's own walls go on past it: they'd be in the same
+            # place, and fight.)
+            if hall.room and not drawn(a, b):
                 ux, uy = (inner[0] - row[0]) / run, (inner[1] - row[1]) / run
                 for p in (el_, er_):
                     ts = [(hall.x + sign * (hall.w + ROOM_EDGE) - p[0]) / ux for sign in (1, -1) if abs(ux) > 1e-6]
