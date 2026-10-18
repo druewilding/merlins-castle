@@ -977,11 +977,10 @@ rope_object.data.transform(Matrix.Translation((0, 0, -low)))
 outward(rope_object)
 
 # The penny: as in its picture, a big old bronze coin, a worn king's head on
-# it (its picture's colours, and its light and shade raised into a low
-# relief), inside a raised rim; plain and worn on its other side. 34 cm
-# across, like the key, big enough to spot.
+# it (its picture's colours: no one looks closely enough for more), inside
+# a raised rim; plain and worn on its other side. 34 cm across, like the
+# key, big enough to spot.
 PENNY_R, PENNY_T = 0.17, 0.024  # its radius, and how thick it is
-RELIEF = 0.005  # how far the king's head stands up off it
 RIM = 0.86  # where its rim starts, of the way out
 PENNY_RINGS, PENNY_SIDES = 56, 120
 BRONZE = c.linear("#8c5530")
@@ -991,28 +990,15 @@ W, H = picture.size
 pixels = np.empty(W * H * 4, dtype=np.float32)
 picture.pixels.foreach_get(pixels)
 pixels = pixels.reshape(H, W, 4)[::-1]  # (its top row first)
-lum = pixels[:, :, :3] @ np.array([0.3, 0.59, 0.11], dtype=np.float32)
-
-
-def blurred(a, r):
-    """A box blur, r pixels each way."""
-    s = np.pad(a, r + 1, mode="edge").cumsum(0).cumsum(1)
-    n = 2 * r + 1
-    return (s[n:, n:] - s[:-n, n:] - s[n:, :-n] + s[:-n, :-n])[: a.shape[0], : a.shape[1]] / (n * n)
-
-
-# (Its light and shade, less the picture's broad lighting: what's raised.)
-bumps = blurred(lum, 6) - blurred(lum, 40)
-bumps = np.clip(bumps / max(1e-6, np.percentile(np.abs(bumps), 98)), -1, 1)
 CX, CY, RX, RY = 634.5, 632.0, 570.5, 552.0  # the coin, in its picture
 
 
 def face_at(u, v):
-    """Its picture's colour (linear) and how raised it is, u and v from -1 to 1 across it."""
+    """Its picture's colour (linear), u and v from -1 to 1 across it."""
     x = int(min(W - 1, max(0, CX + u * RX)))
     y = int(min(H - 1, max(0, CY - v * RY)))
     rgb = [p / 12.92 if p <= 0.04045 else ((p + 0.055) / 1.055) ** 2.4 for p in pixels[y, x, :3]]
-    return (*rgb, 1.0), float(bumps[y, x])
+    return (*rgb, 1.0)
 
 
 def worn(p):
@@ -1023,18 +1009,15 @@ def worn(p):
 penny = c.Builder()
 verts, faces, colours = [], [], []
 # Its face, ring by ring out from its middle (the rim higher, rounded at its edge).
-verts.append((0, 0, PENNY_T + RELIEF * face_at(0, 0)[1]))
-colours.append(face_at(0, 0)[0])
+verts.append((0, 0, PENNY_T))
+colours.append(face_at(0, 0))
 for i in range(1, PENNY_RINGS + 1):
     t = i / PENNY_RINGS
     for k in range(PENNY_SIDES):
         a = 2 * math.pi * k / PENNY_SIDES
         u, v = math.cos(a) * t, math.sin(a) * t
-        colour, bump = face_at(u * 0.985, v * 0.985)
-        if t <= RIM:
-            z = PENNY_T + RELIEF * (0.5 + 0.5 * bump) * c.smooth((RIM - t) / 0.04)
-        else:
-            z = PENNY_T + 0.0055 * math.sin(math.pi * (t - RIM) / (1 - RIM)) ** 0.6 + 0.0025 * (0.5 + 0.5 * bump)
+        colour = face_at(u * 0.985, v * 0.985)
+        z = PENNY_T + (0.0055 * math.sin(math.pi * (t - RIM) / (1 - RIM)) ** 0.6 if t > RIM else 0.0)
         verts.append((u * PENNY_R, v * PENNY_R, z))
         colours.append(colour)
 for k in range(PENNY_SIDES):
