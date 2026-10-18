@@ -58,6 +58,7 @@ import { Fall } from "./fall";
 import { Felling } from "./felling";
 import { Golden } from "./golden";
 import { haze } from "./haze";
+import { Hole, type HoleSpot, Slipped } from "./hole";
 import { items as setUpItems, onPaths } from "./items";
 import { Ladder } from "./ladder";
 import { dressLamp, Lantern } from "./lantern";
@@ -514,6 +515,8 @@ player.bounds = { west, east, north: -north, south: -south };
 // Merlin's trap (trap.ts): the net, hidden, lying in wait in front of its treasure.
 const TRAP = "mountain east";
 const net = new Net(scene, land.trap as TrapSpot, ground);
+// The deep hole between the maze and the treasure room: you fall into it from either side.
+const hole = new Hole(scene, land.hole as HoleSpot);
 
 // Red where a way through kills you (but Merlin's trap: that's its treasure, and the net in front of it).
 const danger = new MeshBasicMaterial({ color: "#d9503f", transparent: true, opacity: 0.5, depthWrite: false });
@@ -817,6 +820,16 @@ const scenes: Record<string, () => Scene3d | undefined> = {
       ? undefined
       : new Caught(player.camera, drawn, witches, reducedMotion),
   [TRAP]: () => new Trapped(player.camera, drawn, net, reducedMotion, () => ownSounds.play("net")),
+  // (Not with the rope across it.)
+  ...Object.fromEntries(
+    ["maze north", "treasure-room south"].map((exit) => [
+      exit,
+      () =>
+        effects(world, items.state).includes("rope")
+          ? undefined
+          : new Slipped(player.camera, hole, reducedMotion, () => ownSounds.play("falling")),
+    ])
+  ),
 };
 
 /** Walking into a way that kills you: its scene (and true), or nothing to see (false). */
@@ -915,6 +928,7 @@ if (debugMode) {
       merlin,
       witches,
       net,
+      hole,
       restart,
       drawn,
     },
@@ -1069,6 +1083,7 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   bridged = undefined;
   witches.free();
   net.reset();
+  hole.reset();
   arrive(game);
   instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
   inUse();
@@ -1215,7 +1230,7 @@ renderer.setAnimationLoop((time) => {
     if (was < playing.scene.ends - EARLY && playing.t >= playing.scene.ends - EARLY) curtain(playing.words);
   }
   river.update(dt, player.camera.position);
-  murky.classList.toggle("under", Boolean(playing) && player.camera.position.y < land.river.water);
+  murky.classList.toggle("under", playing?.scene instanceof Swept && player.camera.position.y < land.river.water);
   trees.update(player.position, player.yaw, player.camera);
   plants.update(dt, player.camera.position, items.lying());
   // Coming down from the mountain to the dense trees, they part for you

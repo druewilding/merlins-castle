@@ -196,6 +196,25 @@ describe("Merlin's trap", () => {
   });
 });
 
+describe("the deep hole", () => {
+  const { box, reach } = land.obstacles["maze north"] as { box: number[]; reach: number };
+
+  it("stops you both ways, at the hole itself", () => {
+    expect(land.obstacles["treasure-room south"]).toEqual(land.obstacles["maze north"]);
+    expect(box).toEqual(land.hole.box);
+  });
+
+  it("lets you walk right up to its edge (to slip in), and is right across the way", () => {
+    expect(reach).toBeLessThan(1);
+    expect(box[2]).toBeGreaterThan(land.ways["maze-treasure"].half);
+  });
+
+  it("goes down a long way, with a beam across its top, over your head", () => {
+    expect(land.hole.floor - land.hole.bottom).toBeGreaterThan(50);
+    expect(land.hole.beam - land.hole.floor).toBeGreaterThan(2.5);
+  });
+});
+
 // Underground: where you can be is in a hall, or along a way (and from a
 // way's mouth, out onto the land, which counts as reaching the place nearest).
 const halls = Object.entries(land.halls);
