@@ -414,7 +414,7 @@ const snake = new Snake(
   scene,
   snaky.scene,
   things.scene.getObjectByName("apple")!,
-  onPaths(ground, land.paths, land.steps),
+  onPaths(ground, land.paths, land.steps, land.floors),
   (guarded!.circle ?? guarded!.box)!,
   reducedMotion
 );
@@ -717,6 +717,7 @@ const items = setUpItems({
   walkable,
   paths: land.paths,
   steps: land.steps,
+  floors: land.floors,
   root,
   say,
   sound: (name) => sounds.play(name),

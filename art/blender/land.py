@@ -2543,6 +2543,7 @@ mx0, my0 = MZ[0] - MAZE_HALF, MZ[1] - MAZE_HALF
 # ivy hanging down from its tops, here and there. Its floor, flagstones
 # (the texture again), just over the ground.
 MAZE_THICK, MAZE_TALL = 0.35, 2.9  # half its thickness, and its height over the ground
+MAZE_FLOOR = 0.14  # how far its floor's over the ground (what's dropped there lies on it, not under it)
 MAZE_MOSS = c.linear("#9fae7a")
 MAZE_LIGHT = c.linear("#ffffff")
 maze = c.Builder()
@@ -2645,7 +2646,7 @@ xs, ys = maze_lines(mx0, mx0 + 2 * MAZE_HALF, X0), maze_lines(my0, my0 + 2 * MAZ
 for i in range(len(xs) - 1):
     for j in range(len(ys) - 1):
         pts = [(xs[i], ys[j]), (xs[i + 1], ys[j]), (xs[i + 1], ys[j + 1]), (xs[i], ys[j + 1])]
-        maze_floor.add([(x, y, drawn_height(x, y, exactly=True) + 0.14) for x, y in pts], [(0, 1, 2), (0, 2, 3)],
+        maze_floor.add([(x, y, drawn_height(x, y, exactly=True) + MAZE_FLOOR) for x, y in pts], [(0, 1, 2), (0, 2, 3)],
                        [MAZE_LIGHT] * 4)
 maze_floor.build("maze-floor", smooth=True)
 # Boulders at the foot of its south wall, either side of the way in: past
@@ -4497,6 +4498,8 @@ if out:
         "props": prop_spots,
         # Steps on the land, for lying on: [x, z, half x, half z, top].
         "steps": STEPS,
+        # Floors over the ground, for lying on: [x, z, half x, half z, how far up]. (The maze's.)
+        "floors": [[round(MZ[0], 2), round(-MZ[1], 2), round(MAZE_HALF, 2), round(MAZE_HALF, 2), MAZE_FLOOR]],
         # The paths, lying a little above the ground (so what's dropped on
         # one lies on it, not in it): each its line [x, z], in three.js's
         # axes, how far either side of it it goes, and how far up it is.

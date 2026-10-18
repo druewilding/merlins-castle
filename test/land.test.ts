@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import layout from "../art/blender/layout.json";
+import { onPaths } from "../src/three/items";
 import landBin from "../src/three/models/land.bin?inline";
 import land from "../src/three/models/land.json";
 import { wayThrough } from "../src/three/player";
@@ -410,5 +411,24 @@ describe("underground, with every obstacle open", () => {
       "treasure-room",
       "trolls",
     ]);
+  });
+});
+
+// The maze's paving lies over the ground: what's left lying in the maze (the
+// penny starts there) must lie on it, not hidden under it.
+describe("the maze's floor", () => {
+  const [[x, z, halfX, halfZ, up]] = land.floors;
+  const maze = places.find((place) => place.id === "maze")!;
+
+  it("covers the maze, a little over the ground", () => {
+    expect(Math.abs(maze.x - x)).toBeLessThan(halfX);
+    expect(Math.abs(maze.z - z)).toBeLessThan(halfZ);
+    expect(up).toBeGreaterThan(0.1);
+  });
+
+  it("is what an object in the maze lies on (and only there)", () => {
+    const surface = onPaths(() => 20, [], [], land.floors);
+    expect(surface(maze.x + 2, maze.z - 3)).toBeCloseTo(20 + up);
+    expect(surface(x + halfX + 1, z)).toBe(20);
   });
 });

@@ -76,8 +76,11 @@ export interface Path {
 /** A step on the land (land.json): [x, z, half x, half z, top]. */
 export type Step = number[];
 
-/** The ground, or the top of a path lying on it (or of a step). */
-export function onPaths(ground: Ground, paths: Path[], steps: Step[] = []): Ground {
+/** A floor over the ground (land.json: the maze's paving): [x, z, half x, half z, how far up]. */
+export type Floor = number[];
+
+/** The ground, or the top of a path lying on it (or of a step, or a floor). */
+export function onPaths(ground: Ground, paths: Path[], steps: Step[] = [], floors: Floor[] = []): Ground {
   return (x, z) => {
     const g = ground(x, z);
     if (g === undefined) return undefined;
@@ -86,6 +89,9 @@ export function onPaths(ground: Ground, paths: Path[], steps: Step[] = []): Grou
       if (Math.abs(x - sx) <= halfX && Math.abs(z - sz) <= halfZ) top = Math.max(top, high);
     }
     let lift = 0;
+    for (const [fx, fz, halfX, halfZ, up] of floors) {
+      if (Math.abs(x - fx) <= halfX && Math.abs(z - fz) <= halfZ) lift = Math.max(lift, up);
+    }
     for (const path of paths) {
       for (let k = 0; k < path.points.length - 1; k++) {
         const [ax, az] = path.points[k];
@@ -177,6 +183,8 @@ export function items(options: {
   /** The paths, a little above the ground (land.json): what lies on one lies on top of it. And the steps. */
   paths: Path[];
   steps: Step[];
+  /** And the floors over the ground (the maze's paving). */
+  floors?: Floor[];
   root: HTMLElement;
   /** Words at the bottom of the screen ("Nothing happens."). */
   say: (words: string) => void;
@@ -268,7 +276,7 @@ export function items(options: {
   }
 
   /** The ground, or the top of a path lying on it. */
-  const surface = onPaths(ground, options.paths, options.steps);
+  const surface = onPaths(ground, options.paths, options.steps, options.floors);
 
   /** The line an object rests on, along its length: the ground's upper hull, under its middle. */
   function resting(x: number, z: number, yaw: number, half: number, wide: number) {
