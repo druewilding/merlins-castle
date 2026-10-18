@@ -1888,7 +1888,18 @@ def arch_breach(x):
                 if abs(x - mid) < wide / 2], default=0.0)
 
 
-def arch_course(x0, x1, z0, z1, short=(0.45, 0.9), top=None):
+# And where the archway's own top has broken away: from over its crown,
+# down to its east pier's outer edge (its ring of stones still whole).
+ARCH_BREAK = (ARCH_X + 0.9, ARCH_X + ARCH_HALF + ARCH_PIER, 1.3)  # from, to, and how far down it's gone, there
+
+
+def arch_broken(x, z1):
+    """Whether a stone, its middle along at x and its top at z1, has fallen from the archway's broken corner."""
+    start, end, deep = ARCH_BREAK
+    return x > start and z1 > ARCH_TOP - deep * min(1.0, (x - start) / (end - start)) + 0.05
+
+
+def arch_course(x0, x1, z0, z1, short=(0.45, 0.9), top=None, gone=None):
     """A course of stones from x0 to x1, joints staggered. (Along the wall's
     top, one gone now and then; and none where it's fallen in.)"""
     x = x0 - arch_rng.uniform(0, short[0])
@@ -1897,6 +1908,8 @@ def arch_course(x0, x1, z0, z1, short=(0.45, 0.9), top=None):
         a, b = max(x, x0), min(x + long, x1)
         x += long
         if b - a <= 0.12:
+            continue
+        if gone and gone((a + b) / 2, z1):
             continue
         if top is not None:
             if z1 > top - max(arch_breach(a), arch_breach(b), arch_breach((a + b) / 2)) + 0.05:
@@ -1925,7 +1938,8 @@ for lo, hi, pier in ((ARCH_ENDS[0], pier_out, False), (pier_out, pier_in, True),
         tall = min(arch_rng.uniform(0.3, 0.42), top - z)
         if pier:
             # (Big quoins, the full width of the pier, every other course.)
-            arch_course(lo, hi, z, z + tall, (0.45, 0.6) if arch_rng.random() < 0.5 else (ARCH_PIER, ARCH_PIER))
+            arch_course(lo, hi, z, z + tall, (0.45, 0.6) if arch_rng.random() < 0.5 else (ARCH_PIER, ARCH_PIER), top=top,
+                        gone=arch_broken)
         else:
             arch_course(lo, hi, z, z + tall, top=top)
         z += tall
@@ -1956,7 +1970,7 @@ for lo, hi, pier in ((ARCH_ENDS[0], pier_out, False), (pier_out, pier_in, True),
             # (Up to its stones' tops, just there: stepping down, a course at a
             # time, where it's fallen in, as its stones do.)
             m = (a + b) / 2
-            t = top if pier or not arch_breach(m) else max(
+            t = top if not pier and not arch_breach(m) else max(
                 (z1 for x0, x1, z1 in arch_laid if x0 <= m <= x1 and z1 <= top + 0.01), default=top) - 0.03
             ta = tb = t
             facing(arch, [(a, y, arch_foot(a)), (b, y, arch_foot(b)), (b, y, tb), (a, y, ta)], [ARCH_GAP] * 4,
@@ -1996,6 +2010,9 @@ while z < ARCH_TOP - 0.05:
         x += long
         lows = [extrados(v) for v in (a, b, (a + b) / 2)]
         floor_ = max((v for v in lows if v is not None), default=0.0)
+        # (None where its corner's broken away; a stone gone from its top now and then.)
+        if arch_broken((a + b) / 2, z + tall) or (z + tall > ARCH_TOP - 0.05 and arch_rng.random() < 0.2):
+            continue
         if z + tall - 0.08 > floor_:
             arch_stone(a, b, max(z, floor_ + 0.02), z + tall)
     z += tall
@@ -2005,7 +2022,11 @@ for side in (-1, 1):
     edge = [(ARCH_X + math.cos(math.pi * k / 16) * (ARCH_HALF + 0.03), y,
              ARCH_SPRING + math.sin(math.pi * k / 16) * (ARCH_HALF + 0.03)) for k in range(17)]
     for p, q in zip(edge, edge[1:]):
-        facing(arch, [p, q, (q[0], y, ARCH_TOP), (p[0], y, ARCH_TOP)], [ARCH_GAP] * 4, (0, side, 0))
+        # (Up to its stones' tops, just there: down where they're gone, behind its ring.)
+        m = (p[0] + q[0]) / 2
+        ring = extrados(m) or ARCH_SPRING
+        t = max([z1 for x0, x1, z1 in arch_laid if x0 <= m <= x1 and z1 > ring - 0.01] + [ring]) - 0.03
+        facing(arch, [p, q, (q[0], y, t), (p[0], y, t)], [ARCH_GAP] * 4, (0, side, 0))
 # Behind the joints in the arch's underside, between its two faces: dark,
 # and a little way up into its stones (whose own undersides are what you see).
 for k in range(16):
@@ -2027,7 +2048,7 @@ for side in (-1, 1):
             lz = top - down
             size = arch_rng.uniform(0.13, 0.2)
             spin = arch_rng.uniform(0, 2 * math.pi)
-            y = ARCH_Y + side * (ARCH_THICK + arch_rng.uniform(0.03, 0.09))
+            y = ARCH_Y + side * (ARCH_THICK + arch_rng.uniform(0.06, 0.12))  # (clear of the stones standing out)
             corners = [(lx + math.cos(spin + a) * size * r, y, lz + math.sin(spin + a) * size * r)
                        for a, r in ((0, 1.0), (math.pi / 2, 0.6), (math.pi, 0.5), (3 * math.pi / 2, 0.6))]
             leaf = c.mix(*IVY, arch_rng.random())
@@ -2061,6 +2082,10 @@ for mid, wide, deep in ARCH_BREACHES:
         side = arch_rng.choice((-1, 1))
         fallen_at.append((mid + arch_rng.uniform(-1.2, 1.2) * wide, ARCH_Y + side * arch_rng.uniform(0.7, 2.6),
                           arch_rng.uniform(0.3, 0.55)))
+# (And from the archway's broken corner, beside the path.)
+for _ in range(5):
+    fallen_at.append((arch_rng.uniform(ARCH_X + ARCH_HALF + 1.0, ARCH_X + ARCH_HALF + 2.6),
+                      ARCH_Y + arch_rng.choice((-1, 1)) * arch_rng.uniform(0.7, 2.2), arch_rng.uniform(0.3, 0.5)))
 for _ in range(6):
     fallen_at.append((arch_rng.uniform(*ARCH_ENDS), ARCH_Y + arch_rng.choice((-1, 1)) * arch_rng.uniform(0.7, 2.0),
                       arch_rng.uniform(0.25, 0.45)))
