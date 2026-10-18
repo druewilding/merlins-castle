@@ -2994,9 +2994,11 @@ for x0, x1 in ((kw, GH[0] - door), (GH[0] + door, ke)):
 # where the two would flicker against each other in blocky stripes.)
 block(built, GH[0] - door, kn - 1, TUNNEL_TALL + 0.4 - LINTEL_DROP, GH[0] + door, kn, KEEP_TALL, GREY, solid=False)
 block(built, kw, ks, 0, ke, ks + 1, KEEP_TALL, GREY, solid=False)
-block(built, kw, ks, 0, kw + 1, kn, KEEP_TALL, GREY, solid=False)
-block(built, ke - 1, ks, 0, ke, kn, KEEP_TALL, GREY, solid=False)
-block(built, kw, ks, KEEP_TALL - 0.4, ke, kn, KEEP_TALL, c.linear("#8d8a80"), solid=False)
+# (Its sides between its front and back, and its roof between its walls:
+# over them, their faces would be in the same place, and flicker.)
+block(built, kw, ks + 1, 0, kw + 1, kn - 1, KEEP_TALL, GREY, solid=False)
+block(built, ke - 1, ks + 1, 0, ke, kn - 1, KEEP_TALL, GREY, solid=False)
+block(built, kw + 1, ks + 1, KEEP_TALL - 0.4, ke - 1, kn - 1, KEEP_TALL, c.linear("#8d8a80"), solid=False)
 x = kw
 while x < ke - 1:
     block(built, x, kn - 1, KEEP_TALL, x + 1, kn, KEEP_TALL + 1, GREY, solid=False)  # battlements
