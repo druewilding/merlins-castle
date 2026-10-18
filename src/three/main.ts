@@ -235,7 +235,7 @@ if (emerald instanceof Mesh) {
 dressLamp(things.scene.getObjectByName("lamp")!);
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
-  node.castShadow = !["paths", "water", "embers"].includes(node.name);
+  node.castShadow = !["paths", "water", "embers", "archway-ivy"].includes(node.name);
   node.receiveShadow = !["water", "embers"].includes(node.name);
 });
 // The maze, in stone.

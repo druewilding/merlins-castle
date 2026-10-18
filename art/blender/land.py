@@ -1850,6 +1850,7 @@ ARCH_THICK = 0.42  # half its thickness
 ARCH_STONES = [c.linear(h) for h in ("#a39d90", "#958f83", "#ada79a", "#8a857a", "#9c968a", "#b2ada2")]
 ARCH_GAP = c.linear("#5f584c")
 arch = c.Builder()
+arch_ivy = c.Builder()  # (its own: casting no shadows, so close to the stones the sun's shadows would speckle them)
 arch_rng = random.Random("the stone archway")
 arch_tops = []  # (from, to, how high its top is there), as it's built: for the ivy to hang from
 arch_laid = []  # (from, to, its top): each stone of the wall, as it's laid, for its core to come up to
@@ -2048,11 +2049,16 @@ for side in (-1, 1):
             lz = top - down
             size = arch_rng.uniform(0.13, 0.2)
             spin = arch_rng.uniform(0, 2 * math.pi)
-            y = ARCH_Y + side * (ARCH_THICK + arch_rng.uniform(0.06, 0.12))  # (clear of the stones standing out)
-            corners = [(lx + math.cos(spin + a) * size * r, y, lz + math.sin(spin + a) * size * r)
+            # (Clear of the stones standing out, each leaf at its own depth and
+            # tipped out towards its tip, the whole of it: two overlapping, at
+            # the same depth and flat there, would flicker through each other.)
+            y = ARCH_Y + side * (ARCH_THICK + 0.06 + arch_rng.uniform(0, 0.08))
+            tip = arch_rng.uniform(0.04, 0.08)
+            corners = [(lx + math.cos(spin + a) * size * r, y + side * tip * (1 + math.cos(a)) / 2,
+                        lz + math.sin(spin + a) * size * r)
                        for a, r in ((0, 1.0), (math.pi / 2, 0.6), (math.pi, 0.5), (3 * math.pi / 2, 0.6))]
             leaf = c.mix(*IVY, arch_rng.random())
-            facing(arch, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf], (0, side, 0))
+            facing(arch_ivy, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf], (0, side, 0))
 # Its fallen stones, at its foot either side: most under where it's fallen
 # in, a few elsewhere; tumbled every which way, half sunk in the ground, and
 # mossy. Not on the path, nor in a tree; the big ones solid.
@@ -2100,6 +2106,7 @@ for cx, cy, size in fallen_at:
     placed.append((cx, cy, size))
     tumbled(cx, cy, size)
 arch.build("archway", smooth=False)
+arch_ivy.build("archway-ivy", smooth=False)
 
 
 # A clue at each dead end: a note, nailed to a rough board on a stake, the
