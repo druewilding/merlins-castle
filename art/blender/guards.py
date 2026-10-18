@@ -20,7 +20,7 @@ from pathlib import Path
 
 import bpy
 import numpy as np
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Vector, kdtree
 
 HERE = Path(__file__).parent
 sys.path.append(str(HERE))
@@ -47,7 +47,7 @@ SHAFT = "#7a5230"
 SIDES = 32  # round the tabard and the helmet
 TOP, HEM, WAIST = 1.58, 0.74, 1.04  # the tabard: from his shoulders to his thighs; belted here
 PANEL = 1.0  # radians either side of his front (and back) the tabard reaches round him
-FIT = 0.025  # metres it stands clear of his tunic, at its snuggest (over its studs)
+FIT = 0.012  # metres it stands clear of his tunic, at its snuggest
 
 # ---- The outfit: his skeleton, tunic, arms, legs and boots ---------------------
 
@@ -68,7 +68,13 @@ beard.name = "guard-beard"
 under = [o for o in skeleton.children if o.name.startswith(("Male_Ranger_Body", "Male_Ranger_Legs"))]
 RINGS = 18
 heights = [TOP + (HEM - TOP) * i / RINGS for i in range(RINGS + 1)]
-snug = c.hang([c.girth(under, z, SIDES, (0.0, 0.01), band=0.03) for z in heights])  # (bands meeting: nothing missed between)
+# (Bands meeting, so nothing's missed between them.) Down to his belt, as
+# snug as what's under it (an oval, his chest broader than his waist, and
+# cinched in by the belt); below it, hanging down from there, never in.
+girths = [c.girth(under, z, SIDES, (0.0, 0.01), band=0.03) for z in heights]
+belted = next(i for i, z in enumerate(heights) if z <= WAIST)
+snug = [[max(g[k - 1], g[k], g[(k + 1) % SIDES]) for k in range(SIDES)] for g in girths[:belted]]
+snug += c.hang(girths[belted:])
 
 
 def tabard_colour(u, z, seed):
@@ -88,14 +94,12 @@ for side, facing in ((0, 0.0), (1, math.pi)):  # his front, then his back
         row = []
         for j in range(ACROSS + 1):
             u = -1 + 2 * j / ACROSS
-            a = facing + u * PANEL
+            # (Narrower at the top, between his shoulders.)
+            a = facing + u * PANEL * (1 - 0.35 * c.smooth((z - 1.42) / 0.16))
             k = round(a / (2 * math.pi) * SIDES) % SIDES
-            r = snug[i][k] + FIT + 0.03 * max(0.0, (WAIST - z) / (WAIST - HEM))
-            # (Below the belt, hanging flat, not round his legs.)
-            flat = c.smooth((WAIST - z) / 0.12)
+            r = snug[i][k] + FIT + 0.012 * max(0.0, (WAIST - z) / (WAIST - HEM))
             x = math.sin(a) * r
             y = -math.cos(a) * r
-            y = y * (1 - flat) + (-1 if side == 0 else 1) * max(abs(y), 0.13 + 0.02 * t) * flat
             low = c.smooth((WAIST + 0.08 - z) / 0.25)
             row.append(((x, y + 0.01, z), {"spine_03": (1 - low) * c.smooth((z - 1.2) / 0.2), "spine_01": (1 - low) * 0.6,
                                            "pelvis": low + 0.05, "thigh_l": 0.12 * low * (x > 0),
@@ -113,7 +117,56 @@ for side, facing in ((0, 0.0), (1, math.pi)):  # his front, then his back
                 weights.append(w)
                 colours.append(colour)
             faces.append((first, first + 1, first + 2, first + 3))
+
+
+# What's under it moves it as it moves what's under it (so, his body bending,
+# nothing comes through it): each of its points by the bones that move the
+# nearest point of his tunic. (Below his belt, it hangs from his hips.)
+groups = {}
+tree = kdtree.KDTree(sum(len(o.data.vertices) for o in under))
+n = 0
+for obj in under:
+    names = {g.index: g.name for g in obj.vertex_groups}
+    for v in obj.data.vertices:
+        tree.insert(obj.matrix_world @ v.co, n)
+        groups[n] = {names[g.group]: g.weight for g in v.groups if g.weight > 0}
+        n += 1
+tree.balance()
+
+
+def as_under(p, own):
+    """The weights of the nearest point of what's under it, above the belt; its own, below."""
+    _, nearest, _ = tree.find(Vector(p))
+    t = c.smooth((p[2] - (WAIST - 0.06)) / 0.12)
+    mixed = {bone: w * (1 - t) for bone, w in own.items()}
+    # (Only his body's bones: not his arms', which would swing its corners out at his shoulders.)
+    body = {bone: w for bone, w in groups[nearest].items() if bone.startswith(("pelvis", "spine", "neck"))}
+    total = sum(body.values()) or 1.0
+    for bone, w in (body or {"spine_03": 1.0}).items():
+        mixed[bone] = mixed.get(bone, 0.0) + w / total * t
+    return mixed
+
+
+weights = [as_under(p, w) for p, w in zip(verts, weights)]
 tabard = c.skinned("guard-tabard", verts, faces, colours, weights, skeleton)
+# (And his tunic, under it, pressed in: nothing of it, a strap or a stud,
+# pokes out through it.)
+for obj in under:
+    to_mesh = obj.matrix_world.inverted()
+    for v in obj.data.vertices:
+        p = obj.matrix_world @ v.co
+        if not HEM < p.z < TOP:
+            continue
+        a = math.atan2(p.x, -(p.y - 0.01)) % (2 * math.pi)
+        if min(abs(a), abs(a - math.pi), abs(a - 2 * math.pi)) > PANEL + 0.05:
+            continue
+        i = min(RINGS, max(0, round((TOP - p.z) / (TOP - HEM) * RINGS)))
+        k = round(a / (2 * math.pi) * SIDES) % SIDES
+        limit = snug[i][k] + FIT - 0.006
+        r = math.hypot(p.x, p.y - 0.01)
+        if r > limit:
+            p = Vector((p.x * limit / r, 0.01 + (p.y - 0.01) * limit / r, p.z))
+            v.co = to_mesh @ p
 tabard.data.materials.append(c.vertex_material())
 
 # Its belt, round his waist over it.
@@ -122,52 +175,75 @@ k_ = heights.index(min(heights, key=lambda z: abs(z - WAIST)))
 for ring, dz in enumerate((-0.035, 0.035)):
     for k in range(SIDES):
         a = 2 * math.pi * k / SIDES
-        r = snug[k_][k] + FIT + 0.012
+        r = snug[k_][k] + FIT + 0.01  # (just over the tabard, and as snug: an oval)
         verts.append((math.sin(a) * r, -math.cos(a) * r + 0.01, WAIST + dz))
         buckle = abs(math.sin(a / 2)) < 0.08
         colours.append(c.linear(TRIM if buckle else LEATHER))
 faces = [(k, (k + 1) % SIDES, SIDES + (k + 1) % SIDES, SIDES + k) for k in range(SIDES)]
-belt = c.skinned("guard-belt", verts, faces, colours, [{"spine_01": 0.3, "pelvis": 0.7}] * len(verts), skeleton)
+belt = c.skinned("guard-belt", verts, faces, colours, [as_under(p, {"pelvis": 1.0}) for p in verts], skeleton)
 belt.data.materials.append(c.vertex_material())
 
 # ---- His helmet: a kettle hat, a round steel cap with a wide brim -------------
 
-skull = [skeleton.matrix_world.inverted() @ head.matrix_world @ v.co for v in head.data.vertices]
-BROW = 1.765  # where it sits on his head (above his eyes)
-TILT = 8  # degrees it's tipped back, so you see his eyes under its brim
-cy = sum(p.y for p in skull if p.z > BROW) / max(1, sum(1 for p in skull if p.z > BROW))
-cap = Vector((0.0, cy, BROW))
-rx, ry, rz = 0.1, 0.115, 0.1
-# (Big enough to cover all of his head above its brim.)
-fit = max(math.sqrt((p.x / rx) ** 2 + ((p.y - cy) / ry) ** 2 + ((p.z - BROW) / rz) ** 2) for p in skull if p.z > BROW)
-rx, ry, rz = (r * fit * 1.1 for r in (rx, ry, rz))
-verts, faces, colours = [], [], []
+# Fitted to his head (an oval, as heads are): its rim snug round it, just
+# above his eyebrows, and its crown just over the top of it, never in.
+BROW = 1.75  # where it sits on his head (above his eyes)
+SNUG = 0.008  # metres it stands clear of his head
 DOME = 8
-for i in range(DOME + 1):
-    up = (i / DOME) * math.pi / 2
+skull = [skeleton.matrix_world.inverted() @ head.matrix_world @ v.co for v in head.data.vertices]
+cy = sum(p.y for p in skull if p.z > BROW) / max(1, sum(1 for p in skull if p.z > BROW))
+crown = max(p.z for p in skull) + SNUG  # (how high it comes)
+rise = crown - BROW
+levels = [BROW + rise * i / DOME for i in range(DOME + 1)]
+heads = [c.girth([head], z, SIDES, (0.0, cy), band=rise / DOME) for z in levels]
+
+
+def oval(ring):
+    """A ring smoothed round, then made just big enough to cover what it was."""
+    smooth_ = [sum(ring[(k + d) % SIDES] for d in range(-3, 4)) / 7 for k in range(SIDES)]
+    grow = max(r / max(s_, 1e-6) for r, s_ in zip(ring, smooth_))
+    return [s_ * grow for s_ in smooth_]
+
+
+rim = oval([r + SNUG for r in heads[0]])
+dome = []
+for i in range(DOME):
+    t = i / DOME
+    need = [max(h[k] for h in heads[i:]) + SNUG for k in range(SIDES)]
+    ring = [r * math.sqrt(1 - t * t) for r in rim]
+    grow = max(1.0, *(n / max(r, 1e-6) for n, r in zip(need, ring)))
+    dome.append([r * grow for r in ring])
+verts, faces, colours = [], [], []
+for i, z in enumerate(levels[:-1]):
+    t = i / DOME
     for k in range(SIDES):
         a = 2 * math.pi * k / SIDES
-        verts.append((math.sin(a) * rx * math.cos(up), cy - math.cos(a) * ry * math.cos(up), BROW + rz * math.sin(up)))
+        # (Round as a dome, from its rim; but never into his head.)
+        r = dome[i][k]
+        verts.append((math.sin(a) * r, cy - math.cos(a) * r, z))
         ridge = abs(math.sin(a)) < 0.06  # (a ridge over the top, front to back)
         colours.append(c.vary(c.linear(STEEL_DARK if ridge or i == 0 else STEEL), 0.06, Vector((a, i, 3))))
-for i in range(DOME):
+top = len(verts)
+verts.append((0.0, cy, crown))
+colours.append(c.linear(STEEL))
+for i in range(DOME - 1):
     for k in range(SIDES):
         a, b = i * SIDES + k, i * SIDES + (k + 1) % SIDES
         faces.append((a, b, b + SIDES, a + SIDES))
-# The brim, out and a little down, all round.
+last = (DOME - 1) * SIDES
+faces += [(last + k, last + (k + 1) % SIDES, top) for k in range(SIDES)]
+# The brim, out and a little down, all round (an oval, as its rim is).
 base = len(verts)
-for ring, (out_, dz) in enumerate(((1.0, 0.0), (1.0, -0.01), (1.0 + 0.075 / rx, -0.025), (1.0 + 0.082 / rx, -0.034))):
+for ring, (out_, dz) in enumerate(((0.0, 0.0), (0.0, -0.01), (0.07, -0.016), (0.076, -0.024))):
     for k in range(SIDES):
         a = 2 * math.pi * k / SIDES
-        grow = out_ - 1
-        verts.append((math.sin(a) * (rx + grow * rx), cy - math.cos(a) * (ry + grow * rx), BROW + dz))
+        r = rim[k] + out_
+        verts.append((math.sin(a) * r, cy - math.cos(a) * r, BROW + dz))
         colours.append(c.vary(c.linear(STEEL_DARK if ring in (1, 3) else STEEL), 0.06, Vector((a, ring, 4))))
 for ring in range(3):
     for k in range(SIDES):
         a, b = base + ring * SIDES + k, base + ring * SIDES + (k + 1) % SIDES
         faces.append((a, a + SIDES, b + SIDES, b))
-tip = Matrix.Rotation(math.radians(-TILT), 4, "X")
-verts = [tuple(tip @ (Vector(v) - cap) + cap) for v in verts]
 helmet = c.skinned("guard-helmet", verts, faces, colours, [{"Head": 1.0}] * len(verts), skeleton)
 helmet.data.materials.append(c.vertex_material())
 
@@ -270,5 +346,6 @@ if preview:
     c.preview(preview, (1.0, -3.0, 1.4), (0, 0, 1.05), (0.4, 0.8, -1), lens=40)
     c.preview(preview.replace(".png", "-side.png"), (-3.2, -0.6, 1.3), (0, 0, 1.05), (0.4, 0.8, -1), lens=40)
     c.preview(preview.replace(".png", "-face.png"), (0.35, -1.3, 1.62), (0, 0, 1.45), (0.4, 0.8, -1), lens=40)
+    c.preview(preview.replace(".png", "-back.png"), (-0.8, 3.0, 1.5), (0, 0, 1.15), (0.4, 0.8, -1), lens=40)
     c.pose(skeleton, "Interact", 30)
     c.preview(preview.replace(".png", "-taking.png"), (1.0, -3.0, 1.4), (0, 0, 1.05), (0.4, 0.8, -1), lens=40)
