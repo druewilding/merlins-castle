@@ -201,16 +201,19 @@ describe("the deep hole", () => {
 
   it("stops you both ways, at the hole itself", () => {
     expect(land.obstacles["treasure-room south"]).toEqual(land.obstacles["maze north"]);
-    expect(box).toEqual(land.hole.box);
+    expect(box.slice(0, 3)).toEqual(land.hole.box.slice(0, 3));
   });
 
-  it("lets you walk right up to its edge (to slip in), and is right across the way", () => {
-    expect(reach).toBeLessThan(1);
+  it("lets you walk right up to its edge and look in (only over it, you slip in), and is right across the way", () => {
+    expect(reach).toBe(0);
+    const edge = land.hole.box[3] - box[3]; // (how far in from the hole's edge it catches you: your body, over it)
+    expect(edge).toBeGreaterThan(0);
+    expect(edge).toBeLessThan(BODY);
     expect(box[2]).toBeGreaterThan(land.ways["maze-treasure"].half);
   });
 
   it("goes down a long way, with a beam across its top, over your head", () => {
-    expect(land.hole.floor - land.hole.bottom).toBeGreaterThan(50);
+    expect(land.hole.floor - land.hole.bottom).toBeGreaterThan(40);
     expect(land.hole.beam - land.hole.floor).toBeGreaterThan(2.5);
   });
 });

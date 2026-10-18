@@ -1,9 +1,9 @@
 // The deep, deep hole across the way from the maze to the treasure room:
 // "You slip down a deep, deep hole." You step up to its edge and peer in,
-// teeter there, your feet slip and you tip in: down and down, tumbling slowly
+// wobble, your feet slip and you tip in: down and down, tumbling slowly
 // round, the rock of its walls going by in your own faint glow (falling with
-// you: main.ts), darker and darker. The curtain comes down over the end of
-// it (from a little before `ends`).
+// you: main.ts), darker and darker; slowing at the bottom, softly, to a stop.
+// The curtain comes down over the end of it (from a little before `ends`).
 
 import { Euler, type PerspectiveCamera, Quaternion, Vector3 } from "three";
 
@@ -16,21 +16,23 @@ export interface HoleSpot {
 }
 
 // The scene's beats, in seconds from walking into it.
-const STEPPED = 0.6; // up to its edge, looking in
-const SLIP = 1.7; // teetering there, till your feet go
-const FALLEN = 2.5; // tipped in, over its middle
+const STEPPED = 0.35; // up to its edge, looking in
+const SLIP = 0.9; // a wobble there, and your feet go
+const FALLEN = 1.7; // tipped in, over its middle
 const ENDS = 6.5;
 
-const EDGE = 0.3; // how far back from the edge you stand
+const EDGE = 0.1; // how far back from the edge you stand
 const PEER = -0.75; // looking down into it (radians)
 const TUMBLING = -1.15; // and down it, falling, nodding this far either way of that
 const NODDING = 0.45;
 const IN = 1.2; // metres down, fallen over into it
-const FALLING = 6.5; // how fast you speed up, falling (m/s²)
-const FASTEST = 15; // m/s
+const FALLING = 8; // how fast you speed up, falling (m/s²)
+const FASTEST = 16; // m/s
+const SLOWING = 6; // and slow down, coming to the bottom (m/s²)
+const LANDED = 1.3; // your eye over its bottom, come to a stop
+const RESTING = -0.35; // looking at the foot of its wall, stopped
 const TURNING = 0.7; // round, as you go down (radians a second)
-const DARKER = 45; // metres down, your glow's as dim as it gets
-const DIMMEST = 0.3;
+const DIMMEST = 0.3; // your glow, at the bottom
 
 export class Slipped {
   readonly ends = ENDS;
@@ -44,6 +46,13 @@ export class Slipped {
   private readonly eye = new Vector3();
   private readonly look = new Quaternion();
   private readonly euler = new Euler(0, 0, 0, "YXZ");
+  private readonly drop: number; // how far down it you fall, from its middle
+  // Falling: how far, how fast, and turning round (by how fast).
+  private fallen = 0;
+  private speed = 0;
+  private slowed: number | undefined; // how fast you were going when you started to slow down
+  private turned = 0;
+  private tumbled = 0;
   /** How bright your glow is (0 to 1), falling: dimmer and dimmer, the further down. */
   glow = 1;
 
@@ -62,6 +71,7 @@ export class Slipped {
     const across = Math.max(-(halfX - 0.6), Math.min(halfX - 0.6, this.from.x - x));
     this.edge = new Vector3(x + across, this.from.y, z + this.side * (halfZ + EDGE));
     this.middle = new Vector3(x + across * 0.3, this.from.y - IN, z + this.side * 0.3);
+    this.drop = this.middle.y - (hole.bottom + LANDED);
   }
 
   /** Each frame (on behind the curtain, too). */
@@ -78,39 +88,45 @@ export class Slipped {
       // Up to the edge, looking in.
       this.eye.lerpVectors(this.from, this.edge, ease(t / STEPPED));
     } else if (t < SLIP) {
-      // Teetering: leaning out over it and back, wobbling.
+      // A wobble, leaning out over it.
       this.eye.copy(this.edge);
       if (!still) {
         const u = (t - STEPPED) / (SLIP - STEPPED);
-        const sway = Math.sin(u * Math.PI * 3) * Math.sin(u * Math.PI);
-        this.eye.z -= this.side * 0.12 * sway;
-        this.eye.y += 0.03 * Math.sin(u * Math.PI * 5);
-        roll = 0.1 * Math.sin(u * Math.PI * 4) * Math.sin(u * Math.PI);
-        pitch += 0.15 * sway;
+        const sway = Math.sin(u * Math.PI * 2) * Math.sin(u * Math.PI);
+        this.eye.z -= this.side * 0.05 * sway;
+        roll = 0.04 * sway;
+        pitch += 0.08 * sway;
       }
     } else {
       // Your feet slip: you tip in, over its middle, and down and down,
-      // tumbling slowly round.
+      // tumbling slowly round; slowing at the bottom to a stop, and the
+      // tumbling with it.
       const u = ease((t - SLIP) / (FALLEN - SLIP));
+      if (t > SLIP + 0.2) {
+        const accelerating = Math.min(FASTEST, this.speed + FALLING * dt);
+        const stopping = Math.sqrt(2 * SLOWING * Math.max(0, this.drop - this.fallen));
+        if (stopping < accelerating) this.slowed ??= this.speed;
+        this.speed = Math.min(accelerating, stopping);
+        this.fallen = Math.min(this.drop, this.fallen + this.speed * dt);
+      }
+      // (How wild it is: all the way, falling, and less and less, slowing down.)
+      const wild = this.slowed ? ease(this.speed / this.slowed) : 1;
       this.eye.lerpVectors(this.edge, this.middle, u);
-      const falling = Math.max(0, t - SLIP - 0.2);
-      const speeding = FASTEST / FALLING; // (seconds, till you're falling as fast as you will)
-      const down =
-        falling < speeding
-          ? (FALLING * falling * falling) / 2
-          : (FASTEST * speeding) / 2 + FASTEST * (falling - speeding);
-      this.eye.y = Math.max(this.hole.bottom + 4, this.eye.y - down);
+      this.eye.y -= this.fallen;
       pitch = PEER + (TUMBLING - PEER) * u;
       if (!still) {
         // (Drifting a little, about the middle: nodding, turning, rolling.)
-        this.eye.x += 0.25 * Math.sin(falling * 1.3) * u;
-        this.eye.z += 0.2 * Math.sin(falling * 0.9 + 1) * u;
-        pitch += NODDING * Math.sin(falling * 1.2) * u;
-        yaw += (TURNING * falling * falling) / (falling + 1);
-        roll = 0.3 * Math.sin(falling * 0.8) * u;
+        this.tumbled += dt * wild;
+        this.turned += TURNING * Math.min(1, this.tumbled / 1.5) * wild * dt;
+        const k = this.tumbled;
+        this.eye.x += 0.25 * Math.sin(k * 1.3) * u * wild;
+        this.eye.z += 0.2 * Math.sin(k * 0.9 + 1) * u * wild;
+        pitch += NODDING * Math.sin(k * 1.2) * u;
+        yaw += this.turned;
+        roll = 0.3 * Math.sin(k * 0.8) * u * wild;
       }
-      const deep = Math.min(1, (this.hole.floor - this.eye.y) / DARKER);
-      this.glow = 1 - (1 - DIMMEST) * deep;
+      pitch = RESTING + (pitch - RESTING) * wild;
+      this.glow = 1 - (1 - DIMMEST) * (this.fallen / this.drop);
     }
     this.camera.position.copy(this.eye);
     this.look.setFromEuler(this.euler.set(pitch, yaw, roll));

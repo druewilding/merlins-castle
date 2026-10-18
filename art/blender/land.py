@@ -3177,7 +3177,7 @@ tunnel.build("tunnel", smooth=False)
 # beam across its top, under the tunnel's roof, its ends in the rock (for a
 # rope to hang from).
 px, py, phx, phy = PIT
-PIT_DEEP = 90
+PIT_DEEP = 48
 PIT_ROW, PIT_ACROSS = 1.2, 0.7  # (its walls' pieces: how tall, and how wide)
 pit = c.Builder()
 corners = [(px - phx, py - phy), (px + phx, py - phy), (px + phx, py + phy), (px - phx, py + phy)]
@@ -3205,15 +3205,15 @@ for k in range(4):
         for i in range(across):
             face = [wall_point(i, j), wall_point(i + 1, j), wall_point(i + 1, j + 1), wall_point(i, j + 1)]
             cz = sum(p[2] for p in face) / 4
-            deep = min(1.0, (pit_floor - cz) / 40)
+            deep = min(1.0, (pit_floor - cz) / PIT_DEEP)
             shade = c.mix(rock_colour(face[0][0], face[0][1], cz), PIT_DARK, 0.1 + 0.35 * deep)
             quad(pit, face, c.mix(shade, PIT_DARK, rough.random() * 0.25), 0.1)
 quad(pit, [(x, y, bottom) for x, y in corners], PIT_DARK)
 PIT_BEAM = pit_floor + PROP_TALL  # its underside
 beam = [(px - phx - 0.3, py - 0.16), (px + phx + 0.3, py - 0.16), (px + phx + 0.3, py + 0.16), (px - phx - 0.3, py + 0.16)]
 oriented_box(pit, beam, PIT_BEAM, PIT_BEAM + 0.3, c.mix(TIMBER, c.linear("#000000"), 0.1))
-# (You walk right up to its edge: just short of it, you slip in.)
-obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy, under=True, reach=0.5)
+# (You can go right up to its edge, and look in: only over it, you slip in.)
+obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy - 0.3, under=True, reach=0)
 
 # The halls: a floor of squares out under the walls, a lumpy round wall with
 # openings where the ways come in, and a dome.
