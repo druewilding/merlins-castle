@@ -978,10 +978,10 @@ outward(rope_object)
 
 # The penny: as in its picture, a big old bronze coin, a worn king's head on
 # it (its picture's colours, and its light and shade raised into a low
-# relief), inside a raised rim; plain and worn on its other side. 24 cm
+# relief), inside a raised rim; plain and worn on its other side. 34 cm
 # across, like the key, big enough to spot.
-PENNY_R, PENNY_T = 0.12, 0.018  # its radius, and how thick it is
-RELIEF = 0.0035  # how far the king's head stands up off it
+PENNY_R, PENNY_T = 0.17, 0.024  # its radius, and how thick it is
+RELIEF = 0.005  # how far the king's head stands up off it
 RIM = 0.86  # where its rim starts, of the way out
 PENNY_RINGS, PENNY_SIDES = 56, 120
 BRONZE = c.linear("#8c5530")
@@ -1034,7 +1034,7 @@ for i in range(1, PENNY_RINGS + 1):
         if t <= RIM:
             z = PENNY_T + RELIEF * (0.5 + 0.5 * bump) * c.smooth((RIM - t) / 0.04)
         else:
-            z = PENNY_T + 0.004 * math.sin(math.pi * (t - RIM) / (1 - RIM)) ** 0.6 + 0.002 * (0.5 + 0.5 * bump)
+            z = PENNY_T + 0.0055 * math.sin(math.pi * (t - RIM) / (1 - RIM)) ** 0.6 + 0.0025 * (0.5 + 0.5 * bump)
         verts.append((u * PENNY_R, v * PENNY_R, z))
         colours.append(colour)
 for k in range(PENNY_SIDES):
