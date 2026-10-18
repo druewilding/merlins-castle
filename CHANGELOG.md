@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.12.0](https://github.com/druewilding/merlins-castle/compare/v2.11.0...v2.12.0) (2026-10-18)
+
+
+### Features
+
+* Build Merlin's treasure and the trap ([#98](https://github.com/druewilding/merlins-castle/issues/98)) ([5aed3b1](https://github.com/druewilding/merlins-castle/commit/5aed3b1d647fbf0bf26e7ee8302b10c94cb9cbfa))
+* Build the deep hole death scene and the rope to swing over it ([#99](https://github.com/druewilding/merlins-castle/issues/99)) ([a8d03b3](https://github.com/druewilding/merlins-castle/commit/a8d03b379190d6599fbd71064a9bae7989a73d46))
+* Model the penny, drawbridge animation and guards ([#100](https://github.com/druewilding/merlins-castle/issues/100)) ([451c30b](https://github.com/druewilding/merlins-castle/commit/451c30b2796de99a46c0aa22c9918a1ae3c93407))
+
+
+### Bug Fixes
+
+* Witches close round you instead of throwing ropes at you ([#97](https://github.com/druewilding/merlins-castle/issues/97)) ([a00bf0c](https://github.com/druewilding/merlins-castle/commit/a00bf0c66d1d0c95074fd33bb09ad2b2f6331a10))
+
 ## [2.11.0](https://github.com/druewilding/merlins-castle/compare/v2.10.0...v2.11.0) (2026-10-17)
 
 
