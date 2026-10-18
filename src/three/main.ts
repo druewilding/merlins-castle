@@ -994,6 +994,7 @@ if (debugMode) {
       items,
       snake,
       merlin,
+      guards,
       witches,
       net,
       restart,

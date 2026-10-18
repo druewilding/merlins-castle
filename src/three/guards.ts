@@ -35,6 +35,8 @@ const ACROSS = new Vector3(1, 0, 0);
 interface Guard {
   model: Object3D;
   head: Object3D | undefined;
+  /** Its head, as its clip has it (before it's turned to you). */
+  posed: Quaternion;
   mixer: AnimationMixer;
   clips: Map<string, AnimationAction>;
   playing: AnimationAction | undefined;
@@ -53,7 +55,7 @@ export class Guards {
   readonly bodies: Circle[] = [];
 
   constructor(scene: Scene, source: Object3D, clips: AnimationClip[], spots: number[][], ground: Ground) {
-    spots.forEach(([x, z], k) => {
+    spots.forEach(([x, z, y], k) => {
       const model = clone(source);
       model.traverse((o) => {
         if (o instanceof Mesh) {
@@ -67,7 +69,7 @@ export class Guards {
       model.scale.setScalar(TALL);
       // Facing up the path, turned a little to the way between them.
       const yaw = Math.atan2(-Math.sign(x) * 0.3, -1);
-      model.position.set(x, ground(x, z) ?? 0, z);
+      model.position.set(x, y ?? ground(x, z) ?? 0, z);
       model.rotation.y = yaw;
       scene.add(model);
       const mixer = new AnimationMixer(model);
@@ -77,6 +79,7 @@ export class Guards {
       const guard: Guard = {
         model,
         head: model.getObjectByName("Head"),
+        posed: new Quaternion(),
         mixer,
         clips: actions,
         playing: undefined,
@@ -89,6 +92,7 @@ export class Guards {
       this.play(guard, "Idle_Loop");
       // (Not in step with each other.)
       mixer.update(k * 1.3);
+      guard.posed.copy(guard.head?.quaternion ?? guard.posed);
       this.guards.push(guard);
       this.bodies.push(body);
     });
@@ -123,7 +127,11 @@ export class Guards {
         guard.busy -= dt;
         if (guard.busy <= 0) this.play(guard, "Idle_Loop");
       }
+      // (The mixer only sets a bone when its clip moves it: held still, the
+      // head would keep the turn it was given last frame, and turn again.)
+      guard.head?.quaternion.copy(guard.posed);
       guard.mixer.update(dt);
+      guard.posed.copy(guard.head?.quaternion ?? guard.posed);
       this.watch(guard, eye, dt);
     }
   }

@@ -4474,11 +4474,11 @@ if out:
         "hole": {"box": [round(px, 2), round(-py, 2), round(phx, 2), round(phy, 2)], "floor": round(pit_floor, 2),
                  "bottom": round(bottom, 2), "beam": round(PIT_BEAM, 2)},
         # The drawbridge: its hinge [x, y, z] (at its deck), how long and half how wide it is, how far in from
-        # its tip its chains are fixed, and their holes in the gatehouse [x, y, z]; where the guards stand [x, z];
+        # its tip its chains are fixed, and their holes in the gatehouse [x, y, z]; where the guards stand [x, z, y]
         # and the castle's walls [west, east, north, south] (in it, it's down).
         "drawbridge": {"hinge": [0, DB_TOP, round(-DB_HINGE, 2)], "length": round(DB_LENGTH, 2), "half": DB_HALF,
                        "chain": DB_CHAIN, "anchors": [[round(x, 2), round(z, 2), round(-y, 2)] for x, y, z in DB_ANCHORS],
-                       "guards": [[round(x, 2), round(-y, 2)] for x, y in GUARDS],
+                       "guards": [[round(x, 2), round(-y, 2), DB_TOP] for x, y in GUARDS],
                        "castle": [CASTLE[0], CASTLE[1], round(-CASTLE[3], 2), round(-CASTLE[2], 2)]},
         # The leaves in the dragon's mouth: where the pile is [x, z] (on the way's floor), and the heaps they're swept into.
         "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},

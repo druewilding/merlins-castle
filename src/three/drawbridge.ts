@@ -32,7 +32,7 @@ export interface DrawbridgeSpot {
   chain: number;
   /** The chains' holes in the gatehouse, [x, y, z]. */
   anchors: number[][];
-  /** Where the guards stand, [x, z]. */
+  /** Where the guards stand, [x, z, y] (on the landing). */
   guards: number[][];
   /** The castle's walls: [west, east, north, south]. */
   castle: number[];
