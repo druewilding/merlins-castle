@@ -2205,8 +2205,7 @@ obstacle(["mossy-steps east"], "circle", bx, -by, 2.6, reach=0.4)
 # treasure, glinting, to tempt you on (a chest, gold spilling round it, a
 # goblet), with an old oak leaning over it, among the firs. Come near, and
 # the net hidden in front of it scoops you up, to dangle from the oak (the
-# game plays it: trap.ts). Its rope runs up into the oak's leaves from where
-# the net lies, for the sharp-eyed.
+# game plays it: trap.ts).
 PROPS = c.Kit(HERE.parent / "models/fantasy-props-megakit/Exports/glTF")
 TX, TY = DEATHS["mountain east"]
 TZ = height(TX, TY)
@@ -2230,9 +2229,11 @@ for n in range(14):
     x, y = TX - 0.1 + math.cos(a) * r, TY + math.sin(a) * r
     PROPS.put(built, "Coin", (x, y, height(x, y)), here.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
 TRAP_NET = (TX - 2.3, TY)  # where the net lies, on the path, in front of the treasure
-TRAP_OAK = (TRAP_NET[0] + 0.3, TRAP_NET[1] - 4.6)  # (to the south, the mountain rising to the north)
-# Where the net's rope's tied, up in the oak's leaves, leaning over the path.
-TRAP_HOOK = (TRAP_NET[0], TRAP_NET[1] - 1.0, height(*TRAP_NET) + 6.5)
+# The oak, up the slope to the north (so its leaves are high over the path,
+# clear of you, swinging in the net under them), and where the net's rope's
+# tied, up in its leaves, over the path.
+TRAP_OAK = (TRAP_NET[0] + 0.3, TRAP_NET[1] + 3.8)
+TRAP_HOOK = (TRAP_NET[0], TRAP_NET[1] + 0.3, height(*TRAP_NET) + 10.4)
 grow(*TRAP_OAK, 11, "CommonTree_2", here, sink=0.4)
 solid_circle(*TRAP_OAK, 0.6)
 obstacle(["mountain east"], "circle", TX, -TY, 1.0, reach=1.3)

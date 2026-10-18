@@ -1,12 +1,13 @@
 // Merlin's trap, east of the mountain: "Oh dear! Merlin's trap is that way."
 // (PLAN-V3.md: deaths are short scenes from where you stand.) A pile of
 // treasure where the path ends, an old oak leaning over it (land.py), and,
-// lying on the path in front of it, a net, its rope running up into the oak's
-// leaves. The gold glints now and then, catching the light, to tempt you
+// hidden on the path in front of it (unseen till it's sprung), a net, its
+// rope running up into the oak's leaves. The gold glints now and then, catching the light, to tempt you
 // on. Come near the treasure and the net springs up round you and lifts
 // you off your feet: you dangle there, swinging gently under the oak and
 // slowly turning round and round, looking down at the gold, as the curtain
-// falls (from a little before `ends`).
+// falls (from a little before `ends`); and on swinging and swaying there,
+// gently, behind it, till you start again.
 
 import {
   AdditiveBlending,
@@ -67,13 +68,15 @@ const ENDS = 7;
 const HANG = 1.6; // metres, the bag's bottom above the ground, lifted
 const EYE = 0.15; // your eye below the bag's middle, curled up in it
 const GRAVITY = 9.8;
-const DAMPING = 0.12; // how quickly it stops swinging
+const DAMPING = 0.12; // how quickly it settles…
+const SWAYING = 0.07; // …to swinging this far (radians), and on
 const PUSH = 0.45; // radians a second, swinging on the way you were going
+const ASIDE = 0.12; // and from side to side
 const TURNING = 0.4; // radians a second, turning round on the rope
 const LOOK_DOWN = -0.3; // radians, at the treasure (and the ground)
 const LOOKING = 3; // how quickly you turn to look (the larger, the quicker)
 
-/** The net and its rope: lying in wait, or (`spring`, `hang`) up round you. */
+/** The net and its rope: hidden, lying in wait, or (`spring`, `hang`) up round you. */
 export class Net {
   readonly group = new Group(); // at its knot
   private readonly bag: Mesh;
@@ -165,6 +168,12 @@ export class Net {
   /** Lying in wait (a new game). */
   reset() {
     this.spring(0, this.lying);
+    this.show(false);
+  }
+
+  /** Whether it's to be seen (sprung). */
+  show(shown: boolean) {
+    this.group.visible = this.rope.visible = shown;
   }
 
   /** How far it's sprung up into a bag (0 to 1), its knot at `at`, hanging straight. */
@@ -216,16 +225,15 @@ export class Trapped {
     // (Swinging on, the way you were walking.)
     if (!reducedMotion) {
       const along = Math.hypot(ahead.x, ahead.z) || 1;
-      this.swing.vx = (PUSH * ahead.x) / along;
-      this.swing.vz = (PUSH * ahead.z) / along;
+      this.swing.vx = (PUSH * ahead.x - ASIDE * ahead.z) / along;
+      this.swing.vz = (PUSH * ahead.z + ASIDE * ahead.x) / along;
     }
   }
 
   /** Each frame (till it ends). */
   update(dt: number) {
-    if (this.t >= ENDS) return;
     const was = this.t;
-    this.t = Math.min(ENDS, this.t + dt);
+    this.t += dt;
     const t = this.t;
     if (was < SPRING && t >= SPRING) this.sprung();
     const net = this.net;
@@ -236,8 +244,12 @@ export class Trapped {
     if (t >= LIFTED && !this.reducedMotion) {
       // Swinging, slowing, under the oak.
       const g = GRAVITY / this.length;
-      s.vx += (-g * Math.sin(s.x) - DAMPING * s.vx) * dt;
-      s.vz += (-g * Math.sin(s.z) - DAMPING * s.vz) * dt;
+      // (Settling to a gentle sway: slowed, swinging further than that, and
+      // kept going, less far.)
+      const far = Math.hypot(s.x, s.z, Math.hypot(s.vx, s.vz) / Math.sqrt(g));
+      const damping = DAMPING * Math.max(-1, Math.min(1, (far - SWAYING) / SWAYING));
+      s.vx += (-g * Math.sin(s.x) - damping * s.vx) * dt;
+      s.vz += (-g * Math.sin(s.z) - damping * s.vz) * dt;
       s.x += s.vx * dt;
       s.z += s.vz * dt;
       const way = Math.sign(s.vx * s.x + s.vz * s.z) || this.creaked;
@@ -252,6 +264,7 @@ export class Trapped {
     );
     this.knot.lerpVectors(net.lying, this.knot, lift);
     const round = this.reducedMotion ? 0 : TURNING * Math.max(0, t - LIFTED) + 0.25 * Math.sin(t * 0.9);
+    net.show(t >= SPRING);
     net.spring(k, this.knot);
     net.hang(this.knot, round);
     // You, curled up in the bottom of it: scooped up into it as it closes.

@@ -509,7 +509,7 @@ solidify();
 const [west, east, south, north] = land.bounds;
 player.bounds = { west, east, north: -north, south: -south };
 
-// Merlin's trap (trap.ts): the net, lying in wait in front of its treasure.
+// Merlin's trap (trap.ts): the net, hidden, lying in wait in front of its treasure.
 const TRAP = "mountain east";
 const net = new Net(scene, land.trap as TrapSpot, ground);
 
