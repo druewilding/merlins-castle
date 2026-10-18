@@ -1851,6 +1851,7 @@ ARCH_STONES = [c.linear(h) for h in ("#a39d90", "#958f83", "#ada79a", "#8a857a",
 ARCH_GAP = c.linear("#5f584c")
 arch = c.Builder()
 arch_rng = random.Random("the stone archway")
+arch_tops = []  # (from, to, how high its top is there), as it's built: for the ivy to hang from
 
 
 def arch_foot(x):
@@ -1908,7 +1909,9 @@ for lo, hi, pier in ((ARCH_ENDS[0], pier_out, False), (pier_out, pier_in, True),
         else:
             arch_course(lo, hi, z, z + tall)
         z += tall
-    if not pier:
+    if pier:
+        arch_tops.append((lo, hi, top))
+    else:
         # Crumbling along its top: a stone or two still standing here and
         # there, lower in places, as in the picture.
         x = lo
@@ -1918,6 +1921,7 @@ for lo, hi, pier in ((ARCH_ENDS[0], pier_out, False), (pier_out, pier_in, True),
             stack = arch_rng.choice((0, 0, 1, 1, 2))
             for k in range(stack):
                 arch_stone(a + 0.05 * k, b - 0.05 * k, top + k * 0.36, top + (k + 1) * 0.36 - 0.02)
+            arch_tops.append((a + 0.05 * max(0, stack - 1), b - 0.05 * max(0, stack - 1), top + stack * 0.36 - 0.02))
             x += wide
     # Its core, deep in: dark between the stones.
     for side in (-1, 1):
@@ -1934,7 +1938,8 @@ for k in range(VOUSSOIRS):
     a0, a1 = a0 + gap, a1 - gap
     key = k == VOUSSOIRS // 2
     r0, r1 = ARCH_HALF, ARCH_HALF + ARCH_RING + (0.08 if key else 0.0)
-    proud = 0.04 if key else arch_rng.uniform(0.0, 0.025)
+    # (Standing well out from the wall's stones, where they overlap the piers': not flickering through each other.)
+    proud = 0.1 if key else 0.06 + arch_rng.uniform(0.0, 0.02)
     colour = arch_colour(ARCH_X, ARCH_SPRING + 2)
     corners = []
     for y in (ARCH_Y - ARCH_THICK - proud, ARCH_Y + ARCH_THICK + proud):
@@ -1963,26 +1968,30 @@ while z < ARCH_TOP - 0.05:
     z += tall
 for side in (-1, 1):
     y = ARCH_Y + side * (ARCH_THICK - 0.05)
-    edge = [(ARCH_X + math.cos(math.pi * k / 16) * (ARCH_HALF + 0.05), y,
-             ARCH_SPRING + math.sin(math.pi * k / 16) * (ARCH_HALF + 0.05)) for k in range(17)]
+    # (Right down to its underside: the joints between its stones dark, not open to the sky.)
+    edge = [(ARCH_X + math.cos(math.pi * k / 16) * (ARCH_HALF + 0.03), y,
+             ARCH_SPRING + math.sin(math.pi * k / 16) * (ARCH_HALF + 0.03)) for k in range(17)]
     for p, q in zip(edge, edge[1:]):
         facing(arch, [p, q, (q[0], y, ARCH_TOP), (p[0], y, ARCH_TOP)], [ARCH_GAP] * 4, (0, side, 0))
-# The arch's underside, between its two faces.
+# Behind the joints in the arch's underside, between its two faces: dark,
+# and a little way up into its stones (whose own undersides are what you see).
 for k in range(16):
     a0, a1 = math.pi * k / 16, math.pi * (k + 1) / 16
-    pts = [(ARCH_X + math.cos(a) * ARCH_HALF, y, ARCH_SPRING + math.sin(a) * ARCH_HALF)
+    pts = [(ARCH_X + math.cos(a) * (ARCH_HALF + 0.03), y, ARCH_SPRING + math.sin(a) * (ARCH_HALF + 0.03))
            for a, y in ((a0, ARCH_Y - ARCH_THICK), (a1, ARCH_Y - ARCH_THICK), (a1, ARCH_Y + ARCH_THICK),
                         (a0, ARCH_Y + ARCH_THICK))]
-    facing(arch, pts, [c.mix(ARCH_STONES[3], ARCH_GAP, 0.3)] * 4, (-math.cos((a0 + a1) / 2), 0, -math.sin((a0 + a1) / 2)))
+    facing(arch, pts, [ARCH_GAP] * 4, (-math.cos((a0 + a1) / 2), 0, -math.sin((a0 + a1) / 2)))
 # Ivy, hanging from its top in places, either side, and over the arch.
 for side in (-1, 1):
-    for cx, top, wide, drop in ((-9.5, ARCH_WALL + 0.3, 2.2, 2.0), (-4.2, ARCH_TOP, 1.4, 2.4), (6.5, ARCH_WALL + 0.3, 2.8, 2.2),
-                                (10.5, ARCH_WALL, 1.6, 1.5)):
+    for cx, wide, drop in ((-9.5, 2.2, 2.0), (-4.2, 1.4, 2.4), (6.5, 2.8, 2.2), (10.5, 1.6, 1.5)):
         cx += arch_rng.uniform(-0.6, 0.6) * side
         for _ in range(int(wide * drop * 30)):
             u = arch_rng.uniform(-1, 1)
             down = drop * (1 - 0.6 * u * u) * arch_rng.uniform(0.5, 1.0) * arch_rng.random() ** 1.3
-            lx, lz = cx + u * wide / 2, top - down
+            lx = cx + u * wide / 2
+            # (From the top of the wall just there: never above it, where it's crumbled.)
+            top = max((t for a, b, t in arch_tops if a <= lx <= b), default=ARCH_WALL) - 0.05
+            lz = top - down
             size = arch_rng.uniform(0.13, 0.2)
             spin = arch_rng.uniform(0, 2 * math.pi)
             y = ARCH_Y + side * (ARCH_THICK + arch_rng.uniform(0.03, 0.09))
