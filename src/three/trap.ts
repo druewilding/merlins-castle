@@ -18,15 +18,20 @@ import {
   Group,
   LinearFilter,
   Mesh,
+  MeshPhysicalMaterial,
   MeshStandardMaterial,
+  type Object3D,
   type PerspectiveCamera,
+  PMREMGenerator,
   Quaternion,
   type Scene,
   Sprite,
   SpriteMaterial,
   TubeGeometry,
   Vector3,
+  type WebGLRenderer,
 } from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 import type { Ground } from "./player";
@@ -81,6 +86,41 @@ const ASIDE = 0.12; // and from side to side
 const TURNING = 0.4; // radians a second, turning round on the rope
 const LOOK_DOWN = -0.3; // radians, at the treasure (and the ground)
 const LOOKING = 3; // how quickly you turn to look (the larger, the quicker)
+
+/**
+ * The treasure, shining (in land.glb: "treasure", its gold, and "jewels"): the
+ * gold metal, catching a little room's light (its own, not the scene's), and
+ * the rubies and emeralds glassy, with a gleam on them.
+ */
+export function dressTreasure(land: Object3D, renderer: WebGLRenderer) {
+  const pmrem = new PMREMGenerator(renderer);
+  const room = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
+  const gold = land.getObjectByName("treasure");
+  if (gold instanceof Mesh) {
+    gold.material = new MeshStandardMaterial({
+      vertexColors: true,
+      flatShading: true,
+      metalness: 1,
+      roughness: 0.42,
+      envMap: room,
+      envMapIntensity: 0.42,
+    });
+  }
+  const jewels = land.getObjectByName("jewels");
+  if (jewels instanceof Mesh) {
+    jewels.material = new MeshPhysicalMaterial({
+      vertexColors: true,
+      flatShading: true,
+      metalness: 0.3,
+      roughness: 0.1,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+      envMap: room,
+      envMapIntensity: 0.4,
+    });
+  }
+}
 
 /** The net and its rope: hidden, lying in wait, or (`spring`, `hang`) up round you. */
 export class Net {

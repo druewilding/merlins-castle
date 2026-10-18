@@ -87,7 +87,7 @@ import { Smoke } from "./smoke";
 import { Snake } from "./snake";
 import OWN_SOUNDS from "./sounds.json";
 import { Swept } from "./swept";
-import { Net, Trapped, type TrapSpot } from "./trap";
+import { dressTreasure, Net, Trapped, type TrapSpot } from "./trap";
 import { Trees, type TreeSpots } from "./trees";
 import { Witches } from "./witches";
 
@@ -234,6 +234,8 @@ model.scene.traverse((node) => {
 });
 // The maze, in stone.
 dressMaze(model.scene, renderer);
+// Merlin's treasure, shining.
+dressTreasure(model.scene, renderer);
 // The charcoal burner's fire: its embers glowing (not lit: they shine, even
 // in the hut's gloom, flickering with its light: lightFor), and its smoke.
 const embers = model.scene.getObjectByName("embers");

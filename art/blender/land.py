@@ -2209,25 +2209,28 @@ obstacle(["mossy-steps east"], "circle", bx, -by, 2.6, reach=0.4)
 PROPS = c.Kit(HERE.parent / "models/fantasy-props-megakit/Exports/glTF")
 TX, TY = DEATHS["mountain east"]
 TZ = height(TX, TY)
-GOLD = (*c.linear("#f0c040")[:3], 0.85)  # (the kit's metal is silvery)
-HEAP = c.linear("#e8b53c")
+GOLD = (*c.linear("#e0a024")[:3], 1.0)  # (the kit's metal is silvery: all gold, deep, as it shines)
+HEAP = c.linear("#dba22a")
 here = random.Random("Merlin's trap")
+# (The gold and the jewels on their own, for the game to make them shine.)
+gold = c.Builder()
+jewels = c.Builder()
 # The chest, open, facing the way you come, full to the brim with gold; and
 # a heap of it spilling out in front, coins and a goblet on it, and more
 # rolled away.
 CHEST_AT = (TX + 0.95, TY)
 PROPS.put(built, "Chest_Wood", (*CHEST_AT, height(*CHEST_AT) - 0.03), -math.pi / 2, 1.2)
-built.blob((*CHEST_AT, height(*CHEST_AT) + 0.5), 0.5, HEAP, squash=0.35, lumpy=0.12, seed=3)
-built.blob((TX - 0.1, TY, TZ - 0.12), 0.9, HEAP, squash=0.5, lumpy=0.14, seed=5)
+gold.blob((*CHEST_AT, height(*CHEST_AT) + 0.5), 0.5, HEAP, squash=0.35, lumpy=0.12, seed=3)
+gold.blob((TX - 0.1, TY, TZ - 0.12), 0.9, HEAP, squash=0.5, lumpy=0.14, seed=5)
 for name, u, v, up, yaw, scale in (("Coin_Pile_2", -0.15, 0.15, 0.28, 0.3, 2.8), ("Coin_Pile", -0.55, 0.45, 0.06, 1.9, 2.4),
                                    ("Coin_Pile", 0.05, -0.55, 0.08, -0.6, 2.2), ("Coin_Pile_2", 1.0, 0.05, 0.52, 2.0, 2.2),
                                    ("Chalice", -0.1, -0.2, 0.25, 0.8, 2.4)):
     x, y = TX + u, TY + v
-    PROPS.put(built, name, (x, y, height(x, y) + up), yaw, scale, tint=GOLD)
+    PROPS.put(gold, name, (x, y, height(x, y) + up), yaw, scale, tint=GOLD)
 for n in range(14):
     a, r = here.uniform(0, 2 * math.pi), here.uniform(0.75, 1.7)
     x, y = TX - 0.1 + math.cos(a) * r, TY + math.sin(a) * r
-    PROPS.put(built, "Coin", (x, y, height(x, y)), here.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
+    PROPS.put(gold, "Coin", (x, y, height(x, y)), here.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
 # And jewels among it, rubies and emeralds, cut and gleaming: on the heap, in
 # the chest, and one or two fallen on the path. (Their own random numbers,
 # so the oak's as it was.)
@@ -2257,13 +2260,15 @@ for n in range(16):
         x, y = TX - 0.1 + math.cos(a) * r, TY + math.sin(a) * r
     size = gems.uniform(0.08, 0.13)
     z = on_heap(x, y) + size * 0.4
-    built.blob((x, y, z), size, JEWELS[kind], squash=0.75, lumpy=0.0, seed=n, subdivisions=0)
+    jewels.blob((x, y, z), size, JEWELS[kind], squash=0.75, lumpy=0.0, seed=n, subdivisions=0)
     jewel_spots.append([round(x, 2), round(z, 2), round(-y, 2), kind])
 # More gold on the heap, coins lying all over it.
 for n in range(18):
     a, r = gems.uniform(0, 2 * math.pi), 0.85 * math.sqrt(gems.random())
     x, y = TX - 0.1 + math.cos(a) * r, TY + math.sin(a) * r
-    PROPS.put(built, "Coin", (x, y, on_heap(x, y) - 0.01), gems.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
+    PROPS.put(gold, "Coin", (x, y, on_heap(x, y) - 0.01), gems.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
+gold.build("treasure", smooth=False)
+jewels.build("jewels", smooth=False)
 # Where the net lies, on the path in front of the treasure, as near as you
 # come to it (the trap's reach, round the treasure, below).
 TRAP_REACH = (1.0, 2.0)
