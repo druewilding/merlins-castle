@@ -2836,6 +2836,7 @@ MAZE_MOSS = c.linear("#9fae7a")
 MAZE_LIGHT = c.linear("#ffffff")
 maze = c.Builder()
 maze_floor = c.Builder()
+maze_ivy = c.Builder()  # (its own: casting no shadows, so close to the stones the sun's shadows would speckle them)
 runs = []  # (along x?, the line it's on, from, to), in cells
 
 
@@ -2875,7 +2876,10 @@ def maze_run(along_x, line, a, b):
                 down = reach * maze_rng.random() ** 1.4
                 lt = min(max(lo + t + u * wide / 2, lo + 0.05), hi - 0.05)
                 size, spin = maze_rng.uniform(0.12, 0.2), maze_rng.uniform(0, 2 * math.pi)
-                out = MAZE_THICK + maze_rng.uniform(0.01, 0.06)
+                # (Each leaf at its own depth, and tipped out towards its tip:
+                # flat, two overlapping all but in the same plane would flicker.)
+                out = MAZE_THICK + 0.02 + maze_rng.uniform(0, 0.06)
+                tip = maze_rng.uniform(0.04, 0.08)
                 if along_x:
                     cx, cy, d, n = mx0 + lt, my0 + at + out * side, (1, 0), (0, side)
                 else:
@@ -2884,9 +2888,10 @@ def maze_run(along_x, line, a, b):
                 corners = []
                 for ang, r in ((0, 1.0), (math.pi / 2, 0.6), (math.pi, 0.5), (3 * math.pi / 2, 0.6)):
                     along_, up_ = math.cos(spin + ang) * size * r, math.sin(spin + ang) * size * r
-                    corners.append((cx + d[0] * along_, cy + d[1] * along_, cz + up_))
+                    lift = tip * (1 + math.cos(ang)) / 2
+                    corners.append((cx + d[0] * along_ + n[0] * lift, cy + d[1] * along_ + n[1] * lift, cz + up_))
                 leaf = c.mix(*IVY, maze_rng.random())
-                facing(built, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf], (*n, 0))
+                facing(maze_ivy, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf], (*n, 0))
             t += wide + maze_rng.uniform(3, 9)
 
 
@@ -2922,6 +2927,7 @@ for along_x in (True, False):
                 a, b = pa, pb
         maze_run(along_x, line, a, b)
 maze.build("maze", smooth=False)
+maze_ivy.build("maze-ivy", smooth=False)
 # Its floor, a little over the ground (and the tunnels' stone lips): on the ground's own grid (and split
 # the way it is), so the ground never comes up through it.
 def maze_lines(lo, hi, origin):
