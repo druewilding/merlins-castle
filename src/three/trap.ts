@@ -125,13 +125,11 @@ export class Net {
     geometry.morphAttributes.normal = [up.getAttribute("normal")];
     this.bag = new Mesh(geometry, material);
     this.bag.morphTargetInfluences = [0];
-    this.bag.castShadow = true;
     this.bag.frustumCulled = false; // (its bounds are lying flat)
     this.group.add(this.bag);
     // The rope, from its knot up to the oak (along y, from 0 to 1, stretched).
     const rope = new CylinderGeometry(ROPE, ROPE, 1, 5, 1, true).translate(0, 0.5, 0);
     this.rope = new Mesh(rope, material);
-    this.rope.castShadow = true;
     scene.add(this.group, this.rope);
     // The glints, each in its own spot on the heap, twinkling in its own time.
     const glint = new SpriteMaterial({
@@ -207,15 +205,13 @@ export class Trapped {
   private readonly look = new Quaternion();
   // Swinging on the rope: how far (radians, towards x and towards z), and how fast.
   private swing = { x: 0, z: 0, vx: 0, vz: 0 };
-  private creaked = 1; // which way it was last swinging (a creak each time it turns back)
 
   constructor(
     private camera: PerspectiveCamera,
     ground: Ground,
     private net: Net,
     private reducedMotion: boolean,
-    private sprung: () => void,
-    private creak: () => void
+    private sprung: () => void
   ) {
     this.from = camera.position.clone();
     const ahead = new Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -252,9 +248,6 @@ export class Trapped {
       s.vz += (-g * Math.sin(s.z) - damping * s.vz) * dt;
       s.x += s.vx * dt;
       s.z += s.vz * dt;
-      const way = Math.sign(s.vx * s.x + s.vz * s.z) || this.creaked;
-      if (way < 0 && this.creaked > 0) this.creak();
-      this.creaked = way;
     }
     const lifted = this.length * Math.cos(Math.hypot(s.x, s.z));
     this.knot.set(

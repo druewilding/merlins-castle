@@ -814,15 +814,7 @@ const scenes: Record<string, () => Scene3d | undefined> = {
     effects(world, items.state).includes("broom")
       ? undefined
       : new Caught(player.camera, drawn, witches, reducedMotion),
-  [TRAP]: () =>
-    new Trapped(
-      player.camera,
-      drawn,
-      net,
-      reducedMotion,
-      () => ownSounds.play("net"),
-      () => ownSounds.play("rope", { rate: 0.9 + Math.random() * 0.2 })
-    ),
+  [TRAP]: () => new Trapped(player.camera, drawn, net, reducedMotion, () => ownSounds.play("net")),
 };
 
 /** Walking into a way that kills you: its scene (and true), or nothing to see (false). */

@@ -4,6 +4,5 @@
   "creak": { "file": "kenney_rpg-audio/Audio/creak1.ogg", "volume": 0.5 },
   "thud": { "file": "kenney_impact-sounds/Audio/impactWood_heavy_002.ogg", "volume": 0.6 },
   "sweep": { "file": "kenney_rpg-audio/Audio/cloth4.ogg", "volume": 0.6 },
-  "net": { "file": "kenney_rpg-audio/Audio/clothBelt2.ogg", "volume": 0.7 },
-  "rope": { "file": "kenney_rpg-audio/Audio/creak3.ogg", "volume": 0.25 }
+  "net": { "file": "kenney_rpg-audio/Audio/clothBelt2.ogg", "volume": 0.7 }
 }
