@@ -159,6 +159,11 @@ Object.assign(sunlight.shadow.camera, { left: -60, right: 60, top: 60, bottom: -
 sunlight.shadow.bias = -0.0004;
 sunlight.shadow.normalBias = 0.05;
 scene.add(sunlight, sunlight.target);
+// (Across the shadow map, as the sun sees it: its texels, in metres.)
+const TEXEL = 120 / 2048;
+const ACROSS_SUN = new Vector3().crossVectors(new Vector3(0, 1, 0), SUN).normalize();
+const UP_SUN = new Vector3().crossVectors(SUN, ACROSS_SUN);
+const sunOn = new Vector3();
 
 const player = new Player(renderer.domElement);
 // The sound effects, as in the illustrated version (from public/fx), and
@@ -1424,8 +1429,15 @@ renderer.setAnimationLoop((time) => {
   items.update(room);
   here.textContent = name(room);
   scored.textContent = T.score(score(world, items.state));
-  // The sun's shadows follow you, so they're sharp wherever you are.
-  sunlight.target.position.copy(player.position);
-  sunlight.position.copy(player.position).addScaledVector(SUN, 200);
+  // The sun's shadows follow you, so they're sharp wherever you are: a
+  // whole texel at a time, or their edges would shift and shimmer as you move.
+  const snap = (along: Vector3) => Math.round(player.position.dot(along) / TEXEL) * TEXEL;
+  sunOn
+    .copy(ACROSS_SUN)
+    .multiplyScalar(snap(ACROSS_SUN))
+    .addScaledVector(UP_SUN, snap(UP_SUN))
+    .addScaledVector(SUN, player.position.dot(SUN));
+  sunlight.target.position.copy(sunOn);
+  sunlight.position.copy(sunOn).addScaledVector(SUN, 200);
   golden.render(outdoors);
 });

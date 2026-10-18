@@ -2851,12 +2851,15 @@ def maze_wall(x0, y0, x1, y1):
 
 def maze_run(along_x, line, a, b):
     """One straight stretch of wall, from cell a to cell b along its line."""
-    lo, hi = a * MAZE_CELL - MAZE_THICK, b * MAZE_CELL + MAZE_THICK
+    # (Those along y a hair thinner and shorter, so where two meet, their
+    # faces are never in the same plane, fighting: just behind the other's.)
+    thick = MAZE_THICK if along_x else MAZE_THICK - 0.004
+    lo, hi = a * MAZE_CELL - thick, b * MAZE_CELL + thick
     at = line * MAZE_CELL
     if along_x:
-        x0, x1, y0, y1 = mx0 + lo, mx0 + hi, my0 + at - MAZE_THICK, my0 + at + MAZE_THICK
+        x0, x1, y0, y1 = mx0 + lo, mx0 + hi, my0 + at - thick, my0 + at + thick
     else:
-        x0, x1, y0, y1 = mx0 + at - MAZE_THICK, mx0 + at + MAZE_THICK, my0 + lo, my0 + hi
+        x0, x1, y0, y1 = mx0 + at - thick, mx0 + at + thick, my0 + lo, my0 + hi
     grounds = [height(x0 + (x1 - x0) * k / 8, y0 + (y1 - y0) * k / 8) for k in range(9)]
     # (Those along x a hair taller, so where two meet their tops don't fight.)
     z0, z1 = min(grounds) - 0.6, max(grounds) + MAZE_TALL + (0.02 if along_x else 0)
