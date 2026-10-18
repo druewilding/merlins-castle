@@ -261,6 +261,10 @@ const river = new River(scene, land.river, reducedMotion);
 // The heights are in Blender's axes (y is north), on a grid; in between, blend.
 const { x0, y0, step, nx, ny } = land.ground;
 const ground: Ground = (x, z) => {
+  // (On a bridge's deck, exactly its height: the grid would sink you at its edges.)
+  for (const [dx, dz, halfX, halfZ, top] of land.decks) {
+    if (Math.abs(x - dx) <= halfX && Math.abs(z - dz) <= halfZ) return top;
+  }
   const i = (x - x0) / step;
   const j = (-z - y0) / step;
   if (i < 0 || j < 0 || i >= nx - 1 || j >= ny - 1) return undefined;

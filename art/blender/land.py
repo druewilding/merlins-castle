@@ -762,12 +762,18 @@ for place, door in (("tower", "tower-door"), ("charcoal-hut", "hut-door")):
     way.segments = list(zip(way.points, way.points[1:]))
 
 
+# The forest bridge and the drawbridge (with the way in under the gatehouse,
+# and the landing on the bank), for walking on: their middles, half how wide
+# and long, and how high. (The game walks you on them at exactly that
+# height: the ground's grid, every 2 m, would sink you at their edges.)
+DECKS = [(BRIDGE[0], BRIDGE[1], 2.2, BRIDGE_HALF, 0.9), (0, -135 * K, 3, 8 * K, 0.6)]
+
+
 def deck(x, y):
     """The bridge and drawbridge, for walking on."""
-    if abs(x - BRIDGE[0]) <= 2.2 and abs(y - BRIDGE[1]) <= BRIDGE_HALF:
-        return 0.9
-    if abs(x) <= 3 and -143 * K <= y <= -127 * K:
-        return 0.6
+    for x0, y0, half_x, half_y, top in DECKS:
+        if abs(x - x0) <= half_x and abs(y - y0) <= half_y:
+            return top
     return None
 
 
@@ -1588,6 +1594,10 @@ block(built, BOOTH[0] - 0.02, BOOTH[1] - 0.02, BOOTH_TALL + 1.2, BOOTH[0] + 0.02
 built.add([(BOOTH[0], BOOTH[1], BOOTH_TALL + 1.8), (BOOTH[0] + 0.45, BOOTH[1], BOOTH_TALL + 1.68),
            (BOOTH[0], BOOTH[1], BOOTH_TALL + 1.56)], [(0, 1, 2)], [c.linear("#f1eadb")] * 3)  # its pennant
 solid_circle(*BOOTH, BOOTH_R + 0.05)
+# (Nor off its corners at the castle end, onto the strip of ground at the
+# foot of the wall, between it and the water.)
+for side in (-1, 1):
+    solid_box(side * 3.9, CASTLE[3] + 1.75, 1.0, 0.85)  # (out over the water's edge: you're never wider than the deck there)
 # Where the guards stand: either side of the way onto the landing, facing up
 # the path, clear of the bridge's width (coming off it, you'd bump into one,
 # and be pushed back, as if you'd turned back into the moat).
@@ -4511,6 +4521,8 @@ if out:
         "props": prop_spots,
         # Steps on the land, for lying on: [x, z, half x, half z, top].
         "steps": STEPS,
+        # The bridges' decks, for walking on at exactly their height: [x, z, half x, half z, top].
+        "decks": [[round(x, 2), round(-y, 2), round(hx, 2), round(hy, 2), top] for x, y, hx, hy, top in DECKS],
         # Floors over the ground, for lying on: [x, z, half x, half z, how far up]. (The maze's.)
         "floors": [[round(MZ[0], 2), round(-MZ[1], 2), round(MAZE_HALF, 2), round(MAZE_HALF, 2), MAZE_FLOOR]],
         # The paths, lying a little above the ground (so what's dropped on
