@@ -2648,6 +2648,17 @@ for i in range(len(xs) - 1):
         pts = [(xs[i], ys[j]), (xs[i + 1], ys[j]), (xs[i + 1], ys[j + 1]), (xs[i], ys[j + 1])]
         maze_floor.add([(x, y, drawn_height(x, y, exactly=True) + MAZE_FLOOR) for x, y in pts], [(0, 1, 2), (0, 2, 3)],
                        [MAZE_LIGHT] * 4)
+# And its edge, all round it, from its top down into the ground: a low step
+# up onto it (at the way in, you'd see under it).
+MAZE_EDGE = c.linear("#c9c2b4")  # (a little darker than its top)
+for line, along_x, out_ in ((ys[0], True, (0, -1, 0)), (ys[-1], True, (0, 1, 0)),
+                            (xs[0], False, (-1, 0, 0)), (xs[-1], False, (1, 0, 0))):
+    edge = xs if along_x else ys
+    for a, b in zip(edge, edge[1:]):
+        (x0, y0), (x1, y1) = ((a, line), (b, line)) if along_x else ((line, a), (line, b))
+        top0, top1 = (drawn_height(x, y, exactly=True) for x, y in ((x0, y0), (x1, y1)))
+        facing(maze_floor, [(x0, y0, top0 - 0.3), (x1, y1, top1 - 0.3), (x1, y1, top1 + MAZE_FLOOR),
+                            (x0, y0, top0 + MAZE_FLOOR)], [MAZE_EDGE] * 4, out_)
 maze_floor.build("maze-floor", smooth=True)
 # Boulders at the foot of its south wall, either side of the way in: past
 # them, between the wall and the crags, there's only a narrow strip, which
