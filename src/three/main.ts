@@ -54,9 +54,11 @@ import {
 } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Caught } from "./caught";
+import { Drawbridge, type DrawbridgeSpot, wantedDown } from "./drawbridge";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
 import { Golden } from "./golden";
+import { Guards } from "./guards";
 import { haze } from "./haze";
 import { type HoleSpot, Slipped } from "./hole";
 import { items as setUpItems, onPaths } from "./items";
@@ -66,6 +68,7 @@ import { DEATHS, placeAt, PLACES } from "./layout";
 import { Leaves } from "./leaves";
 import { dressMaze } from "./maze";
 import { Merlin } from "./merlin";
+import guardModel from "./models/guards.glb?url";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
@@ -156,6 +159,11 @@ Object.assign(sunlight.shadow.camera, { left: -60, right: 60, top: 60, bottom: -
 sunlight.shadow.bias = -0.0004;
 sunlight.shadow.normalBias = 0.05;
 scene.add(sunlight, sunlight.target);
+// (Across the shadow map, as the sun sees it: its texels, in metres.)
+const TEXEL = 120 / 2048;
+const ACROSS_SUN = new Vector3().crossVectors(new Vector3(0, 1, 0), SUN).normalize();
+const UP_SUN = new Vector3().crossVectors(SUN, ACROSS_SUN);
+const sunOn = new Vector3();
 
 const player = new Player(renderer.domElement);
 // The sound effects, as in the illustrated version (from public/fx), and
@@ -181,7 +189,7 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky, wizard, hags, bunnies] = await Promise.all([
+const [model, file, things, snaky, wizard, hags, bunnies, sentries] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
@@ -189,6 +197,7 @@ const [model, file, things, snaky, wizard, hags, bunnies] = await Promise.all([
   loader.loadAsync(merlinModel),
   loader.loadAsync(witchModel),
   loader.loadAsync(rabbitModel),
+  loader.loadAsync(guardModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -231,7 +240,7 @@ if (emerald instanceof Mesh) {
 dressLamp(things.scene.getObjectByName("lamp")!);
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
-  node.castShadow = !["paths", "water", "embers"].includes(node.name);
+  node.castShadow = !["paths", "water", "embers", "archway-ivy", "maze-ivy"].includes(node.name);
   node.receiveShadow = !["water", "embers"].includes(node.name);
 });
 // The maze, in stone.
@@ -257,6 +266,10 @@ const river = new River(scene, land.river, reducedMotion);
 // The heights are in Blender's axes (y is north), on a grid; in between, blend.
 const { x0, y0, step, nx, ny } = land.ground;
 const ground: Ground = (x, z) => {
+  // (On a bridge's deck, exactly its height: the grid would sink you at its edges.)
+  for (const [dx, dz, halfX, halfZ, top] of land.decks) {
+    if (Math.abs(x - dx) <= halfX && Math.abs(z - dz) <= halfZ) return top;
+  }
   const i = (x - x0) / step;
   const j = (-z - y0) / step;
   if (i < 0 || j < 0 || i >= nx - 1 || j >= ny - 1) return undefined;
@@ -410,7 +423,7 @@ const snake = new Snake(
   scene,
   snaky.scene,
   things.scene.getObjectByName("apple")!,
-  onPaths(ground, land.paths, land.steps),
+  onPaths(ground, land.paths, land.steps, land.floors),
   (guarded!.circle ?? guarded!.box)!,
   reducedMotion
 );
@@ -421,6 +434,25 @@ const shut = shapeOf.get("tower south");
 const crossing = shapeOf.get("deep-river south");
 // The deep hole between the maze and the treasure room, which the rope swings you over (rope.ts).
 const holed = shapeOf.get("maze north");
+// The moat, which the drawbridge crosses (drawbridge.ts), lowered for the
+// penny paid at the toll gate (to the guards there: guards.ts).
+const tolled = shapeOf.get("moat south");
+const bridging = land.drawbridge as DrawbridgeSpot;
+const drawbridge = new Drawbridge(
+  scene,
+  model.scene.getObjectByName("drawbridge")!,
+  bridging,
+  reducedMotion,
+  // (Creaking on its chains, going back up: coming down, you hear the penny paid.)
+  (down) => {
+    if (!down) ownSounds.play("creak", { rate: 0.5 });
+  },
+  () => ownSounds.play("thud", { rate: 0.6 })
+);
+const guards = new Guards(scene, sentries.scene, sentries.animations, bridging.guards, ground);
+player.movers.push(...guards.bodies);
+const bridgeDown = (here: string) =>
+  allOpen || wantedDown(bridging, Boolean(tolled && opened.has(tolled)), here, player.position, drawbridge.lowering);
 // The leaves filling the dragon's mouth, which the broom sweeps aside into
 // heaps (leaves.ts): lying on the way's floor in the mouth, and the ground
 // outside it.
@@ -462,7 +494,15 @@ function solidify() {
     const here = [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
     const closed = allOpen ? [] : here.filter((shape) => !opened.has(shape));
     // (And the deep hole, with the rope over it: you swing across it, not walk.)
-    const plain = allOpen ? [] : here.filter((shape) => walls.has(shape) || (shape === holed && opened.has(shape)));
+    // (And the moat, with the drawbridge still coming down: not yet across it.)
+    const plain = allOpen
+      ? []
+      : here.filter(
+          (shape) =>
+            walls.has(shape) ||
+            (shape === holed && opened.has(shape)) ||
+            (shape === tolled && opened.has(shape) && !drawbridge.down)
+        );
     // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
@@ -688,6 +728,7 @@ const items = setUpItems({
   walkable,
   paths: land.paths,
   steps: land.steps,
+  floors: land.floors,
   root,
   say,
   sound: (name) => sounds.play(name),
@@ -733,11 +774,20 @@ function inUse() {
         shape === heaped ||
         shape === dancers ||
         shape === holed ||
+        shape === tolled ||
         unlit.has(shape))
       ? [`${here} ${direction}`]
       : [];
   });
+  const paid = Boolean(tolled && exits.some((exit) => shapeOf.get(exit) === tolled));
+  if (paid && !(tolled && opened.has(tolled)) && !instantly) {
+    // (The penny taken, and the drawbridge lowered straight away: no waiting about.)
+    guards.pay(player.position);
+    ownSounds.play("coins");
+    drawbridge.set(true);
+  }
   opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
+  if (instantly) drawbridge.set(bridgeDown(here), true);
   solidify();
   for (const [shape, gate] of gates) {
     const wants = opened.has(shape) ? 1 : 0;
@@ -957,6 +1007,7 @@ if (debugMode) {
       items,
       snake,
       merlin,
+      guards,
       witches,
       net,
       restart,
@@ -1323,6 +1374,11 @@ renderer.setAnimationLoop((time) => {
     lidOpen += Math.sign(Number(near) - lidOpen) * Math.min(Math.abs(Number(near) - lidOpen), dt * 1.5);
     lid.rotation.x = -(CRACK + (LID - CRACK) * (lidOpen * lidOpen * (3 - 2 * lidOpen)));
   }
+  drawbridge.set(bridgeDown(room));
+  const settled = drawbridge.down;
+  drawbridge.update(dt);
+  if (drawbridge.down !== settled) solidify();
+  guards.update(dt, player.camera.position);
   for (const gate of gates.values()) {
     gate.open += Math.sign(gate.wants - gate.open) * Math.min(Math.abs(gate.wants - gate.open), dt * 0.8);
     // (Slow to start and to stop, like a heavy old gate.)
@@ -1373,8 +1429,15 @@ renderer.setAnimationLoop((time) => {
   items.update(room);
   here.textContent = name(room);
   scored.textContent = T.score(score(world, items.state));
-  // The sun's shadows follow you, so they're sharp wherever you are.
-  sunlight.target.position.copy(player.position);
-  sunlight.position.copy(player.position).addScaledVector(SUN, 200);
+  // The sun's shadows follow you, so they're sharp wherever you are: a
+  // whole texel at a time, or their edges would shift and shimmer as you move.
+  const snap = (along: Vector3) => Math.round(player.position.dot(along) / TEXEL) * TEXEL;
+  sunOn
+    .copy(ACROSS_SUN)
+    .multiplyScalar(snap(ACROSS_SUN))
+    .addScaledVector(UP_SUN, snap(UP_SUN))
+    .addScaledVector(SUN, player.position.dot(SUN));
+  sunlight.target.position.copy(sunOn);
+  sunlight.position.copy(sunOn).addScaledVector(SUN, 200);
   golden.render(outdoors);
 });

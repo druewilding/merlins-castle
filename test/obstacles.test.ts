@@ -121,6 +121,34 @@ describe("a one-way obstacle (the dense trees: north only)", () => {
   });
 });
 
+// Like the moat, with the drawbridge up: one-way, going south, and longer
+// (from the bank to the castle's wall) than it's wide.
+const moat = (): Box => ({ x: 0, z: 0, halfX: 3.2, halfZ: 3.45, names: ["moat south"], ahead: 2.65 });
+
+describe("a one-way obstacle longer than it's wide (the moat: south only)", () => {
+  // (Its shape once said which way you went across it: drifting sideways
+  // towards its middle, on the way out, counted as turning back.)
+  it.each([0.03, -0.03, 0.08])(
+    "lets you walk right through it the other way, drifting sideways (turned %s)",
+    (turn) => {
+      const { player, bumps } = standIn({ box: moat() });
+      player.place(1.5 * Math.sign(turn), 12, NORTH + turn);
+      walk(player, NORTH + turn, 10, () => player.position.z < -12);
+      expect(player.position.z).toBeLessThan(-12);
+      expect(bumps).toEqual([]);
+    }
+  );
+
+  it("won't let you turn back through it once you're past its middle", () => {
+    const { player, bumps } = standIn({ box: moat() });
+    player.place(0, 12, NORTH);
+    walk(player, NORTH, 10, () => player.position.z < -1);
+    walk(player, SOUTH, 3);
+    expect(player.position.z).toBeLessThan(-0.5);
+    expect(bumps).toContain("moat south");
+  });
+});
+
 describe("a two-way obstacle (a gate, shut from both sides)", () => {
   const gate = (): Box => ({
     x: 0,

@@ -3,7 +3,7 @@
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
 # The ladder, the plank, the key, the axe, the apple, the emerald, the
-# broom, the lamp and the rope so far; the rest are to come (PLAN-V3.md).
+# broom, the lamp, the rope and the penny so far; the rest are to come (PLAN-V3.md).
 
 import math
 import random
@@ -11,6 +11,8 @@ import sys
 from pathlib import Path
 
 import bmesh
+import bpy
+import numpy as np
 from mathutils import Matrix, Vector, noise
 
 HERE = Path(__file__).parent
@@ -974,8 +976,72 @@ low = min(v.co.z for v in rope_object.data.vertices)
 rope_object.data.transform(Matrix.Translation((0, 0, -low)))
 outward(rope_object)
 
+# The penny: as in its picture, a big old bronze coin, a worn king's head on
+# it (its picture's colours: no one looks closely enough for more), inside
+# a raised rim; plain and worn on its other side. 34 cm across, like the
+# key, big enough to spot.
+PENNY_R, PENNY_T = 0.17, 0.024  # its radius, and how thick it is
+RIM = 0.86  # where its rim starts, of the way out
+PENNY_RINGS, PENNY_SIDES = 56, 120
+BRONZE = c.linear("#8c5530")
+BRONZE_DARK = c.linear("#4f2c17")
+picture = bpy.data.images.load(str(HERE.parent / "originals/items/penny.png"))
+W, H = picture.size
+pixels = np.empty(W * H * 4, dtype=np.float32)
+picture.pixels.foreach_get(pixels)
+pixels = pixels.reshape(H, W, 4)[::-1]  # (its top row first)
+CX, CY, RX, RY = 634.5, 632.0, 570.5, 552.0  # the coin, in its picture
+
+
+def face_at(u, v):
+    """Its picture's colour (linear), u and v from -1 to 1 across it."""
+    x = int(min(W - 1, max(0, CX + u * RX)))
+    y = int(min(H - 1, max(0, CY - v * RY)))
+    rgb = [p / 12.92 if p <= 0.04045 else ((p + 0.055) / 1.055) ** 2.4 for p in pixels[y, x, :3]]
+    return (*rgb, 1.0)
+
+
+def worn(p):
+    v = Vector(p) * 60
+    return c.mix(BRONZE_DARK, BRONZE, 0.6 + noise.noise(v) * 0.35 + noise.noise(v * 3) * 0.1)
+
+
+penny = c.Builder()
+verts, faces, colours = [], [], []
+# Its face, ring by ring out from its middle (the rim higher, rounded at its edge).
+verts.append((0, 0, PENNY_T))
+colours.append(face_at(0, 0))
+for i in range(1, PENNY_RINGS + 1):
+    t = i / PENNY_RINGS
+    for k in range(PENNY_SIDES):
+        a = 2 * math.pi * k / PENNY_SIDES
+        u, v = math.cos(a) * t, math.sin(a) * t
+        colour = face_at(u * 0.985, v * 0.985)
+        z = PENNY_T + (0.0055 * math.sin(math.pi * (t - RIM) / (1 - RIM)) ** 0.6 if t > RIM else 0.0)
+        verts.append((u * PENNY_R, v * PENNY_R, z))
+        colours.append(colour)
+for k in range(PENNY_SIDES):
+    faces.append((0, 1 + k, 1 + (k + 1) % PENNY_SIDES))
+for i in range(PENNY_RINGS - 1):
+    for k in range(PENNY_SIDES):
+        a, b = 1 + i * PENNY_SIDES + k, 1 + i * PENNY_SIDES + (k + 1) % PENNY_SIDES
+        faces.append((a, a + PENNY_SIDES, b + PENNY_SIDES, b))
+penny.add(verts, faces, colours)
+# Its edge, and its other side: plain, worn bronze.
+edge = [(math.cos(2 * math.pi * k / PENNY_SIDES) * PENNY_R, math.sin(2 * math.pi * k / PENNY_SIDES) * PENNY_R)
+        for k in range(PENNY_SIDES)]
+top = 1 + (PENNY_RINGS - 1) * PENNY_SIDES  # (its face's outermost ring)
+penny.add([(x, y, z) for x, y in edge for z in (0.0, penny.verts[top][2])],
+          [(2 * k, 2 * ((k + 1) % PENNY_SIDES), 2 * ((k + 1) % PENNY_SIDES) + 1, 2 * k + 1) for k in range(PENNY_SIDES)],
+          [c.mix(worn((x, y, z)), BRONZE_DARK, 0.2) for x, y in edge for z in (0.0, 1.0)])
+penny.add([(0, 0, 0)] + [(x, y, 0.0) for x, y in edge],
+          [(0, 1 + (k + 1) % PENNY_SIDES, 1 + k) for k in range(PENNY_SIDES)],
+          [worn((0, 0, 0))] + [worn((x, y, 0)) for x, y in edge])
+outward(penny.build("penny", smooth=True))
+
 if out:
     c.export(out)
     print(f"Exported {out}")
 if preview:
     c.preview(preview, (2.5, -3.5, 2.5), (0, 0, 0), (-0.7, 0.5, -0.45), lens=35)
+    c.preview(preview.replace(".png", "-penny.png"), (0.0, -0.25, 0.45), (0, 0, 0), (-0.7, 0.5, -0.45), lens=50)

@@ -42,6 +42,7 @@ interface Sort {
   wild?: boolean; // only where you can't walk (you'd walk through it)
   shadows?: boolean;
   low?: boolean; // on the mountain too (it grows at any height)
+  steep?: number; // not where the ground rises more than this a metre (it would stick out of the slope)
 }
 
 const SORTS = {
@@ -62,6 +63,7 @@ const SORTS = {
     wild: true,
     shadows: true,
     low: true,
+    steep: 0.6,
   },
   bush: { models: ["bush-1", "bush-2", "bush-3"], far: 75, size: [0.75, 1.25], wild: true, shadows: true },
 } satisfies Record<string, Sort>;
@@ -232,6 +234,7 @@ export class Plants {
             const size = sort.size[0] + (sort.size[1] - sort.size[0]) * random();
             const shade = 0.85 + 0.25 * random();
             if (y === undefined || (sort.wild && this.walkable(px, pz))) continue;
+            if (sort.steep !== undefined && this.slope(px, pz) > sort.steep) continue;
             // (Thinning out up the mountain, where the ground turns to rock: but
             // for the meadow on its top.)
             if (!sort.low && g >> 3 !== MOUNTAIN_TOP && random() < (y - 8) / 8) continue;
@@ -250,6 +253,12 @@ export class Plants {
     const chunk = { matrices, colours };
     this.chunks.set(key, chunk);
     return chunk;
+  }
+
+  // How much the ground rises a metre, here (over 2 m, either way).
+  private slope(x: number, z: number) {
+    const at = (dx: number, dz: number) => this.ground(x + dx, z + dz) ?? 0;
+    return Math.hypot(at(1, 0) - at(-1, 0), at(0, 1) - at(0, -1)) / 2;
   }
 
   // One model, many times over: shrinking away into the ground further off,

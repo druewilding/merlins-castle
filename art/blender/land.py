@@ -23,7 +23,7 @@ import struct
 import sys
 from pathlib import Path
 
-from mathutils import Vector, noise
+from mathutils import Matrix, Vector, noise
 
 HERE = Path(__file__).parent
 sys.path.append(str(HERE))
@@ -730,6 +730,10 @@ def height(x, y):
     w, e, s, n = CASTLE
     if w - 8 <= x <= e + 8 and s - 8 <= y <= n + 8 and not in_moat(x, y):
         h = 0.4  # the castle stands on flat ground
+    # (And the bank comes up to the drawbridge's landing, a step below it.)
+    landing = smooth(1 - (max(0.0, abs(x) - 4) + max(0.0, y - (MOAT[3] + 3))) / 4)
+    if landing > 0 and not in_moat(x, y):
+        h += (0.45 - h) * landing
     return h
 
 
@@ -758,12 +762,18 @@ for place, door in (("tower", "tower-door"), ("charcoal-hut", "hut-door")):
     way.segments = list(zip(way.points, way.points[1:]))
 
 
+# The forest bridge and the drawbridge (with the way in under the gatehouse,
+# and the landing on the bank), for walking on: their middles, half how wide
+# and long, and how high. (The game walks you on them at exactly that
+# height: the ground's grid, every 2 m, would sink you at their edges.)
+DECKS = [(BRIDGE[0], BRIDGE[1], 2.2, BRIDGE_HALF, 0.9), (0, -135 * K, 3, 8 * K, 0.6)]
+
+
 def deck(x, y):
     """The bridge and drawbridge, for walking on."""
-    if abs(x - BRIDGE[0]) <= 2.2 and abs(y - BRIDGE[1]) <= BRIDGE_HALF:
-        return 0.9
-    if abs(x) <= 3 and -143 * K <= y <= -127 * K:
-        return 0.6
+    for x0, y0, half_x, half_y, top in DECKS:
+        if abs(x - x0) <= half_x and abs(y - y0) <= half_y:
+            return top
     return None
 
 
@@ -1022,7 +1032,11 @@ def out_on_the_path(x, y):
 
 
 def off_the_land(x, y):
-    """Over water, beside a bridge: no path there (it'd hang down to the riverbed)."""
+    """Over water, beside a bridge: no path there (it'd hang down to the
+    riverbed). (Nor on the drawbridge, which moves, nor the stone either
+    end of it.)"""
+    if abs(x) <= 3.3 and CASTLE[3] - 1.2 <= y <= -127 * K:
+        return True
     return deck(x, y) is None and (from_river(x, y) < BANK + 0.5 or in_moat(x, y))
 
 
@@ -1507,10 +1521,90 @@ for side in (-1, 1):
     block(built, BRIDGE[0] + side * 2.4 - 0.15, BRIDGE[1] - BRIDGE_HALF, 0.9, BRIDGE[0] + side * 2.4 + 0.15,
           BRIDGE[1] + BRIDGE_HALF, 1.9,
           c.linear("#6b4426"))
-block(built, -3, -143 * K, 0.2, 3, -127 * K, 0.6, c.linear("#7a5230"), solid=False)
-# The drawbridge is up: over the middle of the water, so its far half (where
-# you can walk out of the courtyard) is only on the bridge.
-obstacle(["moat south"], "box", 0, -(MOAT[3] + CASTLE[3] + 2) / 2, 3.2, 1.5)
+# The drawbridge, as in its pictures: planks on beams, edged with iron, on
+# chains up to the gatehouse over the castle's gate. Hinged at the foot of
+# the wall (the game raises it, and lowers it while the penny's in use
+# here, and keeps it down while you're in the castle); lying across the
+# moat, it rests on a stone landing on the bank, between two posts. You
+# walk on its deck at deck()'s height, up or down: from the bank, it stops
+# you on the landing (so you never walk out where it'd be).
+DB_HINGE = CASTLE[3] + 1.2  # its hinge, out from the wall's face
+DB_TIP = MOAT[3] - 0.1  # where it rests, at the landing's edge
+DB_TOP = 0.6  # its deck (deck())
+DB_HALF = 2.9  # half its width, a shade narrower than the gate
+DB_THICK = 0.34
+DB_CHAIN = 0.4  # how far in from its tip its chains are fixed
+GATEHOUSE = (7.0, 9.8)  # over the gate, from the top of the way through to its battlements
+DB_ANCHORS = [(side * (DB_HALF - 0.15), CASTLE[3] + 1, GATEHOUSE[0] + 1.6) for side in (-1, 1)]  # the chains' holes
+PLANKS = [c.linear(h) for h in ("#8a5a33", "#7d5130", "#93613a", "#835634", "#8f5d35")]
+DB_IRON = c.linear("#3b3836")
+DB_LENGTH = DB_TIP - DB_HINGE
+drawbridge = c.Builder()
+
+
+def db_box(x0, a0, z0, x1, a1, z1, colour):
+    """A piece of it, a0 to a1 out from its hinge, z up from its deck."""
+    block(drawbridge, x0, a0, z0, x1, a1, z1, colour, solid=False)
+
+
+k = 0
+a = 0.0
+while a < DB_LENGTH - 0.01:
+    a1 = min(DB_LENGTH, a + 0.32)
+    db_box(-DB_HALF, a + 0.012, -0.12, DB_HALF, a1 - 0.012, 0, PLANKS[(k * 3) % len(PLANKS)])  # (a dark gap between them)
+    a, k = a1, k + 1
+db_box(-DB_HALF + 0.1, 0.02, -0.13, DB_HALF - 0.1, DB_LENGTH - 0.02, -0.1, c.linear("#3d2817"))  # (the gaps, dark)
+for x in (-DB_HALF + 0.25, 0, DB_HALF - 0.25):
+    db_box(x - 0.14, 0.05, -DB_THICK, x + 0.14, DB_LENGTH - 0.05, -0.12, c.linear("#5e3b1f"))  # the beams under it
+for side in (-1, 1):
+    db_box(side * DB_HALF - 0.06, 0, -0.16, side * DB_HALF + 0.06, DB_LENGTH, 0.04, DB_IRON)  # its iron edges
+    # (And where its chains are fixed: a ring standing up on each side.)
+    db_box(side * (DB_HALF - 0.15) - 0.05, DB_LENGTH - DB_CHAIN - 0.08, 0, side * (DB_HALF - 0.15) + 0.05,
+           DB_LENGTH - DB_CHAIN + 0.08, 0.14, DB_IRON)
+for a in (0.25, DB_LENGTH - 0.25):
+    db_box(-DB_HALF, a - 0.06, 0, DB_HALF, a + 0.06, 0.015, DB_IRON)  # straps across its ends
+drawbridge.build("drawbridge", smooth=False).location = (0, DB_HINGE, DB_TOP)
+# The way in under the gatehouse, and the landing on the bank, between its posts.
+block(built, -3, CASTLE[3] - 1.1, 0.0, 3, DB_HINGE, DB_TOP, c.linear("#8d887c"), solid=False)
+block(built, -3.2, DB_TIP, -0.6, 3.2, -127 * K, DB_TOP, c.linear("#8d887c"), solid=False)
+for side in (-1, 1):
+    block(built, side * 3.55 - 0.3, DB_TIP + 0.15, -0.6, side * 3.55 + 0.3, DB_TIP + 0.75, 1.5, STONE)
+    built.cone((side * 3.55, DB_TIP + 0.45, 1.5), 0.3, 0.42, STONE, sides=4, droop=0)
+# The gatehouse over the gate, between the towers either side of it, with
+# the chains' holes in its face.
+block(built, -3.2, CASTLE[3] - 1, GATEHOUSE[0], 3.2, CASTLE[3] + 1, GATEHOUSE[1], GREY, solid=False)
+for x in (-3.2, -1.2, 0.8, 2.6):
+    block(built, x, CASTLE[3] + 0.4, GATEHOUSE[1], x + 0.6, CASTLE[3] + 1, GATEHOUSE[1] + 0.8, GREY, solid=False)
+for x, y, z in DB_ANCHORS:
+    block(built, x - 0.12, y, z - 0.12, x + 0.12, y + 0.02, z + 0.12, c.linear("#1d1b19"), solid=False)
+# The toll booth, beside the guards: striped red and white, as in its
+# picture, under a pointed roof, its doorway to the path.
+BOOTH = (6.6, MOAT[3] + 3.4)
+BOOTH_R, BOOTH_TALL, BOOTH_SIDES = 0.95, 2.3, 10
+for k in range(BOOTH_SIDES):
+    a0, a1 = (2 * math.pi * (k + j) / BOOTH_SIDES for j in (0, 1))
+    pts = [(BOOTH[0] + math.cos(a) * BOOTH_R, BOOTH[1] + math.sin(a) * BOOTH_R, z)
+           for a, z in ((a0, -0.1), (a1, -0.1), (a1, BOOTH_TALL), (a0, BOOTH_TALL))]
+    door = k == BOOTH_SIDES // 2  # (facing west, to the path)
+    colour = c.linear("#2a1d14") if door else c.linear("#c23a33" if k % 2 else "#f1eadb")
+    built.add(pts, [(0, 1, 2, 3)], [colour] * 4)
+built.cone((*BOOTH, BOOTH_TALL), 1.3, BOOTH_R * 1.2, c.linear("#c23a33"), sides=BOOTH_SIDES, droop=0)
+block(built, BOOTH[0] - 0.02, BOOTH[1] - 0.02, BOOTH_TALL + 1.2, BOOTH[0] + 0.02, BOOTH[1] + 0.02, BOOTH_TALL + 1.8,
+      c.linear("#5e3b1f"), solid=False)
+built.add([(BOOTH[0], BOOTH[1], BOOTH_TALL + 1.8), (BOOTH[0] + 0.45, BOOTH[1], BOOTH_TALL + 1.68),
+           (BOOTH[0], BOOTH[1], BOOTH_TALL + 1.56)], [(0, 1, 2)], [c.linear("#f1eadb")] * 3)  # its pennant
+solid_circle(*BOOTH, BOOTH_R + 0.05)
+# (Nor off its corners at the castle end, onto the strip of ground at the
+# foot of the wall, between it and the water.)
+for side in (-1, 1):
+    solid_box(side * 3.9, CASTLE[3] + 1.75, 1.0, 0.85)  # (out over the water's edge: you're never wider than the deck there)
+# Where the guards stand: either side of the way onto the landing, facing up
+# the path, clear of the bridge's width (coming off it, you'd bump into one,
+# and be pushed back, as if you'd turned back into the moat).
+GUARDS = [(side * 3.7, DB_TIP + 1.2) for side in (-1, 1)]
+# The drawbridge is up: across the water, so from the bank it stops you
+# just short of the guards (it's they who stop you, at the toll gate).
+obstacle(["moat south"], "box", 0, -(DB_TIP + CASTLE[3] + 2) / 2, 3.2, (DB_TIP - CASTLE[3] - 2) / 2, reach=2.65)
 
 # The old stone wall: north from the forest, west along the gate, north again.
 WALL = 4.5
@@ -1737,6 +1831,282 @@ for run in ((WX, -18 * K, WX, WY + 0.6), (WW - 0.6, WY, GATE[0], WY), (GATE[1], 
             (WW, WY, WW, WALL_END)):
     stone_wall(*run)
 wall.build("old-stone-wall", smooth=False)
+
+# The stone archway north of the moat, as in its picture: an old wall of
+# dressed stone across the path between the trees (its ends in the forest
+# either side), crumbling along its top, mossy low down, ivy hanging from
+# it; and a round arch over the path, on a pier either side, its stones
+# laid round it, rising over the wall. Solid but for the way through.
+ARCH_Y = -82.0  # where it crosses the path
+ARCH_X = 0.6  # the path's middle, there
+ARCH_ENDS = (-13.0, 13.0)
+ARCH_HALF = 1.9  # half the way through
+ARCH_SPRING = 2.3  # where the arch springs from its piers
+ARCH_RING = 0.5  # how deep its stones are
+ARCH_PIER = 1.0  # how wide each pier is
+ARCH_TOP = ARCH_SPRING + ARCH_HALF + ARCH_RING + 0.55  # the top over the arch
+ARCH_WALL = 2.9  # the wall's height either side (less where it's crumbled)
+ARCH_THICK = 0.42  # half its thickness
+ARCH_STONES = [c.linear(h) for h in ("#a39d90", "#958f83", "#ada79a", "#8a857a", "#9c968a", "#b2ada2")]
+ARCH_GAP = c.linear("#5f584c")
+arch = c.Builder()
+arch_ivy = c.Builder()  # (its own: casting no shadows, so close to the stones the sun's shadows would speckle them)
+arch_rng = random.Random("the stone archway")
+arch_tops = []  # (from, to, how high its top is there), as it's built: for the ivy to hang from
+arch_laid = []  # (from, to, its top): each stone of the wall, as it's laid, for its core to come up to
+
+
+def arch_foot(x):
+    return drawn_height(x, ARCH_Y, exactly=True) - 0.3
+
+
+def arch_colour(x, z):
+    colour = c.vary(arch_rng.choice(ARCH_STONES), 0.08, Vector((x, z, 5)))
+    mossy = smooth(1 - (z - arch_foot(x) - 0.3) / 1.2) * 0.55 + 0.4 * max(0.0, noise.noise(Vector((x / 2, z, 3))))
+    colour = c.mix(colour, MOSS, min(0.55, mossy))
+    if arch_rng.random() < 0.12:
+        colour = c.mix(colour, LICHEN, arch_rng.uniform(0.2, 0.45))
+    return colour
+
+
+def arch_stone(x0, x1, z0, z1):
+    """A dressed stone, through the wall, each face standing out a little from its core."""
+    arch_laid.append((x0, x1, z1))
+    out = ARCH_THICK + arch_rng.uniform(-0.02, 0.03)
+    back = ARCH_THICK + arch_rng.uniform(-0.02, 0.03)
+    block(arch, x0 + 0.015, ARCH_Y - out, z0 + 0.015, x1 - 0.015, ARCH_Y + back, z1 - 0.015,
+          arch_colour((x0 + x1) / 2, (z0 + z1) / 2), solid=False)
+
+
+# Where it's fallen in from its top: a V, deepest in its middle (its
+# middle along it, how wide, and how deep), the stones lying at its foot.
+ARCH_BREACHES = [(-7.4, 1.8, 0.85), (4.7, 1.3, 0.6)]
+
+
+def arch_breach(x):
+    """How far down from its top it's fallen in, here."""
+    return max([deep * (1 - abs(x - mid) / (wide / 2)) for mid, wide, deep in ARCH_BREACHES
+                if abs(x - mid) < wide / 2], default=0.0)
+
+
+# And where the archway's own top has broken away: from over its crown,
+# down to its east pier's outer edge (its ring of stones still whole).
+ARCH_BREAK = (ARCH_X + 0.9, ARCH_X + ARCH_HALF + ARCH_PIER, 1.3)  # from, to, and how far down it's gone, there
+
+
+def arch_broken(x, z1):
+    """Whether a stone, its middle along at x and its top at z1, has fallen from the archway's broken corner."""
+    start, end, deep = ARCH_BREAK
+    return x > start and z1 > ARCH_TOP - deep * min(1.0, (x - start) / (end - start)) + 0.05
+
+
+def arch_course(x0, x1, z0, z1, short=(0.45, 0.9), top=None, gone=None):
+    """A course of stones from x0 to x1, joints staggered. (Along the wall's
+    top, one gone now and then; and none where it's fallen in.)"""
+    x = x0 - arch_rng.uniform(0, short[0])
+    while x < x1 - 0.05:
+        long = arch_rng.uniform(*short)
+        a, b = max(x, x0), min(x + long, x1)
+        x += long
+        if b - a <= 0.12:
+            continue
+        if gone and gone((a + b) / 2, z1):
+            continue
+        if top is not None:
+            if z1 > top - max(arch_breach(a), arch_breach(b), arch_breach((a + b) / 2)) + 0.05:
+                continue
+            if z1 > top - 0.05 and arch_rng.random() < 0.12:
+                continue
+        arch_stone(a, b, z0, z1)
+
+
+def extrados(x):
+    """The top of the arch's ring of stones, over x (None beyond it)."""
+    dx = abs(x - ARCH_X)
+    r = ARCH_HALF + ARCH_RING
+    return ARCH_SPRING + math.sqrt(r * r - dx * dx) if dx < r else None
+
+
+# The wall either side, and the piers: in courses from below the ground,
+# its top ragged (stones gone here and there, a few left standing higher).
+pier_in, pier_out = ARCH_X - ARCH_HALF, ARCH_X - ARCH_HALF - ARCH_PIER
+for lo, hi, pier in ((ARCH_ENDS[0], pier_out, False), (pier_out, pier_in, True),
+                     (ARCH_X + ARCH_HALF, ARCH_X + ARCH_HALF + ARCH_PIER, True),
+                     (ARCH_X + ARCH_HALF + ARCH_PIER, ARCH_ENDS[1], False)):
+    z = min(arch_foot(lo), arch_foot(hi))
+    top = ARCH_TOP if pier else ARCH_WALL
+    while z < top - 0.05:
+        tall = min(arch_rng.uniform(0.3, 0.42), top - z)
+        if pier:
+            # (Big quoins, the full width of the pier, every other course.)
+            arch_course(lo, hi, z, z + tall, (0.45, 0.6) if arch_rng.random() < 0.5 else (ARCH_PIER, ARCH_PIER), top=top,
+                        gone=arch_broken)
+        else:
+            arch_course(lo, hi, z, z + tall, top=top)
+        z += tall
+    if pier:
+        arch_tops.append((lo, hi, top))
+    else:
+        # Crumbling along its top: a stone or two still standing here and
+        # there, lower in places, as in the picture.
+        x = lo
+        while x < hi - 0.3:
+            wide = arch_rng.uniform(0.5, 1.1)
+            a, b = x, min(x + wide, hi)
+            stack = arch_rng.choice((0, 0, 1, 1, 2))
+            fallen = max(arch_breach(a), arch_breach(b), arch_breach((a + b) / 2))
+            if fallen > 0:
+                stack = 0  # (nothing standing over where it's fallen in)
+            for k in range(stack):
+                arch_stone(a + 0.05 * k, b - 0.05 * k, top + k * 0.36, top + (k + 1) * 0.36 - 0.02)
+            arch_tops.append((a + 0.05 * max(0, stack - 1), b - 0.05 * max(0, stack - 1),
+                              top + stack * 0.36 - 0.02 - fallen))
+            x += wide
+    # Its core, deep in: dark between the stones (and down where it's fallen in).
+    steps_ = max(1, int((hi - lo) / 0.2))
+    for side in (-1, 1):
+        y = ARCH_Y + side * (ARCH_THICK - 0.05)
+        for k in range(steps_):
+            a, b = lo + (hi - lo) * k / steps_, lo + (hi - lo) * (k + 1) / steps_
+            # (Up to its stones' tops, just there: stepping down, a course at a
+            # time, where it's fallen in, as its stones do.)
+            m = (a + b) / 2
+            t = top if not pier and not arch_breach(m) else max(
+                (z1 for x0, x1, z1 in arch_laid if x0 <= m <= x1 and z1 <= top + 0.01), default=top) - 0.03
+            ta = tb = t
+            facing(arch, [(a, y, arch_foot(a)), (b, y, arch_foot(b)), (b, y, tb), (a, y, ta)], [ARCH_GAP] * 4,
+                   (0, side, 0))
+    solid_box((lo + hi) / 2, ARCH_Y, (hi - lo) / 2, ARCH_THICK + 0.05)
+# The arch: its stones laid round it, wedges between its springings, a
+# keystone at its crown, a little proud.
+VOUSSOIRS = 13
+for k in range(VOUSSOIRS):
+    a0, a1 = math.pi * k / VOUSSOIRS, math.pi * (k + 1) / VOUSSOIRS
+    gap = 0.012
+    a0, a1 = a0 + gap, a1 - gap
+    key = k == VOUSSOIRS // 2
+    r0, r1 = ARCH_HALF, ARCH_HALF + ARCH_RING + (0.08 if key else 0.0)
+    # (Standing well out from the wall's stones, where they overlap the piers': not flickering through each other.)
+    proud = 0.1 if key else 0.06 + arch_rng.uniform(0.0, 0.02)
+    colour = arch_colour(ARCH_X, ARCH_SPRING + 2)
+    corners = []
+    for y in (ARCH_Y - ARCH_THICK - proud, ARCH_Y + ARCH_THICK + proud):
+        for r, a in ((r0, a0), (r1, a0), (r1, a1), (r0, a1)):
+            corners.append((ARCH_X + math.cos(a) * r, y, ARCH_SPRING + math.sin(a) * r))
+    middle = sum((Vector(p) for p in corners), Vector()) / 8
+    for f in ((0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)):
+        pts = [corners[i] for i in f]
+        centre = sum((Vector(p) for p in pts), Vector()) / 4
+        facing(arch, pts, [colour] * 4, tuple(centre - middle))
+# Over the arch, between the piers: courses down to the arch's ring, each
+# stone cut off where it meets it; and the core behind, with the way
+# through cut out of it.
+z = ARCH_SPRING + 0.2
+while z < ARCH_TOP - 0.05:
+    tall = min(arch_rng.uniform(0.3, 0.4), ARCH_TOP - z)
+    x = pier_in
+    while x < ARCH_X + ARCH_HALF - 0.05:
+        long = arch_rng.uniform(0.4, 0.8)
+        a, b = x, min(x + long, ARCH_X + ARCH_HALF)
+        x += long
+        lows = [extrados(v) for v in (a, b, (a + b) / 2)]
+        floor_ = max((v for v in lows if v is not None), default=0.0)
+        # (None where its corner's broken away; a stone gone from its top now and then.)
+        if arch_broken((a + b) / 2, z + tall) or (z + tall > ARCH_TOP - 0.05 and arch_rng.random() < 0.2):
+            continue
+        if z + tall - 0.08 > floor_:
+            arch_stone(a, b, max(z, floor_ + 0.02), z + tall)
+    z += tall
+for side in (-1, 1):
+    y = ARCH_Y + side * (ARCH_THICK - 0.05)
+    # (Right down to its underside: the joints between its stones dark, not open to the sky.)
+    edge = [(ARCH_X + math.cos(math.pi * k / 16) * (ARCH_HALF + 0.03), y,
+             ARCH_SPRING + math.sin(math.pi * k / 16) * (ARCH_HALF + 0.03)) for k in range(17)]
+    for p, q in zip(edge, edge[1:]):
+        # (Up to its stones' tops, just there: down where they're gone, behind its ring.)
+        m = (p[0] + q[0]) / 2
+        ring = extrados(m) or ARCH_SPRING
+        t = max([z1 for x0, x1, z1 in arch_laid if x0 <= m <= x1 and z1 > ring - 0.01] + [ring]) - 0.03
+        facing(arch, [p, q, (q[0], y, t), (p[0], y, t)], [ARCH_GAP] * 4, (0, side, 0))
+# Behind the joints in the arch's underside, between its two faces: dark,
+# and a little way up into its stones (whose own undersides are what you see).
+for k in range(16):
+    a0, a1 = math.pi * k / 16, math.pi * (k + 1) / 16
+    pts = [(ARCH_X + math.cos(a) * (ARCH_HALF + 0.03), y, ARCH_SPRING + math.sin(a) * (ARCH_HALF + 0.03))
+           for a, y in ((a0, ARCH_Y - ARCH_THICK), (a1, ARCH_Y - ARCH_THICK), (a1, ARCH_Y + ARCH_THICK),
+                        (a0, ARCH_Y + ARCH_THICK))]
+    facing(arch, pts, [ARCH_GAP] * 4, (-math.cos((a0 + a1) / 2), 0, -math.sin((a0 + a1) / 2)))
+# Ivy, hanging from its top in places, either side, and over the arch.
+for side in (-1, 1):
+    for cx, wide, drop in ((-9.5, 2.2, 2.0), (-4.2, 1.4, 2.4), (6.5, 2.8, 2.2), (10.5, 1.6, 1.5)):
+        cx += arch_rng.uniform(-0.6, 0.6) * side
+        for _ in range(int(wide * drop * 30)):
+            u = arch_rng.uniform(-1, 1)
+            down = drop * (1 - 0.6 * u * u) * arch_rng.uniform(0.5, 1.0) * arch_rng.random() ** 1.3
+            lx = cx + u * wide / 2
+            # (From the top of the wall just there: never above it, where it's crumbled.)
+            top = max((t for a, b, t in arch_tops if a <= lx <= b), default=ARCH_WALL) - 0.05
+            lz = top - down
+            size = arch_rng.uniform(0.13, 0.2)
+            spin = arch_rng.uniform(0, 2 * math.pi)
+            # (Clear of the stones standing out, each leaf at its own depth and
+            # tipped out towards its tip, the whole of it: two overlapping, at
+            # the same depth and flat there, would flicker through each other.)
+            y = ARCH_Y + side * (ARCH_THICK + 0.06 + arch_rng.uniform(0, 0.08))
+            tip = arch_rng.uniform(0.04, 0.08)
+            corners = [(lx + math.cos(spin + a) * size * r, y + side * tip * (1 + math.cos(a)) / 2,
+                        lz + math.sin(spin + a) * size * r)
+                       for a, r in ((0, 1.0), (math.pi / 2, 0.6), (math.pi, 0.5), (3 * math.pi / 2, 0.6))]
+            leaf = c.mix(*IVY, arch_rng.random())
+            facing(arch_ivy, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf], (0, side, 0))
+# Its fallen stones, at its foot either side: most under where it's fallen
+# in, a few elsewhere; tumbled every which way, half sunk in the ground, and
+# mossy. Not on the path, nor in a tree; the big ones solid.
+ARCH_TREES = [(7.8, -79.6), (-8.1, -78.5), (-5.6, -75.8), (-15.3, -81.1), (13.7, -78.5), (9.6, -76.6), (-11.2, -84.7)]
+
+
+def tumbled(cx, cy, size):
+    long, wide, tall = size, size * arch_rng.uniform(0.55, 0.8), size * arch_rng.uniform(0.45, 0.65)
+    turn = Matrix.Rotation(arch_rng.uniform(0, math.pi), 4, "Z") @ Matrix.Rotation(arch_rng.uniform(-0.45, 0.45), 4, "X") \
+        @ Matrix.Rotation(arch_rng.uniform(-0.35, 0.35), 4, "Y")
+    centre = Vector((cx, cy, drawn_height(cx, cy, exactly=True) + tall * 0.2))
+    corners = [tuple(centre + turn @ Vector((sx * long / 2, sy * wide / 2, sz * tall / 2)))
+               for sz in (-1, 1) for sy in (-1, 1) for sx in (-1, 1)]
+    colour = c.mix(arch_colour(cx, 3), MOSS, arch_rng.uniform(0.15, 0.45))
+    for f in ((0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)):
+        pts = [corners[i] for i in f]
+        out_ = sum((Vector(p) for p in pts), Vector()) / 4 - centre
+        shade = colour if f != (4, 5, 7, 6) else c.mix(colour, MOSS, 0.2)
+        facing(arch, pts, [shade] * 4, tuple(out_))
+    if size > 0.35:
+        solid_circle(cx, cy, size * 0.45)
+
+
+fallen_at = []
+for mid, wide, deep in ARCH_BREACHES:
+    for _ in range(int(wide * deep * 9)):
+        side = arch_rng.choice((-1, 1))
+        fallen_at.append((mid + arch_rng.uniform(-1.2, 1.2) * wide, ARCH_Y + side * arch_rng.uniform(0.7, 2.6),
+                          arch_rng.uniform(0.3, 0.55)))
+# (And from the archway's broken corner, beside the path.)
+for _ in range(5):
+    fallen_at.append((arch_rng.uniform(ARCH_X + ARCH_HALF + 1.0, ARCH_X + ARCH_HALF + 2.6),
+                      ARCH_Y + arch_rng.choice((-1, 1)) * arch_rng.uniform(0.7, 2.2), arch_rng.uniform(0.3, 0.5)))
+for _ in range(6):
+    fallen_at.append((arch_rng.uniform(*ARCH_ENDS), ARCH_Y + arch_rng.choice((-1, 1)) * arch_rng.uniform(0.7, 2.0),
+                      arch_rng.uniform(0.25, 0.45)))
+placed = []  # (the fallen stones: where, and how big)
+for cx, cy, size in fallen_at:
+    if abs(cx - ARCH_X) < ARCH_HALF + 0.9 or not ARCH_ENDS[0] < cx < ARCH_ENDS[1]:
+        continue  # (off the path through it)
+    if any(math.hypot(cx - tx, cy - ty) < 1.2 for tx, ty in ARCH_TREES):
+        continue
+    if any(math.hypot(cx - px, cy - py) < (size + ps) * 0.6 for px, py, ps in placed):
+        continue
+    placed.append((cx, cy, size))
+    tumbled(cx, cy, size)
+arch.build("archway", smooth=False)
+arch_ivy.build("archway-ivy", smooth=False)
 
 
 # A clue at each dead end: a note, nailed to a rough board on a stake, the
@@ -2461,10 +2831,12 @@ mx0, my0 = MZ[0] - MAZE_HALF, MZ[1] - MAZE_HALF
 # ivy hanging down from its tops, here and there. Its floor, flagstones
 # (the texture again), just over the ground.
 MAZE_THICK, MAZE_TALL = 0.35, 2.9  # half its thickness, and its height over the ground
+MAZE_FLOOR = 0.14  # how far its floor's over the ground (what's dropped there lies on it, not under it)
 MAZE_MOSS = c.linear("#9fae7a")
 MAZE_LIGHT = c.linear("#ffffff")
 maze = c.Builder()
 maze_floor = c.Builder()
+maze_ivy = c.Builder()  # (its own: casting no shadows, so close to the stones the sun's shadows would speckle them)
 runs = []  # (along x?, the line it's on, from, to), in cells
 
 
@@ -2479,12 +2851,15 @@ def maze_wall(x0, y0, x1, y1):
 
 def maze_run(along_x, line, a, b):
     """One straight stretch of wall, from cell a to cell b along its line."""
-    lo, hi = a * MAZE_CELL - MAZE_THICK, b * MAZE_CELL + MAZE_THICK
+    # (Those along y a hair thinner and shorter, so where two meet, their
+    # faces are never in the same plane, fighting: just behind the other's.)
+    thick = MAZE_THICK if along_x else MAZE_THICK - 0.004
+    lo, hi = a * MAZE_CELL - thick, b * MAZE_CELL + thick
     at = line * MAZE_CELL
     if along_x:
-        x0, x1, y0, y1 = mx0 + lo, mx0 + hi, my0 + at - MAZE_THICK, my0 + at + MAZE_THICK
+        x0, x1, y0, y1 = mx0 + lo, mx0 + hi, my0 + at - thick, my0 + at + thick
     else:
-        x0, x1, y0, y1 = mx0 + at - MAZE_THICK, mx0 + at + MAZE_THICK, my0 + lo, my0 + hi
+        x0, x1, y0, y1 = mx0 + at - thick, mx0 + at + thick, my0 + lo, my0 + hi
     grounds = [height(x0 + (x1 - x0) * k / 8, y0 + (y1 - y0) * k / 8) for k in range(9)]
     # (Those along x a hair taller, so where two meet their tops don't fight.)
     z0, z1 = min(grounds) - 0.6, max(grounds) + MAZE_TALL + (0.02 if along_x else 0)
@@ -2504,7 +2879,10 @@ def maze_run(along_x, line, a, b):
                 down = reach * maze_rng.random() ** 1.4
                 lt = min(max(lo + t + u * wide / 2, lo + 0.05), hi - 0.05)
                 size, spin = maze_rng.uniform(0.12, 0.2), maze_rng.uniform(0, 2 * math.pi)
-                out = MAZE_THICK + maze_rng.uniform(0.01, 0.06)
+                # (Each leaf at its own depth, and tipped out towards its tip:
+                # flat, two overlapping all but in the same plane would flicker.)
+                out = MAZE_THICK + 0.02 + maze_rng.uniform(0, 0.06)
+                tip = maze_rng.uniform(0.04, 0.08)
                 if along_x:
                     cx, cy, d, n = mx0 + lt, my0 + at + out * side, (1, 0), (0, side)
                 else:
@@ -2513,9 +2891,10 @@ def maze_run(along_x, line, a, b):
                 corners = []
                 for ang, r in ((0, 1.0), (math.pi / 2, 0.6), (math.pi, 0.5), (3 * math.pi / 2, 0.6)):
                     along_, up_ = math.cos(spin + ang) * size * r, math.sin(spin + ang) * size * r
-                    corners.append((cx + d[0] * along_, cy + d[1] * along_, cz + up_))
+                    lift = tip * (1 + math.cos(ang)) / 2
+                    corners.append((cx + d[0] * along_ + n[0] * lift, cy + d[1] * along_ + n[1] * lift, cz + up_))
                 leaf = c.mix(*IVY, maze_rng.random())
-                facing(built, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf], (*n, 0))
+                facing(maze_ivy, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf], (*n, 0))
             t += wide + maze_rng.uniform(3, 9)
 
 
@@ -2551,6 +2930,7 @@ for along_x in (True, False):
                 a, b = pa, pb
         maze_run(along_x, line, a, b)
 maze.build("maze", smooth=False)
+maze_ivy.build("maze-ivy", smooth=False)
 # Its floor, a little over the ground (and the tunnels' stone lips): on the ground's own grid (and split
 # the way it is), so the ground never comes up through it.
 def maze_lines(lo, hi, origin):
@@ -2563,8 +2943,19 @@ xs, ys = maze_lines(mx0, mx0 + 2 * MAZE_HALF, X0), maze_lines(my0, my0 + 2 * MAZ
 for i in range(len(xs) - 1):
     for j in range(len(ys) - 1):
         pts = [(xs[i], ys[j]), (xs[i + 1], ys[j]), (xs[i + 1], ys[j + 1]), (xs[i], ys[j + 1])]
-        maze_floor.add([(x, y, drawn_height(x, y, exactly=True) + 0.14) for x, y in pts], [(0, 1, 2), (0, 2, 3)],
+        maze_floor.add([(x, y, drawn_height(x, y, exactly=True) + MAZE_FLOOR) for x, y in pts], [(0, 1, 2), (0, 2, 3)],
                        [MAZE_LIGHT] * 4)
+# And its edge, all round it, from its top down into the ground: a low step
+# up onto it (at the way in, you'd see under it).
+MAZE_EDGE = c.linear("#c9c2b4")  # (a little darker than its top)
+for line, along_x, out_ in ((ys[0], True, (0, -1, 0)), (ys[-1], True, (0, 1, 0)),
+                            (xs[0], False, (-1, 0, 0)), (xs[-1], False, (1, 0, 0))):
+    edge = xs if along_x else ys
+    for a, b in zip(edge, edge[1:]):
+        (x0, y0), (x1, y1) = ((a, line), (b, line)) if along_x else ((line, a), (line, b))
+        top0, top1 = (drawn_height(x, y, exactly=True) for x, y in ((x0, y0), (x1, y1)))
+        facing(maze_floor, [(x0, y0, top0 - 0.3), (x1, y1, top1 - 0.3), (x1, y1, top1 + MAZE_FLOOR),
+                            (x0, y0, top0 + MAZE_FLOOR)], [MAZE_EDGE] * 4, out_)
 maze_floor.build("maze-floor", smooth=True)
 # Boulders at the foot of its south wall, either side of the way in: past
 # them, between the wall and the crags, there's only a narrow strip, which
@@ -2603,9 +2994,11 @@ for x0, x1 in ((kw, GH[0] - door), (GH[0] + door, ke)):
 # where the two would flicker against each other in blocky stripes.)
 block(built, GH[0] - door, kn - 1, TUNNEL_TALL + 0.4 - LINTEL_DROP, GH[0] + door, kn, KEEP_TALL, GREY, solid=False)
 block(built, kw, ks, 0, ke, ks + 1, KEEP_TALL, GREY, solid=False)
-block(built, kw, ks, 0, kw + 1, kn, KEEP_TALL, GREY, solid=False)
-block(built, ke - 1, ks, 0, ke, kn, KEEP_TALL, GREY, solid=False)
-block(built, kw, ks, KEEP_TALL - 0.4, ke, kn, KEEP_TALL, c.linear("#8d8a80"), solid=False)
+# (Its sides between its front and back, and its roof between its walls:
+# over them, their faces would be in the same place, and flicker.)
+block(built, kw, ks + 1, 0, kw + 1, kn - 1, KEEP_TALL, GREY, solid=False)
+block(built, ke - 1, ks + 1, 0, ke, kn - 1, KEEP_TALL, GREY, solid=False)
+block(built, kw + 1, ks + 1, KEEP_TALL - 0.4, ke - 1, kn - 1, KEEP_TALL, c.linear("#8d8a80"), solid=False)
 x = kw
 while x < ke - 1:
     block(built, x, kn - 1, KEEP_TALL, x + 1, kn, KEEP_TALL + 1, GREY, solid=False)  # battlements
@@ -3067,8 +3460,10 @@ for way in WAYS.values():
                 quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
             # (Into a room, the frame can stand a little out from its wall,
             # where the way's walls begin: the sides of the doorway, back
-            # from the frame to the wall, so there's no gap to see out of.)
-            if hall.room:
+            # from the frame to the wall, so there's no gap to see out of. Not
+            # where the way's own walls go on past it: they'd be in the same
+            # place, and fight.)
+            if hall.room and not drawn(a, b):
                 ux, uy = (inner[0] - row[0]) / run, (inner[1] - row[1]) / run
                 for p in (el_, er_):
                     ts = [(hall.x + sign * (hall.w + ROOM_EDGE) - p[0]) / ux for sign in (1, -1) if abs(ux) > 1e-6]
@@ -4309,6 +4704,11 @@ def growth(x, y):
         return 0
     to_path = min(path_lines.distance(x, y), trails.distance(x, y) * 1.4)
     to_wall = WALL_LINES.distance(x, y)
+    # (And the archway's wall, and the stones fallen from it, lying in the open.)
+    if ARCH_ENDS[0] - 0.5 <= x <= ARCH_ENDS[1] + 0.5:
+        to_wall = min(to_wall, abs(y - ARCH_Y))
+    if any(math.hypot(x - sx, y - sy) < size * 0.5 + 0.35 for sx, sy, size in placed):
+        return 0
     if to_wall < 0.75:
         return 0
     # (On a path, only grit; and the grass by it growing a little way over its
@@ -4391,6 +4791,13 @@ if out:
         # The deep hole: [x, z, half x, half z], the way's floor across it, how deep it goes and its beam's underside.
         "hole": {"box": [round(px, 2), round(-py, 2), round(phx, 2), round(phy, 2)], "floor": round(pit_floor, 2),
                  "bottom": round(bottom, 2), "beam": round(PIT_BEAM, 2)},
+        # The drawbridge: its hinge [x, y, z] (at its deck), how long and half how wide it is, how far in from
+        # its tip its chains are fixed, and their holes in the gatehouse [x, y, z]; where the guards stand [x, z]
+        # and the castle's walls [west, east, north, south] (in it, it's down).
+        "drawbridge": {"hinge": [0, DB_TOP, round(-DB_HINGE, 2)], "length": round(DB_LENGTH, 2), "half": DB_HALF,
+                       "chain": DB_CHAIN, "anchors": [[round(x, 2), round(z, 2), round(-y, 2)] for x, y, z in DB_ANCHORS],
+                       "guards": [[round(x, 2), round(-y, 2)] for x, y in GUARDS],
+                       "castle": [CASTLE[0], CASTLE[1], round(-CASTLE[3], 2), round(-CASTLE[2], 2)]},
         # The leaves in the dragon's mouth: where the pile is [x, z] (on the way's floor), and the heaps they're swept into.
         "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
         # The fire in the charcoal burner's hut, its middle [x, z] and floor, and the smoke hole over it: how high, and how wide.
@@ -4408,6 +4815,10 @@ if out:
         "props": prop_spots,
         # Steps on the land, for lying on: [x, z, half x, half z, top].
         "steps": STEPS,
+        # The bridges' decks, for walking on at exactly their height: [x, z, half x, half z, top].
+        "decks": [[round(x, 2), round(-y, 2), round(hx, 2), round(hy, 2), top] for x, y, hx, hy, top in DECKS],
+        # Floors over the ground, for lying on: [x, z, half x, half z, how far up]. (The maze's.)
+        "floors": [[round(MZ[0], 2), round(-MZ[1], 2), round(MAZE_HALF, 2), round(MAZE_HALF, 2), MAZE_FLOOR]],
         # The paths, lying a little above the ground (so what's dropped on
         # one lies on it, not in it): each its line [x, z], in three.js's
         # axes, how far either side of it it goes, and how far up it is.
