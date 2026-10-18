@@ -3185,10 +3185,15 @@ tops = [WAYS["maze-treasure"].nearest(x, y)[1] for x, y in corners]
 pit_floor = WAYS["maze-treasure"].nearest(px, py)[1]
 bottom = min(tops) - PIT_DEEP
 rough = random.Random("the deep hole")
+# (Every wall in as many rows, and its bottom's edge in as many pieces as
+# theirs, so they all meet exactly: where they didn't, the sky behind them
+# showed through, in sparkling specks. And behind them, a dark shell, in
+# case.)
+rows = math.ceil((min(tops) - bottom) / PIT_ROW)
+floor_edge = []
 for k in range(4):
     (ax, ay), (bx, by) = corners[k], corners[(k + 1) % 4]
     across = max(1, round(math.dist((ax, ay), (bx, by)) / PIT_ACROSS))
-    rows = math.ceil((min(tops[k], tops[(k + 1) % 4]) - bottom) / PIT_ROW)
     # (Pushed out a little, here and there, never in; but not at the top's
     # edge, or the corners, where the walls meet.)
     out_x, out_y = (by - ay), -(bx - ax)
@@ -3208,7 +3213,13 @@ for k in range(4):
             deep = min(1.0, (pit_floor - cz) / PIT_DEEP)
             shade = c.mix(rock_colour(face[0][0], face[0][1], cz), PIT_DARK, 0.1 + 0.35 * deep)
             quad(pit, face, c.mix(shade, PIT_DARK, rough.random() * 0.25), 0.1)
-quad(pit, [(x, y, bottom) for x, y in corners], PIT_DARK)
+    floor_edge += [wall_point(i, rows) for i in range(across)]
+pit.add(floor_edge, [tuple(range(len(floor_edge)))], [PIT_DARK] * len(floor_edge))
+shell = [(x + 0.6 * (1 if x > px else -1), y + 0.6 * (1 if y > py else -1)) for x, y in corners]
+for k in range(4):
+    (ax, ay), (bx, by) = shell[k], shell[(k + 1) % 4]
+    quad(pit, [(ax, ay, min(tops) - 0.1), (bx, by, min(tops) - 0.1), (bx, by, bottom - 0.3), (ax, ay, bottom - 0.3)], PIT_DARK, 0)
+quad(pit, [(x, y, bottom - 0.3) for x, y in shell], PIT_DARK, 0)
 PIT_BEAM = pit_floor + PROP_TALL  # its underside
 beam = [(px - phx - 0.3, py - 0.16), (px + phx + 0.3, py - 0.16), (px + phx + 0.3, py + 0.16), (px - phx - 0.3, py + 0.16)]
 oriented_box(pit, beam, PIT_BEAM, PIT_BEAM + 0.3, c.mix(TIMBER, c.linear("#000000"), 0.1))
