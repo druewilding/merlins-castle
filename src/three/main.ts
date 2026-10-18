@@ -58,6 +58,7 @@ import { Fall } from "./fall";
 import { Felling } from "./felling";
 import { Golden } from "./golden";
 import { haze } from "./haze";
+import { type HoleSpot, Slipped } from "./hole";
 import { items as setUpItems, onPaths } from "./items";
 import { Ladder } from "./ladder";
 import { dressLamp, Lantern } from "./lantern";
@@ -76,10 +77,11 @@ import witchModel from "./models/witches.glb?url";
 import { Notes, type NoteSpot } from "./notes";
 import { Plank } from "./plank";
 import { type Growth, Plants } from "./plants";
-import { type Box, type Circle, type Ground, type Hall, Player, type Walkable, wayThrough } from "./player";
+import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Walkable, wayThrough } from "./player";
 import { type PropSpots, stampProps } from "./props";
 import { Rabbits } from "./rabbits";
 import { River } from "./river";
+import { Rope, saidSwinging } from "./rope";
 import { Shafts, speck, type Window } from "./shafts";
 import { paintSign, type SignSpot } from "./sign";
 import { sky } from "./sky";
@@ -417,6 +419,8 @@ const shut = shapeOf.get("tower south");
 // The deep river, where it narrows, which the plank crosses (plank.ts), and
 // which (without it) sweeps you away from the north bank (swept.ts).
 const crossing = shapeOf.get("deep-river south");
+// The deep hole between the maze and the treasure room, which the rope swings you over (rope.ts).
+const holed = shapeOf.get("maze north");
 // The leaves filling the dragon's mouth, which the broom sweeps aside into
 // heaps (leaves.ts): lying on the way's floor in the mouth, and the ground
 // outside it.
@@ -457,7 +461,8 @@ function solidify() {
   for (const under of [false, true]) {
     const here = [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
     const closed = allOpen ? [] : here.filter((shape) => !opened.has(shape));
-    const plain = allOpen ? [] : here.filter((shape) => walls.has(shape));
+    // (And the deep hole, with the rope over it: you swing across it, not walk.)
+    const plain = allOpen ? [] : here.filter((shape) => walls.has(shape) || (shape === holed && opened.has(shape)));
     // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
@@ -514,6 +519,8 @@ player.bounds = { west, east, north: -north, south: -south };
 // Merlin's trap (trap.ts): the net, hidden, lying in wait in front of its treasure.
 const TRAP = "mountain east";
 const net = new Net(scene, land.trap as TrapSpot, ground);
+// The deep hole between the maze and the treasure room: you fall into it from either side.
+const hole = land.hole as HoleSpot;
 
 // Red where a way through kills you (but Merlin's trap: that's its treasure, and the net in front of it).
 const danger = new MeshBasicMaterial({ color: "#d9503f", transparent: true, opacity: 0.5, depthWrite: false });
@@ -656,6 +663,22 @@ let bridged: string | undefined; // the exit it's across for
 // And the lamp, lit, in your hand (or where you dropped it).
 const lantern = new Lantern(scene, things.scene.getObjectByName("lamp")!, player.camera, reducedMotion);
 const PLANK = new Box3().setFromObject(things.scene.getObjectByName("plank")!).getSize(new Vector3()).z;
+// And the rope, hanging from the beam over the deep hole (from either side of it).
+const rope = new Rope(
+  scene,
+  hole,
+  (x, z) => nearest(land.ways["maze-treasure"], x, z).floor,
+  player,
+  reducedMotion,
+  () => ownSounds.play("sweep", { rate: 0.8 }),
+  // (The original's words for using it here are for going across: "You swing
+  // over a deep hole." So they're said then, over its middle, not as it goes up.)
+  (exit) => {
+    const [id, direction] = exit.split(" ");
+    say(world.rooms[id]?.exits[direction as Direction]?.obstacle?.useMessage ?? "");
+  }
+);
+let hanging: string | undefined; // the exit it's hanging for
 const items = setUpItems({
   world,
   scene,
@@ -673,11 +696,14 @@ const items = setUpItems({
     if (id === "ladder" && ladder.shown) return { model: ladder.handOver()!, fallsTo: ladder.footing! };
     // (Leaving, it falls where it lay: across the river, bridging it.)
     if (id === "plank" && plank.shown) return { model: plank.handOver()!, fallsTo: plank.footing! };
+    // (Hanging from the beam, as it was.)
+    if (id === "rope" && rope.shown) return { ...rope.handOver()!, fallsTo: rope.footing! };
     return undefined;
   },
   begin: handoff ?? undefined,
   starts: { emerald: { room: "tower", at: land.chest as [number, number, number] } },
   notes: notes.notes.map((note) => note.model),
+  saidGoing: (id, here) => saidSwinging(world, id, here),
   read: (k) => {
     player.held = true;
     notes.read(k);
@@ -706,6 +732,7 @@ function inUse() {
         shape === crossing ||
         shape === heaped ||
         shape === dancers ||
+        shape === holed ||
         unlit.has(shape))
       ? [`${here} ${direction}`]
       : [];
@@ -762,6 +789,13 @@ function inUse() {
     }
     bridged = across;
   } else if (across && itemLocations.plank === "carried") plank.show();
+  // The rope over the deep hole, from the side you're on.
+  const hung = exits.find((exit) => shapeOf.get(exit) === holed);
+  if (hung !== hanging) {
+    rope.away();
+    if (hung) rope.hang(hung, itemLocations.rope === "carried", instantly);
+    hanging = hung;
+  } else if (hung && itemLocations.rope === "carried") rope.show();
 }
 
 // A game loaded: you're where you were in it (or, saved in another version,
@@ -817,6 +851,16 @@ const scenes: Record<string, () => Scene3d | undefined> = {
       ? undefined
       : new Caught(player.camera, drawn, witches, reducedMotion),
   [TRAP]: () => new Trapped(player.camera, drawn, net, reducedMotion, () => ownSounds.play("net")),
+  // (Not with the rope across it.)
+  ...Object.fromEntries(
+    ["maze north", "treasure-room south"].map((exit) => [
+      exit,
+      () =>
+        effects(world, items.state).includes("rope")
+          ? undefined
+          : new Slipped(player.camera, hole, reducedMotion, () => ownSounds.play("falling")),
+    ])
+  ),
 };
 
 /** Walking into a way that kills you: its scene (and true), or nothing to see (false). */
@@ -1067,6 +1111,8 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   leaning = undefined;
   plank.away();
   bridged = undefined;
+  rope.away();
+  hanging = undefined;
   witches.free();
   net.reset();
   arrive(game);
@@ -1178,6 +1224,11 @@ function lightFor(depth: number, time: number, dt: number) {
   lamp.distance = LAMP_REACH + 6 * lantern.light; // (and further)
   if (lamplit > own) lamp.position.copy(lantern.at);
   else lamp.position.set(player.position.x, player.position.y + 1.4, player.position.z);
+  // (Falling down the deep hole, your glow falls with you, dimmer and dimmer.)
+  if (playing?.scene instanceof Slipped) {
+    lamp.position.copy(player.camera.position);
+    lamp.intensity = 3.5 * own * playing.scene.glow;
+  }
   emberLook.color.setScalar(0.75 + 0.25 * flicker * flicker * (reducedMotion ? 1 : 0.9 + 0.1 * Math.sin(time / 23)));
 
   // The halls' lights nearest you.
@@ -1215,7 +1266,7 @@ renderer.setAnimationLoop((time) => {
     if (was < playing.scene.ends - EARLY && playing.t >= playing.scene.ends - EARLY) curtain(playing.words);
   }
   river.update(dt, player.camera.position);
-  murky.classList.toggle("under", Boolean(playing) && player.camera.position.y < land.river.water);
+  murky.classList.toggle("under", playing?.scene instanceof Swept && player.camera.position.y < land.river.water);
   trees.update(player.position, player.yaw, player.camera);
   plants.update(dt, player.camera.position, items.lying());
   // Coming down from the mountain to the dense trees, they part for you
@@ -1282,6 +1333,9 @@ renderer.setAnimationLoop((time) => {
     if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
   });
   plank.update(dt, (exit) => {
+    if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
+  });
+  rope.update(dt, (exit) => {
     if (items.go(exit.split(" ")[1] as Direction)) room = items.state.room;
   });
   // Through what was in the way (over the wall, through the felled trees or

@@ -227,3 +227,18 @@ mkdirSync(OUT, { recursive: true });
   sparkle(track, 1.3, 2, 28, 0.32);
   save("victory", track, 0.35);
 }
+
+// Falling down a deep, deep hole: a harp run down from high to low, slowing
+// as it goes, and further and further away, in a big echoing space.
+{
+  const track = new Track(5);
+  const run = [];
+  for (let octave = 7; octave >= 3; octave--) for (const n of [...PENTATONIC].reverse()) run.push(n + octave);
+  let at = 0;
+  run.forEach((n, i) => {
+    const k = i / (run.length - 1);
+    track.add(at, harp(note(n), 1.4, 0.9 * (1 - 0.75 * k)), 0.5 * Math.sin(i * 0.7));
+    at += 0.06 + 0.12 * k * k;
+  });
+  save("falling", track, 0.5);
+}

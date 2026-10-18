@@ -3,7 +3,7 @@
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
 # The ladder, the plank, the key, the axe, the apple, the emerald, the
-# broom and the lamp so far; the rest are to come (PLAN-V3.md).
+# broom, the lamp and the rope so far; the rest are to come (PLAN-V3.md).
 
 import math
 import random
@@ -861,6 +861,118 @@ for part in (lamp_object, glass_object, flame_object):
 outward(lamp_object)
 outward(flame_object)
 glass_object.parent = flame_object.parent = lamp_object
+
+# The rope: as in its picture, a coil of thick, golden-brown rope, its three
+# strands twisted round it, wound round and round in rows and layers (a
+# ring of it, with a hole in the middle); bound round the bundle in one place
+# by a few turns of its other end, and its end sticking out, whipped round
+# with twine and frayed at its tip. 62 cm across. (The game hangs a length
+# of it, made the same way, from the deep hole's beam: rope.ts.)
+ROPE_STRAND = c.linear("#c99a5a")  # on a strand
+ROPE_GROOVE = c.linear("#7c5730")  # between them
+ROPE_TWINE = c.linear("#8d6a3c")
+ROPE_THICK = 0.03  # its radius
+TWIST = 0.075  # metres along it, for a strand to go once round it
+rope = c.Builder()
+
+
+def roped(builder, path, radius=ROPE_THICK, strands=True, colour=None, sides=12, closed=False):
+    """A length of rope along a path (points every centimetre or so): round
+    it a frame carried along it (so it never flips, round a coil), and on
+    that, its strands, bulging (and lighter) where they are."""
+    pts = [Vector(p) for p in path]
+    n = len(pts)
+    tangents = [(pts[min(k + 1, n - 1)] - pts[max(k - 1, 0)]).normalized() for k in range(n)]
+    if closed:
+        tangents[0] = tangents[-1] = (pts[1] - pts[-2]).normalized()
+    ref = Vector((0, 0, 1)) if abs(tangents[0].z) < 0.9 else Vector((1, 0, 0))
+    normal = (ref - tangents[0] * ref.dot(tangents[0])).normalized()
+    verts, colours, along = [], [], 0.0
+    for k in range(n):
+        if k:
+            along += (pts[k] - pts[k - 1]).length
+            normal = (normal - tangents[k] * normal.dot(tangents[k])).normalized()
+        side = tangents[k].cross(normal)
+        for j in range(sides):
+            a = 2 * math.pi * j / sides
+            crest = math.cos(3 * a - 2 * math.pi * along / TWIST) if strands else 1.0
+            r = radius * (1 + 0.1 * crest)
+            v = pts[k] + (normal * math.cos(a) + side * math.sin(a)) * r
+            verts.append(tuple(v))
+            shade = colour or c.mix(ROPE_GROOVE, ROPE_STRAND, 0.5 + 0.5 * crest)
+            colours.append(c.vary(shade, 0.08, v * 30))
+    rings = n - 1 if closed else n
+    faces = [(k * sides + j, k * sides + (j + 1) % sides, ((k + 1) % n) * sides + (j + 1) % sides,
+              ((k + 1) % n) * sides + j) for k in range(rings - (0 if closed else 1)) for j in range(sides)]
+    if not closed:
+        faces += [tuple(range(sides))[::-1], tuple((n - 1) * sides + j for j in range(sides))]
+    builder.add(verts, faces, colours)
+
+
+# Its turns, from the outside of the bottom row in: (how far out, how high),
+# a row on the ground, over it, in the grooves between, another, and over
+# that, a third, out again.
+ROW = 2 * ROPE_THICK * 0.97
+TURNS = [(0.265, 0), (0.265 - ROW, 0), (0.265 - 2 * ROW, 0), (0.265 - 1.5 * ROW, 1), (0.265 - 0.5 * ROW, 1),
+         (0.265, 2), (0.265 - ROW, 2), (0.265 - 2 * ROW, 2)]
+LAYER = ROPE_THICK * 1.7
+STEP = 0.009  # metres between the rings round it, along it
+coiled = []
+for k, (r0, h0) in enumerate(TURNS):
+    r1, h1 = TURNS[min(k + 1, len(TURNS) - 1)]
+    steps = int(2 * math.pi * r0 / STEP)
+    for i in range(steps):
+        u = i / steps
+        a = 2 * math.pi * (k + u)
+        # (Over to the next turn in the last quarter of each one.)
+        f = smooth_step(max(0.0, (u - 0.75) / 0.25)) if k < len(TURNS) - 1 else 0.0
+        r = r0 + (r1 - r0) * f + 0.006 * math.sin(3 * a + k)
+        z = ROPE_THICK + LAYER * (h0 + (h1 - h0) * f) + 0.004 * math.sin(5 * a + 2 * k)
+        coiled.append((math.cos(a) * r, math.sin(a) * r, z))
+# Its end (the first turn's start), out from the bottom row, along the way
+# it was going: whipped round with twine near its tip, and frayed past that.
+start, after = Vector(coiled[0]), Vector(coiled[1])
+heading = (start - after).normalized()
+heading = (heading + Vector((0.35, 0, 0))).normalized()  # (turning out a little)
+END = 0.16
+lead = [tuple(start + heading * (END * (1 - i / 16))) for i in range(16)]
+roped(rope, lead + coiled)
+tip = start + heading * END
+for i in range(4):
+    at = tip - heading * (0.025 + i * 0.012)
+    ring = []
+    for k in range(25):
+        a = 2 * math.pi * k / 24
+        side = heading.cross(Vector((0, 0, 1))).normalized()
+        up = side.cross(heading)
+        ring.append(tuple(at + (side * math.cos(a) + up * math.sin(a)) * ROPE_THICK * 1.12))
+    roped(rope, ring, radius=0.0045, strands=False, colour=ROPE_TWINE, sides=6, closed=True)
+frayed = random.Random("the rope's end")
+for _ in range(16):
+    a, out_ = frayed.uniform(0, 2 * math.pi), frayed.uniform(0.2, 0.9) * ROPE_THICK
+    side = heading.cross(Vector((0, 0, 1))).normalized()
+    up = side.cross(heading)
+    root = tip - heading * 0.012 + (side * math.cos(a) + up * math.sin(a)) * out_
+    spread = (side * math.cos(a) + up * math.sin(a)) * frayed.uniform(0.2, 0.6)
+    reach = frayed.uniform(0.025, 0.05)
+    fibre = [tuple(root + (heading + spread * t) * reach * t) for t in (0, 0.5, 1)]
+    roped(rope, fibre, radius=0.0035, strands=False, colour=c.mix(ROPE_STRAND, ROPE_GROOVE, frayed.random() * 0.5),
+          sides=4)
+# Bound round the bundle, in one place: a few turns of its other end, round
+# the rows and layers (and the rope's end tucked in under them).
+BUNDLE_R = (TURNS[0][0] + TURNS[2][0]) / 2
+BUNDLE_Z = ROPE_THICK + LAYER
+for k in range(3):
+    a = 2.3 + k * 0.075
+    out_, up = Vector((math.cos(a), math.sin(a), 0)), Vector((0, 0, 1))
+    middle = out_ * BUNDLE_R + up * BUNDLE_Z
+    ring = [tuple(middle + out_ * math.cos(2 * math.pi * i / 40) * (ROW + 2 * ROPE_THICK)
+                  + up * math.sin(2 * math.pi * i / 40) * (LAYER + 2 * ROPE_THICK)) for i in range(41)]
+    roped(rope, ring, closed=True)
+rope_object = rope.build("rope", smooth=True)
+low = min(v.co.z for v in rope_object.data.vertices)
+rope_object.data.transform(Matrix.Translation((0, 0, -low)))
+outward(rope_object)
 
 if out:
     c.export(out)

@@ -3171,17 +3171,60 @@ for way in WAYS.values():
                           (x0, y0, ef - 0.3)], STONE, 0.1)
 tunnel.build("tunnel", smooth=False)
 
-# The deep hole: straight down into the dark.
+# The deep, deep hole: straight down into the dark, a long way (you only
+# see how far falling down it: hole.ts). Its walls rough rock, in layers,
+# darker and darker down it, so going down them you see them go by. And a
+# beam across its top, under the tunnel's roof, its ends in the rock (for a
+# rope to hang from).
 px, py, phx, phy = PIT
+PIT_DEEP = 48
+PIT_ROW, PIT_ACROSS = 1.2, 0.7  # (its walls' pieces: how tall, and how wide)
 pit = c.Builder()
 corners = [(px - phx, py - phy), (px + phx, py - phy), (px + phx, py + phy), (px - phx, py + phy)]
 tops = [WAYS["maze-treasure"].nearest(x, y)[1] for x, y in corners]
-bottom = min(tops) - 9
+pit_floor = WAYS["maze-treasure"].nearest(px, py)[1]
+bottom = min(tops) - PIT_DEEP
+rough = random.Random("the deep hole")
+# (Every wall in as many rows, and its bottom's edge in as many pieces as
+# theirs, so they all meet exactly: where they didn't, the sky behind them
+# showed through, in sparkling specks. And behind them, a dark shell, in
+# case.)
+rows = math.ceil((min(tops) - bottom) / PIT_ROW)
+floor_edge = []
 for k in range(4):
     (ax, ay), (bx, by) = corners[k], corners[(k + 1) % 4]
-    quad(pit, [(ax, ay, tops[k]), (bx, by, tops[(k + 1) % 4]), (bx, by, bottom), (ax, ay, bottom)], c.mix(TUNNEL_STONE, PIT_DARK, 0.6))
-quad(pit, [(x, y, bottom) for x, y in corners], PIT_DARK)
-obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy, under=True)
+    across = max(1, round(math.dist((ax, ay), (bx, by)) / PIT_ACROSS))
+    # (Pushed out a little, here and there, never in; but not at the top's
+    # edge, or the corners, where the walls meet.)
+    out_x, out_y = (by - ay), -(bx - ax)
+    m = math.hypot(out_x, out_y)
+    out_x, out_y = out_x / m, out_y / m
+    def wall_point(i, j):
+        f = i / across
+        x, y = ax + (bx - ax) * f, ay + (by - ay) * f
+        top = tops[k] + (tops[(k + 1) % 4] - tops[k]) * f
+        z = top - j * PIT_ROW if j < rows else bottom
+        push = 0.0 if j == 0 or i in (0, across) or j == rows else 0.25 * (0.5 + noise.noise(Vector((x / 1.3, y / 1.3, z / 1.1))))
+        return x + out_x * push, y + out_y * push, z
+    for j in range(rows):
+        for i in range(across):
+            face = [wall_point(i, j), wall_point(i + 1, j), wall_point(i + 1, j + 1), wall_point(i, j + 1)]
+            cz = sum(p[2] for p in face) / 4
+            deep = min(1.0, (pit_floor - cz) / PIT_DEEP)
+            shade = c.mix(rock_colour(face[0][0], face[0][1], cz), PIT_DARK, 0.1 + 0.35 * deep)
+            quad(pit, face, c.mix(shade, PIT_DARK, rough.random() * 0.25), 0.1)
+    floor_edge += [wall_point(i, rows) for i in range(across)]
+pit.add(floor_edge, [tuple(range(len(floor_edge)))], [PIT_DARK] * len(floor_edge))
+shell = [(x + 0.6 * (1 if x > px else -1), y + 0.6 * (1 if y > py else -1)) for x, y in corners]
+for k in range(4):
+    (ax, ay), (bx, by) = shell[k], shell[(k + 1) % 4]
+    quad(pit, [(ax, ay, min(tops) - 0.1), (bx, by, min(tops) - 0.1), (bx, by, bottom - 0.3), (ax, ay, bottom - 0.3)], PIT_DARK, 0)
+quad(pit, [(x, y, bottom - 0.3) for x, y in shell], PIT_DARK, 0)
+PIT_BEAM = pit_floor + PROP_TALL  # its underside
+beam = [(px - phx - 0.3, py - 0.16), (px + phx + 0.3, py - 0.16), (px + phx + 0.3, py + 0.16), (px - phx - 0.3, py + 0.16)]
+oriented_box(pit, beam, PIT_BEAM, PIT_BEAM + 0.3, c.mix(TIMBER, c.linear("#000000"), 0.1))
+# (You can go right up to its edge, and look in: only over it, you slip in.)
+obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy - 0.3, under=True, reach=0)
 
 # The halls: a floor of squares out under the walls, a lumpy round wall with
 # openings where the ways come in, and a dome.
@@ -4345,6 +4388,9 @@ if out:
         "trap": {"net": [round(TRAP_NET[0], 2), round(-TRAP_NET[1], 2)], "gold": [round(TX, 2), round(TZ, 2), round(-TY, 2)],
                  "jewels": jewel_spots,
                  "hook": [round(TRAP_HOOK[0], 2), round(TRAP_HOOK[2], 2), round(-TRAP_HOOK[1], 2)]},
+        # The deep hole: [x, z, half x, half z], the way's floor across it, how deep it goes and its beam's underside.
+        "hole": {"box": [round(px, 2), round(-py, 2), round(phx, 2), round(phy, 2)], "floor": round(pit_floor, 2),
+                 "bottom": round(bottom, 2), "beam": round(PIT_BEAM, 2)},
         # The leaves in the dragon's mouth: where the pile is [x, z] (on the way's floor), and the heaps they're swept into.
         "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
         # The fire in the charcoal burner's hut, its middle [x, z] and floor, and the smoke hole over it: how high, and how wide.
