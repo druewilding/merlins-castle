@@ -45,9 +45,9 @@ LEATHER = "#5a3a22"
 SHAFT = "#7a5230"
 
 SIDES = 32  # round the tabard and the helmet
-TOP, HEM, WAIST = 1.5, 0.74, 1.04  # the tabard: from his chest to his thighs; belted here
+TOP, HEM, WAIST = 1.58, 0.74, 1.04  # the tabard: from his shoulders to his thighs; belted here
 PANEL = 1.0  # radians either side of his front (and back) the tabard reaches round him
-FIT = 0.014  # metres it stands clear of his tunic, at its snuggest
+FIT = 0.025  # metres it stands clear of his tunic, at its snuggest (over its studs)
 
 # ---- The outfit: his skeleton, tunic, arms, legs and boots ---------------------
 
@@ -64,10 +64,11 @@ beard.name = "guard-beard"
 
 # ---- His tabard: front and back, from his chest to his thighs ------------------
 
-under = [o for o in skeleton.children if o.name in ("Male_Ranger_Body", "Male_Ranger_Legs")]
+# (Round his tunic, its straps and buckles, and his breeches.)
+under = [o for o in skeleton.children if o.name.startswith(("Male_Ranger_Body", "Male_Ranger_Legs"))]
 RINGS = 18
 heights = [TOP + (HEM - TOP) * i / RINGS for i in range(RINGS + 1)]
-snug = c.hang([c.girth(under, z, SIDES, (0.0, 0.01)) for z in heights])
+snug = c.hang([c.girth(under, z, SIDES, (0.0, 0.01), band=0.03) for z in heights])  # (bands meeting: nothing missed between)
 
 
 def tabard_colour(u, z, seed):
@@ -132,13 +133,14 @@ belt.data.materials.append(c.vertex_material())
 # ---- His helmet: a kettle hat, a round steel cap with a wide brim -------------
 
 skull = [skeleton.matrix_world.inverted() @ head.matrix_world @ v.co for v in head.data.vertices]
-BROW = 1.725  # where it sits on his head
+BROW = 1.765  # where it sits on his head (above his eyes)
+TILT = 8  # degrees it's tipped back, so you see his eyes under its brim
 cy = sum(p.y for p in skull if p.z > BROW) / max(1, sum(1 for p in skull if p.z > BROW))
 cap = Vector((0.0, cy, BROW))
 rx, ry, rz = 0.1, 0.115, 0.1
 # (Big enough to cover all of his head above its brim.)
 fit = max(math.sqrt((p.x / rx) ** 2 + ((p.y - cy) / ry) ** 2 + ((p.z - BROW) / rz) ** 2) for p in skull if p.z > BROW)
-rx, ry, rz = (r * fit * 1.08 for r in (rx, ry, rz))
+rx, ry, rz = (r * fit * 1.1 for r in (rx, ry, rz))
 verts, faces, colours = [], [], []
 DOME = 8
 for i in range(DOME + 1):
@@ -154,7 +156,7 @@ for i in range(DOME):
         faces.append((a, b, b + SIDES, a + SIDES))
 # The brim, out and a little down, all round.
 base = len(verts)
-for ring, (out_, dz) in enumerate(((1.0, 0.0), (1.0, -0.012), (1.0 + 0.085 / rx, -0.05), (1.0 + 0.092 / rx, -0.062))):
+for ring, (out_, dz) in enumerate(((1.0, 0.0), (1.0, -0.01), (1.0 + 0.075 / rx, -0.025), (1.0 + 0.082 / rx, -0.034))):
     for k in range(SIDES):
         a = 2 * math.pi * k / SIDES
         grow = out_ - 1
@@ -164,6 +166,8 @@ for ring in range(3):
     for k in range(SIDES):
         a, b = base + ring * SIDES + k, base + ring * SIDES + (k + 1) % SIDES
         faces.append((a, a + SIDES, b + SIDES, b))
+tip = Matrix.Rotation(math.radians(-TILT), 4, "X")
+verts = [tuple(tip @ (Vector(v) - cap) + cap) for v in verts]
 helmet = c.skinned("guard-helmet", verts, faces, colours, [{"Head": 1.0}] * len(verts), skeleton)
 helmet.data.materials.append(c.vertex_material())
 
@@ -265,5 +269,6 @@ if preview:
     c.pose(skeleton, *IDLE)
     c.preview(preview, (1.0, -3.0, 1.4), (0, 0, 1.05), (0.4, 0.8, -1), lens=40)
     c.preview(preview.replace(".png", "-side.png"), (-3.2, -0.6, 1.3), (0, 0, 1.05), (0.4, 0.8, -1), lens=40)
+    c.preview(preview.replace(".png", "-face.png"), (0.35, -1.3, 1.62), (0, 0, 1.45), (0.4, 0.8, -1), lens=40)
     c.pose(skeleton, "Interact", 30)
     c.preview(preview.replace(".png", "-taking.png"), (1.0, -3.0, 1.4), (0, 0, 1.05), (0.4, 0.8, -1), lens=40)
