@@ -2201,6 +2201,42 @@ obstacle(["tower south"], "box", TOWER[0], -(TOWER[1] - stone_at), 1.6, 0.5, und
 bx, by = out_from_tower(7.4, -0.8)  # (under the balcony, and with its reach, all of it, and the ladder's foot)
 obstacle(["mossy-steps east"], "circle", bx, -by, 2.6, reach=0.4)
 
+# Merlin's trap, east of the mountain, where its path ends: a pile of
+# treasure, glinting, to tempt you on (a chest, gold spilling round it, a
+# goblet), with an old oak leaning over it, among the firs. Come near, and
+# the net hidden in front of it scoops you up, to dangle from the oak (the
+# game plays it: trap.ts). Its rope runs up into the oak's leaves from where
+# the net lies, for the sharp-eyed.
+PROPS = c.Kit(HERE.parent / "models/fantasy-props-megakit/Exports/glTF")
+TX, TY = DEATHS["mountain east"]
+TZ = height(TX, TY)
+GOLD = (*c.linear("#f0c040")[:3], 0.85)  # (the kit's metal is silvery)
+HEAP = c.linear("#e8b53c")
+here = random.Random("Merlin's trap")
+# The chest, open, facing the way you come, full to the brim with gold; and
+# a heap of it spilling out in front, coins and a goblet on it, and more
+# rolled away.
+CHEST_AT = (TX + 0.95, TY)
+PROPS.put(built, "Chest_Wood", (*CHEST_AT, height(*CHEST_AT) - 0.03), -math.pi / 2, 1.2)
+built.blob((*CHEST_AT, height(*CHEST_AT) + 0.5), 0.5, HEAP, squash=0.35, lumpy=0.12, seed=3)
+built.blob((TX - 0.1, TY, TZ - 0.12), 0.9, HEAP, squash=0.5, lumpy=0.14, seed=5)
+for name, u, v, up, yaw, scale in (("Coin_Pile_2", -0.15, 0.15, 0.28, 0.3, 2.8), ("Coin_Pile", -0.55, 0.45, 0.06, 1.9, 2.4),
+                                   ("Coin_Pile", 0.05, -0.55, 0.08, -0.6, 2.2), ("Coin_Pile_2", 1.0, 0.05, 0.52, 2.0, 2.2),
+                                   ("Chalice", -0.1, -0.2, 0.25, 0.8, 2.4)):
+    x, y = TX + u, TY + v
+    PROPS.put(built, name, (x, y, height(x, y) + up), yaw, scale, tint=GOLD)
+for n in range(14):
+    a, r = here.uniform(0, 2 * math.pi), here.uniform(0.75, 1.7)
+    x, y = TX - 0.1 + math.cos(a) * r, TY + math.sin(a) * r
+    PROPS.put(built, "Coin", (x, y, height(x, y)), here.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
+TRAP_NET = (TX - 2.3, TY)  # where the net lies, on the path, in front of the treasure
+TRAP_OAK = (TRAP_NET[0] + 0.3, TRAP_NET[1] - 4.6)  # (to the south, the mountain rising to the north)
+# Where the net's rope's tied, up in the oak's leaves, leaning over the path.
+TRAP_HOOK = (TRAP_NET[0], TRAP_NET[1] - 1.0, height(*TRAP_NET) + 6.5)
+grow(*TRAP_OAK, 11, "CommonTree_2", here, sink=0.4)
+solid_circle(*TRAP_OAK, 0.6)
+obstacle(["mountain east"], "circle", TX, -TY, 1.0, reach=1.3)
+
 # The witches, on the way west to the crossroads.
 wx, wy = P["forest-witches"]
 obstacle(["forest-witches west"], "box", (wx + P["forest-crossroads"][0]) / 2, -wy, 1.0, 5.5)
@@ -3288,7 +3324,7 @@ def flame(b, x, y, z, size=0.35):
 # the walls, but not across the doors; his desk with the crystal ball; a
 # bench of potions; candles on stands and in a chandelier; a chart of the
 # stars; and green banners on the purple walls.
-PROPS = c.Kit(HERE.parent / "models/fantasy-props-megakit/Exports/glTF")
+#
 # What's furnished many times over (a bookcase full of books, a candle stand)
 # is kept once in land.glb, as "prop-<kind>", and land.json says where each
 # one stands: the game stamps them there (src/three/props.ts).
@@ -4259,6 +4295,9 @@ if out:
         "stone": {"r": STONE_R, **{k: [round(x, 2), round(-y, 2), round(z, 2)] for k, (x, y, z) in STONE_SPOTS.items()}},
         # The chest in the tower, where the emerald starts: its middle [x, z], and its tray.
         "chest": [round(CHEST["x"], 2), round(-CHEST["y"], 2), round(CHEST["floor"], 2)],
+        # Merlin's trap: where the net lies [x, z] (on the ground), its treasure [x, y, z], and where its rope's tied, up in the oak.
+        "trap": {"net": [round(TRAP_NET[0], 2), round(-TRAP_NET[1], 2)], "gold": [round(TX, 2), round(TZ, 2), round(-TY, 2)],
+                 "hook": [round(TRAP_HOOK[0], 2), round(TRAP_HOOK[2], 2), round(-TRAP_HOOK[1], 2)]},
         # The leaves in the dragon's mouth: where the pile is [x, z] (on the way's floor), and the heaps they're swept into.
         "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
         # The fire in the charcoal burner's hut, its middle [x, z] and floor, and the smoke hole over it: how high, and how wide.
