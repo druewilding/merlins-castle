@@ -437,7 +437,6 @@ const drawbridge = new Drawbridge(
   () => ownSounds.play("creak", { rate: 0.5 }),
   () => ownSounds.play("thud", { rate: 0.6 })
 );
-const PAID = 1.2; // seconds, from the penny's being taken to the drawbridge's starting to come down
 const guards = new Guards(scene, sentries.scene, sentries.animations, bridging.guards, ground);
 player.movers.push(...guards.bodies);
 const bridgeDown = (here: string) =>
@@ -770,9 +769,9 @@ function inUse() {
   });
   const paid = Boolean(tolled && exits.some((exit) => shapeOf.get(exit) === tolled));
   if (paid && !(tolled && opened.has(tolled)) && !instantly) {
-    // (The penny taken, and then the drawbridge lowered.)
+    // (The penny taken, and the drawbridge lowered straight away: no waiting about.)
     guards.pay(player.position);
-    drawbridge.set(true, false, PAID);
+    drawbridge.set(true);
   }
   opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
   if (instantly) drawbridge.set(bridgeDown(here), true);

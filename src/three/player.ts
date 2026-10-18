@@ -798,7 +798,9 @@ export class Player {
       if (Math.hypot(p.x - thing.x, p.z - thing.z) >= Math.hypot(b.x - thing.x, b.z - thing.z)) return;
       p.x = b.x;
       p.z = b.z;
-    } else if (thing.halfX < thing.halfZ) {
+    } else if (/ (east|west)$/.test(exit)) {
+      // (Across it the way its exit goes, east or west: not by its shape. The
+      // moat's, from the bank to the wall, is longer than it's wide.)
       if (Math.abs(p.x - thing.x) >= Math.abs(b.x - thing.x)) return;
       p.x = b.x;
     } else {

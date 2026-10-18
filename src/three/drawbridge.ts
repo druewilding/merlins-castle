@@ -1,7 +1,7 @@
 // The drawbridge over the moat (its model: art/blender/land.py), on its
 // chains up to the gatehouse: up, till the penny's paid at the toll gate,
-// when it's lowered across the water (slowly, its chains paying out, and
-// down onto the landing with a bump); and raised again once you've come out
+// when it's lowered across the water (straight away, its chains paying out,
+// and down onto the landing with a bump); and raised again once you've come out
 // of the castle and off it. main.ts says when it's wanted down.
 //
 // It turns on its hinge at the foot of the castle's wall (its model's
@@ -32,14 +32,14 @@ export interface DrawbridgeSpot {
   chain: number;
   /** The chains' holes in the gatehouse, [x, y, z]. */
   anchors: number[][];
-  /** Where the guards stand, [x, z, y] (on the landing). */
+  /** Where the guards stand, [x, z] (on the bank, beside the landing). */
   guards: number[][];
   /** The castle's walls: [west, east, north, south]. */
   castle: number[];
 }
 
 export const RAISED = 1.52; // radians up from lying across the moat: all but upright, against the gatehouse
-const MOVING = 6; // seconds, from up to down (or back)
+const MOVING = 2; // seconds, from up to down (or back): quick, so there's no waiting about
 const BUMP = 0.035; // radians it bounces back up, landing
 const LINK = 0.19; // metres from one link to the next
 const RING = 0.07; // how far up off its deck the chains are fixed
@@ -71,7 +71,6 @@ export class Drawbridge {
   private from = RAISED;
   private to = RAISED;
   private t = 1; // of the way from one to the other
-  private wait = 0; // seconds, before it starts
   private bumping = 1; // of its bounce, landing (1: done)
   private links: InstancedMesh;
   private ends: [Vector3, Vector3][] = [];
@@ -116,13 +115,12 @@ export class Drawbridge {
     return this.to === 0;
   }
 
-  /** Wanted down, or up: now (loading), or in its own time (after some seconds, if it says). */
-  set(down: boolean, now = false, after = 0) {
+  /** Wanted down, or up: now (loading), or in its own time. */
+  set(down: boolean, now = false) {
     const to = down ? 0 : RAISED;
     if (now || this.reducedMotion) {
       this.from = this.to = to;
       this.t = this.bumping = 1;
-      this.wait = 0;
       return;
     }
     if (to === this.to) return;
@@ -130,13 +128,11 @@ export class Drawbridge {
     this.from = this.angle;
     this.to = to;
     this.t = 0;
-    this.wait = after;
     this.bumping = 1;
   }
 
   update(dt: number) {
-    if (this.wait > 0) this.wait -= dt;
-    else if (this.t < 1) {
+    if (this.t < 1) {
       if (this.t === 0) this.moving(this.to === 0);
       this.t = Math.min(1, this.t + (dt * RAISED) / (MOVING * Math.max(0.2, Math.abs(this.to - this.from))));
       if (this.t >= 1 && this.to === 0) {

@@ -55,7 +55,7 @@ export class Guards {
   readonly bodies: Circle[] = [];
 
   constructor(scene: Scene, source: Object3D, clips: AnimationClip[], spots: number[][], ground: Ground) {
-    spots.forEach(([x, z, y], k) => {
+    spots.forEach(([x, z], k) => {
       const model = clone(source);
       model.traverse((o) => {
         if (o instanceof Mesh) {
@@ -69,7 +69,7 @@ export class Guards {
       model.scale.setScalar(TALL);
       // Facing up the path, turned a little to the way between them.
       const yaw = Math.atan2(-Math.sign(x) * 0.3, -1);
-      model.position.set(x, y ?? ground(x, z) ?? 0, z);
+      model.position.set(x, ground(x, z) ?? 0, z);
       model.rotation.y = yaw;
       scene.add(model);
       const mixer = new AnimationMixer(model);

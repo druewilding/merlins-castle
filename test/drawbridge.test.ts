@@ -55,6 +55,10 @@ describe("the guards at the toll gate", () => {
     for (const z of [z0, z1]) expect(z + GUARD).toBeLessThan(tip);
     expect(Math.abs(x1 - x0) - 2 * GUARD).toBeGreaterThan(2 * BODY + 2);
   });
+
+  it("stand clear of the drawbridge's width, so coming off it you never bump into one", () => {
+    for (const [x] of spot.guards) expect(Math.abs(x - hingeX) - GUARD).toBeGreaterThan(spot.half + BODY);
+  });
 });
 
 describe("when the drawbridge is down", () => {
@@ -108,21 +112,21 @@ describe("the drawbridge, moving", () => {
     expect(drawbridge.down).toBe(false);
   });
 
-  it("paid, waits for the penny to be taken, then comes down slowly, landing with a bump (only then down)", () => {
+  it("paid, comes down straight away and quickly (no waiting about), landing with a bump (only then down)", () => {
     const { model, drawbridge, heard, run } = bridge();
-    drawbridge.set(true, false, 1.2);
-    run(1);
-    expect(model.rotation.x).toBeCloseTo(RAISED);
-    expect(heard).toEqual([]);
-    run(3);
+    drawbridge.set(true);
+    run(FRAME);
     expect(heard).toEqual(["lowering"]);
+    expect(model.rotation.x).toBeLessThan(RAISED);
+    run(1);
     expect(model.rotation.x).toBeGreaterThan(0.1);
     expect(model.rotation.x).toBeLessThan(RAISED - 0.1);
     expect(drawbridge.down).toBe(false);
     expect(drawbridge.lowering).toBe(true);
-    run(5);
+    run(1.2);
     expect(heard).toEqual(["lowering", "landed"]);
-    expect(drawbridge.down).toBe(true);
+    expect(drawbridge.down).toBe(true); // (to walk on, even bouncing)
+    run(0.6);
     expect(model.rotation.x).toBeCloseTo(0);
   });
 

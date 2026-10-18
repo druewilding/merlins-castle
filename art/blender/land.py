@@ -1588,8 +1588,10 @@ block(built, BOOTH[0] - 0.02, BOOTH[1] - 0.02, BOOTH_TALL + 1.2, BOOTH[0] + 0.02
 built.add([(BOOTH[0], BOOTH[1], BOOTH_TALL + 1.8), (BOOTH[0] + 0.45, BOOTH[1], BOOTH_TALL + 1.68),
            (BOOTH[0], BOOTH[1], BOOTH_TALL + 1.56)], [(0, 1, 2)], [c.linear("#f1eadb")] * 3)  # its pennant
 solid_circle(*BOOTH, BOOTH_R + 0.05)
-# Where the guards stand: either side of the way onto the landing, facing up the path.
-GUARDS = [(side * 2.3, DB_TIP + 1.2) for side in (-1, 1)]
+# Where the guards stand: either side of the way onto the landing, facing up
+# the path, clear of the bridge's width (coming off it, you'd bump into one,
+# and be pushed back, as if you'd turned back into the moat).
+GUARDS = [(side * 3.7, DB_TIP + 1.2) for side in (-1, 1)]
 # The drawbridge is up: across the water, so from the bank it stops you
 # just short of the guards (it's they who stop you, at the toll gate).
 obstacle(["moat south"], "box", 0, -(DB_TIP + CASTLE[3] + 2) / 2, 3.2, (DB_TIP - CASTLE[3] - 2) / 2, reach=2.65)
@@ -4486,11 +4488,11 @@ if out:
         "hole": {"box": [round(px, 2), round(-py, 2), round(phx, 2), round(phy, 2)], "floor": round(pit_floor, 2),
                  "bottom": round(bottom, 2), "beam": round(PIT_BEAM, 2)},
         # The drawbridge: its hinge [x, y, z] (at its deck), how long and half how wide it is, how far in from
-        # its tip its chains are fixed, and their holes in the gatehouse [x, y, z]; where the guards stand [x, z, y]
+        # its tip its chains are fixed, and their holes in the gatehouse [x, y, z]; where the guards stand [x, z]
         # and the castle's walls [west, east, north, south] (in it, it's down).
         "drawbridge": {"hinge": [0, DB_TOP, round(-DB_HINGE, 2)], "length": round(DB_LENGTH, 2), "half": DB_HALF,
                        "chain": DB_CHAIN, "anchors": [[round(x, 2), round(z, 2), round(-y, 2)] for x, y, z in DB_ANCHORS],
-                       "guards": [[round(x, 2), round(-y, 2), DB_TOP] for x, y in GUARDS],
+                       "guards": [[round(x, 2), round(-y, 2)] for x, y in GUARDS],
                        "castle": [CASTLE[0], CASTLE[1], round(-CASTLE[3], 2), round(-CASTLE[2], 2)]},
         # The leaves in the dragon's mouth: where the pile is [x, z] (on the way's floor), and the heaps they're swept into.
         "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
