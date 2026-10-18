@@ -438,7 +438,10 @@ const drawbridge = new Drawbridge(
   model.scene.getObjectByName("drawbridge")!,
   bridging,
   reducedMotion,
-  () => ownSounds.play("creak", { rate: 0.5 }),
+  // (Creaking on its chains, going back up: coming down, you hear the penny paid.)
+  (down) => {
+    if (!down) ownSounds.play("creak", { rate: 0.5 });
+  },
   () => ownSounds.play("thud", { rate: 0.6 })
 );
 const guards = new Guards(scene, sentries.scene, sentries.animations, bridging.guards, ground);
@@ -775,6 +778,7 @@ function inUse() {
   if (paid && !(tolled && opened.has(tolled)) && !instantly) {
     // (The penny taken, and the drawbridge lowered straight away: no waiting about.)
     guards.pay(player.position);
+    ownSounds.play("coins");
     drawbridge.set(true);
   }
   opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
