@@ -20,8 +20,24 @@ import {
   Vector3,
 } from "three";
 
+import { type ItemId, type RoomId, type World } from "../engine/types";
 import type { Footing } from "./items";
 import type { Player } from "./player";
+
+/** The ways the rope swings you over: the deep hole's, from either side. */
+export const SWUNG = ["maze north", "treasure-room south"];
+
+/**
+ * Whether what using an object here does is said only as you go through,
+ * not as you use it: the rope over the deep hole, whose words in the
+ * original are for crossing ("You swing over a deep hole."), so they're said
+ * as you swing over its middle. (Not the goblins, tied up with it.)
+ */
+export function saidSwinging(world: World, id: ItemId, room: RoomId) {
+  return Object.entries(world.rooms[room]?.exits ?? {}).some(
+    ([direction, exit]) => exit?.obstacle?.needs === id && SWUNG.includes(`${room} ${direction}`)
+  );
+}
 
 /** The hole, from land.json: [x, z, half x, half z], the floor across it, its bottom, and its beam's underside. */
 interface Hole {
@@ -95,7 +111,7 @@ export class Rope {
   /** Over the hole for an exit, from your side: swinging down from it, or (as a game's loaded) hanging still. */
   hang(exit: string, show: boolean, instantly: boolean) {
     this.away();
-    const side = exit === "maze north" ? 1 : -1;
+    const side = exit === SWUNG[0] ? 1 : -1;
     const angle = instantly || this.reducedMotion ? 0 : side * 0.9;
     this.hung = { exit, side, angle, speed: 0, held: false, holding: false, armed: false };
     if (show) this.show();

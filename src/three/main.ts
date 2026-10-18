@@ -81,7 +81,7 @@ import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Wa
 import { type PropSpots, stampProps } from "./props";
 import { Rabbits } from "./rabbits";
 import { River } from "./river";
-import { Rope } from "./rope";
+import { Rope, saidSwinging } from "./rope";
 import { Shafts, speck, type Window } from "./shafts";
 import { paintSign, type SignSpot } from "./sign";
 import { sky } from "./sky";
@@ -703,7 +703,7 @@ const items = setUpItems({
   begin: handoff ?? undefined,
   starts: { emerald: { room: "tower", at: land.chest as [number, number, number] } },
   notes: notes.notes.map((note) => note.model),
-  saidGoing: (id, here) => id === "rope" && ["maze", "treasure-room"].includes(here),
+  saidGoing: (id, here) => saidSwinging(world, id, here),
   read: (k) => {
     player.held = true;
     notes.read(k);
