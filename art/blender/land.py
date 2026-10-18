@@ -1832,6 +1832,166 @@ for run in ((WX, -18 * K, WX, WY + 0.6), (WW - 0.6, WY, GATE[0], WY), (GATE[1], 
     stone_wall(*run)
 wall.build("old-stone-wall", smooth=False)
 
+# The stone archway north of the moat, as in its picture: an old wall of
+# dressed stone across the path between the trees (its ends in the forest
+# either side), crumbling along its top, mossy low down, ivy hanging from
+# it; and a round arch over the path, on a pier either side, its stones
+# laid round it, rising over the wall. Solid but for the way through.
+ARCH_Y = -82.0  # where it crosses the path
+ARCH_X = 0.6  # the path's middle, there
+ARCH_ENDS = (-13.0, 13.0)
+ARCH_HALF = 1.9  # half the way through
+ARCH_SPRING = 2.3  # where the arch springs from its piers
+ARCH_RING = 0.5  # how deep its stones are
+ARCH_PIER = 1.0  # how wide each pier is
+ARCH_TOP = ARCH_SPRING + ARCH_HALF + ARCH_RING + 0.55  # the top over the arch
+ARCH_WALL = 2.9  # the wall's height either side (less where it's crumbled)
+ARCH_THICK = 0.42  # half its thickness
+ARCH_STONES = [c.linear(h) for h in ("#a39d90", "#958f83", "#ada79a", "#8a857a", "#9c968a", "#b2ada2")]
+ARCH_GAP = c.linear("#5f584c")
+arch = c.Builder()
+arch_rng = random.Random("the stone archway")
+
+
+def arch_foot(x):
+    return drawn_height(x, ARCH_Y, exactly=True) - 0.3
+
+
+def arch_colour(x, z):
+    colour = c.vary(arch_rng.choice(ARCH_STONES), 0.08, Vector((x, z, 5)))
+    mossy = smooth(1 - (z - arch_foot(x) - 0.3) / 1.2) * 0.55 + 0.4 * max(0.0, noise.noise(Vector((x / 2, z, 3))))
+    colour = c.mix(colour, MOSS, min(0.55, mossy))
+    if arch_rng.random() < 0.12:
+        colour = c.mix(colour, LICHEN, arch_rng.uniform(0.2, 0.45))
+    return colour
+
+
+def arch_stone(x0, x1, z0, z1):
+    """A dressed stone, through the wall, each face standing out a little from its core."""
+    out = ARCH_THICK + arch_rng.uniform(-0.02, 0.03)
+    back = ARCH_THICK + arch_rng.uniform(-0.02, 0.03)
+    block(arch, x0 + 0.015, ARCH_Y - out, z0 + 0.015, x1 - 0.015, ARCH_Y + back, z1 - 0.015,
+          arch_colour((x0 + x1) / 2, (z0 + z1) / 2), solid=False)
+
+
+def arch_course(x0, x1, z0, z1, short=(0.45, 0.9)):
+    """A course of stones from x0 to x1, joints staggered."""
+    x = x0 - arch_rng.uniform(0, short[0])
+    while x < x1 - 0.05:
+        long = arch_rng.uniform(*short)
+        a, b = max(x, x0), min(x + long, x1)
+        if b - a > 0.12:
+            arch_stone(a, b, z0, z1)
+        x += long
+
+
+def extrados(x):
+    """The top of the arch's ring of stones, over x (None beyond it)."""
+    dx = abs(x - ARCH_X)
+    r = ARCH_HALF + ARCH_RING
+    return ARCH_SPRING + math.sqrt(r * r - dx * dx) if dx < r else None
+
+
+# The wall either side, and the piers: in courses from below the ground,
+# its top ragged (stones gone here and there, a few left standing higher).
+pier_in, pier_out = ARCH_X - ARCH_HALF, ARCH_X - ARCH_HALF - ARCH_PIER
+for lo, hi, pier in ((ARCH_ENDS[0], pier_out, False), (pier_out, pier_in, True),
+                     (ARCH_X + ARCH_HALF, ARCH_X + ARCH_HALF + ARCH_PIER, True),
+                     (ARCH_X + ARCH_HALF + ARCH_PIER, ARCH_ENDS[1], False)):
+    z = min(arch_foot(lo), arch_foot(hi))
+    top = ARCH_TOP if pier else ARCH_WALL
+    while z < top - 0.05:
+        tall = min(arch_rng.uniform(0.3, 0.42), top - z)
+        if pier:
+            # (Big quoins, the full width of the pier, every other course.)
+            arch_course(lo, hi, z, z + tall, (0.45, 0.6) if arch_rng.random() < 0.5 else (ARCH_PIER, ARCH_PIER))
+        else:
+            arch_course(lo, hi, z, z + tall)
+        z += tall
+    if not pier:
+        # Crumbling along its top: a stone or two still standing here and
+        # there, lower in places, as in the picture.
+        x = lo
+        while x < hi - 0.3:
+            wide = arch_rng.uniform(0.5, 1.1)
+            a, b = x, min(x + wide, hi)
+            stack = arch_rng.choice((0, 0, 1, 1, 2))
+            for k in range(stack):
+                arch_stone(a + 0.05 * k, b - 0.05 * k, top + k * 0.36, top + (k + 1) * 0.36 - 0.02)
+            x += wide
+    # Its core, deep in: dark between the stones.
+    for side in (-1, 1):
+        y = ARCH_Y + side * (ARCH_THICK - 0.05)
+        facing(arch, [(lo, y, arch_foot(lo)), (hi, y, arch_foot(hi)), (hi, y, top), (lo, y, top)], [ARCH_GAP] * 4,
+               (0, side, 0))
+    solid_box((lo + hi) / 2, ARCH_Y, (hi - lo) / 2, ARCH_THICK + 0.05)
+# The arch: its stones laid round it, wedges between its springings, a
+# keystone at its crown, a little proud.
+VOUSSOIRS = 13
+for k in range(VOUSSOIRS):
+    a0, a1 = math.pi * k / VOUSSOIRS, math.pi * (k + 1) / VOUSSOIRS
+    gap = 0.012
+    a0, a1 = a0 + gap, a1 - gap
+    key = k == VOUSSOIRS // 2
+    r0, r1 = ARCH_HALF, ARCH_HALF + ARCH_RING + (0.08 if key else 0.0)
+    proud = 0.04 if key else arch_rng.uniform(0.0, 0.025)
+    colour = arch_colour(ARCH_X, ARCH_SPRING + 2)
+    corners = []
+    for y in (ARCH_Y - ARCH_THICK - proud, ARCH_Y + ARCH_THICK + proud):
+        for r, a in ((r0, a0), (r1, a0), (r1, a1), (r0, a1)):
+            corners.append((ARCH_X + math.cos(a) * r, y, ARCH_SPRING + math.sin(a) * r))
+    middle = sum((Vector(p) for p in corners), Vector()) / 8
+    for f in ((0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)):
+        pts = [corners[i] for i in f]
+        centre = sum((Vector(p) for p in pts), Vector()) / 4
+        facing(arch, pts, [colour] * 4, tuple(centre - middle))
+# Over the arch, between the piers: courses down to the arch's ring, each
+# stone cut off where it meets it; and the core behind, with the way
+# through cut out of it.
+z = ARCH_SPRING + 0.2
+while z < ARCH_TOP - 0.05:
+    tall = min(arch_rng.uniform(0.3, 0.4), ARCH_TOP - z)
+    x = pier_in
+    while x < ARCH_X + ARCH_HALF - 0.05:
+        long = arch_rng.uniform(0.4, 0.8)
+        a, b = x, min(x + long, ARCH_X + ARCH_HALF)
+        x += long
+        lows = [extrados(v) for v in (a, b, (a + b) / 2)]
+        floor_ = max((v for v in lows if v is not None), default=0.0)
+        if z + tall - 0.08 > floor_:
+            arch_stone(a, b, max(z, floor_ + 0.02), z + tall)
+    z += tall
+for side in (-1, 1):
+    y = ARCH_Y + side * (ARCH_THICK - 0.05)
+    edge = [(ARCH_X + math.cos(math.pi * k / 16) * (ARCH_HALF + 0.05), y,
+             ARCH_SPRING + math.sin(math.pi * k / 16) * (ARCH_HALF + 0.05)) for k in range(17)]
+    for p, q in zip(edge, edge[1:]):
+        facing(arch, [p, q, (q[0], y, ARCH_TOP), (p[0], y, ARCH_TOP)], [ARCH_GAP] * 4, (0, side, 0))
+# The arch's underside, between its two faces.
+for k in range(16):
+    a0, a1 = math.pi * k / 16, math.pi * (k + 1) / 16
+    pts = [(ARCH_X + math.cos(a) * ARCH_HALF, y, ARCH_SPRING + math.sin(a) * ARCH_HALF)
+           for a, y in ((a0, ARCH_Y - ARCH_THICK), (a1, ARCH_Y - ARCH_THICK), (a1, ARCH_Y + ARCH_THICK),
+                        (a0, ARCH_Y + ARCH_THICK))]
+    facing(arch, pts, [c.mix(ARCH_STONES[3], ARCH_GAP, 0.3)] * 4, (-math.cos((a0 + a1) / 2), 0, -math.sin((a0 + a1) / 2)))
+# Ivy, hanging from its top in places, either side, and over the arch.
+for side in (-1, 1):
+    for cx, top, wide, drop in ((-9.5, ARCH_WALL + 0.3, 2.2, 2.0), (-4.2, ARCH_TOP, 1.4, 2.4), (6.5, ARCH_WALL + 0.3, 2.8, 2.2),
+                                (10.5, ARCH_WALL, 1.6, 1.5)):
+        cx += arch_rng.uniform(-0.6, 0.6) * side
+        for _ in range(int(wide * drop * 30)):
+            u = arch_rng.uniform(-1, 1)
+            down = drop * (1 - 0.6 * u * u) * arch_rng.uniform(0.5, 1.0) * arch_rng.random() ** 1.3
+            lx, lz = cx + u * wide / 2, top - down
+            size = arch_rng.uniform(0.13, 0.2)
+            spin = arch_rng.uniform(0, 2 * math.pi)
+            y = ARCH_Y + side * (ARCH_THICK + arch_rng.uniform(0.03, 0.09))
+            corners = [(lx + math.cos(spin + a) * size * r, y, lz + math.sin(spin + a) * size * r)
+                       for a, r in ((0, 1.0), (math.pi / 2, 0.6), (math.pi, 0.5), (3 * math.pi / 2, 0.6))]
+            leaf = c.mix(*IVY, arch_rng.random())
+            facing(arch, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf], (0, side, 0))
+arch.build("archway", smooth=False)
+
 
 # A clue at each dead end: a note, nailed to a rough board on a stake, the
 # board leaning back a little, to read. Its words are written on in the game
