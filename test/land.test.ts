@@ -176,6 +176,26 @@ describe("the 3D land, with every obstacle closed", () => {
   });
 });
 
+// Merlin's trap: round its treasure, at the end of the path east from the
+// mountain; you're caught as you come within its reach, where its net lies
+// (on the path, so you're scooped up from right where you stand).
+describe("Merlin's trap", () => {
+  const { circle, reach } = land.obstacles["mountain east"] as { circle: number[]; reach: number };
+  const [x, z, r] = circle;
+
+  it("is round its treasure", () => {
+    expect([x, z]).toEqual([land.trap.gold[0], land.trap.gold[2]]);
+  });
+
+  it("lays its net where you're caught, coming along the path from the mountain", () => {
+    const [nx, nz] = land.trap.net;
+    expect(Math.hypot(nx - x, nz - z)).toBeCloseTo(r + reach, 1);
+    const mountain = places.find((place) => place.id === "mountain")!;
+    expect(Math.hypot(nx - mountain.x, nz - mountain.z)).toBeLessThan(Math.hypot(x - mountain.x, z - mountain.z));
+    expect(walkable(nx, nz)).toBe(true);
+  });
+});
+
 // Underground: where you can be is in a hall, or along a way (and from a
 // way's mouth, out onto the land, which counts as reaching the place nearest).
 const halls = Object.entries(land.halls);
