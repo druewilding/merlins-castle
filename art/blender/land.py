@@ -730,6 +730,10 @@ def height(x, y):
     w, e, s, n = CASTLE
     if w - 8 <= x <= e + 8 and s - 8 <= y <= n + 8 and not in_moat(x, y):
         h = 0.4  # the castle stands on flat ground
+    # (And the bank comes up to the drawbridge's landing, a step below it.)
+    landing = smooth(1 - (max(0.0, abs(x) - 4) + max(0.0, y - (MOAT[3] + 3))) / 4)
+    if landing > 0 and not in_moat(x, y):
+        h += (0.45 - h) * landing
     return h
 
 
@@ -1022,7 +1026,11 @@ def out_on_the_path(x, y):
 
 
 def off_the_land(x, y):
-    """Over water, beside a bridge: no path there (it'd hang down to the riverbed)."""
+    """Over water, beside a bridge: no path there (it'd hang down to the
+    riverbed). (Nor on the drawbridge, which moves, nor the stone either
+    end of it.)"""
+    if abs(x) <= 3.3 and CASTLE[3] - 1.2 <= y <= -127 * K:
+        return True
     return deck(x, y) is None and (from_river(x, y) < BANK + 0.5 or in_moat(x, y))
 
 
@@ -1507,10 +1515,84 @@ for side in (-1, 1):
     block(built, BRIDGE[0] + side * 2.4 - 0.15, BRIDGE[1] - BRIDGE_HALF, 0.9, BRIDGE[0] + side * 2.4 + 0.15,
           BRIDGE[1] + BRIDGE_HALF, 1.9,
           c.linear("#6b4426"))
-block(built, -3, -143 * K, 0.2, 3, -127 * K, 0.6, c.linear("#7a5230"), solid=False)
-# The drawbridge is up: over the middle of the water, so its far half (where
-# you can walk out of the courtyard) is only on the bridge.
-obstacle(["moat south"], "box", 0, -(MOAT[3] + CASTLE[3] + 2) / 2, 3.2, 1.5)
+# The drawbridge, as in its pictures: planks on beams, edged with iron, on
+# chains up to the gatehouse over the castle's gate. Hinged at the foot of
+# the wall (the game raises it, and lowers it while the penny's in use
+# here, and keeps it down while you're in the castle); lying across the
+# moat, it rests on a stone landing on the bank, between two posts. You
+# walk on its deck at deck()'s height, up or down: from the bank, it stops
+# you on the landing (so you never walk out where it'd be).
+DB_HINGE = CASTLE[3] + 1.2  # its hinge, out from the wall's face
+DB_TIP = MOAT[3] - 0.1  # where it rests, at the landing's edge
+DB_TOP = 0.6  # its deck (deck())
+DB_HALF = 2.9  # half its width, a shade narrower than the gate
+DB_THICK = 0.34
+DB_CHAIN = 0.4  # how far in from its tip its chains are fixed
+GATEHOUSE = (7.0, 9.8)  # over the gate, from the top of the way through to its battlements
+DB_ANCHORS = [(side * (DB_HALF - 0.15), CASTLE[3] + 1, GATEHOUSE[0] + 1.6) for side in (-1, 1)]  # the chains' holes
+PLANKS = [c.linear(h) for h in ("#8a5a33", "#7d5130", "#93613a", "#835634", "#8f5d35")]
+DB_IRON = c.linear("#3b3836")
+DB_LENGTH = DB_TIP - DB_HINGE
+drawbridge = c.Builder()
+
+
+def db_box(x0, a0, z0, x1, a1, z1, colour):
+    """A piece of it, a0 to a1 out from its hinge, z up from its deck."""
+    block(drawbridge, x0, a0, z0, x1, a1, z1, colour, solid=False)
+
+
+k = 0
+a = 0.0
+while a < DB_LENGTH - 0.01:
+    a1 = min(DB_LENGTH, a + 0.32)
+    db_box(-DB_HALF, a + 0.012, -0.12, DB_HALF, a1 - 0.012, 0, PLANKS[(k * 3) % len(PLANKS)])  # (a dark gap between them)
+    a, k = a1, k + 1
+db_box(-DB_HALF + 0.1, 0.02, -0.13, DB_HALF - 0.1, DB_LENGTH - 0.02, -0.1, c.linear("#3d2817"))  # (the gaps, dark)
+for x in (-DB_HALF + 0.25, 0, DB_HALF - 0.25):
+    db_box(x - 0.14, 0.05, -DB_THICK, x + 0.14, DB_LENGTH - 0.05, -0.12, c.linear("#5e3b1f"))  # the beams under it
+for side in (-1, 1):
+    db_box(side * DB_HALF - 0.06, 0, -0.16, side * DB_HALF + 0.06, DB_LENGTH, 0.04, DB_IRON)  # its iron edges
+    # (And where its chains are fixed: a ring standing up on each side.)
+    db_box(side * (DB_HALF - 0.15) - 0.05, DB_LENGTH - DB_CHAIN - 0.08, 0, side * (DB_HALF - 0.15) + 0.05,
+           DB_LENGTH - DB_CHAIN + 0.08, 0.14, DB_IRON)
+for a in (0.25, DB_LENGTH - 0.25):
+    db_box(-DB_HALF, a - 0.06, 0, DB_HALF, a + 0.06, 0.015, DB_IRON)  # straps across its ends
+drawbridge.build("drawbridge", smooth=False).location = (0, DB_HINGE, DB_TOP)
+# The way in under the gatehouse, and the landing on the bank, between its posts.
+block(built, -3, CASTLE[3] - 1.1, 0.0, 3, DB_HINGE, DB_TOP, c.linear("#8d887c"), solid=False)
+block(built, -3.2, DB_TIP, -0.6, 3.2, -127 * K, DB_TOP, c.linear("#8d887c"), solid=False)
+for side in (-1, 1):
+    block(built, side * 3.55 - 0.3, DB_TIP + 0.15, -0.6, side * 3.55 + 0.3, DB_TIP + 0.75, 1.5, STONE)
+    built.cone((side * 3.55, DB_TIP + 0.45, 1.5), 0.3, 0.42, STONE, sides=4, droop=0)
+# The gatehouse over the gate, between the towers either side of it, with
+# the chains' holes in its face.
+block(built, -3.2, CASTLE[3] - 1, GATEHOUSE[0], 3.2, CASTLE[3] + 1, GATEHOUSE[1], GREY, solid=False)
+for x in (-3.2, -1.2, 0.8, 2.6):
+    block(built, x, CASTLE[3] + 0.4, GATEHOUSE[1], x + 0.6, CASTLE[3] + 1, GATEHOUSE[1] + 0.8, GREY, solid=False)
+for x, y, z in DB_ANCHORS:
+    block(built, x - 0.12, y, z - 0.12, x + 0.12, y + 0.02, z + 0.12, c.linear("#1d1b19"), solid=False)
+# The toll booth, beside the guards: striped red and white, as in its
+# picture, under a pointed roof, its doorway to the path.
+BOOTH = (6.6, MOAT[3] + 3.4)
+BOOTH_R, BOOTH_TALL, BOOTH_SIDES = 0.95, 2.3, 10
+for k in range(BOOTH_SIDES):
+    a0, a1 = (2 * math.pi * (k + j) / BOOTH_SIDES for j in (0, 1))
+    pts = [(BOOTH[0] + math.cos(a) * BOOTH_R, BOOTH[1] + math.sin(a) * BOOTH_R, z)
+           for a, z in ((a0, -0.1), (a1, -0.1), (a1, BOOTH_TALL), (a0, BOOTH_TALL))]
+    door = k == BOOTH_SIDES // 2  # (facing west, to the path)
+    colour = c.linear("#2a1d14") if door else c.linear("#c23a33" if k % 2 else "#f1eadb")
+    built.add(pts, [(0, 1, 2, 3)], [colour] * 4)
+built.cone((*BOOTH, BOOTH_TALL), 1.3, BOOTH_R * 1.2, c.linear("#c23a33"), sides=BOOTH_SIDES, droop=0)
+block(built, BOOTH[0] - 0.02, BOOTH[1] - 0.02, BOOTH_TALL + 1.2, BOOTH[0] + 0.02, BOOTH[1] + 0.02, BOOTH_TALL + 1.8,
+      c.linear("#5e3b1f"), solid=False)
+built.add([(BOOTH[0], BOOTH[1], BOOTH_TALL + 1.8), (BOOTH[0] + 0.45, BOOTH[1], BOOTH_TALL + 1.68),
+           (BOOTH[0], BOOTH[1], BOOTH_TALL + 1.56)], [(0, 1, 2)], [c.linear("#f1eadb")] * 3)  # its pennant
+solid_circle(*BOOTH, BOOTH_R + 0.05)
+# Where the guards stand: either side of the way onto the landing, facing up the path.
+GUARDS = [(side * 2.3, DB_TIP + 1.2) for side in (-1, 1)]
+# The drawbridge is up: across the water, so from the bank it stops you
+# just short of the guards (it's they who stop you, at the toll gate).
+obstacle(["moat south"], "box", 0, -(DB_TIP + CASTLE[3] + 2) / 2, 3.2, (DB_TIP - CASTLE[3] - 2) / 2, reach=2.65)
 
 # The old stone wall: north from the forest, west along the gate, north again.
 WALL = 4.5
@@ -4391,6 +4473,13 @@ if out:
         # The deep hole: [x, z, half x, half z], the way's floor across it, how deep it goes and its beam's underside.
         "hole": {"box": [round(px, 2), round(-py, 2), round(phx, 2), round(phy, 2)], "floor": round(pit_floor, 2),
                  "bottom": round(bottom, 2), "beam": round(PIT_BEAM, 2)},
+        # The drawbridge: its hinge [x, y, z] (at its deck), how long and half how wide it is, how far in from
+        # its tip its chains are fixed, and their holes in the gatehouse [x, y, z]; where the guards stand [x, z];
+        # and the castle's walls [west, east, north, south] (in it, it's down).
+        "drawbridge": {"hinge": [0, DB_TOP, round(-DB_HINGE, 2)], "length": round(DB_LENGTH, 2), "half": DB_HALF,
+                       "chain": DB_CHAIN, "anchors": [[round(x, 2), round(z, 2), round(-y, 2)] for x, y, z in DB_ANCHORS],
+                       "guards": [[round(x, 2), round(-y, 2)] for x, y in GUARDS],
+                       "castle": [CASTLE[0], CASTLE[1], round(-CASTLE[3], 2), round(-CASTLE[2], 2)]},
         # The leaves in the dragon's mouth: where the pile is [x, z] (on the way's floor), and the heaps they're swept into.
         "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
         # The fire in the charcoal burner's hut, its middle [x, z] and floor, and the smoke hole over it: how high, and how wide.

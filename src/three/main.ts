@@ -54,9 +54,11 @@ import {
 } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Caught } from "./caught";
+import { Drawbridge, type DrawbridgeSpot, wantedDown } from "./drawbridge";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
 import { Golden } from "./golden";
+import { Guards } from "./guards";
 import { haze } from "./haze";
 import { type HoleSpot, Slipped } from "./hole";
 import { items as setUpItems, onPaths } from "./items";
@@ -66,6 +68,7 @@ import { DEATHS, placeAt, PLACES } from "./layout";
 import { Leaves } from "./leaves";
 import { dressMaze } from "./maze";
 import { Merlin } from "./merlin";
+import guardModel from "./models/guards.glb?url";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
 import landModel from "./models/land.glb?url";
@@ -181,7 +184,7 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky, wizard, hags, bunnies] = await Promise.all([
+const [model, file, things, snaky, wizard, hags, bunnies, sentries] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
@@ -189,6 +192,7 @@ const [model, file, things, snaky, wizard, hags, bunnies] = await Promise.all([
   loader.loadAsync(merlinModel),
   loader.loadAsync(witchModel),
   loader.loadAsync(rabbitModel),
+  loader.loadAsync(guardModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -421,6 +425,23 @@ const shut = shapeOf.get("tower south");
 const crossing = shapeOf.get("deep-river south");
 // The deep hole between the maze and the treasure room, which the rope swings you over (rope.ts).
 const holed = shapeOf.get("maze north");
+// The moat, which the drawbridge crosses (drawbridge.ts), lowered for the
+// penny paid at the toll gate (to the guards there: guards.ts).
+const tolled = shapeOf.get("moat south");
+const bridging = land.drawbridge as DrawbridgeSpot;
+const drawbridge = new Drawbridge(
+  scene,
+  model.scene.getObjectByName("drawbridge")!,
+  bridging,
+  reducedMotion,
+  () => ownSounds.play("creak", { rate: 0.5 }),
+  () => ownSounds.play("thud", { rate: 0.6 })
+);
+const PAID = 1.2; // seconds, from the penny's being taken to the drawbridge's starting to come down
+const guards = new Guards(scene, sentries.scene, sentries.animations, bridging.guards, ground);
+player.movers.push(...guards.bodies);
+const bridgeDown = (here: string) =>
+  allOpen || wantedDown(bridging, Boolean(tolled && opened.has(tolled)), here, player.position, drawbridge.lowering);
 // The leaves filling the dragon's mouth, which the broom sweeps aside into
 // heaps (leaves.ts): lying on the way's floor in the mouth, and the ground
 // outside it.
@@ -462,7 +483,15 @@ function solidify() {
     const here = [...shapes.values()].filter((shape) => Boolean(shape.under) === under);
     const closed = allOpen ? [] : here.filter((shape) => !opened.has(shape));
     // (And the deep hole, with the rope over it: you swing across it, not walk.)
-    const plain = allOpen ? [] : here.filter((shape) => walls.has(shape) || (shape === holed && opened.has(shape)));
+    // (And the moat, with the drawbridge still coming down: not yet across it.)
+    const plain = allOpen
+      ? []
+      : here.filter(
+          (shape) =>
+            walls.has(shape) ||
+            (shape === holed && opened.has(shape)) ||
+            (shape === tolled && opened.has(shape) && !drawbridge.down)
+        );
     // The obstacles first, so you bump into them before any wall they stand in.
     player.solid(
       [
@@ -733,11 +762,19 @@ function inUse() {
         shape === heaped ||
         shape === dancers ||
         shape === holed ||
+        shape === tolled ||
         unlit.has(shape))
       ? [`${here} ${direction}`]
       : [];
   });
+  const paid = Boolean(tolled && exits.some((exit) => shapeOf.get(exit) === tolled));
+  if (paid && !(tolled && opened.has(tolled)) && !instantly) {
+    // (The penny taken, and then the drawbridge lowered.)
+    guards.pay(player.position);
+    drawbridge.set(true, false, PAID);
+  }
   opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
+  if (instantly) drawbridge.set(bridgeDown(here), true);
   solidify();
   for (const [shape, gate] of gates) {
     const wants = opened.has(shape) ? 1 : 0;
@@ -1323,6 +1360,11 @@ renderer.setAnimationLoop((time) => {
     lidOpen += Math.sign(Number(near) - lidOpen) * Math.min(Math.abs(Number(near) - lidOpen), dt * 1.5);
     lid.rotation.x = -(CRACK + (LID - CRACK) * (lidOpen * lidOpen * (3 - 2 * lidOpen)));
   }
+  drawbridge.set(bridgeDown(room));
+  const settled = drawbridge.down;
+  drawbridge.update(dt);
+  if (drawbridge.down !== settled) solidify();
+  guards.update(dt, player.camera.position);
   for (const gate of gates.values()) {
     gate.open += Math.sign(gate.wants - gate.open) * Math.min(Math.abs(gate.wants - gate.open), dt * 0.8);
     // (Slow to start and to stop, like a heavy old gate.)
