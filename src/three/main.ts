@@ -58,7 +58,7 @@ import { Fall } from "./fall";
 import { Felling } from "./felling";
 import { Golden } from "./golden";
 import { haze } from "./haze";
-import { Hole, type HoleSpot, Slipped } from "./hole";
+import { type HoleSpot, Slipped } from "./hole";
 import { items as setUpItems, onPaths } from "./items";
 import { Ladder } from "./ladder";
 import { dressLamp, Lantern } from "./lantern";
@@ -516,7 +516,7 @@ player.bounds = { west, east, north: -north, south: -south };
 const TRAP = "mountain east";
 const net = new Net(scene, land.trap as TrapSpot, ground);
 // The deep hole between the maze and the treasure room: you fall into it from either side.
-const hole = new Hole(scene, land.hole as HoleSpot);
+const hole = land.hole as HoleSpot;
 
 // Red where a way through kills you (but Merlin's trap: that's its treasure, and the net in front of it).
 const danger = new MeshBasicMaterial({ color: "#d9503f", transparent: true, opacity: 0.5, depthWrite: false });
@@ -928,7 +928,6 @@ if (debugMode) {
       merlin,
       witches,
       net,
-      hole,
       restart,
       drawn,
     },
@@ -1083,7 +1082,6 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   bridged = undefined;
   witches.free();
   net.reset();
-  hole.reset();
   arrive(game);
   instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
   inUse();
@@ -1193,6 +1191,11 @@ function lightFor(depth: number, time: number, dt: number) {
   lamp.distance = LAMP_REACH + 6 * lantern.light; // (and further)
   if (lamplit > own) lamp.position.copy(lantern.at);
   else lamp.position.set(player.position.x, player.position.y + 1.4, player.position.z);
+  // (Falling down the deep hole, your glow falls with you, dimmer and dimmer.)
+  if (playing?.scene instanceof Slipped) {
+    lamp.position.copy(player.camera.position);
+    lamp.intensity = 3.5 * own * playing.scene.glow;
+  }
   emberLook.color.setScalar(0.75 + 0.25 * flicker * flicker * (reducedMotion ? 1 : 0.9 + 0.1 * Math.sin(time / 23)));
 
   // The halls' lights nearest you.

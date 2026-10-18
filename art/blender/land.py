@@ -3206,7 +3206,7 @@ for k in range(4):
             face = [wall_point(i, j), wall_point(i + 1, j), wall_point(i + 1, j + 1), wall_point(i, j + 1)]
             cz = sum(p[2] for p in face) / 4
             deep = min(1.0, (pit_floor - cz) / 40)
-            shade = c.mix(rock_colour(face[0][0], face[0][1], cz), PIT_DARK, 0.25 + 0.6 * deep)
+            shade = c.mix(rock_colour(face[0][0], face[0][1], cz), PIT_DARK, 0.1 + 0.35 * deep)
             quad(pit, face, c.mix(shade, PIT_DARK, rough.random() * 0.25), 0.1)
 quad(pit, [(x, y, bottom) for x, y in corners], PIT_DARK)
 PIT_BEAM = pit_floor + PROP_TALL  # its underside
