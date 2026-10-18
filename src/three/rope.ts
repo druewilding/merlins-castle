@@ -77,7 +77,9 @@ export class Rope {
     private player: Player,
     private reducedMotion: boolean,
     /** You catch hold of it. */
-    private caught: () => void
+    private caught: () => void,
+    /** You swing past the middle of the hole (going through the way, for exit). */
+    private midway: (exit: string) => void
   ) {
     const [x, z] = hole.box;
     this.pivot = new Vector3(x, hole.beam, z);
@@ -202,7 +204,12 @@ export class Rope {
         this.pivot.z + reach * Math.sin(angle) + h.side * BEHIND
       );
     const at = new Vector3();
+    let past = false;
     return (t: number) => {
+      if (!past && t >= (CAUGHT + LET_GO) / 2) {
+        past = true;
+        this.midway(h.exit);
+      }
       if (t < CAUGHT) {
         const u = ease(t / CAUGHT);
         h.angle = from + (h.side * widest - from) * u;

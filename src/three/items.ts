@@ -193,6 +193,8 @@ export function items(options: {
   /** The clues' notes (notes.ts): looked at, E reads one (its number). */
   notes?: Mesh[];
   read?: (k: number) => void;
+  /** Whether what an object does here is said only as you go through (the rope over the deep hole: as you swing across), not as you use it. */
+  saidGoing?: (id: ItemId, room: RoomId) => boolean;
   reducedMotion: boolean;
 }): Items {
   const { world, scene, player, models, ground, walkable, root, say, sound, changed, stays, begin } = options;
@@ -537,9 +539,8 @@ export function items(options: {
     if (effects(world, state).includes(id)) {
       if (!already) stuck = 0; // (a way opened)
       // (What it does here, if it opens a way: "The ladder leans against the wall.")
-      if (EXIT_ORDER.some((d) => world.rooms[state.room].exits[d]?.obstacle?.needs === id)) {
-        say(result.events.at(-1)?.text ?? "");
-      }
+      const opens = EXIT_ORDER.some((d) => world.rooms[state.room].exits[d]?.obstacle?.needs === id);
+      if (opens && !options.saidGoing?.(id, state.room)) say(result.events.at(-1)?.text ?? "");
       sound("effect");
       draw();
       changed();

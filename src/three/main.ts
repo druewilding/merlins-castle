@@ -670,7 +670,13 @@ const rope = new Rope(
   (x, z) => nearest(land.ways["maze-treasure"], x, z).floor,
   player,
   reducedMotion,
-  () => ownSounds.play("sweep", { rate: 0.8 })
+  () => ownSounds.play("sweep", { rate: 0.8 }),
+  // (The original's words for using it here are for going across: "You swing
+  // over a deep hole." So they're said then, over its middle, not as it goes up.)
+  (exit) => {
+    const [id, direction] = exit.split(" ");
+    say(world.rooms[id]?.exits[direction as Direction]?.obstacle?.useMessage ?? "");
+  }
 );
 let hanging: string | undefined; // the exit it's hanging for
 const items = setUpItems({
@@ -697,6 +703,7 @@ const items = setUpItems({
   begin: handoff ?? undefined,
   starts: { emerald: { room: "tower", at: land.chest as [number, number, number] } },
   notes: notes.notes.map((note) => note.model),
+  saidGoing: (id, here) => id === "rope" && ["maze", "treasure-room"].includes(here),
   read: (k) => {
     player.held = true;
     notes.read(k);
