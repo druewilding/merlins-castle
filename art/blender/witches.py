@@ -36,7 +36,6 @@ ANIMS = [
     "Jog_Fwd_Loop",
     "Jump_Start",
     "Sitting_Idle_Loop",
-    "OverhandThrow",
     "Idle_Loop",
 ]
 TEXTURE = 1024  # the size every texture is shrunk to

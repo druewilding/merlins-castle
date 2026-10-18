@@ -14,9 +14,9 @@
 // looking (at her, flying still, or where she hides), ready to come out and
 // dance again: even if you turn straight back.
 //
-// Walk into them (without the broom) and they catch you: they run at you,
-// close round you, throw their ropes over you, and dance round you, tied
-// up (caught.ts plays it, from where you are).
+// Walk into them (without the broom) and they catch you: they run at you
+// and close round you, and, you down on the ground, dance round you
+// (caught.ts plays it, from where you are).
 //
 // Their clips are the Universal Animation Libraries', named as they are there.
 
@@ -62,7 +62,7 @@ const FADING = [3.5, 7.5];
 // from her hips, and how far up).
 const SEAT = [0, -0.12, 0.5];
 const HURRY = 0.7; // seconds she takes to fade, the broom no longer in use while you can still see her
-const ROUND_YOU = 1.1; // radians a second, the ring turning as they dance round you, tied up
+const ROUND_YOU = 1.1; // radians a second, the ring turning as they dance round you, caught
 
 export interface Ring {
   x: number;
@@ -70,7 +70,7 @@ export interface Ring {
   r: number;
 }
 
-type State = "hiding" | "coming" | "tying" | "dancing" | "going" | "flying" | "flown";
+type State = "hiding" | "coming" | "dancing" | "going" | "flying" | "flown";
 
 class Witch {
   readonly model: Object3D;
@@ -131,11 +131,9 @@ class Witch {
     for (const clip of animations) this.clips.set(clip.name, this.mixer.clipAction(clip));
     const dance = this.clips.get("Dance_Loop");
     if (dance) dance.time = STARTS[n % STARTS.length] * dance.getClip().duration;
-    for (const once of ["OverhandThrow", "Jump_Start"]) {
-      const action = this.clips.get(once);
-      action?.setLoop(LoopOnce, 1);
-      if (action) action.clampWhenFinished = true;
-    }
+    const jump = this.clips.get("Jump_Start"); // (springing up onto her broom, once)
+    jump?.setLoop(LoopOnce, 1);
+    if (jump) jump.clampWhenFinished = true;
   }
 
   /** How much of her there is to see (1: all of her; 0: she's faded away). */
@@ -153,11 +151,6 @@ class Witch {
     this.model.traverse((o) => {
       if (o instanceof Mesh) o.castShadow = !fading;
     });
-  }
-
-  /** Whether what she's doing once (throwing her rope) is done. */
-  get done() {
-    return this.playing?.loop === LoopOnce && !this.playing.isRunning();
   }
 
   play(name: string) {
@@ -276,6 +269,11 @@ export class Witches {
     for (const witch of this.witches) this.hideNow(witch);
   }
 
+  /** Whether, catching you, they've all closed round you. */
+  get round() {
+    return this.caught && this.witches.every((witch) => witch.state === "dancing");
+  }
+
   /** Where each one's face is now (standing up straight). */
   faces() {
     return this.witches.map((witch) =>
@@ -314,27 +312,20 @@ export class Witches {
       witch.model.visible = false;
       if (out || !this.seen(witch.hide, 1.2)) this.hideNow(witch);
     }
-    // (Catching you, the ring's still till they've all thrown their ropes.)
-    const tied = this.witches.every((witch) => witch.state === "dancing");
-    this.turned += (this.caught ? (tied ? ROUND_YOU : 0) : SPIN) * dt;
+    // (Catching you, the ring's still till they've all closed round you.)
+    const round = this.witches.every((witch) => witch.state === "dancing");
+    this.turned += (this.caught ? (round ? ROUND_YOU : 0) : SPIN) * dt;
     this.witches.forEach((witch, n) => {
       const at = witch.model.position;
       if (witch.state === "flown") return;
-      // (Catching you, they're out, whatever: each throws her rope as she gets to you.)
+      // (Catching you, they're out, whatever: each dances as she gets to you.)
       const free = !this.caught && witch.state !== "flying";
       if (free && out && witch.state !== "dancing") witch.state = "coming";
       if (free && !out && witch.state !== "hiding") witch.state = "going";
       if (witch.state === "flying") return this.fly(witch, n, dt);
       if (witch.state === "coming") {
         const { x, z } = this.place(n);
-        if (witch.run(x, z, dt)) witch.state = this.caught ? "tying" : "dancing";
-      } else if (witch.state === "tying") {
-        const { x, z } = this.place(n);
-        at.x = x;
-        at.z = z;
-        witch.face(this.ring.x - x, this.ring.z - z, dt);
-        witch.play("OverhandThrow");
-        if (witch.done) witch.state = "dancing";
+        if (witch.run(x, z, dt)) witch.state = "dancing";
       } else if (witch.state === "dancing") {
         // Round the ring, facing in, dancing.
         const { x, z } = this.place(n);
