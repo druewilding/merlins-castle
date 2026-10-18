@@ -23,7 +23,7 @@ import struct
 import sys
 from pathlib import Path
 
-from mathutils import Vector, noise
+from mathutils import Matrix, Vector, noise
 
 HERE = Path(__file__).parent
 sys.path.append(str(HERE))
@@ -1852,6 +1852,7 @@ ARCH_GAP = c.linear("#5f584c")
 arch = c.Builder()
 arch_rng = random.Random("the stone archway")
 arch_tops = []  # (from, to, how high its top is there), as it's built: for the ivy to hang from
+arch_laid = []  # (from, to, its top): each stone of the wall, as it's laid, for its core to come up to
 
 
 def arch_foot(x):
@@ -1869,21 +1870,40 @@ def arch_colour(x, z):
 
 def arch_stone(x0, x1, z0, z1):
     """A dressed stone, through the wall, each face standing out a little from its core."""
+    arch_laid.append((x0, x1, z1))
     out = ARCH_THICK + arch_rng.uniform(-0.02, 0.03)
     back = ARCH_THICK + arch_rng.uniform(-0.02, 0.03)
     block(arch, x0 + 0.015, ARCH_Y - out, z0 + 0.015, x1 - 0.015, ARCH_Y + back, z1 - 0.015,
           arch_colour((x0 + x1) / 2, (z0 + z1) / 2), solid=False)
 
 
-def arch_course(x0, x1, z0, z1, short=(0.45, 0.9)):
-    """A course of stones from x0 to x1, joints staggered."""
+# Where it's fallen in from its top: a V, deepest in its middle (its
+# middle along it, how wide, and how deep), the stones lying at its foot.
+ARCH_BREACHES = [(-7.4, 1.8, 0.85), (4.7, 1.3, 0.6)]
+
+
+def arch_breach(x):
+    """How far down from its top it's fallen in, here."""
+    return max([deep * (1 - abs(x - mid) / (wide / 2)) for mid, wide, deep in ARCH_BREACHES
+                if abs(x - mid) < wide / 2], default=0.0)
+
+
+def arch_course(x0, x1, z0, z1, short=(0.45, 0.9), top=None):
+    """A course of stones from x0 to x1, joints staggered. (Along the wall's
+    top, one gone now and then; and none where it's fallen in.)"""
     x = x0 - arch_rng.uniform(0, short[0])
     while x < x1 - 0.05:
         long = arch_rng.uniform(*short)
         a, b = max(x, x0), min(x + long, x1)
-        if b - a > 0.12:
-            arch_stone(a, b, z0, z1)
         x += long
+        if b - a <= 0.12:
+            continue
+        if top is not None:
+            if z1 > top - max(arch_breach(a), arch_breach(b), arch_breach((a + b) / 2)) + 0.05:
+                continue
+            if z1 > top - 0.05 and arch_rng.random() < 0.12:
+                continue
+        arch_stone(a, b, z0, z1)
 
 
 def extrados(x):
@@ -1907,7 +1927,7 @@ for lo, hi, pier in ((ARCH_ENDS[0], pier_out, False), (pier_out, pier_in, True),
             # (Big quoins, the full width of the pier, every other course.)
             arch_course(lo, hi, z, z + tall, (0.45, 0.6) if arch_rng.random() < 0.5 else (ARCH_PIER, ARCH_PIER))
         else:
-            arch_course(lo, hi, z, z + tall)
+            arch_course(lo, hi, z, z + tall, top=top)
         z += tall
     if pier:
         arch_tops.append((lo, hi, top))
@@ -1919,15 +1939,28 @@ for lo, hi, pier in ((ARCH_ENDS[0], pier_out, False), (pier_out, pier_in, True),
             wide = arch_rng.uniform(0.5, 1.1)
             a, b = x, min(x + wide, hi)
             stack = arch_rng.choice((0, 0, 1, 1, 2))
+            fallen = max(arch_breach(a), arch_breach(b), arch_breach((a + b) / 2))
+            if fallen > 0:
+                stack = 0  # (nothing standing over where it's fallen in)
             for k in range(stack):
                 arch_stone(a + 0.05 * k, b - 0.05 * k, top + k * 0.36, top + (k + 1) * 0.36 - 0.02)
-            arch_tops.append((a + 0.05 * max(0, stack - 1), b - 0.05 * max(0, stack - 1), top + stack * 0.36 - 0.02))
+            arch_tops.append((a + 0.05 * max(0, stack - 1), b - 0.05 * max(0, stack - 1),
+                              top + stack * 0.36 - 0.02 - fallen))
             x += wide
-    # Its core, deep in: dark between the stones.
+    # Its core, deep in: dark between the stones (and down where it's fallen in).
+    steps_ = max(1, int((hi - lo) / 0.2))
     for side in (-1, 1):
         y = ARCH_Y + side * (ARCH_THICK - 0.05)
-        facing(arch, [(lo, y, arch_foot(lo)), (hi, y, arch_foot(hi)), (hi, y, top), (lo, y, top)], [ARCH_GAP] * 4,
-               (0, side, 0))
+        for k in range(steps_):
+            a, b = lo + (hi - lo) * k / steps_, lo + (hi - lo) * (k + 1) / steps_
+            # (Up to its stones' tops, just there: stepping down, a course at a
+            # time, where it's fallen in, as its stones do.)
+            m = (a + b) / 2
+            t = top if pier or not arch_breach(m) else max(
+                (z1 for x0, x1, z1 in arch_laid if x0 <= m <= x1 and z1 <= top + 0.01), default=top) - 0.03
+            ta = tb = t
+            facing(arch, [(a, y, arch_foot(a)), (b, y, arch_foot(b)), (b, y, tb), (a, y, ta)], [ARCH_GAP] * 4,
+                   (0, side, 0))
     solid_box((lo + hi) / 2, ARCH_Y, (hi - lo) / 2, ARCH_THICK + 0.05)
 # The arch: its stones laid round it, wedges between its springings, a
 # keystone at its crown, a little proud.
@@ -1999,6 +2032,48 @@ for side in (-1, 1):
                        for a, r in ((0, 1.0), (math.pi / 2, 0.6), (math.pi, 0.5), (3 * math.pi / 2, 0.6))]
             leaf = c.mix(*IVY, arch_rng.random())
             facing(arch, corners, [leaf, c.mix(leaf, IVY[0], 0.4), c.mix(leaf, IVY[0], 0.6), leaf], (0, side, 0))
+# Its fallen stones, at its foot either side: most under where it's fallen
+# in, a few elsewhere; tumbled every which way, half sunk in the ground, and
+# mossy. Not on the path, nor in a tree; the big ones solid.
+ARCH_TREES = [(7.8, -79.6), (-8.1, -78.5), (-5.6, -75.8), (-15.3, -81.1), (13.7, -78.5), (9.6, -76.6), (-11.2, -84.7)]
+
+
+def tumbled(cx, cy, size):
+    long, wide, tall = size, size * arch_rng.uniform(0.55, 0.8), size * arch_rng.uniform(0.45, 0.65)
+    turn = Matrix.Rotation(arch_rng.uniform(0, math.pi), 4, "Z") @ Matrix.Rotation(arch_rng.uniform(-0.45, 0.45), 4, "X") \
+        @ Matrix.Rotation(arch_rng.uniform(-0.35, 0.35), 4, "Y")
+    centre = Vector((cx, cy, drawn_height(cx, cy, exactly=True) + tall * 0.2))
+    corners = [tuple(centre + turn @ Vector((sx * long / 2, sy * wide / 2, sz * tall / 2)))
+               for sz in (-1, 1) for sy in (-1, 1) for sx in (-1, 1)]
+    colour = c.mix(arch_colour(cx, 3), MOSS, arch_rng.uniform(0.15, 0.45))
+    for f in ((0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)):
+        pts = [corners[i] for i in f]
+        out_ = sum((Vector(p) for p in pts), Vector()) / 4 - centre
+        shade = colour if f != (4, 5, 7, 6) else c.mix(colour, MOSS, 0.2)
+        facing(arch, pts, [shade] * 4, tuple(out_))
+    if size > 0.35:
+        solid_circle(cx, cy, size * 0.45)
+
+
+fallen_at = []
+for mid, wide, deep in ARCH_BREACHES:
+    for _ in range(int(wide * deep * 9)):
+        side = arch_rng.choice((-1, 1))
+        fallen_at.append((mid + arch_rng.uniform(-1.2, 1.2) * wide, ARCH_Y + side * arch_rng.uniform(0.7, 2.6),
+                          arch_rng.uniform(0.3, 0.55)))
+for _ in range(6):
+    fallen_at.append((arch_rng.uniform(*ARCH_ENDS), ARCH_Y + arch_rng.choice((-1, 1)) * arch_rng.uniform(0.7, 2.0),
+                      arch_rng.uniform(0.25, 0.45)))
+placed = []  # (the fallen stones: where, and how big)
+for cx, cy, size in fallen_at:
+    if abs(cx - ARCH_X) < ARCH_HALF + 0.9 or not ARCH_ENDS[0] < cx < ARCH_ENDS[1]:
+        continue  # (off the path through it)
+    if any(math.hypot(cx - tx, cy - ty) < 1.2 for tx, ty in ARCH_TREES):
+        continue
+    if any(math.hypot(cx - px, cy - py) < (size + ps) * 0.6 for px, py, ps in placed):
+        continue
+    placed.append((cx, cy, size))
+    tumbled(cx, cy, size)
 arch.build("archway", smooth=False)
 
 
@@ -4584,6 +4659,11 @@ def growth(x, y):
         return 0
     to_path = min(path_lines.distance(x, y), trails.distance(x, y) * 1.4)
     to_wall = WALL_LINES.distance(x, y)
+    # (And the archway's wall, and the stones fallen from it, lying in the open.)
+    if ARCH_ENDS[0] - 0.5 <= x <= ARCH_ENDS[1] + 0.5:
+        to_wall = min(to_wall, abs(y - ARCH_Y))
+    if any(math.hypot(x - sx, y - sy) < size * 0.5 + 0.35 for sx, sy, size in placed):
+        return 0
     if to_wall < 0.75:
         return 0
     # (On a path, only grit; and the grass by it growing a little way over its
