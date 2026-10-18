@@ -171,6 +171,22 @@ describe("a round one-way obstacle (west only)", () => {
   );
 });
 
+// Merlin's trap: no object gets you past it, and there's nothing beyond it
+// to have come from, so it catches you all round (as main.ts makes any way
+// that only kills you), whichever way you come at its treasure.
+describe("a way that only kills you (Merlin's trap, round its treasure)", () => {
+  const trap = (): Circle => ({ x: 0, z: 0, r: 1, names: ["mountain east"], ahead: 2, allRound: true });
+
+  it.each(Array.from({ length: 8 }, (_, k) => k * 45))("catches you coming at it from %s°", (degrees) => {
+    const { player, bumps } = standIn({ circle: trap() });
+    const a = (degrees * Math.PI) / 180;
+    player.place(Math.sin(a) * 15, Math.cos(a) * 15, 0);
+    walk(player, Math.atan2(Math.sin(a), Math.cos(a)), 8); // (facing its middle)
+    expect(bumps).toContain("mountain east");
+    expect(Math.hypot(player.position.x, player.position.z)).toBeGreaterThan(2);
+  });
+});
+
 describe("a way that kills you (the witches: west only)", () => {
   const witches = (): Box => ({
     x: 0,

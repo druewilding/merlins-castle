@@ -87,6 +87,7 @@ import { Smoke } from "./smoke";
 import { Snake } from "./snake";
 import OWN_SOUNDS from "./sounds.json";
 import { Swept } from "./swept";
+import { dressTreasure, Net, Trapped, type TrapSpot } from "./trap";
 import { Trees, type TreeSpots } from "./trees";
 import { Witches } from "./witches";
 
@@ -233,6 +234,8 @@ model.scene.traverse((node) => {
 });
 // The maze, in stone.
 dressMaze(model.scene, renderer);
+// Merlin's treasure, shining.
+dressTreasure(model.scene, renderer);
 // The charcoal burner's fire: its embers glowing (not lit: they shine, even
 // in the hut's gloom, flickering with its light: lightFor), and its smoke.
 const embers = model.scene.getObjectByName("embers");
@@ -508,9 +511,14 @@ solidify();
 const [west, east, south, north] = land.bounds;
 player.bounds = { west, east, north: -north, south: -south };
 
-// Red where a way through kills you.
+// Merlin's trap (trap.ts): the net, hidden, lying in wait in front of its treasure.
+const TRAP = "mountain east";
+const net = new Net(scene, land.trap as TrapSpot, ground);
+
+// Red where a way through kills you (but Merlin's trap: that's its treasure, and the net in front of it).
 const danger = new MeshBasicMaterial({ color: "#d9503f", transparent: true, opacity: 0.5, depthWrite: false });
-for (const { x, z } of DEATHS) {
+for (const { exit, x, z } of DEATHS) {
+  if (exit === TRAP) continue;
   const mark = new Mesh(new CylinderGeometry(3, 3, 6, 16, 1, true), danger);
   mark.position.set(x, (ground(x, z) ?? 0) + 3, z);
   scene.add(mark);
@@ -767,7 +775,8 @@ if (handoff && !at) arrive(handoff);
 
 // Dying: walking into a way that kills you, its scene plays out (climbing
 // the ladder propped under the balcony, fall.ts; wading into the deep river,
-// swept.ts; walking into the witches, caught.ts); then a curtain falls, with the original's words, and after it
+// swept.ts; walking into the witches, caught.ts; going for Merlin's
+// treasure, trap.ts); then a curtain falls, with the original's words, and after it
 // your score, as in the illustrated version.
 const BALCONY = "mossy-steps east";
 const RIVER = "deep-river south";
@@ -807,6 +816,7 @@ const scenes: Record<string, () => Scene3d | undefined> = {
     effects(world, items.state).includes("broom")
       ? undefined
       : new Caught(player.camera, drawn, witches, reducedMotion),
+  [TRAP]: () => new Trapped(player.camera, drawn, net, reducedMotion, () => ownSounds.play("net")),
 };
 
 /** Walking into a way that kills you: its scene (and true), or nothing to see (false). */
@@ -893,7 +903,21 @@ const was = player.position.clone(); // (and just where)
 const debugMode = new URLSearchParams(location.search).has("debug");
 if (debugMode) {
   Object.assign(window, {
-    world: { player, scene, ground, walkable, renderer, places: PLACES, items, snake, merlin, witches, restart, drawn },
+    world: {
+      player,
+      scene,
+      ground,
+      walkable,
+      renderer,
+      places: PLACES,
+      items,
+      snake,
+      merlin,
+      witches,
+      net,
+      restart,
+      drawn,
+    },
   });
   const { debug } = await import("./debug");
   debug(
@@ -1044,6 +1068,7 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   plank.away();
   bridged = undefined;
   witches.free();
+  net.reset();
   arrive(game);
   instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
   inUse();
@@ -1174,6 +1199,7 @@ function lightFor(depth: number, time: number, dt: number) {
   fog.far = (HAZE_FAR - (HAZE_FAR - 30) * under + 40 * caveLit) * (1 - murk) + 22 * murk;
   shafts?.update(dt, gloom, player.camera.position);
   smoke.update(dt, player.camera.position);
+  net.update(dt, reducedMotion);
   insideLook?.color.setScalar(0.25 + 0.75 * gloom);
 }
 

@@ -195,7 +195,8 @@ class Kit:
         new = [o for o in bpy.data.objects if o not in before]
         faces = []
         for obj in new:
-            if obj.type != "MESH":
+            # (Not one with nothing on it: a helper, like the chest's sphere round it.)
+            if obj.type != "MESH" or not obj.data.materials:
                 continue
             textures, names = [], []
             for material in obj.data.materials:
