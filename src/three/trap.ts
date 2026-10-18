@@ -31,10 +31,14 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 
 import type { Ground } from "./player";
 
-/** Where the net lies [x, z], its treasure [x, y, z], and where its rope's tied [x, y, z], up in the oak (land.json). */
+/**
+ * Where the net lies [x, z], its treasure [x, y, z] and the jewels in it [x, y, z, kind], and where its rope's
+ * tied [x, y, z], up in the oak (land.json).
+ */
 export interface TrapSpot {
   net: number[];
   gold: number[];
+  jewels: (number | string)[][];
   hook: number[];
 }
 
@@ -54,16 +58,18 @@ const COLOUR = "#a68d62"; // old rope
 
 // The gold's glints: how many, how big (metres), over how much of the heap
 // (metres round, and up), and how long each one's twinkle takes, now and
-// then (seconds, at most).
-const GLINTS = 7;
-const GLINT = 0.35;
+// then (seconds, at most). And the jewels', each in its own colour.
+const GLINTS = 14;
+const GLINT = 0.45;
 const HEAP = [0.9, 0.45];
-const TWINKLE = 3.5;
+const TWINKLE = 2.6;
+const JEWEL_GLINT = 0.3;
+const SPARKLE: Record<string, string> = { gold: "#fff3c4", ruby: "#ff8a9a", emerald: "#8affbe" };
 
 // The scene's beats, in seconds from walking into it.
 const SPRING = 0.35; // the net springs up…
 const LIFTED = 1.1; // …and you're up in it
-const ENDS = 7;
+const ENDS = 6;
 
 const HANG = 1.6; // metres, the bag's bottom above the ground, lifted
 const EYE = 0.15; // your eye below the bag's middle, curled up in it
@@ -86,7 +92,7 @@ export class Net {
   private readonly tilt = new Quaternion();
   private readonly turn = new Quaternion();
   private readonly up = new Vector3(0, 1, 0);
-  private readonly glints: { sprite: Sprite; phase: number; every: number }[] = [];
+  private readonly glints: { sprite: Sprite; size: number; phase: number; every: number }[] = [];
   private time = 0;
 
   constructor(scene: Scene, spot: TrapSpot, ground: Ground) {
@@ -131,23 +137,35 @@ export class Net {
     const rope = new CylinderGeometry(ROPE, ROPE, 1, 5, 1, true).translate(0, 0.5, 0);
     this.rope = new Mesh(rope, material);
     scene.add(this.group, this.rope);
-    // The glints, each in its own spot on the heap, twinkling in its own time.
-    const glint = new SpriteMaterial({
-      map: star(),
-      color: "#fff3c4",
-      blending: AdditiveBlending,
-      depthWrite: false,
-      transparent: true,
-    });
-    for (let n = 0; n < GLINTS; n++) {
-      const sprite = new Sprite(glint);
-      const a = (n / GLINTS) * Math.PI * 2 + 0.7 * Math.sin(n * 2.3);
-      const out = HEAP[0] * (0.25 + 0.75 * ((n * 0.618) % 1));
-      const [gx, gy, gz] = spot.gold;
-      sprite.position.set(gx + Math.sin(a) * out, gy + HEAP[1] * (1 - out / HEAP[0]) + 0.1, gz + Math.cos(a) * out);
+    // The glints, each in its own spot on the heap (or on a jewel, in its
+    // colour), twinkling in its own time.
+    const map = star();
+    const sparkle = Object.fromEntries(
+      Object.entries(SPARKLE).map(([kind, color]) => [
+        kind,
+        new SpriteMaterial({ map, color, blending: AdditiveBlending, depthWrite: false, transparent: true }),
+      ])
+    );
+    const twinkling = (at: Vector3, kind: string, size: number) => {
+      const n = this.glints.length;
+      const sprite = new Sprite(sparkle[kind]);
+      sprite.position.copy(at);
       sprite.scale.setScalar(0);
       scene.add(sprite);
-      this.glints.push({ sprite, phase: n * 1.37, every: TWINKLE * (0.6 + 0.4 * ((n * 0.41) % 1)) });
+      this.glints.push({ sprite, size, phase: n * 1.37, every: TWINKLE * (0.6 + 0.4 * ((n * 0.41) % 1)) });
+    };
+    const [gx, gy, gz] = spot.gold;
+    for (let n = 0; n < GLINTS; n++) {
+      const a = (n / GLINTS) * Math.PI * 2 + 0.7 * Math.sin(n * 2.3);
+      const out = HEAP[0] * (0.25 + 0.75 * ((n * 0.618) % 1));
+      twinkling(
+        new Vector3(gx + Math.sin(a) * out, gy + HEAP[1] * (1 - out / HEAP[0]) + 0.1, gz + Math.cos(a) * out),
+        "gold",
+        GLINT
+      );
+    }
+    for (const [x, y, z, kind] of spot.jewels) {
+      twinkling(new Vector3(Number(x), Number(y) + 0.05, Number(z)), String(kind), JEWEL_GLINT);
     }
     this.reset();
   }
@@ -155,10 +173,10 @@ export class Net {
   /** Each frame: the gold glinting (with motion reduced, just shining softly). */
   update(dt: number, reducedMotion: boolean) {
     this.time += dt;
-    for (const { sprite, phase, every } of this.glints) {
+    for (const { sprite, size, phase, every } of this.glints) {
       const t = ((this.time + phase) % every) / every; // (a twinkle, then a while with none)
       const k = reducedMotion ? 0.4 : Math.max(0, Math.sin(Math.min(1, t * 4) * Math.PI)) ** 2;
-      sprite.scale.setScalar(GLINT * k);
+      sprite.scale.setScalar(size * k);
       sprite.material.rotation = this.time * 0.5;
     }
   }

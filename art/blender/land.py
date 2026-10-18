@@ -2228,7 +2228,46 @@ for n in range(14):
     a, r = here.uniform(0, 2 * math.pi), here.uniform(0.75, 1.7)
     x, y = TX - 0.1 + math.cos(a) * r, TY + math.sin(a) * r
     PROPS.put(built, "Coin", (x, y, height(x, y)), here.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
-TRAP_NET = (TX - 2.3, TY)  # where the net lies, on the path, in front of the treasure
+# And jewels among it, rubies and emeralds, cut and gleaming: on the heap, in
+# the chest, and one or two fallen on the path. (Their own random numbers,
+# so the oak's as it was.)
+JEWELS = {"ruby": c.linear("#e8173f"), "emerald": c.linear("#1fd06e")}
+jewel_spots = []  # [x, y, z, "ruby" or "emerald"], in three.js's axes, for the glints on them
+gems = random.Random("Merlin's jewels")
+
+
+def on_heap(x, y):
+    """How high the gold is here: on the heap in front, or in the chest."""
+    d = math.hypot(x - (TX - 0.1), y - TY)
+    heap = TZ - 0.12 + 0.45 * math.sqrt(max(0.0, 1 - (d / 0.9) ** 2)) if d < 0.9 else None
+    d = math.hypot(x - CHEST_AT[0], y - CHEST_AT[1])
+    chest = height(*CHEST_AT) + 0.5 + 0.175 * math.sqrt(max(0.0, 1 - (d / 0.5) ** 2)) if d < 0.5 else None
+    return max((h for h in (heap, chest) if h is not None), default=height(x, y))
+
+
+for n in range(16):
+    kind = "ruby" if n % 2 else "emerald"
+    if n < 10:
+        a, r = gems.uniform(0, 2 * math.pi), 0.8 * math.sqrt(gems.random())
+        x, y = TX - 0.1 + math.cos(a) * r, TY + math.sin(a) * r
+    elif n < 14:
+        x, y = CHEST_AT[0] + gems.uniform(-0.15, 0.15), CHEST_AT[1] + gems.uniform(-0.3, 0.3)
+    else:
+        a, r = gems.uniform(-1, 1) + math.pi, gems.uniform(1.0, 1.5)
+        x, y = TX - 0.1 + math.cos(a) * r, TY + math.sin(a) * r
+    size = gems.uniform(0.08, 0.13)
+    z = on_heap(x, y) + size * 0.4
+    built.blob((x, y, z), size, JEWELS[kind], squash=0.75, lumpy=0.0, seed=n, subdivisions=0)
+    jewel_spots.append([round(x, 2), round(z, 2), round(-y, 2), kind])
+# More gold on the heap, coins lying all over it.
+for n in range(18):
+    a, r = gems.uniform(0, 2 * math.pi), 0.85 * math.sqrt(gems.random())
+    x, y = TX - 0.1 + math.cos(a) * r, TY + math.sin(a) * r
+    PROPS.put(built, "Coin", (x, y, on_heap(x, y) - 0.01), gems.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
+# Where the net lies, on the path in front of the treasure, as near as you
+# come to it (the trap's reach, round the treasure, below).
+TRAP_REACH = (1.0, 2.0)
+TRAP_NET = (TX - sum(TRAP_REACH), TY)
 # The oak, up the slope to the north (so its leaves are high over the path,
 # clear of you, swinging in the net under them), and where the net's rope's
 # tied, up in its leaves, over the path.
@@ -2236,7 +2275,7 @@ TRAP_OAK = (TRAP_NET[0] + 0.3, TRAP_NET[1] + 3.8)
 TRAP_HOOK = (TRAP_NET[0], TRAP_NET[1] + 0.3, height(*TRAP_NET) + 10.4)
 grow(*TRAP_OAK, 11, "CommonTree_2", here, sink=0.4)
 solid_circle(*TRAP_OAK, 0.6)
-obstacle(["mountain east"], "circle", TX, -TY, 1.0, reach=1.3)
+obstacle(["mountain east"], "circle", TX, -TY, TRAP_REACH[0], reach=TRAP_REACH[1])
 
 # The witches, on the way west to the crossroads.
 wx, wy = P["forest-witches"]
@@ -4296,8 +4335,10 @@ if out:
         "stone": {"r": STONE_R, **{k: [round(x, 2), round(-y, 2), round(z, 2)] for k, (x, y, z) in STONE_SPOTS.items()}},
         # The chest in the tower, where the emerald starts: its middle [x, z], and its tray.
         "chest": [round(CHEST["x"], 2), round(-CHEST["y"], 2), round(CHEST["floor"], 2)],
-        # Merlin's trap: where the net lies [x, z] (on the ground), its treasure [x, y, z], and where its rope's tied, up in the oak.
+        # Merlin's trap: where the net lies [x, z] (on the ground), its treasure [x, y, z] and the jewels in it
+        # ([x, y, z, kind]), and where its rope's tied, up in the oak.
         "trap": {"net": [round(TRAP_NET[0], 2), round(-TRAP_NET[1], 2)], "gold": [round(TX, 2), round(TZ, 2), round(-TY, 2)],
+                 "jewels": jewel_spots,
                  "hook": [round(TRAP_HOOK[0], 2), round(TRAP_HOOK[2], 2), round(-TRAP_HOOK[1], 2)]},
         # The leaves in the dragon's mouth: where the pile is [x, z] (on the way's floor), and the heaps they're swept into.
         "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
