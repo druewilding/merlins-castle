@@ -3131,7 +3131,7 @@ def earth_wall(e0, e1, bottom0, bottom1):
         b0, b1 = bottom0 + (bottom1 - bottom0) * f0, bottom0 + (bottom1 - bottom0) * f1
         t0, t1 = drawn_height(*p0) - 0.05, drawn_height(*p1) - 0.05
         if t0 > b0 or t1 > b1:
-            quad(tunnel, [(*p0, b0), (*p1, b1), (*p1, max(t1, b1)), (*p0, max(t0, b0))], EARTH)
+            quad(built_ways, [(*p0, b0), (*p1, b1), (*p1, max(t1, b1)), (*p0, max(t0, b0))], EARTH)
 
 
 def clip(polygon, px, py, tx, ty):
@@ -3169,7 +3169,7 @@ def lid_over(row, back, wide):
                     continue
                 verts = [(px, py, drawn_height(px, py, exactly=True)) for px, py in pts]
                 colour = ground_colour(*pts[0], height(*pts[0]))
-                tunnel.add(verts, [tuple(range(len(verts)))], [c.vary(colour, 0.12, Vector(v)) for v in verts])
+                built_ways.add(verts, [tuple(range(len(verts)))], [c.vary(colour, 0.12, Vector(v)) for v in verts])
 
 
 def spike(builder, x, y, z, tall, radius, colour, sides=6):
@@ -3207,7 +3207,8 @@ def in_pit(x, y):
 # hall's own floor and walls take over, with a door frame where they meet.
 # (Two lots: dug through rock, which the game draws grainy; and built,
 # indoors, or into the halls of worked stone, and what's made in the ways dug
-# (their timber props, stonework and posts), which it doesn't.)
+# (their timber props, stonework and posts), and the earth and ground over
+# their mouths, outside, which it doesn't.)
 dug, built_ways = c.Builder(), c.Builder()
 tunnel = dug
 SMOOTH_HALLS = ("treasure-room", "beautiful-chamber")
@@ -3517,8 +3518,8 @@ for way in WAYS.values():
             wide = half + 2.4
             for r0, r1 in zip(span, span[1:]):
                 l0, q0, l1_, q1 = side(r0, -wide), side(r0, wide), side(r1, -wide), side(r1, wide)
-                quad(tunnel, [(*l0, r0[2] + TUNNEL_TALL + 0.02), (*q0, r0[2] + TUNNEL_TALL + 0.02),
-                              (*q1, r1[2] + TUNNEL_TALL + 0.02), (*l1_, r1[2] + TUNNEL_TALL + 0.02)], EARTH)
+                quad(built_ways, [(*l0, r0[2] + TUNNEL_TALL + 0.02), (*q0, r0[2] + TUNNEL_TALL + 0.02),
+                                  (*q1, r1[2] + TUNNEL_TALL + 0.02), (*l1_, r1[2] + TUNNEL_TALL + 0.02)], EARTH)
                 for e0, e1 in ((l0, l1_), (q0, q1)):
                     earth_wall(e0, e1, r0[2] + TUNNEL_TALL, r1[2] + TUNNEL_TALL)
             back = span[-1]
