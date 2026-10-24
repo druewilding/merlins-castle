@@ -41,6 +41,7 @@ FEET = 1.35  # ...and his feet (his hands are made bigger in the game, by their 
 BULK = (0.024, 0.018)  # metres his limbs and his body are bulked out
 BELLY = (0.15, 1.04, 0.19)  # metres his belly sticks out, at its middle (its height), and how tall it is
 FATTER = 0.07  # metres more, for the trolls with bigger bellies (the shape key "belly")
+FAT = (0.03, 0.03, 0.04)  # and for the fatter trolls (the shape key "fat"): metres more on his limbs, his body and his belly
 NOSE = (1.5, 0.036, 0.006)  # how much bigger his nose is grown, the radius of the round bulb it's made, and how far it's lifted (off his smile)
 LONG_NOSE = (1.35, 2.3, 0.022)  # or (the shape key "long-nose"): as much bigger across, along, and drooping
 EARS = (1.8, 2.5)  # how much bigger his ears are grown (or, the shape key "big-ears", these)
@@ -216,14 +217,16 @@ LIMBS = ("upperarm", "lowerarm", "thigh", "calf")
 TRUNK = ("spine", "pelvis", "clavicle", "neck")
 
 
-def trolled(i, belly=BELLY[0], **face_):
+def trolled(i, belly=BELLY[0], fat=0.0, **face_):
     """Where a point of him goes: his face, his bulk, his belly, a hunch, his head and feet."""
     p, n, w = rest[i], normals[i], weights[i]
     if i in face:
         p = faced(p, **face_)
     limb = sum(a for b, a in w.items() if b.startswith(LIMBS))
     trunk = sum(a for b, a in w.items() if b.startswith(TRUNK))
-    p = p + n * (BULK[0] * limb + BULK[1] * trunk)
+    # (Fatter, but not on the fronts of his thighs, where his hands rest, sitting.)
+    lap = (w.get("thigh_l", 0) + w.get("thigh_r", 0)) * c.smooth(-n.y / 0.5)
+    p = p + n * (BULK[0] * limb + FAT[0] * fat * (limb - 0.9 * lap) + (BULK[1] + FAT[1] * fat) * trunk)
     # His belly: round, out in front, low on him.
     tummy = sum(w.get(b, 0) for b in ("spine_01", "spine_02", "pelvis"))
     if tummy and p.y < 0.02:
@@ -239,10 +242,11 @@ def trolled(i, belly=BELLY[0], **face_):
 
 everyone = range(len(rest))
 points = welded(trolled(i) for i in everyone)
-# Each a little different (the game mixes these in): a bigger belly, a long
+# Each a little different (the game mixes these in): a bigger belly, fatter all over, a long
 # droopy nose, bigger ears. And his eyes shut, for the game to blink them.
 KEYS = {
     "belly": welded(trolled(i, belly=BELLY[0] + FATTER) for i in everyone),
+    "fat": welded(trolled(i, belly=BELLY[0] + FAT[2], fat=1.0) for i in everyone),
     "long-nose": welded(trolled(i, long_nose=True) if i in face else points[i] for i in everyone),
     "big-ears": welded(trolled(i, big_ears=True) if i in face else points[i] for i in everyone),
     "blink": welded(trolled(i, blink=True) if i in face else points[i] for i in everyone),
@@ -395,7 +399,7 @@ def grow_moss(name, where, blades, length, width, keys=()):
     return obj
 
 
-grow_moss("troll-moss", on_body, 0.25, (0.04, 0.085), (0.007, 0.012), keys=["belly"])
+grow_moss("troll-moss", on_body, 0.25, (0.04, 0.085), (0.007, 0.012), keys=["belly", "fat"])
 grow_moss("troll-hair-0", wild, 0.55, (0.04, 0.085), (0.007, 0.012))
 grow_moss("troll-hair-1", shaggy, 0.55, (0.045, 0.075), (0.008, 0.013))
 grow_moss("troll-hair-2", tufty, 0.9, (0.07, 0.11), (0.007, 0.011))
@@ -519,8 +523,8 @@ if preview:
     # Each of the game's four (LOOKS, in src/three/trolls.ts: their hair,
     # beard and shape keys), standing, and close up on his face; one from
     # the side; sitting (on a block for a rock), asking for a tune; and dancing.
-    LOOKS = [(0, False, {"belly": 0.2}), (1, True, {"belly": 1.0, "big-ears": 0.6}),
-             (2, False, {"long-nose": 1.0}), (1, False, {"belly": 0.6, "big-ears": 1.0, "long-nose": 0.4})]
+    LOOKS = [(0, False, {"belly": 0.2}), (1, True, {"belly": 1.0, "fat": 1.0, "big-ears": 0.6}),
+             (2, False, {"long-nose": 1.0}), (1, False, {"belly": 0.6, "fat": 1.0, "big-ears": 1.0, "long-nose": 0.4})]
     seat = c.Builder()
     seat.add([(x, y, z) for z in (0, 0.48) for y in (0.05, 0.6) for x in (-0.35, 0.35)],
              [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)],

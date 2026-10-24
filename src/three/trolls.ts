@@ -55,17 +55,21 @@ const GLANCE = [1.5, 4]; // seconds between their glances, now to one side, now 
 const BLINK = [3, 7]; // seconds between their blinks (and now and then, straight after, another)
 const SHUT = 0.15; // seconds a blink takes, shutting and opening
 const HANDS = 1.4; // times bigger their hands are (by their bones: so their fingers bend where their joints are)
+// Radians their forearms are lifted at the elbow, sitting, and more for the
+// fatter ones: their hands are bigger, and their thighs and bellies, than the
+// clips' (made for the kit's hero), so they'd rest in their laps, not on them.
+const LAP = [0.14, 0.08];
 // Each its own look (art/blender/trolls.py makes the pieces, and previews
 // these): its hair (troll-hair-0..2), a beard or not, its shape (its body's
 // shape keys, 0 to 1), how big its head is, and its skin's and its moss's tints.
 const LOOKS = [
   { hair: 0, beard: false, keys: { belly: 0.2 }, head: 1.0, skin: "#ffffff", moss: "#ffffff" },
-  { hair: 1, beard: true, keys: { belly: 1, "big-ears": 0.6 }, head: 1.08, skin: "#c9cbc4", moss: "#d8cf8a" },
+  { hair: 1, beard: true, keys: { belly: 1, fat: 1, "big-ears": 0.6 }, head: 1.08, skin: "#c9cbc4", moss: "#d8cf8a" },
   { hair: 2, beard: false, keys: { "long-nose": 1 }, head: 0.94, skin: "#c8e29a", moss: "#8fa86e" },
   {
     hair: 1,
     beard: false,
-    keys: { belly: 0.6, "big-ears": 1, "long-nose": 0.4 },
+    keys: { belly: 0.6, fat: 1, "big-ears": 1, "long-nose": 0.4 },
     head: 1.04,
     skin: "#ffc4a4",
     moss: "#e8b866",
@@ -81,6 +85,12 @@ interface Troll {
   model: Object3D;
   head: Object3D | undefined;
   hands: Object3D[];
+  /** Its forearms and hands, each side; how far its forearms are lifted sitting, and how far they are now. */
+  arms: [Object3D, Object3D][];
+  /** Its forearms and hands as its clip has them (before they're lifted). */
+  armsPosed: Quaternion[];
+  lapLift: number;
+  lap: number;
   /** How big its head is (on top of what its clip has it). */
   headSize: number;
   /** Its head, as its clip has it (before it's turned to you). */
@@ -177,6 +187,13 @@ export class Trolls {
         model,
         head: model.getObjectByName("Head"),
         hands: ["hand_l", "hand_r"].flatMap((name) => model.getObjectByName(name) ?? []),
+        arms: ["l", "r"].flatMap((side) => {
+          const [fore, hand] = [`lowerarm_${side}`, `hand_${side}`].map((name) => model.getObjectByName(name));
+          return fore && hand ? [[fore, hand] as [Object3D, Object3D]] : [];
+        }),
+        armsPosed: [0, 1, 2, 3].map(() => new Quaternion()),
+        lapLift: LAP[0] + ("fat" in look.keys ? LAP[1] : 0),
+        lap: LAP[0] + ("fat" in look.keys ? LAP[1] : 0),
         headSize: look.head,
         posed: new Quaternion(),
         mixer,
@@ -244,6 +261,32 @@ export class Trolls {
   private shape(troll: Troll) {
     for (const hand of troll.hands) hand.scale.setScalar(HANDS);
     troll.head?.scale.setScalar(troll.headSize);
+    // (Its forearms and hands as its clip has them, kept to put back before
+    // the next frame of it: the mixer only sets a bone when its clip moves it,
+    // and they'd be lifted again on top of the last lift.)
+    troll.arms.flat().forEach((bone, k) => troll.armsPosed[k].copy(bone.quaternion));
+    if (troll.lap < 0.001) return;
+    // Its forearms lifted at the elbow (turned up, towards straight up), and
+    // its hands turned back as much, so they still lie flat on its lap.
+    for (const [fore, hand] of troll.arms) {
+      const elbow = fore.getWorldPosition(new Vector3());
+      const along = hand.getWorldPosition(new Vector3()).sub(elbow).normalize();
+      const across = along.cross(Y).normalize();
+      for (const [bone, angle] of [
+        [fore, troll.lap],
+        [hand, -troll.lap],
+      ] as const) {
+        const wanted = new Quaternion()
+          .setFromAxisAngle(across, angle)
+          .multiply(bone.getWorldQuaternion(new Quaternion()));
+        bone.quaternion.copy(bone.parent!.getWorldQuaternion(new Quaternion()).invert().multiply(wanted));
+      }
+    }
+  }
+
+  /** Its forearms and hands put back as its clip had them (before the next frame of it). */
+  private unshape(troll: Troll) {
+    troll.arms.flat().forEach((bone, k) => bone.quaternion.copy(troll.armsPosed[k]));
   }
 
   /** The harp played: up they get, one after another, and dance (or, loading, they're dancing). */
@@ -253,7 +296,9 @@ export class Trolls {
     this.trolls.forEach((troll, k) => {
       if (instantly || this.reducedMotion) {
         this.play(troll, "Dance_Loop", true);
+        this.unshape(troll);
         troll.mixer.update(k * 0.6);
+        troll.lap = 0;
         this.shape(troll);
         troll.rising = troll.standing = 0;
         this.stepTo(troll, 1);
@@ -272,7 +317,9 @@ export class Trolls {
       troll.rising = troll.standing = 0;
       this.stepTo(troll, 0);
       this.play(troll, "Sitting_Idle_Loop", true);
+      this.unshape(troll);
       troll.mixer.update(k * 1.7);
+      troll.lap = troll.lapLift;
       this.shape(troll);
     });
   }
@@ -299,9 +346,14 @@ export class Trolls {
       // Sitting, one of them asks you for a tune when you're near: its hands out.
       else this.play(troll, here && far < ASK && k === this.asker ? "Sitting_Talking_Loop" : "Sitting_Idle_Loop");
       if (this.reducedMotion) continue;
+      // (Its forearms lifted while it sits, and let down again, getting up.)
+      const sitting =
+        troll.playing?.getClip().name !== "Sitting_Exit" && troll.playing?.getClip().name !== "Dance_Loop";
+      troll.lap += ((sitting ? troll.lapLift : 0) - troll.lap) * Math.min(1, dt * 4);
       // (The mixer only sets a bone when its clip moves it: held still, the
       // head would keep the turn it was given last frame, and turn again.)
       troll.head?.quaternion.copy(troll.posed);
+      this.unshape(troll);
       troll.mixer.update(dt);
       this.shape(troll);
       troll.posed.copy(troll.head?.quaternion ?? troll.posed);
