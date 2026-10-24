@@ -314,3 +314,48 @@ const rise = (t, from, to) => Math.min(1, Math.max(0, (t - from) / (to - from)))
   }
   save("dizzy", track, 0.35);
 }
+
+// The harp played for the trolls: a merry jig in six-eight, each eighth a
+// note (or "-", held), a bass note plucked under each beat, and a sweep up
+// to finish.
+{
+  const EIGHTH = 0.15;
+  const tune = [
+    "E5 G5 A5 G5 E5 D5",
+    "C5 D5 E5 D5 C5 A4",
+    "C5 E5 G5 A5 G5 E5",
+    "G5 - - D5 - -",
+    "E5 G5 A5 C6 A5 G5",
+    "A5 G5 E5 D5 E5 G5",
+    "E5 D5 C5 D5 E5 D5",
+    "C5 - - C5 - -",
+  ].map((bar) => bar.split(" "));
+  const bass = ["C3 G3", "A2 E3", "C3 G3", "G2 D3", "C3 G3", "A2 E3", "G2 D3", "C3 C3"].map((bar) => bar.split(" "));
+  const track = new Track(tune.length * 6 * EIGHTH + 2.2);
+  tune.forEach((bar, b) => {
+    bar.forEach((n, k) => {
+      if (n === "-") return;
+      let held = 1;
+      while (bar[k + held] === "-") held++;
+      const at = (b * 6 + k) * EIGHTH;
+      track.add(at, harp(note(n), 0.5 + held * EIGHTH, k % 3 === 0 ? 0.85 : 0.65), 0.15);
+    });
+    bass[b].forEach((n, k) => track.add((b * 6 + k * 3) * EIGHTH, harp(note(n), 0.9, 0.7), -0.25));
+  });
+  const end = tune.length * 6 * EIGHTH;
+  ["C5", "E5", "G5", "A5", "C6", "E6", "G6", "C7"].forEach((n, i) =>
+    track.add(end + i * 0.035, harp(note(n), 1.6, 0.6), -0.4 + i * 0.11)
+  );
+  save("jig", track, 0.28);
+}
+
+// The trolls' spell: a swirl of twinkles going round you, up and back down
+// again, a little eerie (but kindly), with a shimmer of sparkles.
+{
+  const track = new Track(2.2);
+  ["C6", "E6", "G6", "A6", "C7", "A6", "G6", "E6", "D6", "C6"].forEach((n, i) =>
+    track.add(i * 0.09, bell(note(n), 0.8, 0.6), 0.8 * Math.sin(i * 0.9))
+  );
+  sparkle(track, 0.2, 1, 8, 0.25);
+  save("spell", track, 0.4);
+}

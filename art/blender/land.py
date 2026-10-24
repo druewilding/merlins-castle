@@ -504,6 +504,30 @@ def dragon_shape():
     return [(*move((x, y, 0))[:2], r) for x, y, r in DRAGON_SHAPE]
 
 
+# The trolls (trolls.py), sitting on boulders round the north of their cave,
+# two either side of the way north, facing in across it, as in its picture;
+# one with its drum on the floor beside it. Each: how far round from north it
+# sits (radians, anticlockwise), and how big it is (times the model's size).
+TROLLS = [(0.82, 1.5), (0.48, 1.62), (-0.48, 1.38), (-0.82, 1.55)]
+TROLL_OUT = 6.3  # metres from the cave's middle
+TROLL_SEAT = (0.48, 0.33)  # its seat: how high, and how far behind it (at the model's size: sitting, as its clip does)
+TROLL_BODY = 0.75  # its radius, at the model's size: for bumping into, and keeping the rocks clear
+TROLL_DRUM = 2  # which of them has the drum
+
+
+def troll_spots():
+    """Each troll: where it sits [x, y], which way it faces [x, y] (to the
+    cave's middle, a little south of it), and how big it is."""
+    hall = HALLS["trolls"]
+    spots = []
+    for round_, size in TROLLS:
+        a = math.pi / 2 + round_
+        x, y = hall.x + math.cos(a) * TROLL_OUT, hall.y + math.sin(a) * TROLL_OUT
+        facing = Vector((hall.x - x, hall.y - 1.5 - y)).normalized()
+        spots.append(((x, y), (facing.x, facing.y), size))
+    return spots
+
+
 T, O, G, DM = P["trolls"], P["oak-door"], P["giant"], P["damp-tunnels"]
 TR, MZ, DK, BC = P["treasure-room"], P["maze"], P["dark-tunnels"], P["beautiful-chamber"]
 GH, WK, DU = P["grand-hall"], P["wizards-kitchen"], P["dungeon"]
@@ -3816,15 +3840,33 @@ for hall in HALLS.values():
                 continue
             if spot:
                 x, y, _ = spot
-                r = random.uniform(0.35, 0.7)
-                spike(caves, x, y, f - 0.1, random.uniform(1.0, 2.8), r, rock)
+                r, tall = random.uniform(0.35, 0.7), random.uniform(1.0, 2.8)
+                # (Clear of the trolls: drawn all the same, so the caves after this one come out as they did.)
+                if hall.place == "trolls" and any(math.hypot(x - tx, y - ty) < TROLL_BODY * size + 1.5
+                                                  for (tx, ty), _, size in troll_spots()):
+                    continue
+                spike(caves, x, y, f - 0.1, tall, r, rock)
                 under_circle(x, y, r * 0.8)
         for _ in range(int(R * 2)):
             a, rho = random.uniform(0, 2 * math.pi), random.uniform(1.5, R - 0.5)
             x, y = hx + math.cos(a) * rho, hy + math.sin(a) * rho
             if hall.place == "dragon-cave" and math.hypot(x - DRAGON_AT[0], y - DRAGON_AT[1]) < DRAGON_CLEAR:
                 continue
-            spike(caves, x, y, ceiling(x, y) + 0.3, -random.uniform(0.6, min(2.0, hall.tall - 3.4)), random.uniform(0.2, 0.45), rock)
+            long, r = random.uniform(0.6, min(2.0, hall.tall - 3.4)), random.uniform(0.2, 0.45)
+            # (None over the trolls, who stand up to dance: drawn all the same, as the stalagmites are.)
+            if hall.place == "trolls" and any(math.hypot(x - tx, y - ty) < TROLL_BODY * size + 1.2
+                                              for (tx, ty), _, size in troll_spots()):
+                continue
+            spike(caves, x, y, ceiling(x, y) + 0.3, -long, r, rock)
+    if hall.place == "trolls":
+        # The trolls' seats: a boulder behind each, its top as high as they
+        # sit; and the drum's on the floor (the game puts it there).
+        for (x, y), (fx, fy), size in troll_spots():
+            r = 0.42 * size
+            sx, sy = x - fx * TROLL_SEAT[1] * size, y - fy * TROLL_SEAT[1] * size
+            caves.blob((sx, sy, f + TROLL_SEAT[0] * size - r * 0.85), r, c.mix(hall.wall, ROCK, 0.5), squash=0.85,
+                       lumpy=0.1, seed=round(x))
+            under_circle(x, y, TROLL_BODY * size)
     if hall.light == TORCH:
         # Torches on the walls.
         for _ in range(4 if R < 10 else 6):
@@ -4983,6 +5025,12 @@ if out:
         "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
         # The dragon: where it stands [x, z] and its floor, which way it faces [x, z], and where it breathes its
         # fire, across the mouth of the tunnel south [x, y, z].
+        # The trolls: where each sits [x, z] and its floor, which way it faces [x, z], and how big it is; and
+        # where the drum is [x, z] (beside the one with it).
+        "trolls": {"sitting": [{"at": [round(x, 2), round(-y, 2), HALLS["trolls"].floor],
+                                "facing": [round(fx, 3), round(-fy, 3)], "size": size}
+                               for (x, y), (fx, fy), size in troll_spots()],
+                   "drum": TROLL_DRUM},
         "dragon": {"at": [round(DRAGON_AT[0], 2), round(-DRAGON_AT[1], 2), HALLS["dragon-cave"].floor],
                    "facing": [round(math.sin(DRAGON_YAW), 3), round(math.cos(DRAGON_YAW), 3)],
                    "fire": [DC[0], HALLS["dragon-cave"].floor, round(-(DC[1] - HALLS["dragon-cave"].r + 1), 2)]},
