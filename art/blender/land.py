@@ -3201,6 +3201,17 @@ TIMBER = c.linear("#4a3420")
 LAYERS = (c.linear("#6e6d6a"), c.linear("#5a5957"), c.linear("#7c7a76"), c.linear("#4c4b4a"), c.linear("#6a6560"))
 
 
+def swept_by_a_door(x, y):
+    """Whether a spot is where one of the locked doors (below) swings, opening:
+    south from its line, as far as it's wide, across the way."""
+    for place in ("oak-door", "giant"):
+        hall = HALLS[place]
+        line = hall.y - hall.r - 1.2
+        if abs(x - hall.x) < TUNNEL_HALF + 0.5 and line - 2 * TUNNEL_HALF - 0.4 < y < line + 0.4:
+            return True
+    return False
+
+
 RING_OUT = 0.6  # metres past the way's square, round it: past the most its rock is pushed out
 
 
@@ -3417,8 +3428,9 @@ for way in WAYS.values():
                 sign = rubble.choice((1, -1))
                 rx3, ry3 = side(a, sign * (half - 0.08))
                 r = rubble.uniform(0.12, 0.28)
-                tunnel.blob((rx3, ry3, a[2] + r * 0.2), r, c.mix(LAYERS[2], LAYERS[3], rubble.random()),
-                            squash=0.6, lumpy=0.35, seed=rubble.random() * 100, subdivisions=1)
+                shade, seed = c.mix(LAYERS[2], LAYERS[3], rubble.random()), rubble.random() * 100
+                if not swept_by_a_door(rx3, ry3):
+                    tunnel.blob((rx3, ry3, a[2] + r * 0.2), r, shade, squash=0.6, lumpy=0.35, seed=seed, subdivisions=1)
             continue
         if way.open:
             continue
