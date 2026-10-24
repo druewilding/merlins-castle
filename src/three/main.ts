@@ -96,6 +96,7 @@ import OWN_SOUNDS from "./sounds.json";
 import { Swept } from "./swept";
 import { dressTreasure, Net, Trapped, type TrapSpot } from "./trap";
 import { Trees, type TreeSpots } from "./trees";
+import { Stars, Tripped } from "./tripped";
 import { Witches } from "./witches";
 
 const english = worldJson as unknown as World;
@@ -927,11 +928,14 @@ if (handoff && !at) arrive(handoff);
 // Dying: walking into a way that kills you, its scene plays out (climbing
 // the ladder propped under the balcony, fall.ts; wading into the deep river,
 // swept.ts; walking into the witches, caught.ts; going for Merlin's
-// treasure, trap.ts); then a curtain falls, with the original's words, and after it
+// treasure, trap.ts; going on into the dark tunnels, tripped.ts); then a curtain falls, with the original's words, and after it
 // your score, as in the illustrated version.
 const BALCONY = "mossy-steps east";
 const RIVER = "deep-river south";
 const WITCHES = "forest-witches west";
+const DARK_WAY = "dark-tunnels south";
+// (Seen stars, fallen over in the dark.)
+const stars = new Stars(scene);
 // (Each scene plays on behind the curtain, which starts to come down a
 // little before its end, so the end is seen through it, not cut off.)
 interface Scene3d {
@@ -968,6 +972,18 @@ const scenes: Record<string, () => Scene3d | undefined> = {
       ? undefined
       : new Caught(player.camera, drawn, witches, reducedMotion),
   [TRAP]: () => new Trapped(player.camera, drawn, net, reducedMotion, () => ownSounds.play("net")),
+  // (Not with the lamp lit.)
+  [DARK_WAY]: () =>
+    effects(world, items.state).includes("lamp")
+      ? undefined
+      : new Tripped(
+          player.camera,
+          shapeOf.get(DARK_WAY)!.box!,
+          (x, z) => player.floorAt(x, z),
+          stars,
+          reducedMotion,
+          (sound) => (sound === "step" ? ownSounds.play("walk", { volume: 0.7 }) : ownSounds.play(sound))
+        ),
   // (Not with the rope across it.)
   ...Object.fromEntries(
     ["maze north", "treasure-room south"].map((exit) => [
@@ -1234,6 +1250,7 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   hanging = undefined;
   witches.free();
   net.reset();
+  stars.hide();
   arrive(game);
   instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
   inUse();
@@ -1348,6 +1365,8 @@ function lightFor(depth: number, time: number, dt: number) {
     lamp.position.copy(player.camera.position);
     lamp.intensity = 3.5 * own * playing.scene.glow;
   }
+  // (Fallen over in the dark, your glow's with you, on the floor.)
+  if (playing?.scene instanceof Tripped) lamp.position.copy(player.camera.position).y += 0.4;
   emberLook.color.setScalar(0.75 + 0.25 * flicker * flicker * (reducedMotion ? 1 : 0.9 + 0.1 * Math.sin(time / 23)));
 
   // The halls' lights nearest you.
