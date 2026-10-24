@@ -343,15 +343,22 @@ export class Player {
    * Whether nothing solid stands between two spots (a wall, a rock: not an
    * obstacle's reach round it), on the land or underground: for reaching
    * from one to the other. (Not quite all the way: what you reach for may
-   * lie against something solid, or on it.)
+   * lie against something solid, or on it.) Reaching from as high as
+   * `high`, nothing under it is in the way, nor any slab over it: into the
+   * tower's chest, say, over its side and under the stairs.
    */
-  between(ax: number, az: number, bx: number, bz: number, under = false) {
+  between(ax: number, az: number, bx: number, bz: number, under = false, high = Infinity) {
     const long = Math.hypot(bx - ax, bz - az);
+    const clear = (thing: Circle | Box) =>
+      (thing.top ?? Infinity) < high || ("bottom" in thing && (thing.bottom ?? -Infinity) >= high);
     for (let s = 0; s < long - 0.4; s += 0.1) {
       const x = ax + ((bx - ax) * s) / long;
       const z = az + ((bz - az) * s) / long;
       const near = (under ? this.nearUnder : this.near).get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`);
-      if (near && [...near.circles, ...near.boxes].some((thing) => touching({ ...thing, ahead: 0 }, x, z, 0))) {
+      if (
+        near &&
+        [...near.circles, ...near.boxes].some((thing) => !clear(thing) && touching({ ...thing, ahead: 0 }, x, z, 0))
+      ) {
         return false;
       }
     }

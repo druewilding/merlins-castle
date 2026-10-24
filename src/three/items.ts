@@ -745,7 +745,7 @@ export function items(options: {
         Math.abs(seen.x) < 0.9 &&
         Math.abs(seen.y) < 0.9 &&
         seen.z < 1 &&
-        player.between(eye.x, eye.z, x, z, Boolean(player.under));
+        player.between(eye.x, eye.z, x, z, Boolean(player.under), Math.max(eye.y, y));
       if (sees && !inSight.has(id) && !hopping.has(id)) hopping.set(id, { model: thing.model, y, t: 0 });
       if (sees) inSight.add(id);
       else inSight.delete(id);
@@ -792,7 +792,8 @@ export function items(options: {
       if (m < miss) [miss, at] = [m, s];
     }
     const d = from + at;
-    if (d > REACH || !player.between(eye.x, eye.z, x, z, Boolean(player.under))) return undefined;
+    if (d > REACH || !player.between(eye.x, eye.z, x, z, Boolean(player.under), Math.max(eye.y, model.position.y)))
+      return undefined;
     return { miss, d };
   }
 
