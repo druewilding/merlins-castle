@@ -39,8 +39,8 @@ HEAD_SIZE = 1.25  # times bigger, his head (and the game makes each one's its ow
 FEET = 1.35  # ...and his feet (his hands are made bigger in the game, by their bones: so his
 # fingers bend where their joints are, and don't fold through his palms)
 BULK = (0.024, 0.018)  # metres his limbs and his body are bulked out
-BELLY = (0.2, 1.02, 0.19)  # metres his belly sticks out, at its middle (its height), and how tall it is
-FATTER = 0.1  # metres more, for the trolls with bigger bellies (the shape key "belly")
+BELLY = (0.15, 1.04, 0.19)  # metres his belly sticks out, at its middle (its height), and how tall it is
+FATTER = 0.07  # metres more, for the trolls with bigger bellies (the shape key "belly")
 NOSE = (1.5, 0.036, 0.006)  # how much bigger his nose is grown, the radius of the round bulb it's made, and how far it's lifted (off his smile)
 LONG_NOSE = (1.35, 2.3, 0.022)  # or (the shape key "long-nose"): as much bigger across, along, and drooping
 EARS = (1.8, 2.5)  # how much bigger his ears are grown (or, the shape key "big-ears", these)
