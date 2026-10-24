@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.13.0](https://github.com/druewilding/merlins-castle/compare/v2.12.0...v2.13.0) (2026-10-24)
+
+
+### Features
+
+* Add the trolls and the harp, and improve the look of the caves ([#105](https://github.com/druewilding/merlins-castle/issues/105)) ([0c3ae44](https://github.com/druewilding/merlins-castle/commit/0c3ae44e5f1410fbffd74f38e9019dcbcc6a2466))
+* Add unlockable doors in the caves ([#104](https://github.com/druewilding/merlins-castle/issues/104)) ([5049ccc](https://github.com/druewilding/merlins-castle/commit/5049ccc1a8d892cf37b3cc718aac6fb32b95f40c))
+* Build the dragon and the water ([#102](https://github.com/druewilding/merlins-castle/issues/102)) ([e367ac5](https://github.com/druewilding/merlins-castle/commit/e367ac5d79c631d3acfc8d57771b8774025e60c8))
+* Fall over in the darkness ([#103](https://github.com/druewilding/merlins-castle/issues/103)) ([16b3555](https://github.com/druewilding/merlins-castle/commit/16b355500a2dac68be8156ba924d890da92e3826))
+* Let the player jump higher (1 m instead of 0.6 m) ([#106](https://github.com/druewilding/merlins-castle/issues/106)) ([9fd1934](https://github.com/druewilding/merlins-castle/commit/9fd1934a5c72e873c4b1aaea392eaf86e8477a5e))
+
+
+### Bug Fixes
+
+* Keep the snake's tail tip from going NaN when its body bends ([#108](https://github.com/druewilding/merlins-castle/issues/108)) ([f79bcea](https://github.com/druewilding/merlins-castle/commit/f79bcea2e7e28d3f44a9432809f276b49fdc5a06))
+* Let the emerald be taken from under the tower's stairs ([#107](https://github.com/druewilding/merlins-castle/issues/107)) ([7b2d591](https://github.com/druewilding/merlins-castle/commit/7b2d59199d9169ce3bba0ee804f3faf021b8f8ba))
+
 ## [2.12.0](https://github.com/druewilding/merlins-castle/compare/v2.11.0...v2.12.0) (2026-10-18)
 
 
