@@ -269,7 +269,8 @@ for obj in faces_on:
         v.co = m.inverted() @ grown(m @ v.co, w or {"Head": 1.0})
 body.data.update()
 
-# ---- His moss: on his shoulders, down his back, and round his hips (troll-moss);
+# ---- His moss: on his shoulders, down his back, and round his hips (troll-moss),
+# with a fringe in front (troll-fringe);
 # his hair, in four styles (troll-hair-0..3), and a beard (troll-beard): the
 # game gives each troll its own ----------------------------------------------
 
@@ -296,6 +297,17 @@ def on_body(i):
         return 1.0, 1.0  # round his hips, hanging down
     if p.y > 0.05 and 1.0 < p.z < 1.3 and w.get("spine_02", 0) + w.get("spine_01", 0) > 0.4:
         return 0.6, 0.8  # (and a little down his back)
+    return 0, 0
+
+
+def fringe(i):
+    """A fringe of broad grass hanging down in front, between his legs, from his
+    hips' moss (troll-fringe): so sitting, legs apart, you can't see between them.
+    (Hung from his hips, so it still hangs down when he sits, not along his lap.)"""
+    p, w = rest[i], weights[i]
+    if abs(p.x) < 0.13 and p.y < 0.02 and 0.72 < p.z < 1.0 and \
+            (w.get("pelvis", 0) + w.get("thigh_l", 0) + w.get("thigh_r", 0)) > 0.4:
+        return 1.0, 1.0
     return 0, 0
 
 
@@ -350,12 +362,13 @@ def mossy(p):
     return c.vary(colour, 0.12, v * 3)
 
 
-def grow_moss(name, where, blades, length, width, keys=()):
+def grow_moss(name, where, blades, length, width, keys=(), hung=None):
     """A bed of moss, lumpy, just over his skin (moved as his skin is), with a
     ragged edge, wherever where(i) says it grows; and blades sticking out of
     it, as many as blades (each point's chance of a tuft), as long and as wide
     as those (low, high), longer where it hangs. With the body's shape keys
-    (keys) too, each of its points moved as the point of him it grows from."""
+    (keys) too, each of its points moved as the point of him it grows from.
+    Its blades moved by his bone hung, if it's given, not by his skin under them."""
     growing = [where(i) for i in everyone]
     verts, faces, colours, weights_, grows_from, offsets = [], [], [], [], [], []
     SHELL = (0.012, 0.012)  # metres it stands off his skin, and how lumpy
@@ -394,7 +407,7 @@ def grow_moss(name, where, blades, length, width, keys=()):
             dark = c.mix(colour, (0, 0, 0, 1), 0.35)
             colours += [dark, dark, colour, colour, c.mix(colour, MOSS_TIP, 0.6)]
             faces += [(first, first + 1, first + 3, first + 2), (first + 2, first + 3, first + 4)]
-            weights_ += [weights[i]] * 5
+            weights_ += [{hung: 1.0} if hung else weights[i]] * 5
             grows_from += [i] * 5
     obj = c.skinned(name, verts, faces, colours, weights_, skeleton)
     if keys:
@@ -408,6 +421,7 @@ def grow_moss(name, where, blades, length, width, keys=()):
 
 
 grow_moss("troll-moss", on_body, 0.25, (0.04, 0.085), (0.007, 0.012), keys=["belly", "fat"])
+grow_moss("troll-fringe", fringe, 1.0, (0.05, 0.09), (0.022, 0.032), keys=["belly", "fat"], hung="pelvis")
 grow_moss("troll-hair-0", wild, 0.55, (0.04, 0.085), (0.007, 0.012))
 grow_moss("troll-hair-1", shaggy, 0.55, (0.045, 0.075), (0.008, 0.013))
 grow_moss("troll-hair-2", tufty, 0.9, (0.07, 0.11), (0.007, 0.011))
