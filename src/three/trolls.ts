@@ -372,13 +372,13 @@ export class Trolls {
       // Sitting, one of them asks you for a tune when you're near: its hands out.
       else this.play(troll, here && far < ASK && k === this.asker ? "Sitting_Talking_Loop" : "Sitting_Idle_Loop");
       if (this.reducedMotion) continue;
-      // (Its forearms lifted while it sits, and let down again, getting up.)
-      const sitting =
-        troll.playing?.getClip().name !== "Sitting_Exit" && troll.playing?.getClip().name !== "Dance_Loop";
-      troll.lap += ((sitting ? troll.lapLift : 0) - troll.lap) * Math.min(1, dt * 4);
-      // (And its upper arms swung out while it dances.)
+      // (Its forearms lifted while it sits and gets up, and let down again,
+      // dancing; and its upper arms swung out getting up and dancing: its hands
+      // push off its knees, getting up, and would sink into its thighs.)
       const dancing = troll.playing?.getClip().name === "Dance_Loop";
-      troll.spread += ((dancing ? troll.spreadOut : 0) - troll.spread) * Math.min(1, dt * 4);
+      const sitting = !dancing && troll.playing?.getClip().name !== "Sitting_Exit";
+      troll.lap += ((dancing ? 0 : troll.lapLift) - troll.lap) * Math.min(1, dt * 4);
+      troll.spread += ((sitting ? 0 : troll.spreadOut) - troll.spread) * Math.min(1, dt * 4);
       // (The mixer only sets a bone when its clip moves it: held still, the
       // head would keep the turn it was given last frame, and turn again.)
       troll.head?.quaternion.copy(troll.posed);
