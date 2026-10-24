@@ -8,14 +8,14 @@ description: Build a short death scene for Merlin's Castle 3D, played from where
 How the death scenes were made, written down so the next one goes faster.
 The six built so far each live in their own file:
 
-| The words | The way | The scene |
-| --- | --- | --- |
-| The ladder slips and you fall. | mossy-steps east | `fall.ts` (`Fall`) |
-| You are swept away by the current. | deep-river south | `swept.ts` (`Swept`) |
-| The witches catch you and tie you up. | forest-witches west | `caught.ts` (`Caught`) |
-| Oh dear! Merlin's trap is that way. | mountain east | `trap.ts` (`Trapped`) |
-| You slip down a deep, deep hole. | maze north, treasure-room south | `hole.ts` (`Slipped`) |
-| You fall over in the dark. | dark-tunnels south | `tripped.ts` (`Tripped`) |
+| The words                             | The way                         | The scene                |
+| ------------------------------------- | ------------------------------- | ------------------------ |
+| The ladder slips and you fall.        | mossy-steps east                | `fall.ts` (`Fall`)       |
+| You are swept away by the current.    | deep-river south                | `swept.ts` (`Swept`)     |
+| The witches catch you and tie you up. | forest-witches west             | `caught.ts` (`Caught`)   |
+| Oh dear! Merlin's trap is that way.   | mountain east                   | `trap.ts` (`Trapped`)    |
+| You slip down a deep, deep hole.      | maze north, treasure-room south | `hole.ts` (`Slipped`)    |
+| You fall over in the dark.            | dark-tunnels south              | `tripped.ts` (`Tripped`) |
 
 `tripped.ts` is the newest and the simplest to copy. `trap.ts` shows a prop of
 its own that goes on moving behind the curtain.
@@ -89,7 +89,7 @@ and telling the scene beat by beat, as the others do.
   `Tripped`). Use `ease()` (smoothstep) for anything that starts and stops.
   Something falling speeds up as `f * f`.
 - **Sounds at beats:** take a callback (`play: (sound: "trip" | "bump") =>
-  void`) and call it as a beat is crossed (`was < BEAT && t >= BEAT`), so each
+void`) and call it as a beat is crossed (`was < BEAT && t >= BEAT`), so each
   plays exactly once.
 - **Behind the curtain:** the curtain and the score card are see-through, and
   `update` goes on being called until you start again. Something that should
@@ -139,10 +139,10 @@ run sounds` for a new synthesised one, then `npm run art:build`.
     `/3d?debug&at=x,z,yawDeg`). Placed within it, you count as already going
     through it, and walk straight on.
   - Hold the key on `window`: `dispatchEvent(new KeyboardEvent("keydown", {
-    code: "KeyW" }))`, then wait for `document.body.classList.contains("scene")`
+code: "KeyW" }))`, then wait for `document.body.classList.contains("scene")`
     and let go.
   - Screenshot at each beat, and well after the curtain; click `.curtain
-    button` (Continue) and look behind the score card too. Combine them with
+button` (Continue) and look behind the score card too. Combine them with
     `magick ... +append` and look side by side.
   - With `page.emulateMedia({ reducedMotion: "reduce" })` too.
   - `window.world.restart({ state: structuredClone(window.world.items.state) })`,
