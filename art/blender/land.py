@@ -3213,6 +3213,10 @@ dug, built_ways = c.Builder(), c.Builder()
 tunnel = dug
 SMOOTH_HALLS = ("treasure-room", "beautiful-chamber")
 DROPS = []  # (cave, and the two sides of where a way drops away out of it)
+# (Each doorway into a cave of rough rock: the cave, the way's two edges
+# there, its floor, and how high the cave's wall goes. The cave draws round
+# it: its rock curving in to meet the way's mouth.)
+CAVE_DOORS = []
 
 # Underground, under cover, a way is dug through rock: rough walls (pushed
 # out, never in, by noise, so they're the same from one stretch to the next
@@ -3559,6 +3563,9 @@ for way in WAYS.values():
             el_, er_ = (edge_left[i][0] + hx_, edge_left[i][1] + hy_), (edge_right[i][0] + hx_, edge_right[i][1] + hy_)
             # (In a cave, as high as its wall goes before the dome.)
             top = f + TUNNEL_TALL + 0.1 if hall.indoor else hall.floor + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
+            if not hall.indoor and hall.place not in SMOOTH_HALLS:
+                CAVE_DOORS.append((hall, el_, er_, f, top))
+                continue
             for p, jut in ((er_, 1.8), (el_, -1.8)):
                 q = (p[0] + nx_ * jut, p[1] + ny_ * jut)
                 quad(framed, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
@@ -3853,6 +3860,70 @@ for hall in HALLS.values():
             rock_of.add(pts, [(0, 1, 2, 3)], colours)
         last = rings[-1]
         rock_of.add([point(k, last), point(k + 1, last), (hx, hy, f + hall.tall)], [(0, 1, 2)], [hall.wall] * 3)
+
+    # Round each doorway, the rock curving in to meet the way's mouth: from
+    # its edges (the way's walls and roof end there) back into the cave's
+    # wall, out to each side and up, so it closes round the way, no gap
+    # between them to see into. (Just behind the wall, where it meets it.)
+    for cave, el_, er_, df, top in CAVE_DOORS:
+        if cave is not hall:
+            continue
+        mx, my = (el_[0] + er_[0]) / 2, (el_[1] + er_[1]) / 2
+        half_ = math.hypot(er_[0] - el_[0], er_[1] - el_[1]) / 2
+        lx, ly = (er_[0] - el_[0]) / (2 * half_), (er_[1] - el_[1]) / (2 * half_)
+        roof = df + TUNNEL_TALL
+        SWEEP = 2.2  # metres, out from its mouth, it curves back into the wall
+        SHELL = 0.7  # metres the way's rock reaches out round its mouth
+        # Its mouth: the way's own arch (VAULT), a little ragged, in (so its
+        # lip hangs over the way's rock).
+        mouth = []
+        for k, (u, h) in enumerate(VAULT):
+            u, z = u * half_, df + max(h, -0.3)
+            jag = 0.05 + 0.18 * abs(noise.noise(Vector((mx + u, my, z)) * 1.4))
+            mouth.append((u - math.copysign(jag, u) if abs(u) > 0.5 * half_ else u, z - (jag if h > SPRING else 0.0)))
+        mouth[0], mouth[-1] = (mouth[0][0], df - 0.3), (mouth[-1][0], df - 0.3)
+        # (Out from each point of it, square to it: sideways at its foot, up over its top.)
+        outward = []
+        for k, (u, z) in enumerate(mouth):
+            (u0, z0), (u1, z1) = mouth[max(k - 1, 0)], mouth[min(k + 1, len(mouth) - 1)]
+            du, dz = u1 - u0, z1 - z0
+            n = math.hypot(du, dz) or 1
+            outward.append((-1.0, 0.0) if k == 0 else (1.0, 0.0) if k == len(mouth) - 1 else (-dz / n, du / n))
+        steps = [0.0, 0.06, 0.14, 0.25, 0.38, 0.52, 0.68, 0.84, 1.0]
+
+        def skirt(u, z, lipless=False):
+            px, py = mx + lx * u, my + ly * u
+            a = math.atan2(py - hy, px - hx)
+            back = wall_at(a, min(z, wall_top)) + 0.08
+            wx, wy = hx + math.cos(a) * back, hy + math.sin(a) * back
+            out = max(abs(u) - half_, z - roof, 0.0)
+            # (Not curving back till it's past the end of the way's own rock, round it.)
+            t = c.smooth((out - SHELL) / (SWEEP - SHELL)) ** 0.6
+            t = max(t, c.smooth((z - roof - SHELL) / max(top - roof - SHELL, 0.1)))
+            # (Lumpy, as the rock is, where it curves; and round the way's
+            # mouth, a lip of it jutting out over the way's own rock's end.)
+            v = Vector((px, py, z))
+            lip = (0.0 if lipless else 0.3) * (1 - c.smooth((out - SHELL) / 1.0)) * (0.7 + 0.6 * abs(noise.noise(v * 1.3)))
+            lump = t * (1 - t) * 4 * 0.3 * noise.noise(v * 0.7) - lip
+            return (px + (wx - px) * t + math.cos(a) * lump, py + (wy - py) * t + math.sin(a) * lump, z), lump
+
+        def at(k, s_):
+            (u, z), (nu, nz) = mouth[k], outward[k]
+            return u + nu * s_ * SWEEP, max(df - 0.3, z + nz * s_ * SWEEP)
+
+        for k in range(len(mouth) - 1):
+            for j_ in range(len(steps) - 1):
+                corners = [skirt(*at(k, steps[j_])), skirt(*at(k + 1, steps[j_])),
+                           skirt(*at(k + 1, steps[j_ + 1])), skirt(*at(k, steps[j_ + 1]))]
+                pts = [q for q, _ in corners]
+                # (Darker in its hollows, as the cave's wall is.)
+                caves.add(pts, [(0, 1, 2, 3)], [c.vary(c.mix(hall.wall, c.linear("#000000"), min(0.45, max(0.0, d) * 1.2)),
+                                                       0.12, Vector(q)) for q, d in corners])
+        # (Under its lip, back to the way's own rock, all round its mouth.)
+        for k in range(len(mouth) - 1):
+            (u0, z0), (u1, z1) = mouth[k], mouth[k + 1]
+            pts = [skirt(u0, z0)[0], skirt(u1, z1)[0], skirt(u1, z1, True)[0], skirt(u0, z0, True)[0]]
+            caves.add(pts, [(0, 1, 2, 3)], [c.vary(c.mix(hall.wall, c.linear("#000000"), 0.3), 0.12, Vector(q)) for q in pts])
 
     def free_spot(radius):
         """Somewhere near the wall that isn't in a doorway."""
