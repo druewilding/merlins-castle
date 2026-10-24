@@ -1,7 +1,8 @@
 // The trolls in their cave (their model: art/blender/trolls.py), sitting on
 // boulders round the north of it, two either side of the way north (land.py),
-// one with its drum on the floor beside it. Come near, they lean forward with
-// their hands out, asking you for a tune, and watch you as you go about.
+// one with its drum on the floor beside it, each its own look. Come near,
+// they take turns to lean forward with their hands out, asking you for a
+// tune, and watch you as you go about.
 // Played one on the harp, they get up, one after another, and dance (and
 // let you by). Walking into the way before that, they cast a spell on you: a
 // swirl of twinkles round your head (and the way stays shut).
@@ -15,6 +16,7 @@ import {
   AnimationMixer,
   Color,
   LoopOnce,
+  type Material,
   Mesh,
   type Object3D,
   Quaternion,
@@ -40,7 +42,8 @@ export interface TrollsPlace {
   drum: number;
 }
 
-const ASK = 11; // metres: this near, they ask you for a tune
+const ASK = 11; // metres: this near, they ask you for a tune...
+const TURNS = [3.5, 6.5]; // ...one at a time, each for between these many seconds
 const FAR = 45; // metres: further off than this, they aren't drawn
 const BLEND = 0.4; // seconds from one clip to the next
 const UP = [0, 0.45, 0.2, 0.7]; // seconds after you play, each gets up
@@ -48,6 +51,23 @@ const STEP = 0.45; // metres (at its size) each steps forward off its boulder, g
 const DRUM = [0.7, 0.2]; // the drum, beside its troll: how far to its side, and forward (at its size)
 const TURN = 1.0; // radians their heads turn, at most, either way
 const LIFT = 0.12; // radians their heads are lifted, looking up to you
+const HANDS = 1.4; // times bigger their hands are (by their bones: so their fingers bend where their joints are)
+// Each its own look (art/blender/trolls.py makes the pieces, and previews
+// these): its hair (troll-hair-0..2), a beard or not, its shape (its body's
+// shape keys, 0 to 1), how big its head is, and its skin's and its moss's tints.
+const LOOKS = [
+  { hair: 0, beard: false, keys: { belly: 0.2 }, head: 1.0, skin: "#ffffff", moss: "#ffffff" },
+  { hair: 1, beard: true, keys: { belly: 1, "big-ears": 0.6 }, head: 1.08, skin: "#c9cbc4", moss: "#d8cf8a" },
+  { hair: 2, beard: false, keys: { "long-nose": 1 }, head: 0.94, skin: "#c8e29a", moss: "#8fa86e" },
+  {
+    hair: 1,
+    beard: false,
+    keys: { belly: 0.6, "big-ears": 1, "long-nose": 0.4 },
+    head: 1.04,
+    skin: "#ffc4a4",
+    moss: "#e8b866",
+  },
+];
 const TWINKLES = 36;
 const SPELL = 1.8; // seconds the spell's twinkles last
 const GOLD = new Color("#ffe08a");
@@ -58,6 +78,9 @@ const X = new Vector3(1, 0, 0);
 interface Troll {
   model: Object3D;
   head: Object3D | undefined;
+  hands: Object3D[];
+  /** How big its head is (on top of what its clip has it). */
+  headSize: number;
   /** Its head, as its clip has it (before it's turned to you). */
   posed: Quaternion;
   mixer: AnimationMixer;
@@ -82,6 +105,8 @@ interface Twinkle {
 export class Trolls {
   private trolls: Troll[] = [];
   private twinkles: Twinkle[] = [];
+  private asker = 0; // (which of them is asking you for a tune)
+  private asking = 0; // (and for how much longer)
   private spellAge = SPELL;
   private spellAt = new Vector3();
   /** Whether they're up and dancing (or getting up to), the harp played. */
@@ -97,11 +122,25 @@ export class Trolls {
     const body = source.getObjectByName("troll")!;
     place.sitting.forEach(({ at: [x, z, floor], facing: [fx, fz], size }, k) => {
       const model = clone(body);
+      const look = LOOKS[k % LOOKS.length];
+      const tinted = (material: Material, tint: string) => {
+        const own = material.clone() as Material & { color: Color };
+        own.color.set(tint);
+        return own;
+      };
       model.traverse((o) => {
-        if (o instanceof Mesh) {
-          o.castShadow = true;
-          o.frustumCulled = false; // (moved by their bones: their bounds don't follow)
+        if (!(o instanceof Mesh)) return;
+        o.castShadow = true;
+        o.frustumCulled = false; // (moved by their bones: their bounds don't follow)
+        // Its own hair (or a beard), shape, skin and moss.
+        if (o.name.startsWith("troll-hair")) o.visible = o.name === `troll-hair-${look.hair}`;
+        if (o.name === "troll-beard") o.visible = look.beard;
+        for (const [key, amount] of Object.entries(look.keys)) {
+          const at = o.morphTargetDictionary?.[key];
+          if (at !== undefined && o.morphTargetInfluences) o.morphTargetInfluences[at] = amount;
         }
+        if (o.name.startsWith("troll-")) o.material = tinted(o.material as Material, look.moss);
+        else if (o.name.startsWith("SuperHero")) o.material = tinted(o.material as Material, look.skin);
       });
       const yaw = Math.atan2(fx, fz);
       model.scale.setScalar(size);
@@ -116,6 +155,8 @@ export class Trolls {
       const troll: Troll = {
         model,
         head: model.getObjectByName("Head"),
+        hands: ["hand_l", "hand_r"].flatMap((name) => model.getObjectByName(name) ?? []),
+        headSize: look.head,
         posed: new Quaternion(),
         mixer,
         clips: actions,
@@ -130,6 +171,7 @@ export class Trolls {
       this.play(troll, "Sitting_Idle_Loop", true);
       // (Not in step with each other.)
       mixer.update(k * 1.7);
+      this.shape(troll);
       troll.posed.copy(troll.head?.quaternion ?? troll.posed);
       this.trolls.push(troll);
     });
@@ -174,6 +216,12 @@ export class Trolls {
     troll.playing = next;
   }
 
+  /** Its hands and head as big as they are (each frame, after its clip: its clips set every bone's size). */
+  private shape(troll: Troll) {
+    for (const hand of troll.hands) hand.scale.setScalar(HANDS);
+    troll.head?.scale.setScalar(troll.headSize);
+  }
+
   /** The harp played: up they get, one after another, and dance (or, loading, they're dancing). */
   dance(instantly: boolean) {
     if (this.dancing) return;
@@ -182,6 +230,7 @@ export class Trolls {
       if (instantly || this.reducedMotion) {
         this.play(troll, "Dance_Loop", true);
         troll.mixer.update(k * 0.6);
+        this.shape(troll);
         troll.rising = troll.standing = 0;
         this.stepTo(troll, 1);
       } else {
@@ -200,6 +249,7 @@ export class Trolls {
       this.stepTo(troll, 0);
       this.play(troll, "Sitting_Idle_Loop", true);
       troll.mixer.update(k * 1.7);
+      this.shape(troll);
     });
   }
 
@@ -211,18 +261,25 @@ export class Trolls {
 
   /** Each frame: your eyes, and whether you're in their cave. */
   update(dt: number, eye: Vector3, here: boolean) {
-    for (const troll of this.trolls) {
+    // (Taking turns to ask.)
+    this.asking -= dt;
+    if (this.asking <= 0) {
+      this.asker = (this.asker + 1 + Math.floor(Math.random() * (this.trolls.length - 1))) % this.trolls.length;
+      this.asking = TURNS[0] + Math.random() * (TURNS[1] - TURNS[0]);
+    }
+    for (const [k, troll] of this.trolls.entries()) {
       const far = troll.model.position.distanceTo(eye);
       troll.model.visible = here || far < FAR;
       if (!troll.model.visible) continue;
       if (this.dancing) this.rise(troll, dt);
-      // Sitting, they ask you for a tune when you're near: their hands out.
-      else this.play(troll, here && far < ASK ? "Sitting_Talking_Loop" : "Sitting_Idle_Loop");
+      // Sitting, one of them asks you for a tune when you're near: its hands out.
+      else this.play(troll, here && far < ASK && k === this.asker ? "Sitting_Talking_Loop" : "Sitting_Idle_Loop");
       if (this.reducedMotion) continue;
       // (The mixer only sets a bone when its clip moves it: held still, the
       // head would keep the turn it was given last frame, and turn again.)
       troll.head?.quaternion.copy(troll.posed);
       troll.mixer.update(dt);
+      this.shape(troll);
       troll.posed.copy(troll.head?.quaternion ?? troll.posed);
       if (!this.dancing) this.watch(troll, eye, here && far < ASK * 1.5, dt);
     }
