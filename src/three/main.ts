@@ -222,9 +222,12 @@ if (cobwebs instanceof Mesh) {
 }
 // The emerald, glassy: a little room's lights caught in its facets (its own,
 // not the scene's), and a glow from within, so it shines even in the tower.
+// (The flask's glass catches them too.)
+const pmrem = new PMREMGenerator(renderer);
+const shine = pmrem.fromScene(new RoomEnvironment(), 0.02).texture;
+pmrem.dispose();
 const emerald = things.scene.getObjectByName("emerald");
 if (emerald instanceof Mesh) {
-  const pmrem = new PMREMGenerator(renderer);
   emerald.material = new MeshPhysicalMaterial({
     vertexColors: true,
     flatShading: true,
@@ -232,15 +235,57 @@ if (emerald instanceof Mesh) {
     metalness: 0.9, // (its reflections green, as in its picture: white only in a thin coat over them)
     clearcoat: 0.2,
     clearcoatRoughness: 0.05,
-    envMap: pmrem.fromScene(new RoomEnvironment(), 0.02).texture,
+    envMap: shine,
     envMapIntensity: 0.55,
     emissive: new Color("#0f7a38"),
     emissiveIntensity: 1.0,
   });
-  pmrem.dispose();
 }
 // The lamp: its glass see-through, and its flame (lit, lantern.ts) bright.
 dressLamp(things.scene.getObjectByName("lamp")!);
+// The water: its flask's glass clear and shining, and the water in it a
+// clear blue, glowing a little (so it shows, even in the shade). The water
+// drawn first, then the glass round it.
+const flask = things.scene.getObjectByName("water-glass");
+if (flask instanceof Mesh) {
+  const glass = new MeshPhysicalMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.12,
+    roughness: 0.05,
+    envMap: shine,
+    envMapIntensity: 1.6,
+    clearcoat: 1,
+    side: DoubleSide,
+    depthWrite: false,
+  });
+  flask.material = glass;
+  flask.renderOrder = 1;
+  // (Clearer face on, and whiter, more solid, round its edges, where you
+  // look through more of it.)
+  glass.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <opaque_fragment>",
+      `float edge = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 2.5);
+      diffuseColor.a = mix(diffuseColor.a, 0.8, edge);
+      outgoingLight = mix(outgoingLight, vec3(0.85, 0.93, 1.0), 0.6 * edge);
+      #include <opaque_fragment>`
+    );
+  };
+}
+const drink = things.scene.getObjectByName("water-inside");
+if (drink instanceof Mesh) {
+  drink.material = new MeshPhysicalMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.85,
+    roughness: 0.15,
+    envMap: shine,
+    envMapIntensity: 0.35,
+    emissive: new Color("#1d5c9e"),
+    emissiveIntensity: 0.5,
+  });
+}
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
   node.castShadow = !["paths", "water", "embers", "archway-ivy", "maze-ivy"].includes(node.name);
