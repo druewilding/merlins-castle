@@ -3201,6 +3201,26 @@ TIMBER = c.linear("#4a3420")
 LAYERS = (c.linear("#6e6d6a"), c.linear("#5a5957"), c.linear("#7c7a76"), c.linear("#4c4b4a"), c.linear("#6a6560"))
 
 
+RING_OUT = 0.6  # metres past the way's square, round it: past the most its rock is pushed out
+
+
+def ring_out(row, rock, half):
+    """For a point of the rock round a way's end: on out from the middle of
+    the roof's curve, through it, to a frame round the square opening."""
+    x, y, f = row[0], row[1], row[2]
+    across = (rock[0] - x) * row[3] + (rock[1] - y) * row[4]
+    up = rock[2] - (f + SPRING)
+    ts = []
+    if abs(across) > 1e-6:
+        ts.append((half + RING_OUT) / abs(across))
+    if up > 1e-6:
+        ts.append((TUNNEL_TALL - SPRING + RING_OUT) / up)
+    elif up < -1e-6:
+        ts.append((SPRING + RING_OUT) / -up)
+    t = max(1.0, min(ts))
+    return (x + row[3] * across * t, y + row[4] * across * t, f + SPRING + up * t)
+
+
 def vault_point(row, u, h, half):
     """A point of the rock round a way: pushed out by up to 0.4 m (but not at
     the foot of its walls, where they meet the floor)."""
@@ -3365,23 +3385,14 @@ for way in WAYS.values():
             for row, pts_, ends in ((a, pa, k == 0 or not rocky_[k - 1]), (b, pb, k == len(rocky_) - 1 or not rocky_[k + 1])):
                 if not ends or (row is a and k in dead_rows) or (row is b and k + 1 in dead_rows):
                     continue  # (a dead end: the rock closes round it, below)
-                square = [(*side(row, u * half), row[2] + (h if h <= SPRING else TUNNEL_TALL)) for u, h in VAULT]
-                # (In triangles, all facing the same way along the way: where
-                # the rock's pushed out past the square's corner, a piece
-                # folds over itself, and its two halves, facing opposite
-                # ways, would flicker, one lit and one dark.)
-                along = (row[4], -row[3], 0.0)
+                # (Each piece straight out from the rock, away from the middle
+                # of the roof's curve, to a frame round it a little bigger
+                # than the rock ever is: pieces side by side never cross, and
+                # fold over each other, and flicker. The door frames and
+                # lintels in front hide what's past the square opening.)
+                beyond = [ring_out(row, p, half) for p in pts_]
                 for i in range(len(VAULT) - 1):
-                    colour = c.vary(rock_colour(*pts_[i]), 0.1, Vector(pts_[i]))
-                    piece = [pts_[i], pts_[i + 1], square[i + 1], square[i]]
-                    for t in ((0, 1, 2), (0, 2, 3)):
-                        corners = [Vector(piece[j]) for j in t]
-                        facing = (corners[1] - corners[0]).cross(corners[2] - corners[0])
-                        if facing.length < 1e-6:
-                            continue
-                        if facing.dot(Vector(along)) < 0:
-                            corners.reverse()
-                        tunnel.add([tuple(p) for p in corners], [(0, 1, 2)], [colour] * 3)
+                    quad(tunnel, [pts_[i], pts_[i + 1], beyond[i + 1], beyond[i]], rock_colour(*pts_[i]), 0.1)
             # Timber props, every few metres (not by a hall).
             if k % PROP_EVERY == PROP_EVERY // 2 and not in_a_hall(*mid, 4):
                 dx, dy = b[0] - a[0], b[1] - a[1]
