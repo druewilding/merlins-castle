@@ -105,6 +105,77 @@ interface Joint {
   turn: Quaternion;
 }
 
+/**
+ * Its skin, scaly: rows of round scales, each overlapping the one behind
+ * (towards its tail), a little lighter or darker than the next, and dark at
+ * its edge, where it lies over the next. Where each point is on them comes
+ * with its model (dragon.py's Skinned: its two sets of UVs, which glTF turns
+ * upside down): which way round its tube, as a cosine and a sine; how far
+ * along it, and how big round, in scales (round 0: none; more than 0, none
+ * on its belly, where it has plates).
+ */
+function scaly(mesh: Mesh, material: MeshStandardMaterial) {
+  const geometry = mesh.geometry;
+  geometry.setAttribute("scaleRound", geometry.getAttribute("uv"));
+  geometry.setAttribute("scaleAlong", geometry.getAttribute("uv1"));
+  const skin = material.clone();
+  skin.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+        attribute vec2 scaleRound;
+        attribute vec2 scaleAlong;
+        varying vec2 vRound;
+        varying vec2 vAlong;`
+      )
+      .replace(
+        "#include <begin_vertex>",
+        `#include <begin_vertex>
+        vRound = vec2(scaleRound.x, 1.0 - scaleRound.y);
+        vAlong = vec2(scaleAlong.x, 1.0 - scaleAlong.y);`
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+        varying vec2 vRound;
+        varying vec2 vAlong;
+        float scaleHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float scaled() {
+          float round = abs(vAlong.y);
+          if (round < 0.05) return 1.0;
+          // (Its rows close together: each scale well over the one behind.)
+          vec2 p = vec2(atan(vRound.y, vRound.x) * round, vAlong.x * 1.35);
+          // (The scale it's on: in this row or the next on, whichever's over it.)
+          float row = floor(p.y);
+          float d = 1.0;
+          vec2 id = vec2(0.0);
+          for (int k = 1; k >= 0; k--) {
+            float y = row + float(k);
+            float stagger = 0.5 * mod(y, 2.0);
+            float x = floor(p.x - stagger) + 0.5 + stagger;
+            for (int j = -1; j <= 1; j++) {
+              vec2 centre = vec2(x + float(j), y);
+              float e = length((p - centre) * vec2(1.0, 1.15)) / 0.74;
+              if (e < 1.0 && d >= 1.0) { d = e; id = centre; }
+            }
+          }
+          float shade = (0.9 + 0.18 * scaleHash(id)) * mix(1.08, 0.62, smoothstep(0.7, 1.0, d));
+          // (Its belly's plates, smooth.)
+          float belly = vAlong.y > 0.0 ? smoothstep(-0.3, -0.55, vRound.x) : 0.0;
+          return mix(shade, 1.0, belly);
+        }`
+      )
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+        diffuseColor.rgb *= scaled();`
+      );
+  };
+  return skin;
+}
+
 const ease = (t: number) => {
   const u = Math.min(1, Math.max(0, t));
   return u * u * (3 - 2 * u);
@@ -156,7 +227,8 @@ export class Dragon {
       if (!(o instanceof Mesh)) return;
       o.frustumCulled = false; // (moved by its bones: its bounds don't follow)
       const material = o.material as MeshStandardMaterial;
-      if (o.name.startsWith("dragon-eyes")) {
+      if (o.name === "dragon") o.material = scaly(o, material);
+      else if (o.name.startsWith("dragon-eyes")) {
         o.material = new MeshBasicMaterial({ vertexColors: true });
       } else if (o.name.startsWith("dragon-wings")) {
         // (Thin: lit a little from behind, by the fire and the cave's light.)

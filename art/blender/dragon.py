@@ -35,6 +35,7 @@ import common as c  # noqa: E402
 out, preview = c.args()
 c.clear()
 
+SCALE = 0.11  # metres across each of its scales (a little smaller on its head)
 TALL = 7.9  # metres, from its feet to the top of its horns (made bigger, then scaled to this: see the end)
 STEP = 0.1  # metres between the rings round its body
 AROUND = 22  # points round each ring
@@ -130,12 +131,15 @@ def frames(samples, up):
     return out
 
 
-def tube(build, samples, fs, colour, weight, around=AROUND, start_cap=True, end_cap=True, shape=None):
+def tube(build, samples, fs, colour, weight, around=AROUND, start_cap=True, end_cap=True, shape=None, scaly=None):
     """A tube along a curve's samples, each ring as wide and as tall as its
     first two numbers (half-widths). colour(sample, a) and weight(sample)
     for each point (a: round it, from its back, 0, to its belly, pi); shape
-    (sample, a), how far out each point is, of the ring's radius."""
+    (sample, a), how far out each point is, of the ring's radius. Scaly
+    ("belly": scales but for its belly; "all": all round), it says where
+    each point is, for the game to draw its scales (Skinned)."""
     verts, colours, weights, faces = [], [], [], []
+    rounds, alongs = [], []
     for sample, (t, u, x) in zip(samples, fs):
         at, values, s, _ = sample
         w, h = values[0], values[1]
@@ -146,6 +150,10 @@ def tube(build, samples, fs, colour, weight, around=AROUND, start_cap=True, end_
             verts.append(tuple(p))
             colours.append(colour(sample, a, p))
             weights.append(weight(sample))
+            rounds.append((math.cos(a), math.sin(a)))
+            # (Each scale lies over the one before it, along the tube: its
+            # body from its tail to its head; its legs, down from its body.)
+            alongs.append((s / SCALE * (1 if scaly == "belly" else -1), (w + h) / 2 * r / SCALE * (1 if scaly == "belly" else -1)))
     n = len(samples)
     faces += [(k * around + j, (k + 1) * around + j, (k + 1) * around + (j + 1) % around, k * around + (j + 1) % around)
               for k in range(n - 1) for j in range(around)]
@@ -157,23 +165,33 @@ def tube(build, samples, fs, colour, weight, around=AROUND, start_cap=True, end_
         verts.append(tuple(at + fs[k][0] * sign * min(values[0], values[1]) * 0.5))
         colours.append(colours[k * around])
         weights.append(weight(samples[k]))
+        rounds.append((1.0, 0.0))
+        alongs.append((0.0, 0.0))
         for j in range(around):
             a, b = k * around + j, k * around + (j + 1) % around
             faces.append((tip, a, b) if sign > 0 else (tip, b, a))
-    build.add(verts, faces, colours)
-    build.weights += weights
+    build.put(verts, faces, colours, weights, (rounds, alongs) if scaly else None)
 
 
 class Skinned(c.Builder):
-    """A builder that keeps each point's bone weights as well."""
+    """A builder that keeps each point's bone weights as well, and where it
+    is on its scales: which way round its tube (or its head) it is, as a
+    cosine and a sine (so they blend smoothly all the way round), and how
+    far along it, and how big round it is there, both counted in scales
+    (round 0: no scales; less than 0, scales all round, more, but for its
+    belly). Exported as its two sets of UVs."""
 
     def __init__(self):
         super().__init__()
         self.weights = []
+        self.rounds, self.alongs = [], []
 
-    def put(self, verts, faces, colours, weights):
+    def put(self, verts, faces, colours, weights, scales=None):
         self.add(verts, faces, colours)
         self.weights += weights if isinstance(weights, list) else [weights] * len(verts)
+        rounds, alongs = scales or ([(1.0, 0.0)] * len(verts), [(0.0, 0.0)] * len(verts))
+        self.rounds += rounds
+        self.alongs += alongs
 
 
 def cone(build, base, tip, radius, colour, weight, tip_colour=None, sides=6, bend=None):
@@ -281,7 +299,7 @@ def scales(p, a, s, back=BACK, side=SIDE, belly=BELLY, plates=True):
 
 body = Skinned()
 tube(body, spine, spine_frames, lambda smp, a, p: scales(p, a, smp[2]), lambda smp: along(smp[2]),
-     shape=lambda smp, a: 1.0 - 0.06 * max(0.0, -math.cos(a)) if smp[2] > mark[HIPS] else 1.0)
+     shape=lambda smp, a: 1.0 - 0.06 * max(0.0, -math.cos(a)) if smp[2] > mark[HIPS] else 1.0, scaly="belly")
 
 
 def on_spine(s):
@@ -309,33 +327,47 @@ while s > 0.15:
 
 # ---- Its legs: big hind legs under its hips, and front legs under its
 # chest, each with three clawed toes. (All of them still: on its body.)
-def leg(side, joints, toes_at, toe_y):
+def leg(side, joints, toe_y):
+    """A leg, through its joints (each a point and how thick it is there),
+    from well inside its body (so it grows out of it, with no edge to
+    see) down to its foot, the last; and three toes on that, spreading
+    forward to toe_y, each with a hooked claw."""
     pts = [((side * p[0], p[1], p[2]), r, r) for p, r in joints]
     samples = spline(pts, step=0.08)
     fs = frames(samples, (0, -1, 0))
     tube(body, samples, fs, lambda smp, a, p: scales(p, a + math.pi * 0.5, smp[2], plates=False),
-         lambda smp: {"body": 1.0}, around=16, start_cap=False)
-    fx, fy, fz = toes_at
-    for k, spread in enumerate((-0.32, 0.0, 0.32)):
-        root = Vector((side * fx + side * spread * 0.55, fy, fz))
-        tip = Vector((side * fx + side * spread * 1.1, toe_y, 0.07))
-        toe = spline([(tuple(root), 0.15, 0.13), (tuple((root + tip) / 2 + Vector((0, 0, 0.06))), 0.11, 0.09),
-                      (tuple(tip), 0.08, 0.06)], step=0.06)
+         lambda smp: {"body": 1.0}, around=16, start_cap=False, scaly="all")
+    (fx, fy, fz), foot = joints[-1]
+    for k, spread in enumerate((-0.3, 0.0, 0.3)):
+        # (From inside its foot, so each grows out of it.)
+        root = Vector((side * (fx + spread * 0.35), fy, fz + foot * 0.3))
+        tip = Vector((side * (fx + spread * 1.15), toe_y, 0.08))
+        knuckle = root.lerp(tip, 0.55) + Vector((0, 0, 0.07))
+        toe = spline([(tuple(root), foot * 0.75, foot * 0.65), (tuple(knuckle), 0.11, 0.1), (tuple(tip), 0.08, 0.065)],
+                     step=0.05)
         tube(body, toe, frames(toe, (0, 0, 1)), lambda smp, a, p: scales(p, a, smp[2], plates=False),
-             lambda smp: {"body": 1.0}, around=10, start_cap=False, end_cap=False)
-        claw_root = tip + Vector((0, -0.02, 0.02))
-        cone(body, claw_root, claw_root + Vector((side * spread * 0.1, -0.24, -0.06)), 0.07, CLAW, {"body": 1.0},
-             bend=claw_root + Vector((0, -0.14, 0.03)), sides=6)
+             lambda smp: {"body": 1.0}, around=10, start_cap=False, end_cap=True, scaly="all")
+        # Its claw, from inside the end of its toe, hooked down to the ground.
+        ahead = (tip - knuckle).normalized()
+        claw_root = tip - ahead * 0.05
+        cone(body, claw_root, claw_root + ahead * 0.3 + Vector((0, 0, -0.08)), 0.065, CLAW, {"body": 1.0},
+             bend=claw_root + ahead * 0.17 + Vector((0, 0, 0.02)), sides=6)
 
 
 for side in (-1, 1):
-    # (Its thighs big and strong, its hocks high, as a dog's are.)
-    # (Each from well inside its body, so it grows out of it: no edge to see.)
-    leg(side, [((0.3, 1.35, 2.9), 0.5), ((0.68, 1.25, 2.6), 0.72), ((0.95, 0.75, 2.05), 0.78), ((1.12, 0.2, 1.45), 0.5),
-               ((1.15, 0.95, 0.62), 0.3), ((1.15, 0.6, 0.18), 0.23)], (1.15, 0.55, 0.15), -0.3)
-    leg(side, [((0.3, -0.85, 4.2), 0.45), ((0.66, -0.7, 3.55), 0.6), ((0.92, -0.4, 2.4), 0.46),
-               ((0.98, -0.8, 1.2), 0.31), ((0.96, -1.1, 0.42), 0.25), ((0.96, -1.15, 0.16), 0.21)],
-        (0.96, -1.15, 0.15), -1.8)
+    # Its hind legs, as a beast's: a great thigh, its knee forward, its long
+    # shin back to its hock, high off the ground, and from there its long
+    # foot down to its toes.
+    leg(side, [((0.3, 1.35, 2.9), 0.5), ((0.66, 1.3, 2.55), 0.8), ((0.9, 0.8, 2.05), 0.74), ((1.02, 0.3, 1.62), 0.5),
+               ((1.08, 0.75, 1.15), 0.36), ((1.12, 1.2, 0.78), 0.26), ((1.14, 0.95, 0.4), 0.21),
+               ((1.15, 0.65, 0.17), 0.2)], -0.35)
+    # Its front legs: a big shoulder, its elbow back, its forearm thick near
+    # the elbow and slimming to its wrist, and its paw forward.
+    # (From straight above its shoulder, inside its chest, so it runs down
+    # from the first, and so do its scales.)
+    leg(side, [((0.5, -0.75, 4.45), 0.4), ((0.62, -0.72, 3.9), 0.56), ((0.68, -0.7, 3.45), 0.64), ((0.86, -0.35, 2.75), 0.52),
+               ((0.95, -0.2, 2.25), 0.44), ((0.98, -0.55, 1.5), 0.33), ((0.98, -0.85, 0.75), 0.24),
+               ((0.97, -1.0, 0.4), 0.22), ((0.96, -1.1, 0.17), 0.2)], -1.75)
 
 
 # ---- Its head: a long, broad skull, a jaw hinged under it, horns sweeping
@@ -373,6 +405,7 @@ def wedge(top):
     """The top of its head (top) or its lower jaw: a shell over (or under)
     the mouth's line, and the inside of its mouth closing it."""
     verts, colours, faces = [], [], []
+    rounds, alongs = [], []
     t0 = 0.0 if top else HINGE - 0.1
     t1 = 1.0 if top else 0.97
     for i in range(ALONG + 1):
@@ -399,6 +432,9 @@ def wedge(top):
                     and abs(abs(math.sin(a)) - 0.4) < 0.15:
                 colour = THROAT  # (its nostrils)
             colours.append(colour)
+            # (Its scales smaller on its head; under its jaw, plates.)
+            rounds.append((math.cos(a), math.sin(a)) if top else (-math.cos(a), math.sin(a)))
+            alongs.append((t * HEAD_LONG / (SCALE * 0.7), (wide if top else 0.7 * wide) / (SCALE * 0.7) * (-1 if top else 1)))
     for i in range(ALONG):
         for j in range(ROUND):
             q = (i * (ROUND + 1) + j, (i + 1) * (ROUND + 1) + j, (i + 1) * (ROUND + 1) + j + 1, i * (ROUND + 1) + j + 1)
@@ -412,19 +448,21 @@ def wedge(top):
         for j in range(3):
             verts.append(tuple(at_head(t, (-1 + j) * wide, MOUTH + (sink if j == 1 else 0))))
             colours.append(c.mix(THROAT, GUMS, smooth((t - 0.1) / 0.5)))
+            rounds.append((1.0, 0.0))
+            alongs.append((0.0, 0.0))
     for i in range(ALONG):
         for j in range(2):
             q = (inside + i * 3 + j, inside + i * 3 + j + 1, inside + (i + 1) * 3 + j + 1, inside + (i + 1) * 3 + j)
             faces.append(q if top else q[::-1])
     back = list(range(ROUND + 1))
     faces.append(tuple(back if not top else back[::-1]))
-    return verts, faces, colours
+    return verts, faces, colours, (rounds, alongs)
 
 
-verts, faces, colours = wedge(True)
-body.put(verts, faces, colours, {"head": 1.0})
-verts, faces, colours = wedge(False)
-body.put(verts, faces, colours, {"jaw": 1.0})
+verts, faces, colours, scaled = wedge(True)
+body.put(verts, faces, colours, {"head": 1.0}, scaled)
+verts, faces, colours, scaled = wedge(False)
+body.put(verts, faces, colours, {"jaw": 1.0}, scaled)
 
 # Its teeth: a row along each side of its upper jaw, pointing down, and of
 # its lower jaw, pointing up; a long fang at the front of each.
@@ -629,8 +667,17 @@ for side, arm, fore in ((1, "arm-l", "fore-l"), (-1, "arm-r", "fore-r")):
     bone(fore, mirror(ELBOW, side), mirror(WRIST, side), arm)
 bpy.ops.object.mode_set(mode="OBJECT")
 
+def scaled(obj, build):
+    """Where each of its points is on its scales, as its UVs (Skinned)."""
+    for name, values in (("round", build.rounds), ("along", build.alongs)):
+        layer = obj.data.uv_layers.new(name=name)
+        for loop in obj.data.loops:
+            layer.data[loop.index].uv = values[loop.vertex_index]
+    return obj
+
+
 made = [
-    c.skinned("dragon", body.verts, body.faces, body.colours, body.weights, skeleton),
+    scaled(c.skinned("dragon", body.verts, body.faces, body.colours, body.weights, skeleton), body),
     c.skinned("dragon-wings", wings.verts, wings.faces, wings.colours, wings.weights, skeleton),
     c.skinned("dragon-eyes", eyes.verts, eyes.faces, eyes.colours, eyes.weights, skeleton),
 ]
