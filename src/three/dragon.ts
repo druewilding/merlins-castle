@@ -71,6 +71,7 @@ const FIRE = 1.8;
 const AFTER = 0.6;
 const JAW = 0.6; // radians its jaw opens, breathing fire
 const TIP = 0.3; // and its head tips back
+const AJAR = 0.05; // radians its jaw rests open, just showing its teeth (a little more as it breathes out)
 
 const SPRITES = 220;
 const FIRE_RATE = 75; // sprites a second, breathing fire
@@ -470,7 +471,7 @@ export class Dragon {
       turn(name, ACROSS, this.look.nod * NODS[k] + 0.012 * breath);
       turn(name, UP, this.look.turn * TURNS[k] + this.shake * NODS[k]);
     });
-    turn("jaw", ACROSS, JAW * this.jaw);
+    turn("jaw", ACROSS, AJAR + 0.01 * breath + (JAW - AJAR) * this.jaw);
     TAIL.forEach((name, k) => turn(name, UP, 0.07 * Math.sin(t * 0.8 - k * 0.7) * (0.4 + k * 0.25)));
     for (const [name, side] of [
       ["arm-l", 1],
