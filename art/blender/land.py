@@ -485,6 +485,24 @@ HALLS = {h.place: h for h in [
     Hall("tower", 0, TOWER_R - 0.8, 9, c.linear("#2c2a26"), c.linear("#34312c"), at=TOWER, indoor=True, dark=True),
 ]}
 
+# The dragon (dragon.py), standing just in from the tunnel south, beside
+# it, facing west-south-west, across the way in from the west: it turns its
+# head to breathe its fire across the mouth of the tunnel. (Its head as near
+# the roof as it can be, and nothing hanging there; its tail curled round
+# behind it, on its right.) Where it stands, which way it faces, and its
+# shape on the ground: circles [x, y, r] from where it stands, as it faces -y.
+DRAGON_AT = (P["dragon-cave"][0] + 3.6, P["dragon-cave"][1] - 4.2)
+DRAGON_YAW = math.atan2(-0.96, 0.29)  # (anticlockwise, from facing -y)
+DRAGON_SHAPE = [(0, -0.9, 1.5), (0, 1.0, 1.4), (-0.4, 3.3, 0.6), (-1.4, 4.9, 0.45), (-2.6, 4.6, 0.4), (-2.8, 3.6, 0.3)]
+DRAGON_CLEAR = 5.5  # metres round it, with no stalactites or stalagmites
+
+
+def dragon_shape():
+    """Its circles on the ground, where it stands: [x, y, r]."""
+    move = c.Kit.placing((*DRAGON_AT, 0), DRAGON_YAW, 0.91)  # (as dragon.py scales it)
+    return [(*move((x, y, 0))[:2], r) for x, y, r in DRAGON_SHAPE]
+
+
 T, O, G, DM = P["trolls"], P["oak-door"], P["giant"], P["damp-tunnels"]
 TR, MZ, DK, BC = P["treasure-room"], P["maze"], P["dark-tunnels"], P["beautiful-chamber"]
 GH, WK, DU = P["grand-hall"], P["wizards-kitchen"], P["dungeon"]
@@ -3737,6 +3755,8 @@ for hall in HALLS.values():
         rock = c.mix(hall.wall, ROCK, 0.4)
         for _ in range(int(R * 1.6)):
             spot = free_spot(R - random.uniform(0.6, 2.4))
+            if spot and hall.place == "dragon-cave" and math.hypot(spot[0] - DRAGON_AT[0], spot[1] - DRAGON_AT[1]) < DRAGON_CLEAR:
+                continue
             if spot:
                 x, y, _ = spot
                 r = random.uniform(0.35, 0.7)
@@ -3745,6 +3765,8 @@ for hall in HALLS.values():
         for _ in range(int(R * 2)):
             a, rho = random.uniform(0, 2 * math.pi), random.uniform(1.5, R - 0.5)
             x, y = hx + math.cos(a) * rho, hy + math.sin(a) * rho
+            if hall.place == "dragon-cave" and math.hypot(x - DRAGON_AT[0], y - DRAGON_AT[1]) < DRAGON_CLEAR:
+                continue
             spike(caves, x, y, ceiling(x, y) + 0.3, -random.uniform(0.6, min(2.0, hall.tall - 3.4)), random.uniform(0.2, 0.45), rock)
     if hall.light == TORCH:
         # Torches on the walls.
@@ -4541,6 +4563,8 @@ for z in (CAVE + 0.3, CAVE + 1.6, CAVE + TUNNEL_TALL - 0.2):
 obstacle(["giant south"], "box", G[0], -gy, TUNNEL_HALF + 0.3, 0.5, under=True)  # the padlocked gate
 dy = DC[1] - HALLS["dragon-cave"].r - 1.5
 obstacle(["dragon-cave south"], "box", DC[0], -dy, TUNNEL_HALF + 0.3, 1.0, under=True)  # the dragon's fire
+for x, y, r in dragon_shape():
+    under_circle(x, y, r)  # (the dragon itself)
 ky = DK[1] - HALLS["dark-tunnels"].r - 1.5
 obstacle(["dark-tunnels south"], "box", DK[0], -ky, TUNNEL_HALF + 0.3, 1.0, under=True)  # too dark to go on
 caves.build("caves", smooth=False)
@@ -4800,6 +4824,11 @@ if out:
                        "castle": [CASTLE[0], CASTLE[1], round(-CASTLE[3], 2), round(-CASTLE[2], 2)]},
         # The leaves in the dragon's mouth: where the pile is [x, z] (on the way's floor), and the heaps they're swept into.
         "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
+        # The dragon: where it stands [x, z] and its floor, which way it faces [x, z], and where it breathes its
+        # fire, across the mouth of the tunnel south [x, y, z].
+        "dragon": {"at": [round(DRAGON_AT[0], 2), round(-DRAGON_AT[1], 2), HALLS["dragon-cave"].floor],
+                   "facing": [round(math.sin(DRAGON_YAW), 3), round(math.cos(DRAGON_YAW), 3)],
+                   "fire": [DC[0], HALLS["dragon-cave"].floor, round(-(DC[1] - HALLS["dragon-cave"].r + 1), 2)]},
         # The fire in the charcoal burner's hut, its middle [x, z] and floor, and the smoke hole over it: how high, and how wide.
         "hut": {"fire": [round(HUT_FIRE["x"], 2), round(-HUT_FIRE["y"], 2), round(HUT_FIRE["floor"], 2)],
                 "hole": round(HUT_FIRE["hole"], 2), "r": HUT_FIRE["r"]},

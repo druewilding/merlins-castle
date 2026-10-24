@@ -124,7 +124,7 @@ export class Smoke {
  * over and only its alpha fading, rather than drawn on a canvas: a canvas's
  * nearly clear edges come out speckled with colour.)
  */
-function puff(): Texture {
+export function puff(): Texture {
   const SIZE = 64;
   const data = new Uint8Array(SIZE * SIZE * 4).fill(255);
   for (let y = 0; y < SIZE; y++) {

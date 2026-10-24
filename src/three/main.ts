@@ -54,6 +54,7 @@ import {
 } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Caught } from "./caught";
+import { Dragon, type DragonSpot } from "./dragon";
 import { Drawbridge, type DrawbridgeSpot, wantedDown } from "./drawbridge";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
@@ -68,6 +69,7 @@ import { DEATHS, placeAt, PLACES } from "./layout";
 import { Leaves } from "./leaves";
 import { dressMaze } from "./maze";
 import { Merlin } from "./merlin";
+import dragonModel from "./models/dragon.glb?url";
 import guardModel from "./models/guards.glb?url";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
@@ -189,7 +191,7 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky, wizard, hags, bunnies, sentries] = await Promise.all([
+const [model, file, things, snaky, wizard, hags, bunnies, sentries, dragony] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
@@ -198,6 +200,7 @@ const [model, file, things, snaky, wizard, hags, bunnies, sentries] = await Prom
   loader.loadAsync(witchModel),
   loader.loadAsync(rabbitModel),
   loader.loadAsync(guardModel),
+  loader.loadAsync(dragonModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -482,6 +485,17 @@ function heap(now: boolean) {
   const swept = broomed || here === inside || (here === heaped.names[0].split(" ")[0] && pile.inMouth(player.position));
   pile.sweep(swept, now, broomed);
 }
+// The dragon by the tunnel south of its cave, breathing fire across it,
+// which the water douses (dragon.ts).
+const fiery = shapeOf.get("dragon-cave south");
+const dragon = new Dragon(
+  scene,
+  dragony.scene,
+  land.dragon as DragonSpot,
+  reducedMotion,
+  (loudness) => ownSounds.play("roar", { volume: loudness, rate: 0.9 + Math.random() * 0.2 }),
+  (loudness) => ownSounds.play("hiss", { volume: loudness })
+);
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 // A way that kills you even with the object (the balcony) has no far side
@@ -758,7 +772,7 @@ function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
   // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees, the snake, the river,
-  // the leaves, the witches, the dark.)
+  // the leaves, the witches, the moat, the dragon, the dark.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
     const shape = shapeOf.get(`${here} ${direction}`);
@@ -775,6 +789,7 @@ function inUse() {
         shape === dancers ||
         shape === holed ||
         shape === tolled ||
+        shape === fiery ||
         unlit.has(shape))
       ? [`${here} ${direction}`]
       : [];
@@ -804,6 +819,11 @@ function inUse() {
     if (instantly) snake.away();
     else snake.feed(player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
   } else if (instantly && here !== "tower") snake.back();
+  // The water thrown into the dragon's mouth, from your hand (or, loading,
+  // it's doused already); and once it's no longer in use there, its fire's back.
+  if (fiery && opened.has(fiery)) {
+    dragon.douse(instantly ? undefined : player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
+  } else dragon.relight();
   // The broom used on the witches: they fly off (or, loading, they've gone).
   if (dancers && opened.has(dancers)) {
     if (instantly) witches.away();
@@ -1006,6 +1026,7 @@ if (debugMode) {
       places: PLACES,
       items,
       snake,
+      dragon,
       merlin,
       guards,
       witches,
@@ -1338,6 +1359,7 @@ renderer.setAnimationLoop((time) => {
   merlin.update(dt, player.position, room === "merlins-lair");
   witches.update(dt, room === "forest-witches", player.camera, !(dancers && opened.has(dancers)));
   rabbits.update(dt, player.position);
+  dragon.update(dt, player.camera.position, room === "dragon-cave");
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)
