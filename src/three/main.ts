@@ -695,6 +695,7 @@ player.onBump = (exit) => {
   if (needs && effects(world, items.state).includes(needs)) return;
   say(way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo);
   sounds.play("blocked");
+  if (fiery?.names.includes(exit)) dragon.blaze();
 };
 
 // The objects, lying where the game puts them, and the five slots you carry

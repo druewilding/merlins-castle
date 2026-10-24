@@ -493,8 +493,9 @@ HALLS = {h.place: h for h in [
 # shape on the ground: circles [x, y, r] from where it stands, as it faces -y.
 DRAGON_AT = (P["dragon-cave"][0] + 3.6, P["dragon-cave"][1] - 4.2)
 DRAGON_YAW = math.atan2(-0.96, 0.29)  # (anticlockwise, from facing -y)
-DRAGON_SHAPE = [(0, -0.9, 1.5), (0, 1.0, 1.4), (-0.4, 3.3, 0.6), (-1.4, 4.9, 0.45), (-2.6, 4.6, 0.4), (-2.8, 3.6, 0.3)]
-DRAGON_CLEAR = 5.5  # metres round it, with no stalactites or stalagmites
+DRAGON_SHAPE = [(0, -0.9, 1.5), (0, 1.0, 1.4), (-0.3, 3.6, 0.55), (-0.8, 5.2, 0.4), (-2.0, 5.6, 0.35),
+                (-3.0, 4.8, 0.3), (-2.9, 3.6, 0.25)]
+DRAGON_CLEAR = 5.5  # metres round it, with no stalactites (and no stalagmites near any of it)
 
 
 def dragon_shape():
@@ -3755,7 +3756,8 @@ for hall in HALLS.values():
         rock = c.mix(hall.wall, ROCK, 0.4)
         for _ in range(int(R * 1.6)):
             spot = free_spot(R - random.uniform(0.6, 2.4))
-            if spot and hall.place == "dragon-cave" and math.hypot(spot[0] - DRAGON_AT[0], spot[1] - DRAGON_AT[1]) < DRAGON_CLEAR:
+            if spot and hall.place == "dragon-cave" and any(math.hypot(spot[0] - x, spot[1] - y) < r + 1.3
+                                                            for x, y, r in dragon_shape()):
                 continue
             if spot:
                 x, y, _ = spot

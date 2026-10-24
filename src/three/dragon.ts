@@ -1,7 +1,8 @@
 // The dragon in its cave (its model: art/blender/dragon.py), standing just
 // in from the tunnel south, its head up by the roof. It watches you, and
-// every few seconds it rears its head back and breathes a great gout of fire
-// across the mouth of the tunnel (the more often, the nearer you come). Use
+// as you come in, and again when you try to go on south past it, it rears
+// its head back and breathes a great gout of fire across the mouth of the
+// tunnel (and meanwhile puffs smoke, and a flicker of flame). Use
 // the water and you throw it, up into its open mouth: its fire turns to
 // steam, and it shakes its head, crossly, puffing smoke and steam, and lets
 // you by. Once the water's no longer in use there (you've gone on, as in
@@ -54,15 +55,15 @@ const TAIL = ["tail-1", "tail-2", "tail-3", "tail-4", "tail-5", "tail-6"];
 const TURN = 1.3; // radians it turns its head, at most, either way
 const NOD = { up: -0.45, down: 1.0 }; // and up and down
 const NEAR = 18; // metres: this near, it watches you
-const CLOSE = 5; // metres from where its fire goes: this near, it breathes it sooner
 const FAR = 90; // metres: further off than this, it's left as it is
 
 // Breathing fire: back, breathing in, then the fire, then its mouth closing.
 const BREATHE_IN = 0.8; // seconds
 const FIRE = 1.8;
 const AFTER = 0.6;
-const BETWEEN = [2.2, 4.5]; // seconds between, at least and at most (while you're near, the shorter)
-const JAW = 0.55; // radians its jaw opens, breathing fire
+const COMING_IN = 0.9; // seconds after you come in
+const JAW = 0.6; // radians its jaw opens, breathing fire
+const TIP = 0.3; // and its head tips back
 
 const SPRITES = 220;
 const FIRE_RATE = 75; // sprites a second, breathing fire
@@ -118,13 +119,13 @@ export class Dragon {
   private state: "watching" | "breathing" | "doused" | "sulking" = "watching";
   private time = 0;
   private since = 0; // seconds since its state changed (or it began breathing in)
-  private next = 2; // seconds till it next breathes fire
+  private next = Infinity; // seconds till it next breathes fire
   private look = { turn: 0, nod: 0 };
   private jaw = 0;
   private emitting = 0; // sprites owed
   private thrown = -1; // seconds since you threw the water (-1: not thrown)
-  private puffIn = 3; // seconds, sulking, till its next puff of smoke
-  private wasNear = false;
+  private puffIn = 3; // seconds till its next puff of smoke
+  private wasHere = false;
   private shake = 0; // radians its head's shaken round, doused
 
   constructor(
@@ -227,10 +228,15 @@ export class Dragon {
     if (this.state !== "doused" && this.state !== "sulking") return;
     this.state = "watching";
     this.since = 0;
-    this.next = 1.5;
+    this.next = Infinity;
     this.thrown = -1;
     for (const s of this.sprites) this.retire(s);
     if (this.reducedMotion) this.still();
+  }
+
+  /** You trying to go on south past it: it breathes its fire at the tunnel. */
+  blaze() {
+    if (this.state === "watching") this.next = Math.min(this.next, 0.15);
   }
 
   get doused() {
@@ -247,23 +253,31 @@ export class Dragon {
     }
     this.time += dt;
     this.since += dt;
-    const near = here && Math.hypot(eye.x - this.fireAt.x, eye.z - this.fireAt.z) < CLOSE;
     const watching = here && far < NEAR;
 
-    // Breathing fire, every few seconds (sooner, with you near), across the
-    // tunnel's mouth.
+    // Breathing fire across the tunnel's mouth, as you come in (or when you
+    // try to go past it: blaze); meanwhile, now and then, a puff of smoke
+    // and a flicker of flame.
     let target: Vector3 | undefined = watching ? eye : undefined;
     let wantsJaw = 0;
     let rear = 0; // (its head drawn back and up, breathing in)
+    if (here && !this.wasHere && this.state === "watching") this.next = COMING_IN;
+    this.wasHere = here;
     if (this.state === "watching") {
       this.next -= dt;
-      if (near && !this.wasNear) this.next = Math.min(this.next, 0.4);
-      if (this.next <= 0 && (here || far < 30)) {
+      if (this.next <= 0) {
         this.state = "breathing";
         this.since = 0;
+        this.next = Infinity;
+      }
+      this.puffIn -= dt;
+      if (this.puffIn <= 0) {
+        this.puffIn = 3 + Math.random() * 3;
+        const mouth = this.mouth();
+        for (let k = 0; k < 3; k++) this.puff(mouth, "smoke", 0.5);
+        for (let k = 0; k < 4; k++) this.flicker(mouth);
       }
     }
-    this.wasNear = near;
     if (this.state === "breathing") {
       const t = this.since;
       target = this.fireAt;
@@ -282,7 +296,6 @@ export class Dragon {
       } else if (t > BREATHE_IN + FIRE + AFTER) {
         this.state = "watching";
         this.since = 0;
-        this.next = MathUtils.lerp(BETWEEN[0], BETWEEN[1], near ? 0 : Math.random());
       }
     }
     // The water, landing in its mouth: the fire turns to steam.
@@ -367,11 +380,15 @@ export class Dragon {
     };
     const t = this.time;
     const breath = Math.sin(t * 1.3);
+    // Breathing fire, its head tipped back, and its jaw dropped. (Its mouth
+    // bone, where the fire comes from, isn't: the fire goes where it's aimed.)
+    turn("head", ACROSS, -TIP * this.jaw);
+    turn("mouth", ACROSS, TIP * this.jaw);
     NECK.forEach((name, k) => {
       turn(name, ACROSS, this.look.nod * NODS[k] + 0.012 * breath);
       turn(name, UP, this.look.turn * TURNS[k] + this.shake * NODS[k]);
     });
-    turn("jaw", ACROSS, -JAW * this.jaw - 0.04 * Math.max(0, breath));
+    turn("jaw", ACROSS, JAW * this.jaw + 0.03 * Math.max(0, breath));
     TAIL.forEach((name, k) => turn(name, UP, 0.07 * Math.sin(t * 0.8 - k * 0.7) * (0.4 + k * 0.25)));
     for (const [name, side] of [
       ["arm-l", 1],
@@ -387,9 +404,12 @@ export class Dragon {
     this.model.updateMatrixWorld(true);
   }
 
-  /** Where its mouth is. */
+  /** Where its mouth is (open, between its jaws). */
   private mouth() {
-    return this.joints.get("mouth")!.bone.getWorldPosition(new Vector3());
+    return this.joints
+      .get("mouth")!
+      .bone.getWorldPosition(new Vector3())
+      .add(new Vector3(0, -0.35 * this.jaw, 0));
   }
 
   /** Which way it's pointing. */
@@ -434,6 +454,14 @@ export class Dragon {
     this.start(s, "fire", this.mouth().addScaledVector(s.speed, 0.02), FIRE_LIFE * (0.8 + Math.random() * 0.4), 0.6);
   }
 
+  /** A little flicker of flame, from its nose. */
+  private flicker(at: Vector3) {
+    const s = this.take();
+    if (!s) return;
+    s.speed.set(Math.random() - 0.5, Math.random() - 0.2, Math.random() - 0.5).addScaledVector(this.mouthWay(), 2);
+    this.start(s, "fire", at, 0.45 + Math.random() * 0.2, 0.15);
+  }
+
   /** A puff of steam or smoke, from its mouth. */
   private puff(at: Vector3, kind: "steam" | "smoke", force: number) {
     const s = this.take();
@@ -476,7 +504,7 @@ export class Dragon {
         const k = Math.min(FLAME.length - 1.001, t * (FLAME.length - 1) * 1.15);
         material.color.copy(FLAME[Math.floor(k)]).lerp(FLAME[Math.floor(k) + 1], k % 1);
         material.opacity = 0.8 * Math.min(1, s.age / 0.05) * (1 - t) ** 1.2;
-        sprite.scale.setScalar(s.size + 3 * ease(t * 1.3));
+        sprite.scale.setScalar(s.size * (1 + 5 * ease(t * 1.3)));
       } else if (s.kind === "water") {
         s.speed.y -= 9.8 * dt;
         s.at.addScaledVector(s.speed, dt);

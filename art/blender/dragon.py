@@ -441,14 +441,24 @@ for top in (True, False):
 # Its horns: two great ones from the back of its skull, sweeping back and up
 # and out; two smaller ones under them, from its cheeks; and a fringe of
 # little spikes along the back of its jaw.
+def on_skull(t, across, up):
+    """A point on the top of its head, t along it, `across` of the way out to
+    its side, and sunk `up` of the way in, from its surface to its middle
+    (for the roots of its horns, deep enough in that none of their base
+    shows)."""
+    wide, crown, _ = head_shape(t)
+    a = math.asin(max(-1.0, min(1.0, across)))
+    return at_head(t, math.sin(a) * wide * up, MOUTH + math.cos(a) * crown * up)
+
+
 for side in (-1, 1):
-    root = at_head(0.1, side * 0.26, MOUTH + 0.52)
-    bend = root - FORWARD * 0.55 + HEAD_UP * 0.4 + ACROSS * side * 0.16
-    tip = root - FORWARD * 1.3 + HEAD_UP * 0.42 + ACROSS * side * 0.3
+    root = on_skull(0.14, side * 0.55, 0.8)
+    bend = root - FORWARD * 0.6 + HEAD_UP * 0.5 + ACROSS * side * 0.16
+    tip = root - FORWARD * 1.35 + HEAD_UP * 0.55 + ACROSS * side * 0.3
     cone(body, root, tip, 0.15, HORN, {"head": 1.0}, tip_colour=HORN_TIP, sides=10, bend=bend)
-    root = at_head(0.2, side * 0.42, MOUTH + 0.2)
-    cone(body, root, root - FORWARD * 0.6 + HEAD_UP * 0.12 + ACROSS * side * 0.24, 0.08, HORN, {"head": 1.0},
-         tip_colour=HORN_TIP, sides=8, bend=root - FORWARD * 0.3 + HEAD_UP * 0.1 + ACROSS * side * 0.14)
+    root = on_skull(0.22, side * 0.9, 0.82)
+    cone(body, root, root - FORWARD * 0.65 + HEAD_UP * 0.14 + ACROSS * side * 0.3, 0.08, HORN, {"head": 1.0},
+         tip_colour=HORN_TIP, sides=8, bend=root - FORWARD * 0.32 + HEAD_UP * 0.1 + ACROSS * side * 0.2)
     for k, t in enumerate((0.1, 0.22, 0.34)):
         root = at_head(t, side * head_shape(t)[0] * 0.85, MOUTH - head_shape(t)[2] * 0.7)
         cone(body, root, root - FORWARD * 0.28 - HEAD_UP * 0.08 + ACROSS * side * 0.16, 0.05, SPINE, {"jaw": 1.0},
@@ -634,8 +644,11 @@ if out:
 if preview:
     # From the front, then (beside it) from its side and from behind.
     c.preview(preview, (-9, -12, 6), (0, 0, 4.2), (0.4, 0.7, -1), lens=30)
-    for name, eye in (("side", (-16, 0.5, 4.5)), ("back", (6, 14, 7))):
+    head_mid = (head_at + FORWARD * HEAD_LONG * 0.4) * size
+    for name, eye, at in (("side", (-16, 0.5, 4.5), (0, 0.5, 3.8)), ("back", (6, 14, 7), (0, 0.5, 3.8)),
+                          ("head", tuple(head_mid + Vector((-2.2, -1.2, 0.9))), tuple(head_mid)),
+                          ("horns", tuple(head_mid + Vector((1.6, 1.4, 1.6))), tuple(head_mid))):
         bpy.context.scene.camera.location = eye
-        bpy.context.scene.camera.rotation_euler = (Vector((0, 0.5, 3.8)) - Vector(eye)).to_track_quat("-Z", "Y").to_euler()
+        bpy.context.scene.camera.rotation_euler = (Vector(at) - Vector(eye)).to_track_quat("-Z", "Y").to_euler()
         bpy.context.scene.render.filepath = preview.replace(".png", f"-{name}.png")
         bpy.ops.render.render(write_still=True)
