@@ -507,9 +507,10 @@ def dragon_shape():
 # The trolls (trolls.py), sitting on boulders round the north of their cave,
 # two either side of the way north, facing in across it, as in its picture;
 # one with its drum on the floor beside it. Each: how far round from north it
-# sits (radians, anticlockwise), and how big it is (times the model's size).
-TROLLS = [(0.82, 1.5), (0.48, 1.62), (-0.48, 1.38), (-0.82, 1.55)]
-TROLL_OUT = 6.3  # metres from the cave's middle
+# sits (radians, anticlockwise), how big it is (times the model's size), and
+# how far out from the cave's middle (metres: the bigger ones further in, off
+# the wall). The two biggest on the west, away from the way in from the east.
+TROLLS = [(1.0, 1.9, 6.15), (0.48, 2.3, 5.7), (-0.42, 1.38, 6.3), (-0.88, 1.8, 6.1)]
 TROLL_SEAT = (0.48, 0.33)  # its seat: how high, and how far behind it (at the model's size: sitting, as its clip does)
 TROLL_BODY = 0.75  # its radius, at the model's size: for bumping into, and keeping the rocks clear
 TROLL_DRUM = 2  # which of them has the drum
@@ -520,9 +521,9 @@ def troll_spots():
     cave's middle, a little south of it), and how big it is."""
     hall = HALLS["trolls"]
     spots = []
-    for round_, size in TROLLS:
+    for round_, size, out in TROLLS:
         a = math.pi / 2 + round_
-        x, y = hall.x + math.cos(a) * TROLL_OUT, hall.y + math.sin(a) * TROLL_OUT
+        x, y = hall.x + math.cos(a) * out, hall.y + math.sin(a) * out
         facing = Vector((hall.x - x, hall.y - 1.5 - y)).normalized()
         spots.append(((x, y), (facing.x, facing.y), size))
     return spots
