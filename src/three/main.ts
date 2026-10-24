@@ -54,7 +54,7 @@ import {
 } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Caught } from "./caught";
-import { Dragon, type DragonSpot } from "./dragon";
+import { Dragon, type DragonCave, type DragonSpot } from "./dragon";
 import { Drawbridge, type DrawbridgeSpot, wantedDown } from "./drawbridge";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
@@ -492,6 +492,7 @@ const dragon = new Dragon(
   scene,
   dragony.scene,
   land.dragon as DragonSpot,
+  land.halls["dragon-cave"] as DragonCave,
   reducedMotion,
   (loudness) => ownSounds.play("roar", { volume: loudness, rate: 0.9 + Math.random() * 0.2 }),
   (loudness) => ownSounds.play("hiss", { volume: loudness })

@@ -43,6 +43,14 @@ export interface DragonSpot {
   fire: number[];
 }
 
+/** Its cave (land.json's hall): its middle, how far its wall is, and how tall it is. */
+export interface DragonCave {
+  x: number;
+  z: number;
+  r: number;
+  tall: number;
+}
+
 const UP = new Vector3(0, 1, 0);
 const ACROSS = new Vector3(1, 0, 0); // (its left, as it was made, facing +z)
 const AHEAD = new Vector3(0, 0, 1);
@@ -131,6 +139,7 @@ export class Dragon {
     scene: Scene,
     source: Object3D,
     spot: DragonSpot,
+    private cave: DragonCave,
     private reducedMotion: boolean,
     /** Its fire, roaring out (how loud, for how near you are). */
     private onRoar: (loudness: number) => void,
@@ -521,7 +530,18 @@ export class Dragon {
         material.opacity = (s.kind === "steam" ? 0.45 : 0.35) * Math.min(1, s.age / 0.3) * (1 - t) ** 1.5;
         sprite.scale.setScalar(s.size + (s.kind === "steam" ? 3 : 1.6) * ease(t));
       }
+      // (Kept out of the rock: lifted off the floor, and fading as it
+      // reaches the walls and the roof. A sprite into the rock is cut off
+      // sharp, in stripes along its faces.)
+      const half = sprite.scale.x / 2;
       sprite.position.copy(s.at);
+      sprite.position.y = Math.max(s.at.y, this.floor + half * 0.9);
+      const { x, z, r, tall } = this.cave;
+      const out = Math.hypot(s.at.x - x, s.at.z - z);
+      const wall = this.floor + Math.max(4, tall * 0.5);
+      const roof = wall + (this.floor + tall - wall) * Math.sqrt(Math.max(0, 1 - (out / (r + 0.4)) ** 2));
+      const room = Math.min(r - 0.2 - out, roof - 0.2 - sprite.position.y) / half;
+      material.opacity *= Math.min(1, Math.max(0, room));
     }
   }
 

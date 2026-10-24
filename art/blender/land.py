@@ -3201,6 +3201,23 @@ TIMBER = c.linear("#4a3420")
 LAYERS = (c.linear("#6e6d6a"), c.linear("#5a5957"), c.linear("#7c7a76"), c.linear("#4c4b4a"), c.linear("#6a6560"))
 
 
+def ring_to_square(row, u, h, half, rock):
+    """Where the ring of rock at a way's end (from the rock in to the square
+    opening) meets the square, for this point of the rock: straight in from
+    it, towards the middle of the roof's curve, as the rock was pushed out
+    (so no two pieces of the ring cross, and fold over each other, and
+    flicker); and never further out than the rock is."""
+    x, y, f = row[0], row[1], row[2]
+    if h <= SPRING:
+        return (x + row[3] * u * half, y + row[4] * u * half, f + h)
+    dx, dz = u * half, h - SPRING
+    t = (TUNNEL_TALL - SPRING) / dz
+    if abs(dx) > 1e-6:
+        t = min(t, half / abs(dx))
+    t = min(t, (rock[2] - f - SPRING) / dz)
+    return (x + row[3] * dx * t, y + row[4] * dx * t, f + SPRING + dz * t)
+
+
 def vault_point(row, u, h, half):
     """A point of the rock round a way: pushed out by up to 0.4 m (but not at
     the foot of its walls, where they meet the floor)."""
@@ -3365,7 +3382,7 @@ for way in WAYS.values():
             for row, pts_, ends in ((a, pa, k == 0 or not rocky_[k - 1]), (b, pb, k == len(rocky_) - 1 or not rocky_[k + 1])):
                 if not ends or (row is a and k in dead_rows) or (row is b and k + 1 in dead_rows):
                     continue  # (a dead end: the rock closes round it, below)
-                square = [(*side(row, u * half), row[2] + (h if h <= SPRING else TUNNEL_TALL)) for u, h in VAULT]
+                square = [ring_to_square(row, u, h, half, p) for (u, h), p in zip(VAULT, pts_)]
                 for i in range(len(VAULT) - 1):
                     quad(tunnel, [pts_[i], pts_[i + 1], square[i + 1], square[i]], rock_colour(*pts_[i]), 0.1)
             # Timber props, every few metres (not by a hall).

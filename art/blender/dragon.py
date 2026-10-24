@@ -330,10 +330,12 @@ def leg(side, joints, toes_at, toe_y):
 
 for side in (-1, 1):
     # (Its thighs big and strong, its hocks high, as a dog's are.)
-    leg(side, [((0.7, 1.3, 2.75), 0.72), ((0.95, 0.75, 2.05), 0.78), ((1.12, 0.2, 1.45), 0.5),
+    # (Each from well inside its body, so it grows out of it: no edge to see.)
+    leg(side, [((0.3, 1.35, 2.9), 0.5), ((0.68, 1.25, 2.6), 0.72), ((0.95, 0.75, 2.05), 0.78), ((1.12, 0.2, 1.45), 0.5),
                ((1.15, 0.95, 0.62), 0.3), ((1.15, 0.6, 0.18), 0.23)], (1.15, 0.55, 0.15), -0.3)
-    leg(side, [((0.68, -0.75, 3.7), 0.6), ((0.92, -0.4, 2.4), 0.46), ((0.98, -0.8, 1.2), 0.31),
-               ((0.96, -1.1, 0.42), 0.25), ((0.96, -1.15, 0.16), 0.21)], (0.96, -1.15, 0.15), -1.8)
+    leg(side, [((0.3, -0.85, 4.2), 0.45), ((0.66, -0.7, 3.55), 0.6), ((0.92, -0.4, 2.4), 0.46),
+               ((0.98, -0.8, 1.2), 0.31), ((0.96, -1.1, 0.42), 0.25), ((0.96, -1.15, 0.16), 0.21)],
+        (0.96, -1.15, 0.15), -1.8)
 
 
 # ---- Its head: a long, broad skull, a jaw hinged under it, horns sweeping
@@ -644,6 +646,11 @@ if out:
 if preview:
     # From the front, then (beside it) from its side and from behind.
     c.preview(preview, (-9, -12, 6), (0, 0, 4.2), (0.4, 0.7, -1), lens=30)
+    for name, eye, at in (("legs", (-6, -7, 3.2), (0.6, -0.6, 2.8)),):
+        bpy.context.scene.camera.location = eye
+        bpy.context.scene.camera.rotation_euler = (Vector(at) - Vector(eye)).to_track_quat("-Z", "Y").to_euler()
+        bpy.context.scene.render.filepath = preview.replace(".png", f"-{name}.png")
+        bpy.ops.render.render(write_still=True)
     head_mid = (head_at + FORWARD * HEAD_LONG * 0.4) * size
     for name, eye, at in (("side", (-16, 0.5, 4.5), (0, 0.5, 3.8)), ("back", (6, 14, 7), (0, 0.5, 3.8)),
                           ("head", tuple(head_mid + Vector((-2.2, -1.2, 0.9))), tuple(head_mid)),
