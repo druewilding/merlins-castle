@@ -54,6 +54,7 @@ import {
 } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Caught } from "./caught";
+import { Door } from "./door";
 import { Dragon, type DragonCave, type DragonSpot } from "./dragon";
 import { Drawbridge, type DrawbridgeSpot, wantedDown } from "./drawbridge";
 import { Fall } from "./fall";
@@ -429,6 +430,30 @@ if (rusty && leaves[0] && leaves[1]) {
   });
 }
 const SWING = 1.75; // radians, open
+// The locked doors across the ways south (door.ts): the oak door, and the
+// giant's iron gate, padlocked. Open until you come into its room, then shut
+// behind you, and open again while the key's in use there.
+const doors = new Map<Shape, Door>();
+for (const [exit, name, shackle, way, iron] of [
+  ["oak-door south", "oak-door-leaf", undefined, 1, false],
+  ["giant south", "iron-gate-leaf", "padlock-shackle", -1, true],
+] as const) {
+  const shape = shapeOf.get(exit);
+  const leaf = model.scene.getObjectByName(name);
+  if (!shape || !leaf) continue;
+  doors.set(
+    shape,
+    new Door(leaf, shackle && model.scene.getObjectByName(shackle), way, {
+      unlock: () => ownSounds.play("unlock"),
+      open: () => (iron ? ownSounds.play("creak", { rate: 0.8 }) : ownSounds.play("door")),
+      shut: () => ownSounds.play(iron ? "clang" : "shut"),
+      lock: () => ownSounds.play("latch"),
+    })
+  );
+}
+// (Away from its room, it stands open, as you'd find it coming from behind:
+// set so straight away, unseen and unheard. In its room, it's shut behind you.)
+const awayFrom = (shape: Shape) => items.state.room !== shape.names[0].split(" ")[0];
 // The chest in the tower, its lid opening as you come up to it (and the
 // emerald in it, items.ts), and shutting as you go.
 const lid = model.scene.getObjectByName("chest-lid");
@@ -819,7 +844,7 @@ let instantly = true; // (loading, what's in use is as it was: no gate swinging 
 function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
-  // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees, the snake, the river,
+  // (Only the ways the 3D world can open so far: walls to climb, gates, doors, the dense trees, the snake, the river,
   // the leaves, the witches, the moat, the dragon, the dark.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
@@ -829,6 +854,7 @@ function inUse() {
       shape &&
       (walls.has(shape) ||
         gates.has(shape) ||
+        doors.has(shape) ||
         shape === dense ||
         shape === guarded ||
         shape === shut ||
@@ -859,6 +885,7 @@ function inUse() {
     gate.wants = wants;
     if (instantly) gate.open = gate.wants;
   }
+  if (instantly) for (const [shape, door] of doors) door.set(awayFrom(shape) || opened.has(shape), true);
   if (dense) felling.fell(opened.has(dense), instantly);
   if (heaped) heap(instantly);
   // The apple thrown to the snake, from your hand (or, loading, it's gone,
@@ -1094,6 +1121,7 @@ if (debugMode) {
       guards,
       witches,
       net,
+      doors,
       restart,
       drawn,
     },
@@ -1467,6 +1495,10 @@ renderer.setAnimationLoop((time) => {
   drawbridge.update(dt);
   if (drawbridge.down !== settled) solidify();
   guards.update(dt, player.camera.position);
+  for (const [shape, door] of doors) {
+    door.set(awayFrom(shape) || opened.has(shape), awayFrom(shape));
+    door.update(dt);
+  }
   for (const gate of gates.values()) {
     gate.open += Math.sign(gate.wants - gate.open) * Math.min(Math.abs(gate.wants - gate.open), dt * 0.8);
     // (Slow to start and to stop, like a heavy old gate.)

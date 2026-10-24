@@ -3201,6 +3201,17 @@ TIMBER = c.linear("#4a3420")
 LAYERS = (c.linear("#6e6d6a"), c.linear("#5a5957"), c.linear("#7c7a76"), c.linear("#4c4b4a"), c.linear("#6a6560"))
 
 
+def swept_by_a_door(x, y):
+    """Whether a spot is where one of the locked doors (below) swings, opening:
+    south from its line, as far as it's wide, across the way."""
+    for place in ("oak-door", "giant"):
+        hall = HALLS[place]
+        line = hall.y - hall.r - 1.2
+        if abs(x - hall.x) < TUNNEL_HALF + 0.5 and line - 2 * TUNNEL_HALF - 0.4 < y < line + 0.4:
+            return True
+    return False
+
+
 RING_OUT = 0.6  # metres past the way's square, round it: past the most its rock is pushed out
 
 
@@ -3417,8 +3428,9 @@ for way in WAYS.values():
                 sign = rubble.choice((1, -1))
                 rx3, ry3 = side(a, sign * (half - 0.08))
                 r = rubble.uniform(0.12, 0.28)
-                tunnel.blob((rx3, ry3, a[2] + r * 0.2), r, c.mix(LAYERS[2], LAYERS[3], rubble.random()),
-                            squash=0.6, lumpy=0.35, seed=rubble.random() * 100, subdivisions=1)
+                shade, seed = c.mix(LAYERS[2], LAYERS[3], rubble.random()), rubble.random() * 100
+                if not swept_by_a_door(rx3, ry3):
+                    tunnel.blob((rx3, ry3, a[2] + r * 0.2), r, shade, squash=0.6, lumpy=0.35, seed=seed, subdivisions=1)
             continue
         if way.open:
             continue
@@ -4579,17 +4591,117 @@ embers.build("embers", smooth=False)
 # Doors and things that block the ways (until the game opens them).
 t_edge = T[1] + HALLS["trolls"].r + 1.5
 obstacle(["trolls north"], "box", T[0], -t_edge, TUNNEL_HALF + 0.3, 1.0, under=True)  # the trolls, in the way
+# The two locked doors across the ways south, the oak door's and the giant's
+# iron gate: each its own object, on its hinge at one of the way's walls, which
+# the game swings open (south, away from its hall) and shut again. Each hangs
+# below where the roof starts to curve in (so, opening, it clears the roof),
+# under a fixed piece filling the arch over it: oak boards over the door, bars
+# over the gate. (Each object's origin is its hinge, at the door's south face
+# and its foot: swinging, it never goes into the post it hangs on.)
+DOOR_IN = 0.08  # its hinge, in from the way's wall
+DOOR_TALL = 2.15  # its height, under the roof's curve
+DOOR_WIDE = 2 * (TUNNEL_HALF - DOOR_IN) - 0.02
+OLD_OAK = c.linear("#6b4a2c")
+DOOR_IRON = c.linear("#242325")
+BRASS = c.linear("#a8823a")
+KEYHOLE = c.linear("#0a0806")
+STEEL = c.linear("#a19d94")
+
+
+def strap(b, x0, x1, z, y0, y1, studs=True):
+    """A door's iron strap across it, from x0 to x1, with studs along it."""
+    block(b, x0, y0, z - 0.045, x1, y1, z + 0.045, DOOR_IRON, solid=False)
+    out = y1 - y0
+    for k in range(int((x1 - x0) / 0.28) + 1 if studs else 0):
+        x = x0 + 0.1 + k * 0.28
+        if x < x1 - 0.05:
+            near = y1 if y1 > y0 else y0
+            block(b, x - 0.018, near - out * 0.1, z - 0.018, x + 0.018, near + out * 0.6, z + 0.018, DOOR_IRON,
+                  solid=False)
+
+
+def ring_handle(b, x, y, z, out):
+    """A ring to pull it by, hanging from a round plate: out (+1 or -1) is
+    which face it's on."""
+    block(b, x - 0.06, y, z - 0.06, x + 0.06, y + out * 0.015, z + 0.06, DOOR_IRON, solid=False)
+    block(b, x - 0.015, y, z - 0.015, x + 0.015, y + out * 0.05, z + 0.015, DOOR_IRON, solid=False)
+    r, t = 0.075, 0.014
+    for k in range(10):
+        a0, a1 = 2 * math.pi * k / 10, 2 * math.pi * (k + 1) / 10
+        p0 = (x + r * math.sin(a0), z - r + r * math.cos(a0))
+        p1 = (x + r * math.sin(a1), z - r + r * math.cos(a1))
+        xs, zs = sorted((p0[0], p1[0])), sorted((p0[1], p1[1]))
+        block(b, xs[0] - t, y + out * 0.04, zs[0] - t, xs[1] + t, y + out * 0.065, zs[1] + t, DOOR_IRON, solid=False)
+
+
+# The oak door: old planks, dark seams between them, iron straps from its
+# hinges across both faces, studded, a ring to pull it by and a keyhole.
 oy = O[1] - HALLS["oak-door"].r - 1.2
-block(caves, O[0] - TUNNEL_HALF, oy - 0.15, CAVE, O[0] + TUNNEL_HALF, oy + 0.15, CAVE + TUNNEL_TALL, OAK, solid=False)
+ox0, ox1 = O[0] - TUNNEL_HALF, O[0] + TUNNEL_HALF
+for x0, x1 in ((ox0 - 0.3, ox0 + DOOR_IN), (ox1 - DOOR_IN - 0.02, ox1 + 0.3)):
+    block(caves, x0, oy - 0.14, CAVE, x1, oy + 0.14, CAVE + DOOR_TALL + 0.05, OAK, solid=False)  # its posts
+block(caves, ox0 - 0.3, oy - 0.16, CAVE + DOOR_TALL + 0.02, ox1 + 0.3, oy + 0.16, CAVE + DOOR_TALL + 0.3, OAK,
+      solid=False)  # the beam over it
+for k in range(9):
+    x0 = ox0 - 0.3 + k * (ox1 - ox0 + 0.6) / 9
+    block(caves, x0 + 0.01, oy - 0.07, CAVE + DOOR_TALL + 0.3, x0 + (ox1 - ox0 + 0.6) / 9 - 0.01, oy + 0.07,
+          CAVE + TUNNEL_TALL + 0.3, c.vary(OAK, 0.2, Vector((k, 1.7, 0))), solid=False)  # the boards over it
+block(caves, ox0, oy - 0.05, CAVE + DOOR_TALL + 0.3, ox1, oy + 0.05, CAVE + TUNNEL_TALL + 0.3, KEYHOLE,
+      solid=False)  # (dark, between them)
+oak_leaf = c.Builder()
+THICK = 0.12  # its thickness
+PLANKS = 6
+block(oak_leaf, 0.02, 0.012, 0.01, DOOR_WIDE - 0.02, THICK - 0.012, DOOR_TALL - 0.01, KEYHOLE, solid=False)  # (the seams)
+for k in range(PLANKS):
+    x0, x1 = k * DOOR_WIDE / PLANKS, (k + 1) * DOOR_WIDE / PLANKS
+    shade = c.mix(c.vary(OLD_OAK, 0.25, Vector((k * 1.3, 4, 2))), c.linear("#3a2a1c"), 0.15 * (k % 2))
+    block(oak_leaf, x0 + 0.008, 0, 0, x1 - 0.008, THICK, DOOR_TALL - 0.004 * (k % 3), shade, solid=False)
+for z in (0.42, DOOR_TALL - 0.42):
+    strap(oak_leaf, -0.02, DOOR_WIDE * 0.8, z, THICK, THICK + 0.014)  # (its north face)
+    strap(oak_leaf, -0.02, DOOR_WIDE * 0.8, z, 0, -0.014)  # (and its south)
+for y, face in ((THICK, 1), (0, -1)):
+    ring_handle(oak_leaf, DOOR_WIDE - 0.32, y, 1.12, face)
+    block(oak_leaf, DOOR_WIDE - 0.36, y, 0.82, DOOR_WIDE - 0.28, y + face * 0.012, 0.96, DOOR_IRON, solid=False)
+    block(oak_leaf, DOOR_WIDE - 0.33, y + face * 0.012, 0.85, DOOR_WIDE - 0.31, y + face * 0.016, 0.91, KEYHOLE, solid=False)
+oak_leaf.build("oak-door-leaf", smooth=False).location = (ox0 + DOOR_IN, oy - THICK / 2, CAVE)
 obstacle(["oak-door south"], "box", O[0], -oy, TUNNEL_HALF + 0.3, 0.5, under=True)  # the oak door, locked
 gx = G[0] - HALLS["giant"].r - 1.5
 obstacle(["giant west"], "box", gx, -G[1], 1.0, TUNNEL_HALF + 0.3, under=True)  # the giant, in the way
+# The giant's iron gate: bars and rails, between iron posts at the walls, with
+# more bars fixed over it, up into the roof; padlocked, on the hall's side, to
+# a staple on the west post, its hinges on the east one (the padlock, brass, stays there, its shackle its
+# own object, steel, which the game springs open with the key).
 gy = G[1] - HALLS["giant"].r - 1.2
-for k in range(11):
-    x = G[0] - TUNNEL_HALF + 0.15 + k * (2 * TUNNEL_HALF - 0.3) / 10
-    block(caves, x - 0.05, gy - 0.05, CAVE, x + 0.05, gy + 0.05, CAVE + TUNNEL_TALL, IRON, solid=False)
-for z in (CAVE + 0.3, CAVE + 1.6, CAVE + TUNNEL_TALL - 0.2):
-    block(caves, G[0] - TUNNEL_HALF, gy - 0.08, z, G[0] + TUNNEL_HALF, gy + 0.08, z + 0.15, IRON, solid=False)
+gx0, gx1 = G[0] - TUNNEL_HALF, G[0] + TUNNEL_HALF
+BARS = 11
+for x0, x1 in ((gx0 - 0.2, gx0 + DOOR_IN), (gx1 - DOOR_IN - 0.02, gx1 + 0.2)):
+    block(caves, x0, gy - 0.08, CAVE, x1, gy + 0.08, CAVE + DOOR_TALL + 0.05, IRON, solid=False)  # its posts
+block(caves, gx0 - 0.2, gy - 0.08, CAVE + DOOR_TALL + 0.03, gx1 + 0.2, gy + 0.08, CAVE + DOOR_TALL + 0.18, IRON,
+      solid=False)  # the rail over it
+block(caves, gx0, gy - 0.08, CAVE + TUNNEL_TALL - 0.2, gx1, gy + 0.08, CAVE + TUNNEL_TALL - 0.05, IRON, solid=False)
+for k in range(BARS):
+    x = gx0 + DOOR_IN + 0.05 + k * (DOOR_WIDE - 0.1) / (BARS - 1)
+    block(caves, x - 0.05, gy - 0.05, CAVE + DOOR_TALL + 0.18, x + 0.05, gy + 0.05, CAVE + TUNNEL_TALL + 0.3, IRON,
+          solid=False)  # (the bars over it, in line with its own)
+gate_leaf = c.Builder()
+THICK = 0.16  # its thickness, at its rails
+for k in range(BARS):
+    x = -0.05 - k * (DOOR_WIDE - 0.1) / (BARS - 1)  # (out west from its hinge)
+    block(gate_leaf, x - 0.05, THICK / 2 - 0.05, 0, x + 0.05, THICK / 2 + 0.05, DOOR_TALL, IRON, solid=False)
+for z in (0.25, 1.15, DOOR_TALL - 0.15):
+    block(gate_leaf, -DOOR_WIDE, 0, z, 0, THICK, z + 0.15, IRON, solid=False)
+# (A hasp on its end, for the padlock's shackle to go through, at the post's staple.)
+block(gate_leaf, -DOOR_WIDE - 0.01, THICK, 1.17, -DOOR_WIDE + 0.1, THICK + 0.08, 1.25, IRON, solid=False)
+gate_leaf.build("iron-gate-leaf", smooth=False).location = (gx1 - DOOR_IN, gy - THICK / 2, CAVE)
+lx, ly, lz = gx0 + DOOR_IN + 0.01, gy + THICK / 2 + 0.07, CAVE + 1.0  # the padlock's middle, on the hall's side
+block(caves, lx - 0.035, gy + 0.08, lz + 0.15, lx + 0.015, ly, lz + 0.24, IRON, solid=False)  # the staple
+block(caves, lx - 0.075, ly - 0.03, lz - 0.09, lx + 0.075, ly + 0.03, lz + 0.09, BRASS, solid=False)  # its body
+block(caves, lx - 0.016, ly + 0.03, lz - 0.01, lx + 0.016, ly + 0.036, lz + 0.035, KEYHOLE, solid=False)  # keyhole
+block(caves, lx - 0.006, ly + 0.03, lz - 0.05, lx + 0.006, ly + 0.036, lz - 0.01, KEYHOLE, solid=False)
+shackle = c.Builder()
+for x0, x1, z0, z1 in ((-0.015, 0.015, -0.07, 0.13), (0.085, 0.115, -0.01, 0.13), (-0.015, 0.115, 0.11, 0.145)):
+    block(shackle, x0, -0.015, z0, x1, 0.015, z1, STEEL, solid=False)  # (one leg longer, deep in it: lifted, it stays in on that one)
+shackle.build("padlock-shackle", smooth=False).location = (lx - 0.05, ly, lz + 0.09)
 obstacle(["giant south"], "box", G[0], -gy, TUNNEL_HALF + 0.3, 0.5, under=True)  # the padlocked gate
 dy = DC[1] - HALLS["dragon-cave"].r - 1.5
 obstacle(["dragon-cave south"], "box", DC[0], -dy, TUNNEL_HALF + 0.3, 1.0, under=True)  # the dragon's fire
