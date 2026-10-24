@@ -384,7 +384,8 @@ export class Dragon {
     // The water, landing in its mouth: the fire turns to steam.
     if (this.thrown >= 0) {
       this.thrown += dt;
-      if (this.thrown >= THROW && this.state !== "doused") {
+      if (this.thrown >= THROW) {
+        this.thrown = -1; // (landed: once)
         this.state = "doused";
         this.since = 0;
         this.onHiss(this.loudness(far));

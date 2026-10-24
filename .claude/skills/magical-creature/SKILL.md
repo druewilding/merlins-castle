@@ -180,3 +180,7 @@ hiss for steam), list them in `src/three/sounds.json`, and run
   right way on every part.
 - The mouth looked hollow: close the nose and chin, add lips, rest the jaw just
   open enough to show the teeth.
+- Doused, it hissed and steamed again every couple of seconds: a one-off
+  moment (a hiss, a burst of steam) must reset its own timer when it fires,
+  not rely on the state it moves to. Drive it and log each sound for a good
+  while after, not just the first few seconds.
