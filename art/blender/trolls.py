@@ -143,10 +143,37 @@ EAR = Vector((0.072, 0.025, 1.695))  # where his ears join his head (on his left
 NOSE_AT = tip + Vector((0, 0.027, -0.002))  # the middle of his nose, behind its tip
 MOUTH = 1.607  # the line between his lips
 CHEEK = Vector((0.04, -0.072, 1.64))  # the middle of his cheek (his left)
+EYE = (Vector((0.0338, -0.066, 1.6986)), 0.0148)  # the middle of his eye (his left), and how big it is
+# Where his lids open, the upper and the lower, and where they meet, blinking
+# (the shape key "blink"): radians up from straight ahead, round his eye's middle.
+LIDS = (0.204, -0.49, -0.28)
 
 
-def faced(p, long_nose=False, big_ears=False):
-    """A point of his face, made a troll's, and smiling."""
+def blinked(p):
+    """A point of his face, his eyes shut: each lid turned round his eye's
+    middle over it (so it never goes into it), most at its edge, less going
+    away from it."""
+    eye = Vector((math.copysign(EYE[0].x, p.x), EYE[0].y, EYE[0].z))
+    d = p - eye
+    if d.y > 0.003 or d.length > EYE[1] + 0.012:
+        return p
+    across = c.smooth(1 - (abs(d.x) - 0.85 * EYE[1]) / (0.6 * EYE[1]))
+    up = math.atan2(d.z, -d.y)
+    if up > 0.1:
+        turn = (LIDS[2] - LIDS[0]) * c.smooth(1 - (up - LIDS[0]) / 0.9)  # (down)
+    elif up < -0.2:
+        turn = (LIDS[2] - LIDS[1]) * c.smooth(1 - (LIDS[1] - up) / 0.6)  # (up)
+    else:
+        return p
+    turn *= across * c.smooth(1 - (d.length - EYE[1] - 0.004) / 0.008)
+    out = math.hypot(d.y, d.z)
+    return Vector((p.x, eye.y - out * math.cos(up + turn), eye.z + out * math.sin(up + turn)))
+
+
+def faced(p, long_nose=False, big_ears=False, blink=False):
+    """A point of his face, made a troll's, and smiling (or blinking)."""
+    if blink:
+        p = blinked(p)
     # The nose: grown round and heavy, all of it, from its middle; or long,
     # and drooping at its end.
     d = Vector(((p.x - NOSE_AT.x) / 0.035, (p.y - NOSE_AT.y) / 0.045, (p.z - NOSE_AT.z) / 0.035)).length
@@ -213,11 +240,12 @@ def trolled(i, belly=BELLY[0], **face_):
 everyone = range(len(rest))
 points = welded(trolled(i) for i in everyone)
 # Each a little different (the game mixes these in): a bigger belly, a long
-# droopy nose, bigger ears.
+# droopy nose, bigger ears. And his eyes shut, for the game to blink them.
 KEYS = {
     "belly": welded(trolled(i, belly=BELLY[0] + FATTER) for i in everyone),
     "long-nose": welded(trolled(i, long_nose=True) if i in face else points[i] for i in everyone),
     "big-ears": welded(trolled(i, big_ears=True) if i in face else points[i] for i in everyone),
+    "blink": welded(trolled(i, blink=True) if i in face else points[i] for i in everyone),
 }
 for v, p in zip(body.data.vertices, points):
     v.co = to_mesh @ p
@@ -515,6 +543,13 @@ if preview:
         c.preview(preview.replace(".png", f"-{n}.png"), (1.2, -4.2, 1.3), (0, 0, 0.95), (0.4, 0.8, -1), lens=40)
         c.preview(preview.replace(".png", f"-face-{n}.png"), (0.2, -0.8, 1.5), (0, 0, 1.64), (0.4, 0.8, -1), lens=50)
     c.preview(preview.replace(".png", "-profile.png"), (-0.8, -0.35, 1.64), (0, 0, 1.63), (0.4, 0.8, -1), lens=50)
+    # (And blinking, close up: open, and shut.)
+    keys = body.data.shape_keys.key_blocks
+    for shut in (0.0, 1.0):
+        keys["blink"].value = shut
+        c.preview(preview.replace(".png", f"-blink-{int(shut)}.png"), (0.1, -0.45, 1.69), (0.02, 0, 1.69), (0.4, 0.8, -1),
+                  lens=60)
+    keys["blink"].value = 0.0
     rock.hide_render = False
     c.pose(skeleton, "Sitting_Talking_Loop", 30)
     c.preview(preview.replace(".png", "-sitting.png"), (1.6, -3.6, 1.3), (0, 0, 0.75), (0.4, 0.8, -1), lens=40)

@@ -52,6 +52,8 @@ const STEP = 0.45; // metres (at its size) each steps forward off its boulder, g
 const DRUM = [0.7, 0.2]; // the drum, beside its troll: how far to its side, and forward (at its size)
 const TURN = 1.0; // radians their heads turn, at most, either way
 const GLANCE = [1.5, 4]; // seconds between their glances, now to one side, now back to you
+const BLINK = [3, 7]; // seconds between their blinks (and now and then, straight after, another)
+const SHUT = 0.15; // seconds a blink takes, shutting and opening
 const HANDS = 1.4; // times bigger their hands are (by their bones: so their fingers bend where their joints are)
 // Each its own look (art/blender/trolls.py makes the pieces, and previews
 // these): its hair (troll-hair-0..2), a beard or not, its shape (its body's
@@ -98,6 +100,8 @@ interface Troll {
   look: { turn: number; up: number };
   /** A glance aside (radians round, and up), and for how much longer. */
   glance: { turn: number; up: number; for: number };
+  /** Its eyelids (its body's shape key "blink", 0 open to 1 shut): seconds till it blinks, and how far into one it is. */
+  lids: { shut: (amount: number) => void; wait: number; at: number };
 }
 
 interface Twinkle {
@@ -141,6 +145,7 @@ export class Trolls {
         own.color.set(tint);
         return own;
       };
+      let shut = (_amount: number) => {};
       model.traverse((o) => {
         if (!(o instanceof Mesh)) return;
         o.castShadow = true;
@@ -154,6 +159,9 @@ export class Trolls {
         }
         if (o.name.startsWith("troll-")) o.material = tinted(o.material as Material, look.moss);
         else if (o.name.startsWith("SuperHero")) o.material = tinted(o.material as Material, look.skin);
+        const blink = o.morphTargetDictionary?.blink;
+        const influences = o.morphTargetInfluences;
+        if (blink !== undefined && influences) shut = (amount) => (influences[blink] = amount);
       });
       const yaw = Math.atan2(fx, fz);
       model.scale.setScalar(size);
@@ -182,6 +190,7 @@ export class Trolls {
         face,
         look: { turn: 0, up: 0 },
         glance: { turn: 0, up: 0, for: 0 },
+        lids: { shut, wait: BLINK[0] * Math.random(), at: -1 },
       };
       this.play(troll, "Sitting_Idle_Loop", true);
       // (Not in step with each other.)
@@ -297,6 +306,7 @@ export class Trolls {
       this.shape(troll);
       troll.posed.copy(troll.head?.quaternion ?? troll.posed);
       if (!this.dancing) this.watch(troll, eye, here && far < ASK * 1.5, dt);
+      this.blink(troll, dt);
     }
     this.twinkle(dt);
   }
@@ -323,6 +333,22 @@ export class Trolls {
   /** How far it's stepped forward off its boulder (0 to 1). */
   private stepTo(troll: Troll, step: number) {
     troll.model.position.copy(troll.seat).addScaledVector(troll.ahead, step);
+  }
+
+  /** Now and then, a blink (and sometimes another, straight after). */
+  private blink(troll: Troll, dt: number) {
+    const { lids } = troll;
+    if (lids.at < 0) {
+      lids.wait -= dt;
+      if (lids.wait > 0) return;
+      lids.at = 0;
+    }
+    lids.at += dt;
+    lids.shut(Math.sin(Math.PI * Math.min(1, lids.at / SHUT)));
+    if (lids.at < SHUT) return;
+    lids.shut(0);
+    lids.at = -1;
+    lids.wait = Math.random() < 0.2 ? 0.12 : BLINK[0] + Math.random() * (BLINK[1] - BLINK[0]);
   }
 
   /** Its head turned to you (as far as it can turn), now and then glancing aside. */
