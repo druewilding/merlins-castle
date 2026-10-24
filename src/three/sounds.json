@@ -8,5 +8,8 @@
   "falling": { "file": "merlin/falling.wav", "volume": 0.6 },
   "coins": { "file": "kenney_rpg-audio/Audio/handleCoins.ogg", "volume": 0.7 },
   "roar": { "file": "merlin/roar.wav", "volume": 0.8 },
-  "hiss": { "file": "merlin/hiss.wav", "volume": 0.6 }
+  "hiss": { "file": "merlin/hiss.wav", "volume": 0.6 },
+  "trip": { "file": "kenney_impact-sounds/Audio/footstep_concrete_004.ogg", "volume": 0.7 },
+  "bump": { "file": "kenney_impact-sounds/Audio/impactSoft_heavy_001.ogg", "volume": 0.8 },
+  "dizzy": { "file": "merlin/dizzy.wav", "volume": 0.5 }
 }

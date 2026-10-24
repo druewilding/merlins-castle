@@ -698,6 +698,11 @@ export class Player {
     return this.under ? this.under.floor : this.ground(x, z);
   }
 
+  /** The floor underground at a spot, going on from where you stand (or nothing: not a way or a hall). */
+  floorAt(x: number, z: number) {
+    return this.underAt(x, z, this.position.y)?.floor;
+  }
+
   /** How far below the land you are: 0 on it, more the deeper you go. */
   get depth() {
     return Math.max(0, (this.ground(this.position.x, this.position.z) ?? 0) - this.position.y);

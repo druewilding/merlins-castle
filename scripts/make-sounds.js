@@ -299,3 +299,18 @@ const rise = (t, from, to) => Math.min(1, Math.max(0, (t - from) / (to - from)))
   hiss(0.3);
   save("hiss", track, 0.3);
 }
+
+// Dazed, stars circling round your head: little twinkles going round and
+// round you (from one ear to the other and back), a tinkling figure up and
+// down again, slowing and fading.
+{
+  const track = new Track(4);
+  const figure = ["E7", "G7", "A7", "G7", "E7", "D7"];
+  let at = 0.05;
+  for (let i = 0; i < 26; i++) {
+    const k = i / 25;
+    track.add(at, bell(note(figure[i % figure.length]), 0.6, 0.7 * (1 - 0.7 * k)), 0.8 * Math.sin(at * 4));
+    at += 0.1 + 0.06 * k;
+  }
+  save("dizzy", track, 0.35);
+}
