@@ -163,7 +163,7 @@ export class Tripped {
       this.ring,
       this.ringA,
       this.ringB,
-      still ? 0.6 : dizzy * 2.4,
+      still ? 0.6 : dizzy * 1.5,
       Math.min(1, dizzy / 0.4),
       still ? 0 : t
     );
@@ -205,7 +205,7 @@ export class Stars {
       sprite.position.copy(middle).addScaledVector(a, Math.cos(angle)).addScaledVector(b, Math.sin(angle));
       const twinkle = time ? 0.85 + 0.15 * Math.sin(time * 7 + n * 2.1) : 1;
       sprite.scale.setScalar(SIZE * pop(there) * twinkle);
-      sprite.material.rotation = time ? Math.sin(time * 2 + n) * 0.5 : 0;
+      sprite.material.rotation = time ? Math.sin(time * 1.3 + n) * 0.5 : 0;
       sprite.visible = there > 0;
     });
   }
