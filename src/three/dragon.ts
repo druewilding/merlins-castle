@@ -1,9 +1,9 @@
 // The dragon in its cave (its model: art/blender/dragon.py), standing just
-// in from the tunnel south, its head up by the roof. It watches you, and
-// as you come in, and again when you try to go on south past it, it rears
-// its head back and breathes a great gout of fire across the mouth of the
-// tunnel (and meanwhile puffs smoke, and a flicker of flame). Use
-// the water and you throw it, up into its open mouth: its fire turns to
+// in from the tunnel south, its head up by the roof. It watches you; the
+// moment you come in, and again the moment you try to go on south past it,
+// it throws its head back and breathes a great gout of fire across the
+// mouth of the tunnel (and meanwhile puffs smoke, and a flicker of flame).
+// Use the water and you throw it, up into its open mouth: its fire turns to
 // steam, and it shakes its head, crossly, puffing smoke and steam, and lets
 // you by. Once the water's no longer in use there (you've gone on, as in
 // the original), it's breathing fire again.
@@ -58,10 +58,9 @@ const NEAR = 18; // metres: this near, it watches you
 const FAR = 90; // metres: further off than this, it's left as it is
 
 // Breathing fire: back, breathing in, then the fire, then its mouth closing.
-const BREATHE_IN = 0.8; // seconds
+const BREATHE_IN = 0.25; // seconds (quickly: no doubt the way is shut)
 const FIRE = 1.8;
 const AFTER = 0.6;
-const COMING_IN = 0.9; // seconds after you come in
 const JAW = 0.6; // radians its jaw opens, breathing fire
 const TIP = 0.3; // and its head tips back
 
@@ -236,7 +235,9 @@ export class Dragon {
 
   /** You trying to go on south past it: it breathes its fire at the tunnel. */
   blaze() {
-    if (this.state === "watching") this.next = Math.min(this.next, 0.15);
+    if (this.state === "watching") this.next = 0;
+    // (Or, its fire dying away, a fresh gout of it.)
+    else if (this.state === "breathing" && this.since > BREATHE_IN + FIRE * 0.6) this.since = BREATHE_IN / 2;
   }
 
   get doused() {
@@ -261,7 +262,7 @@ export class Dragon {
     let target: Vector3 | undefined = watching ? eye : undefined;
     let wantsJaw = 0;
     let rear = 0; // (its head drawn back and up, breathing in)
-    if (here && !this.wasHere && this.state === "watching") this.next = COMING_IN;
+    if (here && !this.wasHere) this.blaze();
     this.wasHere = here;
     if (this.state === "watching") {
       this.next -= dt;
@@ -365,7 +366,7 @@ export class Dragon {
       wants.nod = MathUtils.clamp(level(this.ahead) - level(to), NOD.up, NOD.down);
     }
     wants.nod -= rear * 0.45;
-    const rate = Math.min(1, dt * (this.state === "breathing" ? 5 : 2));
+    const rate = Math.min(1, dt * (this.state === "breathing" ? 9 : 2));
     this.look.turn += (wants.turn - this.look.turn) * rate;
     this.look.nod += (wants.nod - this.look.nod) * rate;
     this.shake = shake;
