@@ -133,7 +133,7 @@ run sounds` for a new synthesised one, then `npm run art:build`.
 ## 5. Check it
 
 - Playwright, a temporary `*.t.mjs` in the repo root (webkit), deleted after:
-  - English: `localStorage.setItem("merlins-castle:language", "en")` in
+  - English: `localStorage.setItem("merlins-castle:language", JSON.stringify("en"))` in
     `addInitScript` (the browser's own language otherwise: Danish here).
   - Start **outside the obstacle's reach** (a few metres back:
     `/3d?debug&at=x,z,yawDeg`). Placed within it, you count as already going
