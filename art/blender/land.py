@@ -3761,38 +3761,83 @@ for hall in HALLS.values():
             caves.add([(x, y, fl) for x, y in square], [tuple(range(len(square)))],
                       [c.vary(colour, vary, Vector((x0, y0, fl)))] * len(square))
 
-    sides = max(28, int(2 * math.pi * R / 1.1))
-    wall_top = f + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
-    domes = 6
     smooth_wall = hall.place in ("treasure-room", "beautiful-chamber")
+    sides = max(28, int(2 * math.pi * R / (1.1 if smooth_wall else 0.55)))
+    wall_top = f + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
+    domes = 6 if smooth_wall else 10
 
     def bulge(k, level):
+        """Its great bulges of rock (as they were, before the cave had as many sides)."""
         if smooth_wall:
             return R + 0.4
-        return R + 0.4 + 0.9 * abs(noise.noise(Vector((k / 3, level / 2, hx / 10 + f))))
+        old = max(28, int(2 * math.pi * R / 1.1))
+        return R + 0.4 + 0.9 * abs(noise.noise(Vector((k * old / sides / 3, level / 2, hx / 10 + f))))
 
-    rings = []  # each: a radius for every side, and a height
-    rings.append(([bulge(k, 0) for k in range(sides)], f - 0.3))
-    rings.append(([bulge(k, 1) for k in range(sides)], wall_top))
+    def crag(k, z):
+        """How far the rock here is pushed out (a hollow) or in (a ridge), metres: craggy, as rock is."""
+        if smooth_wall:
+            return 0.0
+        a = 2 * math.pi * k / sides
+        v = Vector((math.cos(a) * R, math.sin(a) * R, z * 1.3)) * 0.55 + Vector((hx, hy, f)) * 0.1
+        return 0.55 * noise.noise(v) + 0.25 * noise.noise(v * 2.7) + 0.1 * noise.noise(v * 6.1)
+
+    # Its rings of rock, round it: each, a radius for every side, and a
+    # height; up the wall, then curving in over the dome. (Craggy, but never
+    # in past where the torches are, against it.)
+    # (Each ring: its radius at every side, its height, and how craggy at every side.)
+    levels = [0.0] + ([] if smooth_wall else [m / 5 for m in range(1, 5)]) + [1.0]
+    rings = []
+    for up in levels:
+        z = f - 0.3 + (wall_top - f + 0.3) * up
+        rough = [crag(k, z) for k in range(sides)]
+        rings.append(([max(R + 0.3, bulge(k, 0) * (1 - up) + bulge(k, 1) * up + rough[k]) for k in range(sides)], z, rough))
     for m in range(1, domes + 1):
         t = m / (domes + 1) * math.pi / 2
-        rings.append(([bulge(k, m + 1) * math.cos(t) for k in range(sides)], wall_top + (f + hall.tall - wall_top) * math.sin(t)))
+        z = wall_top + (f + hall.tall - wall_top) * math.sin(t)
+        rough = [crag(k, z) * math.cos(t) for k in range(sides)]
+        rings.append(([(bulge(k, m + 1) + rough[k]) * math.cos(t) for k in range(sides)], z, rough))
     point = lambda k, ring: (hx + math.cos(2 * math.pi * k / sides) * ring[0][k % sides],  # noqa: E731
                              hy + math.sin(2 * math.pi * k / sides) * ring[0][k % sides], ring[1])
+
+    def wall_at(a, z):
+        """How far out the rock is, round at a (radians) and up at z (on its wall, below its dome)."""
+        k = round(a / (2 * math.pi) * sides) % sides
+        for r0, r1 in zip(rings, rings[1:]):
+            if r0[1] <= z <= r1[1]:
+                t = (z - r0[1]) / (r1[1] - r0[1])
+                return r0[0][k] + (r1[0][k] - r0[0][k]) * t
+        return R + 0.4
+
+    def shade(k, ring, darker):
+        """The rock's colour here: its hollows darker, its ridges lit."""
+        colour = c.mix(hall.wall, c.linear("#000000"), darker)
+        if not smooth_wall:
+            deep = max(-1.0, min(1.0, ring[2][k % sides] / 0.45))
+            colour = c.mix(colour, c.linear("#000000"), 0.55 * deep) if deep > 0 else \
+                c.mix(colour, c.linear("#fff0d8"), -0.3 * deep)
+        return c.vary(colour, 0.12, Vector(point(k, ring)))
+
+    wall_rings = len(levels)
     for k in range(sides):
         am = 2 * math.pi * (k + 0.5) / sides
         door = opening(hall, hx + math.cos(am) * (R + 0.6), hy + math.sin(am) * (R + 0.6))
-        a0, b0, a1, b1 = point(k, rings[0]), point(k + 1, rings[0]), point(k, rings[1]), point(k + 1, rings[1])
-        if door:
-            # (Over the doorway, from clear above the way's rock, which bulges
-            # up past its roof: lower, the wall cuts across the inside of the
-            # way. The door frame's lintel hides the gap below, from the cave.)
-            low = f + TUNNEL_TALL + 0.5
-            a0, b0 = (a1[0], a1[1], low), (b1[0], b1[1], low)
-        quad(caves, [a0, b0, b1, a1], hall.wall)
-        for r0, r1 in zip(rings[1:], rings[2:]):
-            colour = c.mix(hall.wall, c.linear("#000000"), 0.15)
-            quad(caves, [point(k, r0), point(k + 1, r0), point(k + 1, r1), point(k, r1)], colour)
+        for j, (r0, r1) in enumerate(zip(rings, rings[1:])):
+            darker = 0.0 if j < wall_rings - 1 else 0.15
+            a0, b0, a1, b1 = point(k, r0), point(k + 1, r0), point(k, r1), point(k + 1, r1)
+            if door:
+                # (Over the doorway, from clear above the way's rock, which bulges
+                # up past its roof: lower, the wall cuts across the inside of the
+                # way. The door frame's lintel hides the gap below, from the cave.)
+                low = f + TUNNEL_TALL + 0.5
+                if r1[1] <= low:
+                    continue
+                if r0[1] < low:
+                    t = (low - r0[1]) / (r1[1] - r0[1])
+                    a0 = tuple(p + (q - p) * t for p, q in zip(a0, a1))
+                    b0 = tuple(p + (q - p) * t for p, q in zip(b0, b1))
+            pts = [a0, b0, b1, a1]
+            colours = [shade(k, r0, darker), shade(k + 1, r0, darker), shade(k + 1, r1, darker), shade(k, r1, darker)]
+            caves.add(pts, [(0, 1, 2, 3)], colours)
         last = rings[-1]
         caves.add([point(k, last), point(k + 1, last), (hx, hy, f + hall.tall)], [(0, 1, 2)], [hall.wall] * 3)
 
@@ -3873,7 +3918,10 @@ for hall in HALLS.values():
         for _ in range(4 if R < 10 else 6):
             spot = free_spot(R + 0.25)
             if spot:
-                x, y, a = spot
+                # (Against the rock, however far in or out it is there.)
+                _, _, a = spot
+                back = min(wall_at(a, f + 1.9), wall_at(a, f + 2.5)) - 0.12
+                x, y = hx + math.cos(a) * back, hy + math.sin(a) * back
                 block(caves, x - 0.08, y - 0.08, f + 1.9, x + 0.08, y + 0.08, f + 2.5, IRON, solid=False)
                 caves.cone((x, y, f + 2.5), 0.5, 0.16, FLAME, sides=6, droop=0)
 
