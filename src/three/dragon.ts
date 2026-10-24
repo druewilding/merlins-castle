@@ -470,7 +470,7 @@ export class Dragon {
       turn(name, ACROSS, this.look.nod * NODS[k] + 0.012 * breath);
       turn(name, UP, this.look.turn * TURNS[k] + this.shake * NODS[k]);
     });
-    turn("jaw", ACROSS, JAW * this.jaw + 0.03 * Math.max(0, breath));
+    turn("jaw", ACROSS, JAW * this.jaw);
     TAIL.forEach((name, k) => turn(name, UP, 0.07 * Math.sin(t * 0.8 - k * 0.7) * (0.4 + k * 0.25)));
     for (const [name, side] of [
       ["arm-l", 1],

@@ -401,18 +401,27 @@ def head_shape(t):
 ALONG, ROUND = 26, 18
 
 
+LIP = 0.22  # radians its upper jaw's sides wrap on down past its mouth's line, over its lower jaw's edge
+
+
 def wedge(top):
     """The top of its head (top) or its lower jaw: a shell over (or under)
-    the mouth's line, and the inside of its mouth closing it."""
+    the mouth's line, the inside of its mouth closing it, and its nose (or
+    chin) closing the front. The top's sides come down a little past the
+    line, as lips, over the edge of its jaw: shut, there's no gap to see
+    into its mouth."""
     verts, colours, faces = [], [], []
     rounds, alongs = [], []
     t0 = 0.0 if top else HINGE - 0.1
     t1 = 1.0 if top else 0.97
+    angles = [-math.pi / 2 + math.pi * j / ROUND for j in range(ROUND + 1)]
+    if top:
+        angles = [-math.pi / 2 - LIP] + angles + [math.pi / 2 + LIP]
+    n = len(angles)
     for i in range(ALONG + 1):
         t = t0 + (t1 - t0) * i / ALONG
         wide, crown, jaw = head_shape(t)
-        for j in range(ROUND + 1):
-            a = -math.pi / 2 + math.pi * j / ROUND
+        for a in angles:
             if top:
                 x, z = math.sin(a) * wide, MOUTH + math.cos(a) * crown
                 # Its brows: a ridge over each eye; and its nostrils, raised on its snout.
@@ -427,7 +436,7 @@ def wedge(top):
             p = at_head(t, x, z)
             verts.append(tuple(p))
             up = math.cos(a) if top else -math.cos(a)
-            colour = scales(p, math.acos(max(-1.0, min(1.0, up))) * (1 if top else 1), t * 2, plates=not top)
+            colour = scales(p, math.acos(max(-1.0, min(1.0, up))), t * 2, plates=not top)
             if top and t > 0.9 and abs(math.sin(a)) < 0.6 and math.exp(-((t - 0.93) / 0.03) ** 2) > 0.5 \
                     and abs(abs(math.sin(a)) - 0.4) < 0.15:
                 colour = THROAT  # (its nostrils)
@@ -436,8 +445,8 @@ def wedge(top):
             rounds.append((math.cos(a), math.sin(a)) if top else (-math.cos(a), math.sin(a)))
             alongs.append((t * HEAD_LONG / (SCALE * 0.7), (wide if top else 0.7 * wide) / (SCALE * 0.7) * (-1 if top else 1)))
     for i in range(ALONG):
-        for j in range(ROUND):
-            q = (i * (ROUND + 1) + j, (i + 1) * (ROUND + 1) + j, (i + 1) * (ROUND + 1) + j + 1, i * (ROUND + 1) + j + 1)
+        for j in range(n - 1):
+            q = (i * n + j, (i + 1) * n + j, (i + 1) * n + j + 1, i * n + j + 1)
             faces.append(q if top else q[::-1])
     # The inside of its mouth: a dark red roof (or floor), darker deep in.
     inside = len(verts)
@@ -454,8 +463,18 @@ def wedge(top):
         for j in range(2):
             q = (inside + i * 3 + j, inside + i * 3 + j + 1, inside + (i + 1) * 3 + j + 1, inside + (i + 1) * 3 + j)
             faces.append(q if top else q[::-1])
-    back = list(range(ROUND + 1))
-    faces.append(tuple(back if not top else back[::-1]))
+    # Its back, closed; and its front (its nose, or its chin): the shell's
+    # last ring, from one side of its mouth over to the other, and back
+    # along the inside of its mouth. (Each facing out.)
+    first = 1 if top else 0
+    ends = [(list(range(n)), -FORWARD),
+            ([ALONG * n + j for j in range(first, n - first)] + [inside + ALONG * 3 + 1], FORWARD)]
+    for loop, facing in ends:
+        pts = [Vector(verts[k]) for k in loop]
+        normal = Vector((0, 0, 0))
+        for p0, p1 in zip(pts, pts[1:] + pts[:1]):
+            normal += Vector(((p0.y - p1.y) * (p0.z + p1.z), (p0.z - p1.z) * (p0.x + p1.x), (p0.x - p1.x) * (p0.y + p1.y)))
+        faces.append(tuple(loop if normal.dot(facing) > 0 else loop[::-1]))
     return verts, faces, colours, (rounds, alongs)
 
 
