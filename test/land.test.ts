@@ -432,3 +432,13 @@ describe("the maze's floor", () => {
     expect(surface(x + halfX + 1, z)).toBe(20);
   });
 });
+
+describe("the leaves in the dragon's mouth", () => {
+  it("lie where they stop you going in, between the heaps they're swept into", () => {
+    const [x, z] = land.leaves.at;
+    const [bx, bz, halfX, halfZ] = (land.obstacles["cave-entrance east"] as { box: number[] }).box;
+    expect(Math.abs(x - bx)).toBeLessThanOrEqual(halfX);
+    expect(Math.abs(z - bz)).toBeLessThanOrEqual(halfZ);
+    for (const [hx, hz] of land.leaves.heaps) expect(Math.hypot(hx - x, hz - z)).toBeLessThan(8);
+  });
+});

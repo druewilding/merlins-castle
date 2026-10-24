@@ -3,7 +3,7 @@
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
 # The ladder, the plank, the key, the axe, the apple, the emerald, the
-# broom, the lamp, the rope, the penny and the water so far; the rest are to come (PLAN-V3.md).
+# broom, the lamp, the rope, the penny, the water and the harp so far; the rest are to come (PLAN-V3.md).
 
 import math
 import random
@@ -1123,6 +1123,289 @@ for part in (flask_object, flask_glass_object, flask_water_object):
 outward(flask_object)
 outward(flask_water_object)
 flask_glass_object.parent = flask_water_object.parent = flask_object
+
+# The harp: as in its picture, a little wooden harp, standing on a stepped
+# plinth with four feet. Its pillar curves up at the front, carved down
+# both sides with a gilded vine, to a collar and a round scrolled head; its
+# neck swoops from the head, dips in the middle and rises to a curl at its
+# other end, gold pins along it; and from there its soundbox slopes back
+# down to the plinth, its soundboard pale and painted with leafy sprigs.
+# Thirteen gold strings, from the pins down to the soundboard. Standing up,
+# 98 cm high (big, like the lamp, so you can spot it).
+HARP_SIZE = 1.4
+HARP_WOOD = c.linear("#9a5a2c")
+HARP_WOOD_DARK = c.linear("#55301a")
+HARP_WOOD_LIGHT = c.linear("#cf8d4f")
+BOARD = c.linear("#e2b874")
+BOARD_LIGHT = c.linear("#f3d89c")
+BOARD_PAINT = c.linear("#9a6235")
+GOLD = c.linear("#d9a93f")
+GOLD_LIGHT = c.linear("#f8e08e")
+GOLD_DARK = c.linear("#8a6420")
+X = Vector((1, 0, 0))
+harp = c.Builder()
+
+
+def harp_wood(p, shine=0.5):
+    """Polished wood: its grain in streaks, rubbed lighter in places."""
+    v = Vector(p) * 30
+    streak = noise.noise(Vector((p[0] * 20, p[1] * 90, p[2] * 25)))
+    colour = c.mix(HARP_WOOD_DARK, HARP_WOOD_LIGHT, shine + noise.noise(v) * 0.25 + streak * 0.15)
+    return c.mix(c.vary(colour, 0.06, v * 2), HARP_WOOD, 0.2)
+
+
+def gold(p, shine=0.6):
+    """Gilding: bright, a little rubbed and darker in its hollows."""
+    v = Vector(p) * 60
+    return c.vary(c.mix(GOLD_DARK, GOLD_LIGHT, shine + noise.noise(v) * 0.3), 0.05, v)
+
+
+def spline(points, steps):
+    """A smooth path through points (y, z), `steps` between each."""
+    pts = [Vector(p) for p in points]
+    path = []
+    for i in range(len(pts) - 1):
+        p0, p1, p2, p3 = pts[max(i - 1, 0)], pts[i], pts[i + 1], pts[min(i + 2, len(pts) - 1)]
+        for k in range(steps):
+            t = k / steps
+            path.append(0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t
+                               + (3 * p1 - p0 - 3 * p2 + p3) * t ** 3))
+    return path + [pts[-1]]
+
+
+def carved(path, half_h, half_w, colour, sides=16):
+    """A bar along a path (y, z), squarish with rounded corners: half_h(s)
+    across it in its plane, half_w(s) in x, s how far along it (0 to 1).
+    colour(p, s, up): up from -1 to 1 across it."""
+    n = len(path)
+    verts, colours = [], []
+    for k, p in enumerate(path):
+        s = k / (n - 1)
+        t = (path[min(k + 1, n - 1)] - path[max(k - 1, 0)]).normalized()
+        m = Vector((-t.y, t.x))
+        h, w = half_h(s), half_w(s)
+        for j in range(sides):
+            a = 2 * math.pi * j / sides
+            cx = math.copysign(abs(math.cos(a)) ** 0.5, math.cos(a))
+            cn = math.copysign(abs(math.sin(a)) ** 0.5, math.sin(a))
+            v = (w * cx, p.x + m.x * h * cn, p.y + m.y * h * cn)
+            verts.append(v)
+            colours.append(colour(v, s, cn))
+    faces = [(k * sides + j, k * sides + (j + 1) % sides, (k + 1) * sides + (j + 1) % sides, (k + 1) * sides + j)
+             for k in range(n - 1) for j in range(sides)]
+    faces += [tuple(range(sides))[::-1], tuple((n - 1) * sides + j for j in range(sides))]
+    harp.add(verts, faces, colours)
+
+
+def rod(path, radius, colour, sides=6):
+    """A thin round rod along a path in a plane across x (a string, a gilded
+    line): colour(p)."""
+    n = len(path)
+    verts = []
+    for k, p in enumerate(path):
+        t = (Vector(path[min(k + 1, n - 1)]) - Vector(path[max(k - 1, 0)])).normalized()
+        across = t.cross(X).normalized()
+        verts += [tuple(Vector(p) + (across * math.cos(2 * math.pi * j / sides) + X * math.sin(2 * math.pi * j / sides))
+                        * radius) for j in range(sides)]
+    faces = [(k * sides + j, k * sides + (j + 1) % sides, (k + 1) * sides + (j + 1) % sides, (k + 1) * sides + j)
+             for k in range(n - 1) for j in range(sides)]
+    faces += [tuple(range(sides))[::-1], tuple((n - 1) * sides + j for j in range(sides))]
+    harp.add(verts, faces, [colour(v) for v in verts])
+
+
+def gilded_leaf(x, at, towards, length, width):
+    """A little gilded leaf standing proud of a side (at x), from `at` (y, z)
+    towards `towards`, pointed, ridged along its vein."""
+    side, out = Vector((-towards.y, towards.x)), math.copysign(1, x)
+    verts = []
+    for k in range(8):
+        s = k / 7
+        mid = at + towards * length * s
+        half = width * math.sin(math.pi * s) ** 0.7
+        for dx, d in ((0.0015, half), (0.005, 0), (0.0015, -half), (-0.003, 0)):
+            q = mid + side * d
+            verts.append((x + out * dx, q.x, q.y))
+    faces = [(k * 4 + j, k * 4 + (j + 1) % 4, (k + 1) * 4 + (j + 1) % 4, (k + 1) * 4 + j)
+             for k in range(7) for j in range(4)]
+    harp.add(verts, faces, [gold(v, 0.7) for v in verts])
+
+
+def spiral(x, centre, r0, r1, turns, start=0.0):
+    """A gilded curl on a side (at x): from r0 out round to r1 in."""
+    n = int(24 * turns)
+    path = []
+    for k in range(n + 1):
+        a = start + 2 * math.pi * turns * k / n
+        r = r0 + (r1 - r0) * k / n
+        path.append((x, centre[0] + math.cos(a) * r, centre[1] + math.sin(a) * r))
+    rod(path, 0.0038, lambda p: gold(p, 0.65))
+
+
+def harp_box(x0, y0, z0, x1, y1, z1):
+    """A block of the plinth, its top lighter."""
+    corners = [(x, y, z) for z in (z0, z1) for y in (y0, y1) for x in (x0, x1)]
+    for face in [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]:
+        pts = [corners[i] for i in face]
+        up = sum(p[2] for p in pts) / 4 > (z0 + z1) / 2 + 1e-6
+        harp.add(pts, [(0, 1, 2, 3)], [harp_wood(p, 0.55 if up else 0.35) for p in pts])
+
+
+# The plinth: four feet, a broad block on them, and a step on that.
+PLINTH = 0.075  # its top
+for x0 in (-0.105, 0.06):
+    for y0 in (-0.18, 0.16):
+        harp_box(x0, y0, 0, x0 + 0.045, y0 + 0.05, 0.025)
+harp_box(-0.105, -0.18, 0.025, 0.105, 0.21, 0.06)
+harp_box(-0.088, -0.165, 0.06, 0.088, 0.195, PLINTH)
+
+# The soundbox: sloping up from the plinth (its soundboard facing the
+# pillar) to the neck's end, narrowing and shallower towards the top.
+S0, S1 = Vector((-0.06, PLINTH)), Vector((0.215, 0.49))
+ALONG = (S1 - S0).normalized()
+BACK = Vector((ALONG.y, -ALONG.x))  # from its soundboard into it
+SB_STEPS, SB_ACROSS = 140, 36
+
+
+def soundboard(t):
+    return S0 + (S1 - S0) * t
+
+
+def box_half(t):
+    return 0.06 - 0.025 * t
+
+
+def box_back(t):
+    return soundboard(t) + BACK * (0.1 - 0.04 * t)
+
+
+def board_colour(p, u, t):
+    """Pale, its grain along it, framed in dark wood, painted with a leafy
+    sprig either side of its middle."""
+    colour = c.mix(BOARD, BOARD_LIGHT, 0.45 + 0.35 * noise.noise(Vector((u * 9, t * 1.5, 2))))
+    if abs(u) > 0.86:
+        return harp_wood(p, 0.3)
+    for sign in (-1, 1):
+        stem = 0.48 + 0.1 * math.sin(t * 2 * math.pi * 3.5 + sign)
+        if 0.12 < t < 0.92 and abs(sign * u - stem) < 0.035:
+            colour = c.mix(colour, BOARD_PAINT, 0.8)
+        for k in range(7):
+            tk = 0.16 + 0.11 * k + 0.03 * sign
+            lean = 1 if k % 2 else -1
+            uk = sign * (0.48 + 0.1 * math.sin(tk * 2 * math.pi * 3.5 + sign) + lean * 0.14)
+            if ((u - uk) / 0.1) ** 2 + ((t - tk - 0.012) / 0.018) ** 2 < 1:
+                colour = c.mix(colour, BOARD_PAINT, 0.8)
+    return c.vary(colour, 0.05, Vector(p) * 40)
+
+
+ts = [k / SB_STEPS for k in range(SB_STEPS + 1)]
+us = [-1 + 2 * j / SB_ACROSS for j in range(SB_ACROSS + 1)]
+verts, colours = [], []
+for t in ts:
+    f = soundboard(t)
+    for u in us:
+        p = (u * box_half(t), f.x, f.y)
+        verts.append(p)
+        colours.append(board_colour(p, u, t))
+cols = len(us)
+harp.add(verts, [(k * cols + j, k * cols + j + 1, (k + 1) * cols + j + 1, (k + 1) * cols + j)
+                 for k in range(SB_STEPS) for j in range(SB_ACROSS)], colours)
+for sx in (-1, 1):  # its sides
+    verts = [(sx * box_half(t), q.x, q.y) for t in ts for q in (soundboard(t), box_back(t))]
+    harp.add(verts, [(2 * k, 2 * k + 1, 2 * k + 3, 2 * k + 2) for k in range(SB_STEPS)],
+             [harp_wood(v, 0.35) for v in verts])
+verts = [(sx * box_half(t), box_back(t).x, box_back(t).y) for t in ts for sx in (-1, 1)]  # its back
+harp.add(verts, [(2 * k, 2 * k + 1, 2 * k + 3, 2 * k + 2) for k in range(SB_STEPS)],
+         [harp_wood(v, 0.3) for v in verts])
+for t in (0, 1):  # and its ends
+    f, b = soundboard(t), box_back(t)
+    pts = [(-box_half(t), f.x, f.y), (box_half(t), f.x, f.y), (box_half(t), b.x, b.y), (-box_half(t), b.x, b.y)]
+    harp.add(pts, [(0, 1, 2, 3)], [harp_wood(p, 0.4) for p in pts])
+
+# The pillar: from the plinth, curving out and up to its collar under the head.
+pillar = spline([(-0.095, 0.05), (-0.145, 0.2), (-0.18, 0.37), (-0.192, 0.5), (-0.19, 0.58)], 8)
+P_HALF_H, P_HALF_W = 0.03, 0.026
+carved(pillar, lambda s: P_HALF_H, lambda s: P_HALF_W, lambda p, s, up: harp_wood(p, 0.42 + 0.1 * up))
+collar = [p for p in pillar if 0.535 < p.y < 0.57]
+carved(collar, lambda s: P_HALF_H + 0.007, lambda s: P_HALF_W + 0.006, lambda p, s, up: harp_wood(p, 0.55))
+# Its vine, gilded, down both sides: a wavy stem, a leaf at each wave.
+for sx in (-1, 1):
+    x = sx * (P_HALF_W + 0.002)
+    stem, leaves = [], []
+    n = len(pillar)
+    for k in range(int(0.08 * n), int(0.82 * n)):
+        s = k / (n - 1)
+        t = (pillar[min(k + 1, n - 1)] - pillar[k - 1]).normalized()
+        m = Vector((-t.y, t.x))
+        wave = math.sin(2 * math.pi * 3.5 * s)
+        q = pillar[k] + m * P_HALF_H * 0.45 * wave
+        stem.append((x, q.x, q.y))
+        if abs(wave) > 0.99 and (not leaves or k - leaves[-1][0] > 2):
+            leaves.append((k, q, (t + m * math.copysign(1.2, wave)).normalized()))
+    rod(stem, 0.003, lambda p: gold(p, 0.6))
+    for _, q, towards in leaves:
+        gilded_leaf(x, q, towards, 0.04, 0.011)
+
+# The head: round, on top of the pillar, a gilded curl on either side.
+HEAD, HEAD_R, HEAD_HALF = Vector((-0.212, 0.636)), 0.062, 0.027
+head = c.Builder()
+lathe(head, [(0, -HEAD_HALF), (HEAD_R - 0.01, -HEAD_HALF), (HEAD_R - 0.003, -HEAD_HALF + 0.003),
+             (HEAD_R, -HEAD_HALF + 0.01), (HEAD_R, HEAD_HALF - 0.01), (HEAD_R - 0.003, HEAD_HALF - 0.003),
+             (HEAD_R - 0.01, HEAD_HALF), (0, HEAD_HALF)], lambda p, t: (0, 0, 0, 1), sides=32)
+head_verts = [(z, HEAD.x + x, HEAD.y + y) for x, y, z in head.verts]
+harp.add(head_verts, head.faces, [harp_wood(v, 0.45 + 4 * (v[2] - HEAD.y)) for v in head_verts])
+for sx in (-1, 1):
+    spiral(sx * (HEAD_HALF + 0.001), HEAD, HEAD_R - 0.012, 0.012, 1.6, start=-0.5 * math.pi)
+    gilded_leaf(sx * (HEAD_HALF + 0.001), HEAD + Vector((0.0, -0.005)), Vector((0.3, 1)).normalized(), 0.03, 0.009)
+
+# The neck: from the head, dipping in its middle and rising to a curl at its
+# end, then turning down into the top of the soundbox (and on into it, so
+# they meet).
+neck = spline([(-0.2, 0.64), (-0.12, 0.645), (-0.04, 0.62), (0.03, 0.583), (0.09, 0.567), (0.15, 0.583),
+               (0.205, 0.612), (0.245, 0.605), (0.264, 0.565), (0.252, 0.505), (0.24, 0.455)], 8)
+N_HALF_W = 0.022
+
+
+def neck_half_h(s):
+    return 0.027 + 0.01 * max(0.0, (s - 0.72) / 0.28)
+
+
+carved(neck, neck_half_h, lambda s: N_HALF_W, lambda p, s, up: harp_wood(p, 0.42 + 0.12 * up))
+for sx in (-1, 1):
+    spiral(sx * (N_HALF_W + 0.001), Vector((0.236, 0.582)), 0.024, 0.007, 1.4, start=0.4 * math.pi)
+
+# The strings, gold, from the neck down to the soundboard; a pin over each
+# on top of the neck, another on its side, and a little eyelet where each
+# goes into the soundboard.
+STRINGS = 13
+
+
+def neck_at(y):
+    """The neck's middle (z), and how far along it, over y."""
+    for k in range(len(neck) - 1):
+        a, b = neck[k], neck[k + 1]
+        if a.x <= y <= b.x:
+            f = (y - a.x) / (b.x - a.x)
+            return a.y + (b.y - a.y) * f, (k + f) / (len(neck) - 1)
+    raise ValueError(y)
+
+
+for i in range(STRINGS):
+    y = -0.035 + 0.235 * i / (STRINGS - 1)
+    t = (y - S0.x) / (S1.x - S0.x)
+    low = soundboard(t).y
+    top, s = neck_at(y)
+    rod([(0, y, low - 0.004), (0, y, top)], 0.0022, lambda p: gold(p, 0.75), sides=5)
+    harp.blob((0, y, low + 0.002), 0.005, GOLD, subdivisions=1, lumpy=0)
+    harp.blob((0, y, top + neck_half_h(s) + 0.006), 0.0085, GOLD, subdivisions=1, lumpy=0)
+    harp.blob((N_HALF_W + 0.003, y + 0.006, top + 0.008), 0.0065, GOLD, subdivisions=1, lumpy=0)
+
+# Its middle (along it) at the origin.
+ys = [v[1] for v in harp.verts]
+mid = (min(ys) + max(ys)) / 2
+harp.verts = [(x, y - mid, z) for x, y, z in harp.verts]
+harp_object = harp.build("harp", smooth=True)
+harp_object.data.transform(Matrix.Scale(HARP_SIZE, 4))
+outward(harp_object)
 
 if out:
     c.export(out)

@@ -79,6 +79,7 @@ import land from "./models/land.json";
 import merlinModel from "./models/merlin.glb?url";
 import rabbitModel from "./models/rabbits.glb?url";
 import snakeModel from "./models/snake.glb?url";
+import trollModel from "./models/trolls.glb?url";
 import witchModel from "./models/witches.glb?url";
 import { Notes, type NoteSpot } from "./notes";
 import { Plank } from "./plank";
@@ -87,6 +88,7 @@ import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Wa
 import { type PropSpots, stampProps } from "./props";
 import { Rabbits } from "./rabbits";
 import { River } from "./river";
+import { dressRock } from "./rock";
 import { Rope, saidSwinging } from "./rope";
 import { Shafts, speck, type Window } from "./shafts";
 import { paintSign, type SignSpot } from "./sign";
@@ -98,6 +100,7 @@ import { Swept } from "./swept";
 import { dressTreasure, Net, Trapped, type TrapSpot } from "./trap";
 import { Trees, type TreeSpots } from "./trees";
 import { Stars, Tripped } from "./tripped";
+import { Trolls, type TrollsPlace } from "./trolls";
 import { Witches } from "./witches";
 
 const english = worldJson as unknown as World;
@@ -193,7 +196,7 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky, wizard, hags, bunnies, sentries, dragony] = await Promise.all([
+const [model, file, things, snaky, wizard, hags, bunnies, sentries, dragony, trolly] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
@@ -203,6 +206,7 @@ const [model, file, things, snaky, wizard, hags, bunnies, sentries, dragony] = a
   loader.loadAsync(rabbitModel),
   loader.loadAsync(guardModel),
   loader.loadAsync(dragonModel),
+  loader.loadAsync(trollModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -293,6 +297,8 @@ model.scene.traverse((node) => {
   node.castShadow = !["paths", "water", "embers", "archway-ivy", "maze-ivy"].includes(node.name);
   node.receiveShadow = !["water", "embers"].includes(node.name);
 });
+// The rock underground, grainy and cracked.
+dressRock(model.scene);
 // The maze, in stone.
 dressMaze(model.scene, renderer);
 // Merlin's treasure, shining.
@@ -568,6 +574,10 @@ const dragon = new Dragon(
   (loudness) => ownSounds.play("roar", { volume: loudness, rate: 0.9 + Math.random() * 0.2 }),
   (loudness) => ownSounds.play("hiss", { volume: loudness })
 );
+// The trolls round the way north from their cave, asking for a tune; played
+// one on the harp, they dance (trolls.ts).
+const pleased = shapeOf.get("trolls north");
+const trolls = new Trolls(scene, trolly.scene, trolly.animations, land.trolls as TrollsPlace, reducedMotion);
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 // A way that kills you even with the object (the balcony) has no far side
@@ -768,6 +778,10 @@ player.onBump = (exit) => {
   say(way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo);
   sounds.play("blocked");
   if (fiery?.names.includes(exit)) dragon.blaze();
+  if (pleased?.names.includes(exit)) {
+    trolls.spell(player.camera);
+    ownSounds.play("spell");
+  }
 };
 
 // The objects, lying where the game puts them, and the five slots you carry
@@ -864,6 +878,7 @@ function inUse() {
         shape === holed ||
         shape === tolled ||
         shape === fiery ||
+        shape === pleased ||
         unlit.has(shape))
       ? [`${here} ${direction}`]
       : [];
@@ -899,6 +914,12 @@ function inUse() {
   if (fiery && opened.has(fiery)) {
     dragon.douse(instantly ? undefined : player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
   } else dragon.relight();
+  // The harp played to the trolls: up they get and dance, to its tune (or,
+  // loading, they're dancing); and once you've gone, they sit down again.
+  if (pleased && opened.has(pleased)) {
+    if (!trolls.dancing && !instantly) ownSounds.play("jig");
+    trolls.dance(instantly);
+  } else trolls.sit();
   // The broom used on the witches: they fly off (or, loading, they've gone).
   if (dancers && opened.has(dancers)) {
     if (instantly) witches.away();
@@ -1117,6 +1138,7 @@ if (debugMode) {
       items,
       snake,
       dragon,
+      trolls,
       merlin,
       guards,
       witches,
@@ -1454,6 +1476,7 @@ renderer.setAnimationLoop((time) => {
   witches.update(dt, room === "forest-witches", player.camera, !(dancers && opened.has(dancers)));
   rabbits.update(dt, player.position);
   dragon.update(dt, player.camera.position, room === "dragon-cave");
+  trolls.update(dt, player.camera.position, room === "trolls");
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)
