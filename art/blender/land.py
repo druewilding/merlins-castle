@@ -3364,8 +3364,12 @@ for way in WAYS.values():
                 # A doorstep: edges down to the hall's floor, so there's no gap
                 # under it (a way can still be climbing as it comes in).
                 bottom = near.floor - 0.12
-                for p0, p1, z0, z1 in (((alx, aly), (blx, bly), a[2], b[2]), ((arx, ary), (brx, bry), a[2], b[2]),
-                                       ((alx, aly), (arx, ary), a[2], a[2]), ((blx, bly), (brx, bry), b[2], b[2])):
+                # (Not across an end at the deep hole's edge: the hole's wall
+                # is just there, and the two would flicker.)
+                past_a = in_pit(a[0] - (b[0] - a[0]) / 2, a[1] - (b[1] - a[1]) / 2)
+                past_b = in_pit(b[0] + (b[0] - a[0]) / 2, b[1] + (b[1] - a[1]) / 2)
+                for p0, p1, z0, z1 in (((alx, aly), (blx, bly), a[2], b[2]), ((arx, ary), (brx, bry), a[2], b[2])) + \
+                        (((alx, aly), (arx, ary), a[2], a[2]),) * (not past_a) + (((blx, bly), (brx, bry), b[2], b[2]),) * (not past_b):
                     quad(tunnel, [(*p0, z0 + lift), (*p1, z1 + lift), (*p1, min(z1 - 0.12, bottom)), (*p0, min(z0 - 0.12, bottom))],
                          floor_colour)
         if rocky_[k]:
@@ -3404,6 +3408,17 @@ for way in WAYS.values():
                 beyond = [ring_out(row, p, half) for p in pts_]
                 for i in range(len(VAULT) - 1):
                     quad(tunnel, [pts_[i], pts_[i + 1], beyond[i + 1], beyond[i]], rock_colour(*pts_[i]), 0.1)
+                # (And in, up its walls, from the rock, pushed out, to the way's
+                # own walls going on past it, out under the sky: or there's a
+                # slit between them to see out of. Not into a hall: its door
+                # frame does that, just where this would go, and they'd flicker.)
+                on = k - 1 if row is a else k + 1
+                if not (0 <= on < len(rocky_) and drawn(rows[on], rows[on + 1])):
+                    continue
+                flat = [(*side(row, u * half), p[2]) for (u, _), p in zip(VAULT, pts_)]
+                for i in range(len(VAULT) - 1):
+                    if abs(VAULT[i][0]) == 1 and VAULT[i + 1][0] == VAULT[i][0]:
+                        quad(tunnel, [flat[i], flat[i + 1], pts_[i + 1], pts_[i]], rock_colour(*pts_[i]), 0.1)
             # Timber props, every few metres (not by a hall).
             if k % PROP_EVERY == PROP_EVERY // 2 and not in_a_hall(*mid, 4):
                 dx, dy = b[0] - a[0], b[1] - a[1]
