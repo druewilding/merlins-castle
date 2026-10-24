@@ -267,12 +267,17 @@ const rise = (t, from, to) => Math.min(1, Math.max(0, (t - from) / (to - from)))
   const envelope = (t) => rise(t, 0, 0.15) * (1 - rise(t, 1.2, 2.4)) ** 2;
   track.add(0, rush(2.6, 0.035, envelope), -0.2);
   track.add(0.012, rush(2.6, 0.035, envelope), 0.2);
-  track.add(0, rush(2.6, 0.25, (t) => envelope(t) * 0.25), 0);
+  track.add(
+    0,
+    rush(2.6, 0.25, (t) => envelope(t) * 0.25),
+    0
+  );
   const crackle = new Float32Array(Math.round(2.4 * RATE));
   for (let i = 0; i < crackle.length; i++) {
     if (random() < 0.0012) {
       const amp = (0.3 + random() * 0.5) * envelope(i / RATE);
-      for (let j = 0; j < 220 && i + j < crackle.length; j++) crackle[i + j] += (random() * 2 - 1) * amp * Math.exp(-j / 40);
+      for (let j = 0; j < 220 && i + j < crackle.length; j++)
+        crackle[i + j] += (random() * 2 - 1) * amp * Math.exp(-j / 40);
     }
   }
   track.add(0, release(crackle), 0.1);
