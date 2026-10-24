@@ -35,12 +35,7 @@ export class Door {
     this.lifted = shackle?.position.y ?? 0;
   }
 
-  /** Whether it's open, or opening (and so, kept open while you're going through). */
-  get opening() {
-    return this.wants || this.open > 0;
-  }
-
-  /** Open, or shut (instantly: as it was, loading, with no sound). */
+  /** Open, or shut (instantly: as it was, loading, or out of sight, with no sound). */
   set(open: boolean, instantly = false) {
     if (instantly) {
       this.wants = open;

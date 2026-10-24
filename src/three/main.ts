@@ -431,8 +431,8 @@ if (rusty && leaves[0] && leaves[1]) {
 }
 const SWING = 1.75; // radians, open
 // The locked doors across the ways south (door.ts): the oak door, and the
-// giant's iron gate, padlocked. Open while the key's in use there, and for
-// you coming through from behind (the free way), and shut again after you.
+// giant's iron gate, padlocked. Open until you come into its room, then shut
+// behind you, and open again while the key's in use there.
 const doors = new Map<Shape, Door>();
 for (const [exit, name, shackle, iron] of [
   ["oak-door south", "oak-door-leaf", undefined, false],
@@ -451,16 +451,9 @@ for (const [exit, name, shackle, iron] of [
     })
   );
 }
-const BEHIND = 9; // metres back from a door, coming to it the free way, it opens for you
-const THROUGH = 2.5; // and either side of it, open, it stays open while you go through
-function doorWants(shape: Shape, door: Door) {
-  if (opened.has(shape)) return true;
-  const [x, z, halfX] = shape.box!;
-  const { position: p } = player;
-  if (!player.under || Math.abs(p.x - x) > halfX + 1) return false;
-  const off = Math.abs(p.z - z);
-  return off < (door.opening ? THROUGH : 0) || (!wayThrough(shape.names, x, z, p.x, p.z) && off < BEHIND);
-}
+// (Away from its room, it stands open, as you'd find it coming from behind:
+// set so straight away, unseen and unheard. In its room, it's shut behind you.)
+const awayFrom = (shape: Shape) => items.state.room !== shape.names[0].split(" ")[0];
 // The chest in the tower, its lid opening as you come up to it (and the
 // emerald in it, items.ts), and shutting as you go.
 const lid = model.scene.getObjectByName("chest-lid");
@@ -892,7 +885,7 @@ function inUse() {
     gate.wants = wants;
     if (instantly) gate.open = gate.wants;
   }
-  if (instantly) for (const [shape, door] of doors) door.set(doorWants(shape, door), true);
+  if (instantly) for (const [shape, door] of doors) door.set(awayFrom(shape) || opened.has(shape), true);
   if (dense) felling.fell(opened.has(dense), instantly);
   if (heaped) heap(instantly);
   // The apple thrown to the snake, from your hand (or, loading, it's gone,
@@ -1503,7 +1496,7 @@ renderer.setAnimationLoop((time) => {
   if (drawbridge.down !== settled) solidify();
   guards.update(dt, player.camera.position);
   for (const [shape, door] of doors) {
-    door.set(doorWants(shape, door));
+    door.set(awayFrom(shape) || opened.has(shape), awayFrom(shape));
     door.update(dt);
   }
   for (const gate of gates.values()) {
