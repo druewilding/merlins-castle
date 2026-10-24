@@ -54,6 +54,7 @@ import {
 } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Caught } from "./caught";
+import { Dragon, type DragonCave, type DragonSpot } from "./dragon";
 import { Drawbridge, type DrawbridgeSpot, wantedDown } from "./drawbridge";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
@@ -68,6 +69,7 @@ import { DEATHS, placeAt, PLACES } from "./layout";
 import { Leaves } from "./leaves";
 import { dressMaze } from "./maze";
 import { Merlin } from "./merlin";
+import dragonModel from "./models/dragon.glb?url";
 import guardModel from "./models/guards.glb?url";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
@@ -189,7 +191,7 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky, wizard, hags, bunnies, sentries] = await Promise.all([
+const [model, file, things, snaky, wizard, hags, bunnies, sentries, dragony] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
@@ -198,6 +200,7 @@ const [model, file, things, snaky, wizard, hags, bunnies, sentries] = await Prom
   loader.loadAsync(witchModel),
   loader.loadAsync(rabbitModel),
   loader.loadAsync(guardModel),
+  loader.loadAsync(dragonModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -219,9 +222,12 @@ if (cobwebs instanceof Mesh) {
 }
 // The emerald, glassy: a little room's lights caught in its facets (its own,
 // not the scene's), and a glow from within, so it shines even in the tower.
+// (The flask's glass catches them too.)
+const pmrem = new PMREMGenerator(renderer);
+const shine = pmrem.fromScene(new RoomEnvironment(), 0.02).texture;
+pmrem.dispose();
 const emerald = things.scene.getObjectByName("emerald");
 if (emerald instanceof Mesh) {
-  const pmrem = new PMREMGenerator(renderer);
   emerald.material = new MeshPhysicalMaterial({
     vertexColors: true,
     flatShading: true,
@@ -229,15 +235,57 @@ if (emerald instanceof Mesh) {
     metalness: 0.9, // (its reflections green, as in its picture: white only in a thin coat over them)
     clearcoat: 0.2,
     clearcoatRoughness: 0.05,
-    envMap: pmrem.fromScene(new RoomEnvironment(), 0.02).texture,
+    envMap: shine,
     envMapIntensity: 0.55,
     emissive: new Color("#0f7a38"),
     emissiveIntensity: 1.0,
   });
-  pmrem.dispose();
 }
 // The lamp: its glass see-through, and its flame (lit, lantern.ts) bright.
 dressLamp(things.scene.getObjectByName("lamp")!);
+// The water: its flask's glass clear and shining, and the water in it a
+// clear blue, glowing a little (so it shows, even in the shade). The water
+// drawn first, then the glass round it.
+const flask = things.scene.getObjectByName("water-glass");
+if (flask instanceof Mesh) {
+  const glass = new MeshPhysicalMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.12,
+    roughness: 0.05,
+    envMap: shine,
+    envMapIntensity: 1.6,
+    clearcoat: 1,
+    side: DoubleSide,
+    depthWrite: false,
+  });
+  flask.material = glass;
+  flask.renderOrder = 1;
+  // (Clearer face on, and whiter, more solid, round its edges, where you
+  // look through more of it.)
+  glass.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <opaque_fragment>",
+      `float edge = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 2.5);
+      diffuseColor.a = mix(diffuseColor.a, 0.8, edge);
+      outgoingLight = mix(outgoingLight, vec3(0.85, 0.93, 1.0), 0.6 * edge);
+      #include <opaque_fragment>`
+    );
+  };
+}
+const drink = things.scene.getObjectByName("water-inside");
+if (drink instanceof Mesh) {
+  drink.material = new MeshPhysicalMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.85,
+    roughness: 0.15,
+    envMap: shine,
+    envMapIntensity: 0.35,
+    emissive: new Color("#1d5c9e"),
+    emissiveIntensity: 0.5,
+  });
+}
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
   node.castShadow = !["paths", "water", "embers", "archway-ivy", "maze-ivy"].includes(node.name);
@@ -482,6 +530,18 @@ function heap(now: boolean) {
   const swept = broomed || here === inside || (here === heaped.names[0].split(" ")[0] && pile.inMouth(player.position));
   pile.sweep(swept, now, broomed);
 }
+// The dragon by the tunnel south of its cave, breathing fire across it,
+// which the water douses (dragon.ts).
+const fiery = shapeOf.get("dragon-cave south");
+const dragon = new Dragon(
+  scene,
+  dragony.scene,
+  land.dragon as DragonSpot,
+  land.halls["dragon-cave"] as DragonCave,
+  reducedMotion,
+  (loudness) => ownSounds.play("roar", { volume: loudness, rate: 0.9 + Math.random() * 0.2 }),
+  (loudness) => ownSounds.play("hiss", { volume: loudness })
+);
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 // A way that kills you even with the object (the balcony) has no far side
@@ -681,6 +741,7 @@ player.onBump = (exit) => {
   if (needs && effects(world, items.state).includes(needs)) return;
   say(way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo);
   sounds.play("blocked");
+  if (fiery?.names.includes(exit)) dragon.blaze();
 };
 
 // The objects, lying where the game puts them, and the five slots you carry
@@ -758,7 +819,7 @@ function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
   // (Only the ways the 3D world can open so far: walls to climb, gates, the dense trees, the snake, the river,
-  // the leaves, the witches, the dark.)
+  // the leaves, the witches, the moat, the dragon, the dark.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
     const shape = shapeOf.get(`${here} ${direction}`);
@@ -775,6 +836,7 @@ function inUse() {
         shape === dancers ||
         shape === holed ||
         shape === tolled ||
+        shape === fiery ||
         unlit.has(shape))
       ? [`${here} ${direction}`]
       : [];
@@ -804,6 +866,11 @@ function inUse() {
     if (instantly) snake.away();
     else snake.feed(player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
   } else if (instantly && here !== "tower") snake.back();
+  // The water thrown into the dragon's mouth, from your hand (or, loading,
+  // it's doused already); and once it's no longer in use there, its fire's back.
+  if (fiery && opened.has(fiery)) {
+    dragon.douse(instantly ? undefined : player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
+  } else dragon.relight();
   // The broom used on the witches: they fly off (or, loading, they've gone).
   if (dancers && opened.has(dancers)) {
     if (instantly) witches.away();
@@ -1006,6 +1073,7 @@ if (debugMode) {
       places: PLACES,
       items,
       snake,
+      dragon,
       merlin,
       guards,
       witches,
@@ -1338,6 +1406,7 @@ renderer.setAnimationLoop((time) => {
   merlin.update(dt, player.position, room === "merlins-lair");
   witches.update(dt, room === "forest-witches", player.camera, !(dancers && opened.has(dancers)));
   rabbits.update(dt, player.position);
+  dragon.update(dt, player.camera.position, room === "dragon-cave");
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)

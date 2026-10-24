@@ -6,5 +6,7 @@
   "sweep": { "file": "kenney_rpg-audio/Audio/cloth4.ogg", "volume": 0.6 },
   "net": { "file": "kenney_rpg-audio/Audio/clothBelt2.ogg", "volume": 0.7 },
   "falling": { "file": "merlin/falling.wav", "volume": 0.6 },
-  "coins": { "file": "kenney_rpg-audio/Audio/handleCoins.ogg", "volume": 0.7 }
+  "coins": { "file": "kenney_rpg-audio/Audio/handleCoins.ogg", "volume": 0.7 },
+  "roar": { "file": "merlin/roar.wav", "volume": 0.8 },
+  "hiss": { "file": "merlin/hiss.wav", "volume": 0.6 }
 }

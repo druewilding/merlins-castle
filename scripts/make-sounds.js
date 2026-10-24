@@ -242,3 +242,60 @@ mkdirSync(OUT, { recursive: true });
   });
   save("falling", track, 0.5);
 }
+
+// Noise, through a gentle low-pass filter (each sample `smooth` of the way
+// to the next: the smaller, the deeper), as long as `seconds`, shaped by
+// envelope(t).
+function rush(seconds, smooth, envelope) {
+  const out = new Float32Array(Math.round(seconds * RATE));
+  let low = 0;
+  let lower = 0;
+  for (let i = 0; i < out.length; i++) {
+    low += (random() * 2 - 1 - low) * smooth;
+    lower += (low - lower) * smooth;
+    out[i] = lower * envelope(i / RATE);
+  }
+  return release(out);
+}
+
+const rise = (t, from, to) => Math.min(1, Math.max(0, (t - from) / (to - from)));
+
+// The dragon's fire: a great roaring whoosh, swelling quickly and dying
+// away, with a crackle in it, deep in its cave.
+{
+  const track = new Track(2.8);
+  const envelope = (t) => rise(t, 0, 0.15) * (1 - rise(t, 1.2, 2.4)) ** 2;
+  track.add(0, rush(2.6, 0.035, envelope), -0.2);
+  track.add(0.012, rush(2.6, 0.035, envelope), 0.2);
+  track.add(
+    0,
+    rush(2.6, 0.25, (t) => envelope(t) * 0.25),
+    0
+  );
+  const crackle = new Float32Array(Math.round(2.4 * RATE));
+  for (let i = 0; i < crackle.length; i++) {
+    if (random() < 0.0012) {
+      const amp = (0.3 + random() * 0.5) * envelope(i / RATE);
+      for (let j = 0; j < 220 && i + j < crackle.length; j++)
+        crackle[i + j] += (random() * 2 - 1) * amp * Math.exp(-j / 40);
+    }
+  }
+  track.add(0, release(crackle), 0.1);
+  save("roar", track, 0.45);
+}
+
+// The fire doused: a long hiss of steam, loud at first, fading slowly.
+{
+  const track = new Track(3);
+  const envelope = (t) => rise(t, 0, 0.05) * Math.exp(-t * 1.2) * (1 - rise(t, 2.4, 2.9));
+  const hiss = (pan) => {
+    const deep = rush(2.9, 0.5, envelope);
+    // (High: the noise less what's deep in it.)
+    const high = new Float32Array(deep.length);
+    for (let i = 0; i < deep.length; i++) high[i] = (random() * 2 - 1) * envelope(i / RATE) * 0.5 - deep[i] * 0.3;
+    track.add(0, release(high), pan);
+  };
+  hiss(-0.3);
+  hiss(0.3);
+  save("hiss", track, 0.3);
+}

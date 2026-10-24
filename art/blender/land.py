@@ -485,6 +485,25 @@ HALLS = {h.place: h for h in [
     Hall("tower", 0, TOWER_R - 0.8, 9, c.linear("#2c2a26"), c.linear("#34312c"), at=TOWER, indoor=True, dark=True),
 ]}
 
+# The dragon (dragon.py), standing just in from the tunnel south, beside
+# it, facing west-south-west, across the way in from the west: it turns its
+# head to breathe its fire across the mouth of the tunnel. (Its head as near
+# the roof as it can be, and nothing hanging there; its tail curled round
+# behind it, on its right.) Where it stands, which way it faces, and its
+# shape on the ground: circles [x, y, r] from where it stands, as it faces -y.
+DRAGON_AT = (P["dragon-cave"][0] + 3.6, P["dragon-cave"][1] - 4.2)
+DRAGON_YAW = math.atan2(-0.96, 0.29)  # (anticlockwise, from facing -y)
+DRAGON_SHAPE = [(0, -0.9, 1.5), (0, 1.0, 1.4), (-0.3, 3.6, 0.55), (-0.8, 5.2, 0.4), (-2.0, 5.6, 0.35),
+                (-3.0, 4.8, 0.3), (-2.9, 3.6, 0.25)]
+DRAGON_CLEAR = 5.5  # metres round it, with no stalactites (and no stalagmites near any of it)
+
+
+def dragon_shape():
+    """Its circles on the ground, where it stands: [x, y, r]."""
+    move = c.Kit.placing((*DRAGON_AT, 0), DRAGON_YAW, 0.91)  # (as dragon.py scales it)
+    return [(*move((x, y, 0))[:2], r) for x, y, r in DRAGON_SHAPE]
+
+
 T, O, G, DM = P["trolls"], P["oak-door"], P["giant"], P["damp-tunnels"]
 TR, MZ, DK, BC = P["treasure-room"], P["maze"], P["dark-tunnels"], P["beautiful-chamber"]
 GH, WK, DU = P["grand-hall"], P["wizards-kitchen"], P["dungeon"]
@@ -3182,6 +3201,26 @@ TIMBER = c.linear("#4a3420")
 LAYERS = (c.linear("#6e6d6a"), c.linear("#5a5957"), c.linear("#7c7a76"), c.linear("#4c4b4a"), c.linear("#6a6560"))
 
 
+RING_OUT = 0.6  # metres past the way's square, round it: past the most its rock is pushed out
+
+
+def ring_out(row, rock, half):
+    """For a point of the rock round a way's end: on out from the middle of
+    the roof's curve, through it, to a frame round the square opening."""
+    x, y, f = row[0], row[1], row[2]
+    across = (rock[0] - x) * row[3] + (rock[1] - y) * row[4]
+    up = rock[2] - (f + SPRING)
+    ts = []
+    if abs(across) > 1e-6:
+        ts.append((half + RING_OUT) / abs(across))
+    if up > 1e-6:
+        ts.append((TUNNEL_TALL - SPRING + RING_OUT) / up)
+    elif up < -1e-6:
+        ts.append((SPRING + RING_OUT) / -up)
+    t = max(1.0, min(ts))
+    return (x + row[3] * across * t, y + row[4] * across * t, f + SPRING + up * t)
+
+
 def vault_point(row, u, h, half):
     """A point of the rock round a way: pushed out by up to 0.4 m (but not at
     the foot of its walls, where they meet the floor)."""
@@ -3346,9 +3385,14 @@ for way in WAYS.values():
             for row, pts_, ends in ((a, pa, k == 0 or not rocky_[k - 1]), (b, pb, k == len(rocky_) - 1 or not rocky_[k + 1])):
                 if not ends or (row is a and k in dead_rows) or (row is b and k + 1 in dead_rows):
                     continue  # (a dead end: the rock closes round it, below)
-                square = [(*side(row, u * half), row[2] + (h if h <= SPRING else TUNNEL_TALL)) for u, h in VAULT]
+                # (Each piece straight out from the rock, away from the middle
+                # of the roof's curve, to a frame round it a little bigger
+                # than the rock ever is: pieces side by side never cross, and
+                # fold over each other, and flicker. The door frames and
+                # lintels in front hide what's past the square opening.)
+                beyond = [ring_out(row, p, half) for p in pts_]
                 for i in range(len(VAULT) - 1):
-                    quad(tunnel, [pts_[i], pts_[i + 1], square[i + 1], square[i]], rock_colour(*pts_[i]), 0.1)
+                    quad(tunnel, [pts_[i], pts_[i + 1], beyond[i + 1], beyond[i]], rock_colour(*pts_[i]), 0.1)
             # Timber props, every few metres (not by a hall).
             if k % PROP_EVERY == PROP_EVERY // 2 and not in_a_hall(*mid, 4):
                 dx, dy = b[0] - a[0], b[1] - a[1]
@@ -3426,7 +3470,7 @@ for way in WAYS.values():
             # (A shade out from under cover, off the rock's end.)
             outside = a if b[5] else b
             run = math.hypot(outside[0] - row[0], outside[1] - row[1]) or 1
-            ox_, oy_ = (outside[0] - row[0]) / run * 0.03, (outside[1] - row[1]) / run * 0.03
+            ox_, oy_ = (outside[0] - row[0]) / run * 0.06, (outside[1] - row[1]) / run * 0.06
             l1, r1 = side(row, -half - 2.4), side(row, half + 2.4)
             l1, r1 = (l1[0] + ox_, l1[1] + oy_), (r1[0] + ox_, r1[1] + oy_)
             low = row[2] + TUNNEL_TALL
@@ -3451,7 +3495,7 @@ for way in WAYS.values():
             # (In a cave, a shade out into it, off the rock's end.)
             inner = a if i == k + 1 else b
             run = math.hypot(inner[0] - row[0], inner[1] - row[1]) or 1
-            hx_, hy_ = ((inner[0] - row[0]) / run * 0.03, (inner[1] - row[1]) / run * 0.03) if not hall.indoor else (0, 0)
+            hx_, hy_ = ((inner[0] - row[0]) / run * 0.06, (inner[1] - row[1]) / run * 0.06) if not hall.indoor else (0, 0)
             el_, er_ = (edge_left[i][0] + hx_, edge_left[i][1] + hy_), (edge_right[i][0] + hx_, edge_right[i][1] + hy_)
             # (In a cave, as high as its wall goes before the dome.)
             top = f + TUNNEL_TALL + 0.1 if hall.indoor else hall.floor + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
@@ -3688,7 +3732,10 @@ for hall in HALLS.values():
         door = opening(hall, hx + math.cos(am) * (R + 0.6), hy + math.sin(am) * (R + 0.6))
         a0, b0, a1, b1 = point(k, rings[0]), point(k + 1, rings[0]), point(k, rings[1]), point(k + 1, rings[1])
         if door:
-            low = f + TUNNEL_TALL
+            # (Over the doorway, from clear above the way's rock, which bulges
+            # up past its roof: lower, the wall cuts across the inside of the
+            # way. The door frame's lintel hides the gap below, from the cave.)
+            low = f + TUNNEL_TALL + 0.5
             a0, b0 = (a1[0], a1[1], low), (b1[0], b1[1], low)
         quad(caves, [a0, b0, b1, a1], hall.wall)
         for r0, r1 in zip(rings[1:], rings[2:]):
@@ -3737,6 +3784,9 @@ for hall in HALLS.values():
         rock = c.mix(hall.wall, ROCK, 0.4)
         for _ in range(int(R * 1.6)):
             spot = free_spot(R - random.uniform(0.6, 2.4))
+            if spot and hall.place == "dragon-cave" and any(math.hypot(spot[0] - x, spot[1] - y) < r + 1.3
+                                                            for x, y, r in dragon_shape()):
+                continue
             if spot:
                 x, y, _ = spot
                 r = random.uniform(0.35, 0.7)
@@ -3745,6 +3795,8 @@ for hall in HALLS.values():
         for _ in range(int(R * 2)):
             a, rho = random.uniform(0, 2 * math.pi), random.uniform(1.5, R - 0.5)
             x, y = hx + math.cos(a) * rho, hy + math.sin(a) * rho
+            if hall.place == "dragon-cave" and math.hypot(x - DRAGON_AT[0], y - DRAGON_AT[1]) < DRAGON_CLEAR:
+                continue
             spike(caves, x, y, ceiling(x, y) + 0.3, -random.uniform(0.6, min(2.0, hall.tall - 3.4)), random.uniform(0.2, 0.45), rock)
     if hall.light == TORCH:
         # Torches on the walls.
@@ -4541,6 +4593,8 @@ for z in (CAVE + 0.3, CAVE + 1.6, CAVE + TUNNEL_TALL - 0.2):
 obstacle(["giant south"], "box", G[0], -gy, TUNNEL_HALF + 0.3, 0.5, under=True)  # the padlocked gate
 dy = DC[1] - HALLS["dragon-cave"].r - 1.5
 obstacle(["dragon-cave south"], "box", DC[0], -dy, TUNNEL_HALF + 0.3, 1.0, under=True)  # the dragon's fire
+for x, y, r in dragon_shape():
+    under_circle(x, y, r)  # (the dragon itself)
 ky = DK[1] - HALLS["dark-tunnels"].r - 1.5
 obstacle(["dark-tunnels south"], "box", DK[0], -ky, TUNNEL_HALF + 0.3, 1.0, under=True)  # too dark to go on
 caves.build("caves", smooth=False)
@@ -4800,6 +4854,11 @@ if out:
                        "castle": [CASTLE[0], CASTLE[1], round(-CASTLE[3], 2), round(-CASTLE[2], 2)]},
         # The leaves in the dragon's mouth: where the pile is [x, z] (on the way's floor), and the heaps they're swept into.
         "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
+        # The dragon: where it stands [x, z] and its floor, which way it faces [x, z], and where it breathes its
+        # fire, across the mouth of the tunnel south [x, y, z].
+        "dragon": {"at": [round(DRAGON_AT[0], 2), round(-DRAGON_AT[1], 2), HALLS["dragon-cave"].floor],
+                   "facing": [round(math.sin(DRAGON_YAW), 3), round(math.cos(DRAGON_YAW), 3)],
+                   "fire": [DC[0], HALLS["dragon-cave"].floor, round(-(DC[1] - HALLS["dragon-cave"].r + 1), 2)]},
         # The fire in the charcoal burner's hut, its middle [x, z] and floor, and the smoke hole over it: how high, and how wide.
         "hut": {"fire": [round(HUT_FIRE["x"], 2), round(-HUT_FIRE["y"], 2), round(HUT_FIRE["floor"], 2)],
                 "hole": round(HUT_FIRE["hole"], 2), "r": HUT_FIRE["r"]},

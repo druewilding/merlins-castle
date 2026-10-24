@@ -3,7 +3,7 @@
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
 # The ladder, the plank, the key, the axe, the apple, the emerald, the
-# broom, the lamp, the rope and the penny so far; the rest are to come (PLAN-V3.md).
+# broom, the lamp, the rope, the penny and the water so far; the rest are to come (PLAN-V3.md).
 
 import math
 import random
@@ -1038,6 +1038,91 @@ penny.add([(0, 0, 0)] + [(x, y, 0.0) for x, y in edge],
           [(0, 1 + (k + 1) % PENNY_SIDES, 1 + k) for k in range(PENNY_SIDES)],
           [worn((0, 0, 0))] + [worn((x, y, 0)) for x, y in edge])
 outward(penny.build("penny", smooth=True))
+
+# The water: as in its picture, in a round glass flask, standing on a little
+# flat base, with a short neck, a thick lip round its top, and a cork pushed
+# into it. Its glass (`water-glass`) and the water in it (`water-inside`,
+# half full, its surface flat) are their own, on the cork, for the game to
+# make see-through. 56 cm high to the top of its cork (big, like the lamp,
+# so you can spot it).
+FLASK_SIZE = 1.2
+FLASK_R = 0.165  # its bulb's radius
+FLASK_Z = FLASK_R * math.sqrt(1 - 0.5 ** 2)  # its bulb's middle (cut flat underneath, half as wide)
+NECK_R = 0.3 * FLASK_R
+NECK_LOW = FLASK_Z + FLASK_R * math.sqrt(1 - 0.36 ** 2)  # where the bulb narrows to its neck
+NECK_HIGH = NECK_LOW + 0.07
+LIP = NECK_HIGH + 0.03  # the top of its lip
+CORK_TOP = LIP + 0.07
+FILL = FLASK_Z + 0.1 * FLASK_R  # its surface, a little over halfway up
+WALL = 0.004  # the glass's thickness, to the water inside it
+FLASK_GLASS = c.linear("#dfeef6")
+WATER_DEEP = c.linear("#1f5fae")
+WATER_LIGHT = c.linear("#4f9ad8")
+CORK = c.linear("#b07a45")
+CORK_DARK = c.linear("#6e4523")
+CORK_LIGHT = c.linear("#d3a066")
+flask, flask_glass, flask_water = c.Builder(), c.Builder(), c.Builder()
+
+
+def bulb(r, start, end, steps):
+    """Round its bulb (r out from its middle), from start to end (angles from straight down)."""
+    return [(r * math.sin(start + (end - start) * k / steps), FLASK_Z - r * math.cos(start + (end - start) * k / steps))
+            for k in range(steps + 1)]
+
+
+def corky(p, t):
+    """Cork: speckled with dark pits, lighter towards its top."""
+    v = Vector(p) * 90
+    colour = c.mix(CORK, CORK_LIGHT, 0.25 * t + 0.3 * noise.noise(v * 0.3))
+    if noise.noise(v) > 0.35:
+        colour = c.mix(colour, CORK_DARK, 0.75)
+    return c.vary(colour, 0.06, v)
+
+
+# Its glass: in a little under its base (pushed up, as a flask's is), out
+# to its edge, round its bulb, in to its neck, up to its lip, round over it,
+# and down a little way inside (where the cork hides the rest).
+base = [(0, 0.012), (0.3 * FLASK_R, 0.006), (0.5 * FLASK_R - 0.006, 0.0)]
+round_ = bulb(FLASK_R, math.asin(0.5), math.pi - math.asin(0.36), 28)
+neck = [(NECK_R + 0.012, NECK_LOW + 0.01), (NECK_R + 0.002, NECK_LOW + 0.025), (NECK_R, NECK_LOW + 0.04),
+        (NECK_R, NECK_HIGH)]
+lip = [(NECK_R + 0.012 * math.sin(math.pi * k / 8), NECK_HIGH + (LIP - NECK_HIGH) * (1 - math.cos(math.pi * k / 8)) / 2)
+       for k in range(1, 9)]
+lip += [(NECK_R - 0.005, LIP + 0.002), (NECK_R - 0.012, LIP - 0.006), (NECK_R - 0.013, NECK_HIGH - 0.02)]
+lathe(flask_glass, base + round_[1:] + neck + lip, lambda p, t: FLASK_GLASS, sides=48)
+
+# The water: just inside its glass, from its base up to its surface, and
+# across that (lighter, and rippled a little).
+inside = [(0, 0.012 + WALL)] + bulb(FLASK_R - WALL, math.asin(0.5), math.acos((FLASK_Z - FILL) / (FLASK_R - WALL)), 20)
+inside += [(inside[-1][0] * (1 - k / 6), FILL) for k in range(1, 7)]
+
+
+def watery(p, t):
+    if p[2] >= FILL - 1e-6:
+        return c.vary(WATER_LIGHT, 0.12, Vector(p) * 25)
+    return c.mix(WATER_DEEP, WATER_LIGHT, 0.6 * (p[2] / FILL) ** 2)
+
+
+lathe(flask_water, inside, watery, sides=48)
+
+# The cork: pushed in down its neck, standing up out of it, a little wider
+# than its lip at its top, its edge rounded.
+CORK_LOW = NECK_HIGH - 0.03
+cork = [(0, CORK_LOW), (NECK_R - 0.016, CORK_LOW), (NECK_R - 0.014, LIP), (NECK_R + 0.002, LIP + 0.004)]
+cork += [(NECK_R + 0.014 + 0.004 * k / 4, LIP + 0.004 + (CORK_TOP - LIP - 0.02) * k / 4) for k in range(1, 5)]
+cork += [(NECK_R + 0.018 - 0.008 * (1 - math.cos(math.pi / 2 * k / 4)),
+          CORK_TOP - 0.016 + 0.016 * math.sin(math.pi / 2 * k / 4)) for k in range(1, 5)]
+cork += [(0, CORK_TOP + 0.002)]
+lathe(flask, cork, corky, sides=32)
+
+flask_object = flask.build("water", smooth=True)
+flask_glass_object = flask_glass.build("water-glass", smooth=True)
+flask_water_object = flask_water.build("water-inside", smooth=True)
+for part in (flask_object, flask_glass_object, flask_water_object):
+    part.data.transform(Matrix.Scale(FLASK_SIZE, 4))
+outward(flask_object)
+outward(flask_water_object)
+flask_glass_object.parent = flask_water_object.parent = flask_object
 
 if out:
     c.export(out)
