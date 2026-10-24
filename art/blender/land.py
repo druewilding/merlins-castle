@@ -3201,23 +3201,6 @@ TIMBER = c.linear("#4a3420")
 LAYERS = (c.linear("#6e6d6a"), c.linear("#5a5957"), c.linear("#7c7a76"), c.linear("#4c4b4a"), c.linear("#6a6560"))
 
 
-def ring_to_square(row, u, h, half, rock):
-    """Where the ring of rock at a way's end (from the rock in to the square
-    opening) meets the square, for this point of the rock: straight in from
-    it, towards the middle of the roof's curve, as the rock was pushed out
-    (so no two pieces of the ring cross, and fold over each other, and
-    flicker); and never further out than the rock is."""
-    x, y, f = row[0], row[1], row[2]
-    if h <= SPRING:
-        return (x + row[3] * u * half, y + row[4] * u * half, f + h)
-    dx, dz = u * half, h - SPRING
-    t = (TUNNEL_TALL - SPRING) / dz
-    if abs(dx) > 1e-6:
-        t = min(t, half / abs(dx))
-    t = min(t, (rock[2] - f - SPRING) / dz)
-    return (x + row[3] * dx * t, y + row[4] * dx * t, f + SPRING + dz * t)
-
-
 def vault_point(row, u, h, half):
     """A point of the rock round a way: pushed out by up to 0.4 m (but not at
     the foot of its walls, where they meet the floor)."""
@@ -3382,9 +3365,23 @@ for way in WAYS.values():
             for row, pts_, ends in ((a, pa, k == 0 or not rocky_[k - 1]), (b, pb, k == len(rocky_) - 1 or not rocky_[k + 1])):
                 if not ends or (row is a and k in dead_rows) or (row is b and k + 1 in dead_rows):
                     continue  # (a dead end: the rock closes round it, below)
-                square = [ring_to_square(row, u, h, half, p) for (u, h), p in zip(VAULT, pts_)]
+                square = [(*side(row, u * half), row[2] + (h if h <= SPRING else TUNNEL_TALL)) for u, h in VAULT]
+                # (In triangles, all facing the same way along the way: where
+                # the rock's pushed out past the square's corner, a piece
+                # folds over itself, and its two halves, facing opposite
+                # ways, would flicker, one lit and one dark.)
+                along = (row[4], -row[3], 0.0)
                 for i in range(len(VAULT) - 1):
-                    quad(tunnel, [pts_[i], pts_[i + 1], square[i + 1], square[i]], rock_colour(*pts_[i]), 0.1)
+                    colour = c.vary(rock_colour(*pts_[i]), 0.1, Vector(pts_[i]))
+                    piece = [pts_[i], pts_[i + 1], square[i + 1], square[i]]
+                    for t in ((0, 1, 2), (0, 2, 3)):
+                        corners = [Vector(piece[j]) for j in t]
+                        facing = (corners[1] - corners[0]).cross(corners[2] - corners[0])
+                        if facing.length < 1e-6:
+                            continue
+                        if facing.dot(Vector(along)) < 0:
+                            corners.reverse()
+                        tunnel.add([tuple(p) for p in corners], [(0, 1, 2)], [colour] * 3)
             # Timber props, every few metres (not by a hall).
             if k % PROP_EVERY == PROP_EVERY // 2 and not in_a_hall(*mid, 4):
                 dx, dy = b[0] - a[0], b[1] - a[1]
@@ -3462,7 +3459,7 @@ for way in WAYS.values():
             # (A shade out from under cover, off the rock's end.)
             outside = a if b[5] else b
             run = math.hypot(outside[0] - row[0], outside[1] - row[1]) or 1
-            ox_, oy_ = (outside[0] - row[0]) / run * 0.03, (outside[1] - row[1]) / run * 0.03
+            ox_, oy_ = (outside[0] - row[0]) / run * 0.06, (outside[1] - row[1]) / run * 0.06
             l1, r1 = side(row, -half - 2.4), side(row, half + 2.4)
             l1, r1 = (l1[0] + ox_, l1[1] + oy_), (r1[0] + ox_, r1[1] + oy_)
             low = row[2] + TUNNEL_TALL
@@ -3487,7 +3484,7 @@ for way in WAYS.values():
             # (In a cave, a shade out into it, off the rock's end.)
             inner = a if i == k + 1 else b
             run = math.hypot(inner[0] - row[0], inner[1] - row[1]) or 1
-            hx_, hy_ = ((inner[0] - row[0]) / run * 0.03, (inner[1] - row[1]) / run * 0.03) if not hall.indoor else (0, 0)
+            hx_, hy_ = ((inner[0] - row[0]) / run * 0.06, (inner[1] - row[1]) / run * 0.06) if not hall.indoor else (0, 0)
             el_, er_ = (edge_left[i][0] + hx_, edge_left[i][1] + hy_), (edge_right[i][0] + hx_, edge_right[i][1] + hy_)
             # (In a cave, as high as its wall goes before the dome.)
             top = f + TUNNEL_TALL + 0.1 if hall.indoor else hall.floor + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
@@ -3724,7 +3721,10 @@ for hall in HALLS.values():
         door = opening(hall, hx + math.cos(am) * (R + 0.6), hy + math.sin(am) * (R + 0.6))
         a0, b0, a1, b1 = point(k, rings[0]), point(k + 1, rings[0]), point(k, rings[1]), point(k + 1, rings[1])
         if door:
-            low = f + TUNNEL_TALL
+            # (Over the doorway, from clear above the way's rock, which bulges
+            # up past its roof: lower, the wall cuts across the inside of the
+            # way. The door frame's lintel hides the gap below, from the cave.)
+            low = f + TUNNEL_TALL + 0.5
             a0, b0 = (a1[0], a1[1], low), (b1[0], b1[1], low)
         quad(caves, [a0, b0, b1, a1], hall.wall)
         for r0, r1 in zip(rings[1:], rings[2:]):
