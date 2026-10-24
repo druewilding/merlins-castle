@@ -39,10 +39,10 @@ HEAD_SIZE = 1.25  # times bigger, his head (and the game makes each one's its ow
 FEET = 1.35  # ...and his feet (his hands are made bigger in the game, by their bones: so his
 # fingers bend where their joints are, and don't fold through his palms)
 BULK = (0.024, 0.018)  # metres his limbs and his body are bulked out
-BELLY = (0.11, 1.1, 0.2, 0.11)  # metres his belly sticks out, at its middle (its height), and how far it goes up and down
+BELLY = (0.07, 1.1, 0.2, 0.15)  # metres his belly sticks out, at its middle (its height), and how far it goes up and down
 # from there (not far down: it's his tummy, not his hips, which bend their own way, dancing)
-FATTER = 0.05  # metres more, for the trolls with bigger bellies (the shape key "belly")
-FAT = (0.03, 0.03, 0.03)  # and for the fatter trolls (the shape key "fat"): metres more on his limbs, his body and his belly
+FATTER = 0.035  # metres more, for the trolls with bigger bellies (the shape key "belly")
+FAT = (0.03, 0.03, 0.02)  # and for the fatter trolls (the shape key "fat"): metres more on his limbs, his body and his belly
 NOSE = (1.5, 0.036, 0.006)  # how much bigger his nose is grown, the radius of the round bulb it's made, and how far it's lifted (off his smile)
 LONG_NOSE = (1.35, 2.3, 0.022)  # or (the shape key "long-nose"): as much bigger across, along, and drooping
 EARS = (1.8, 2.5)  # how much bigger his ears are grown (or, the shape key "big-ears", these)
@@ -233,7 +233,7 @@ def trolled(i, belly=BELLY[0], fat=0.0, **face_):
     if tummy and p.y < 0.02:
         f = math.exp(-(((p.z - BELLY[1]) / (BELLY[2] if p.z > BELLY[1] else BELLY[3])) ** 2)) * tummy
         front = c.smooth(-p.y / 0.13)
-        p = Vector((p.x * (1 + 0.7 * belly * f), p.y - belly * f * front, p.z))
+        p = Vector((p.x * (1 + 0.35 * belly * f), p.y - belly * f * front, p.z))
     # (A little hunched: his upper back up and back.)
     hunch = w.get("spine_03", 0) + 0.5 * w.get("neck_01", 0)
     if p.y > 0:
