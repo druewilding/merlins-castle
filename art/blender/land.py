@@ -3206,7 +3206,8 @@ def in_pit(x, y):
 # round the hole, and a lintel where the roof begins. Inside a hall, the
 # hall's own floor and walls take over, with a door frame where they meet.
 # (Two lots: dug through rock, which the game draws grainy; and built,
-# indoors, or into the halls of worked stone, which it doesn't.)
+# indoors, or into the halls of worked stone, and what's made in the ways dug
+# (their timber props, stonework and posts), which it doesn't.)
 dug, built_ways = c.Builder(), c.Builder()
 tunnel = dug
 SMOOTH_HALLS = ("treasure-room", "beautiful-chamber")
@@ -3462,12 +3463,12 @@ for way in WAYS.values():
                     px, py = side(a, sign * (half - 0.14))
                     post = [(px + ux * su * 0.13 + vx * sv * 0.13, py + uy * su * 0.13 + vy * sv * 0.13)
                             for su, sv in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
-                    oriented_box(tunnel, post, f - 0.05, f + PROP_TALL, TIMBER)
+                    oriented_box(built_ways, post, f - 0.05, f + PROP_TALL, TIMBER)
                 lx2, ly2 = side(a, -half - 0.2)
                 rx2, ry2 = side(a, half + 0.2)
                 beam = [(lx2 - ux * 0.15, ly2 - uy * 0.15), (rx2 - ux * 0.15, ry2 - uy * 0.15),
                         (rx2 + ux * 0.15, ry2 + uy * 0.15), (lx2 + ux * 0.15, ly2 + uy * 0.15)]
-                oriented_box(tunnel, beam, f + PROP_TALL, f + PROP_TALL + 0.25, c.mix(TIMBER, c.linear("#000000"), 0.15))
+                oriented_box(built_ways, beam, f + PROP_TALL, f + PROP_TALL + 0.25, c.mix(TIMBER, c.linear("#000000"), 0.15))
             # Rubble along the foot of the walls.
             if rubble.random() < 0.22:
                 sign = rubble.choice((1, -1))
@@ -3498,12 +3499,12 @@ for way in WAYS.values():
                 for inner, outer in zip(across, across[1:]):
                     pa = [side(a, inner), side(a, outer)]
                     pb = [side(b, outer), side(b, inner)]
-                    quad(tunnel, [(*p, height(*p) + 0.32) for p in pa + pb], STONE)
+                    quad(built_ways, [(*p, height(*p) + 0.32) for p in pa + pb], STONE)
                     # Solid down into the ground at its outer edge and its
                     # ends, so there's nothing to see under it.
                     (ia, oa), (ob, ib) = pa, pb
                     for p0, p1 in ((oa, ob),) * (outer == across[-1]) + ((ia, oa), (ib, ob)):
-                        quad(tunnel, [(*p0, height(*p0) + 0.32), (*p1, height(*p1) + 0.32), (*p1, height(*p1) - 0.6),
+                        quad(built_ways, [(*p0, height(*p0) + 0.32), (*p1, height(*p1) + 0.32), (*p1, height(*p1) - 0.6),
                                       (*p0, height(*p0) - 0.6)], STONE)
         if a[5] != b[5]:
             # Just behind the lintel, the earth over the roof: from the top of
@@ -3532,7 +3533,7 @@ for way in WAYS.values():
             l1, r1 = (l1[0] + ox_, l1[1] + oy_), (r1[0] + ox_, r1[1] + oy_)
             low = row[2] + TUNNEL_TALL
             high = max(height(*l1), height(*r1), height(row[0], row[1])) + 0.8
-            quad(tunnel, [(*l1, low), (*r1, low), (*r1, high), (*l1, high)], STONE)
+            quad(built_ways, [(*l1, low), (*r1, low), (*r1, high), (*l1, high)], STONE)
             # And a lid over the box: the ground's hole reaches a square's
             # width back past the lintel, and on a cliff the box's back would
             # show through it. So the ground's cut squares are drawn again,
@@ -3632,7 +3633,7 @@ for way in WAYS.values():
         tunnel.add(feet, [tuple(range(len(feet)))[::1 if up else -1]], [c.vary(floor_colour, 0.12, Vector(p)) for p in feet])
         if way.clue:
             px, py = x + ox * NOTE_IN, y + oy * NOTE_IN
-            note_post(tunnel, way.clue, px, py, f, (-ox, -oy), TUNNEL_FLOOR)
+            note_post(built_ways, way.clue, px, py, f, (-ox, -oy), TUNNEL_FLOOR)
 # A stone threshold at every mouth onto the land, over the ragged edge of the
 # hole in the ground (which comes in whole squares, so it reaches a little
 # past where the ramp begins, and shows the sky through the gap).
@@ -3654,17 +3655,17 @@ for way in WAYS.values():
         for i in range(len(steps) - 1):
             for j in range(len(across) - 1):
                 pts = [grid[i][j], grid[i][j + 1], grid[i + 1][j + 1], grid[i + 1][j]]
-                quad(tunnel, [(x, y, height(x, y) + 0.06) for x, y in pts], STONE, 0.1)
+                quad(built_ways, [(x, y, height(x, y) + 0.06) for x, y in pts], STONE, 0.1)
         # Its sides, down into the ground; and its edge over the ramp, down to
         # the ramp's floor: seen from below, there's nothing to look under.
         for i in range(len(steps) - 1):
             for j in (0, len(across) - 1):
                 (x0, y0), (x1, y1) = grid[i][j], grid[i + 1][j]
-                quad(tunnel, [(x0, y0, height(x0, y0) + 0.06), (x1, y1, height(x1, y1) + 0.06), (x1, y1, height(x1, y1) - 0.6),
+                quad(built_ways, [(x0, y0, height(x0, y0) + 0.06), (x1, y1, height(x1, y1) + 0.06), (x1, y1, height(x1, y1) - 0.6),
                               (x0, y0, height(x0, y0) - 0.6)], STONE, 0.1)
         for j in range(len(across) - 1):
             (x0, y0), (x1, y1) = grid[0][j], grid[0][j + 1]
-            quad(tunnel, [(x0, y0, height(x0, y0) + 0.06), (x1, y1, height(x1, y1) + 0.06), (x1, y1, ef - 0.3),
+            quad(built_ways, [(x0, y0, height(x0, y0) + 0.06), (x1, y1, height(x1, y1) + 0.06), (x1, y1, ef - 0.3),
                           (x0, y0, ef - 0.3)], STONE, 0.1)
 dug.build("tunnel", smooth=False)
 built_ways.build("tunnel-built", smooth=False)
