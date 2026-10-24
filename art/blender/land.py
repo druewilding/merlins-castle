@@ -3205,7 +3205,11 @@ def in_pit(x, y):
 # The ways: floor, walls and roof, stone walls up the ramps, a lip of stone
 # round the hole, and a lintel where the roof begins. Inside a hall, the
 # hall's own floor and walls take over, with a door frame where they meet.
-tunnel = c.Builder()
+# (Two lots: dug through rock, which the game draws grainy; and built,
+# indoors, or into the halls of worked stone, which it doesn't.)
+dug, built_ways = c.Builder(), c.Builder()
+tunnel = dug
+SMOOTH_HALLS = ("treasure-room", "beautiful-chamber")
 DROPS = []  # (cave, and the two sides of where a way drops away out of it)
 
 # Underground, under cover, a way is dug through rock: rough walls (pushed
@@ -3295,6 +3299,7 @@ def oriented_box(builder, corners, z0, z1, colour):
 
 
 for way in WAYS.values():
+    tunnel = built_ways if way.indoor else dug
     half = way.half
     # The way's two edges, as lines meeting exactly at every bend (mitred,
     # like the corner of a picture frame), so the floor never folds over
@@ -3541,6 +3546,7 @@ for way in WAYS.values():
             if abs(hall.floor - a[2]) > 1.5 or hall.inside(a[0], a[1], m) == hall.inside(b[0], b[1], m):
                 continue
             i = k + 1 if hall.inside(a[0], a[1], m) else k
+            framed = built_ways if hall.place in SMOOTH_HALLS else tunnel
             row = rows[i]
             f = row[2]
             nx_, ny_ = row[3], row[4]
@@ -3553,7 +3559,7 @@ for way in WAYS.values():
             top = f + TUNNEL_TALL + 0.1 if hall.indoor else hall.floor + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
             for p, jut in ((er_, 1.8), (el_, -1.8)):
                 q = (p[0] + nx_ * jut, p[1] + ny_ * jut)
-                quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
+                quad(framed, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
             # (Into a room, the frame can stand a little out from its wall,
             # where the way's walls begin: the sides of the doorway, back
             # from the frame to the wall, so there's no gap to see out of. Not
@@ -3568,11 +3574,11 @@ for way in WAYS.values():
                     if 0 < t < 1:
                         q = (p[0] + ux * t, p[1] + uy * t)
                         # (Facing both ways: one side's faces in, the other's out.)
-                        quad(tunnel, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
-                        quad(tunnel, [(*p, top), (*q, top), (*q, f - 0.3), (*p, f - 0.3)], hall.wall)
+                        quad(framed, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
+                        quad(framed, [(*p, top), (*q, top), (*q, f - 0.3), (*p, f - 0.3)], hall.wall)
             if not hall.indoor:
                 p, q = el_, er_
-                quad(tunnel, [(*p, f + TUNNEL_TALL), (*q, f + TUNNEL_TALL), (*q, top), (*p, top)], hall.wall)
+                quad(framed, [(*p, f + TUNNEL_TALL), (*q, f + TUNNEL_TALL), (*q, top), (*p, top)], hall.wall)
     # Where it drops away steeply out of a cave's doorway: the cave's floor
     # is cut off there (it reaches out under the cave's lumpy wall, and would
     # stick out over the drop, a ledge).
@@ -3660,7 +3666,8 @@ for way in WAYS.values():
             (x0, y0), (x1, y1) = grid[0][j], grid[0][j + 1]
             quad(tunnel, [(x0, y0, height(x0, y0) + 0.06), (x1, y1, height(x1, y1) + 0.06), (x1, y1, ef - 0.3),
                           (x0, y0, ef - 0.3)], STONE, 0.1)
-tunnel.build("tunnel", smooth=False)
+dug.build("tunnel", smooth=False)
+built_ways.build("tunnel-built", smooth=False)
 
 # The deep, deep hole: straight down into the dark, a long way (you only
 # see how far falling down it: hole.ts). Its walls rough rock, in layers,
@@ -3720,11 +3727,16 @@ obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy - 0.3, 
 # The halls: a floor of squares out under the walls, a lumpy round wall with
 # openings where the ways come in, and a dome.
 caves = c.Builder()
+# (And what's made, in the caves, not rock: built, carved or forged; and the
+# halls with smooth walls, of worked stone. The game draws the rock grainy.)
+cave_made = c.Builder()
 for hall in HALLS.values():
     if hall.indoor:
         continue  # (below)
     random.seed(f"cave {hall.place}")  # (its rocks its own: a change anywhere else doesn't move them)
     hx, hy, f, R = hall.x, hall.y, hall.floor, hall.r
+    smooth_wall = hall.place in SMOOTH_HALLS
+    rock_of = cave_made if smooth_wall else caves
     step = 1.5
     reach = R + 1.4
     n = int(reach / step) + 1
@@ -3758,10 +3770,9 @@ for hall in HALLS.values():
                 colour = c.linear("#2f3c44")  # puddles
             # (A shade lower than the ways' floors, where they overlap.)
             fl = f - 0.06
-            caves.add([(x, y, fl) for x, y in square], [tuple(range(len(square)))],
+            rock_of.add([(x, y, fl) for x, y in square], [tuple(range(len(square)))],
                       [c.vary(colour, vary, Vector((x0, y0, fl)))] * len(square))
 
-    smooth_wall = hall.place in ("treasure-room", "beautiful-chamber")
     sides = max(28, int(2 * math.pi * R / (1.1 if smooth_wall else 0.55)))
     wall_top = f + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
     domes = 6 if smooth_wall else 10
@@ -3837,9 +3848,9 @@ for hall in HALLS.values():
                     b0 = tuple(p + (q - p) * t for p, q in zip(b0, b1))
             pts = [a0, b0, b1, a1]
             colours = [shade(k, r0, darker), shade(k + 1, r0, darker), shade(k + 1, r1, darker), shade(k, r1, darker)]
-            caves.add(pts, [(0, 1, 2, 3)], colours)
+            rock_of.add(pts, [(0, 1, 2, 3)], colours)
         last = rings[-1]
-        caves.add([point(k, last), point(k + 1, last), (hx, hy, f + hall.tall)], [(0, 1, 2)], [hall.wall] * 3)
+        rock_of.add([point(k, last), point(k + 1, last), (hx, hy, f + hall.tall)], [(0, 1, 2)], [hall.wall] * 3)
 
     def free_spot(radius):
         """Somewhere near the wall that isn't in a doorway."""
@@ -3864,17 +3875,17 @@ for hall in HALLS.values():
             x, y = hx + math.cos(a) * (R - inset), hy + math.sin(a) * (R - inset)
             if opening(hall, x, y):
                 continue
-            caves.cylinder((x, y, f), (x, y, ceiling(x, y) + 0.2), 0.55, 0.45, GOLD_STONE if hall.place == "beautiful-chamber"
+            cave_made.cylinder((x, y, f), (x, y, ceiling(x, y) + 0.2), 0.55, 0.45, GOLD_STONE if hall.place == "beautiful-chamber"
                            else c.linear("#b49a68"), sides=10)
             under_circle(x, y, 0.55)
     if hall.place == "treasure-room":
         # The altar on its steps, against the north wall, and chests.
         ax, ay = hx, hy + R - 3.2
-        block(caves, ax - 2.6, ay - 1.6, f, ax + 2.6, ay + 1.6, f + 0.4, GOLD_STONE, solid=False)
-        block(caves, ax - 1.6, ay - 0.9, f + 0.4, ax + 1.6, ay + 0.9, f + 1.5, c.linear("#d8b46a"), solid=False)
+        block(cave_made, ax - 2.6, ay - 1.6, f, ax + 2.6, ay + 1.6, f + 0.4, GOLD_STONE, solid=False)
+        block(cave_made, ax - 1.6, ay - 0.9, f + 0.4, ax + 1.6, ay + 0.9, f + 1.5, c.linear("#d8b46a"), solid=False)
         under_box(ax, ay, 2.6, 1.6)
         for cx_, cy_ in ((hx - 4.5, hy + 3), (hx + 4.5, hy + 3), (hx - 5, hy - 3.5), (hx + 5, hy - 3.5)):
-            block(caves, cx_ - 0.7, cy_ - 0.45, f, cx_ + 0.7, cy_ + 0.45, f + 0.8, c.linear("#7a4e26"), solid=False)
+            block(cave_made, cx_ - 0.7, cy_ - 0.45, f, cx_ + 0.7, cy_ + 0.45, f + 0.8, c.linear("#7a4e26"), solid=False)
             under_box(cx_, cy_, 0.7, 0.45)
     elif hall.place != "beautiful-chamber":
         # Stalagmites round the edge, stalactites overhead.
@@ -3922,8 +3933,8 @@ for hall in HALLS.values():
                 _, _, a = spot
                 back = min(wall_at(a, f + 1.9), wall_at(a, f + 2.5)) - 0.12
                 x, y = hx + math.cos(a) * back, hy + math.sin(a) * back
-                block(caves, x - 0.08, y - 0.08, f + 1.9, x + 0.08, y + 0.08, f + 2.5, IRON, solid=False)
-                caves.cone((x, y, f + 2.5), 0.5, 0.16, FLAME, sides=6, droop=0)
+                block(cave_made, x - 0.08, y - 0.08, f + 1.9, x + 0.08, y + 0.08, f + 2.5, IRON, solid=False)
+                cave_made.cone((x, y, f + 2.5), 0.5, 0.16, FLAME, sides=6, droop=0)
 
 # The castle's rooms: a patterned floor out under the walls, walls with a
 # darker band at the bottom and doorways where the corridors come in, a
@@ -4745,14 +4756,14 @@ def ring_handle(b, x, y, z, out):
 oy = O[1] - HALLS["oak-door"].r - 1.2
 ox0, ox1 = O[0] - TUNNEL_HALF, O[0] + TUNNEL_HALF
 for x0, x1 in ((ox0 - 0.3, ox0 + DOOR_IN), (ox1 - DOOR_IN - 0.02, ox1 + 0.3)):
-    block(caves, x0, oy - 0.14, CAVE, x1, oy + 0.14, CAVE + DOOR_TALL + 0.05, OAK, solid=False)  # its posts
-block(caves, ox0 - 0.3, oy - 0.16, CAVE + DOOR_TALL + 0.02, ox1 + 0.3, oy + 0.16, CAVE + DOOR_TALL + 0.3, OAK,
+    block(cave_made, x0, oy - 0.14, CAVE, x1, oy + 0.14, CAVE + DOOR_TALL + 0.05, OAK, solid=False)  # its posts
+block(cave_made, ox0 - 0.3, oy - 0.16, CAVE + DOOR_TALL + 0.02, ox1 + 0.3, oy + 0.16, CAVE + DOOR_TALL + 0.3, OAK,
       solid=False)  # the beam over it
 for k in range(9):
     x0 = ox0 - 0.3 + k * (ox1 - ox0 + 0.6) / 9
-    block(caves, x0 + 0.01, oy - 0.07, CAVE + DOOR_TALL + 0.3, x0 + (ox1 - ox0 + 0.6) / 9 - 0.01, oy + 0.07,
+    block(cave_made, x0 + 0.01, oy - 0.07, CAVE + DOOR_TALL + 0.3, x0 + (ox1 - ox0 + 0.6) / 9 - 0.01, oy + 0.07,
           CAVE + TUNNEL_TALL + 0.3, c.vary(OAK, 0.2, Vector((k, 1.7, 0))), solid=False)  # the boards over it
-block(caves, ox0, oy - 0.05, CAVE + DOOR_TALL + 0.3, ox1, oy + 0.05, CAVE + TUNNEL_TALL + 0.3, KEYHOLE,
+block(cave_made, ox0, oy - 0.05, CAVE + DOOR_TALL + 0.3, ox1, oy + 0.05, CAVE + TUNNEL_TALL + 0.3, KEYHOLE,
       solid=False)  # (dark, between them)
 oak_leaf = c.Builder()
 THICK = 0.12  # its thickness
@@ -4781,13 +4792,13 @@ gy = G[1] - HALLS["giant"].r - 1.2
 gx0, gx1 = G[0] - TUNNEL_HALF, G[0] + TUNNEL_HALF
 BARS = 11
 for x0, x1 in ((gx0 - 0.2, gx0 + DOOR_IN), (gx1 - DOOR_IN - 0.02, gx1 + 0.2)):
-    block(caves, x0, gy - 0.08, CAVE, x1, gy + 0.08, CAVE + DOOR_TALL + 0.05, IRON, solid=False)  # its posts
-block(caves, gx0 - 0.2, gy - 0.08, CAVE + DOOR_TALL + 0.03, gx1 + 0.2, gy + 0.08, CAVE + DOOR_TALL + 0.18, IRON,
+    block(cave_made, x0, gy - 0.08, CAVE, x1, gy + 0.08, CAVE + DOOR_TALL + 0.05, IRON, solid=False)  # its posts
+block(cave_made, gx0 - 0.2, gy - 0.08, CAVE + DOOR_TALL + 0.03, gx1 + 0.2, gy + 0.08, CAVE + DOOR_TALL + 0.18, IRON,
       solid=False)  # the rail over it
-block(caves, gx0, gy - 0.08, CAVE + TUNNEL_TALL - 0.2, gx1, gy + 0.08, CAVE + TUNNEL_TALL - 0.05, IRON, solid=False)
+block(cave_made, gx0, gy - 0.08, CAVE + TUNNEL_TALL - 0.2, gx1, gy + 0.08, CAVE + TUNNEL_TALL - 0.05, IRON, solid=False)
 for k in range(BARS):
     x = gx0 + DOOR_IN + 0.05 + k * (DOOR_WIDE - 0.1) / (BARS - 1)
-    block(caves, x - 0.05, gy - 0.05, CAVE + DOOR_TALL + 0.18, x + 0.05, gy + 0.05, CAVE + TUNNEL_TALL + 0.3, IRON,
+    block(cave_made, x - 0.05, gy - 0.05, CAVE + DOOR_TALL + 0.18, x + 0.05, gy + 0.05, CAVE + TUNNEL_TALL + 0.3, IRON,
           solid=False)  # (the bars over it, in line with its own)
 gate_leaf = c.Builder()
 THICK = 0.16  # its thickness, at its rails
@@ -4800,10 +4811,10 @@ for z in (0.25, 1.15, DOOR_TALL - 0.15):
 block(gate_leaf, -DOOR_WIDE - 0.01, THICK, 1.17, -DOOR_WIDE + 0.1, THICK + 0.08, 1.25, IRON, solid=False)
 gate_leaf.build("iron-gate-leaf", smooth=False).location = (gx1 - DOOR_IN, gy - THICK / 2, CAVE)
 lock_x, lock_y, lock_z = gx0 + DOOR_IN + 0.01, gy + THICK / 2 + 0.07, CAVE + 1.0  # the padlock's middle, on the hall's side
-block(caves, lock_x - 0.035, gy + 0.08, lock_z + 0.15, lock_x + 0.015, lock_y, lock_z + 0.24, IRON, solid=False)  # the staple
-block(caves, lock_x - 0.075, lock_y - 0.03, lock_z - 0.09, lock_x + 0.075, lock_y + 0.03, lock_z + 0.09, BRASS, solid=False)  # its body
-block(caves, lock_x - 0.016, lock_y + 0.03, lock_z - 0.01, lock_x + 0.016, lock_y + 0.036, lock_z + 0.035, KEYHOLE, solid=False)  # keyhole
-block(caves, lock_x - 0.006, lock_y + 0.03, lock_z - 0.05, lock_x + 0.006, lock_y + 0.036, lock_z - 0.01, KEYHOLE, solid=False)
+block(cave_made, lock_x - 0.035, gy + 0.08, lock_z + 0.15, lock_x + 0.015, lock_y, lock_z + 0.24, IRON, solid=False)  # the staple
+block(cave_made, lock_x - 0.075, lock_y - 0.03, lock_z - 0.09, lock_x + 0.075, lock_y + 0.03, lock_z + 0.09, BRASS, solid=False)  # its body
+block(cave_made, lock_x - 0.016, lock_y + 0.03, lock_z - 0.01, lock_x + 0.016, lock_y + 0.036, lock_z + 0.035, KEYHOLE, solid=False)  # keyhole
+block(cave_made, lock_x - 0.006, lock_y + 0.03, lock_z - 0.05, lock_x + 0.006, lock_y + 0.036, lock_z - 0.01, KEYHOLE, solid=False)
 shackle = c.Builder()
 for x0, x1, z0, z1 in ((-0.015, 0.015, -0.07, 0.13), (0.085, 0.115, -0.01, 0.13), (-0.015, 0.115, 0.11, 0.145)):
     block(shackle, x0, -0.015, z0, x1, 0.015, z1, STEEL, solid=False)  # (one leg longer, deep in it: lifted, it stays in on that one)
@@ -4816,6 +4827,7 @@ for x, y, r in dragon_shape():
 ky = DK[1] - HALLS["dark-tunnels"].r - 1.5
 obstacle(["dark-tunnels south"], "box", DK[0], -ky, TUNNEL_HALF + 0.3, 1.0, under=True)  # too dark to go on
 caves.build("caves", smooth=False)
+cave_made.build("cave-made", smooth=False)
 pit.build("pit", smooth=False)
 
 # Rocks either side of the mouths. (Their buried halves reach down a long

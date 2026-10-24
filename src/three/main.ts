@@ -88,6 +88,7 @@ import { type Box, type Circle, type Ground, type Hall, nearest, Player, type Wa
 import { type PropSpots, stampProps } from "./props";
 import { Rabbits } from "./rabbits";
 import { River } from "./river";
+import { dressRock } from "./rock";
 import { Rope, saidSwinging } from "./rope";
 import { Shafts, speck, type Window } from "./shafts";
 import { paintSign, type SignSpot } from "./sign";
@@ -296,6 +297,8 @@ model.scene.traverse((node) => {
   node.castShadow = !["paths", "water", "embers", "archway-ivy", "maze-ivy"].includes(node.name);
   node.receiveShadow = !["water", "embers"].includes(node.name);
 });
+// The rock underground, grainy and cracked.
+dressRock(model.scene);
 // The maze, in stone.
 dressMaze(model.scene, renderer);
 // Merlin's treasure, shining.
