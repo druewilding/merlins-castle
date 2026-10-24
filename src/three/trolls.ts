@@ -21,6 +21,7 @@ import {
   type Object3D,
   Quaternion,
   type Scene,
+  SkinnedMesh,
   Sprite,
   SpriteMaterial,
   Vector3,
@@ -50,7 +51,7 @@ const UP = [0, 0.45, 0.2, 0.7]; // seconds after you play, each gets up
 const STEP = 0.45; // metres (at its size) each steps forward off its boulder, getting up
 const DRUM = [0.7, 0.2]; // the drum, beside its troll: how far to its side, and forward (at its size)
 const TURN = 1.0; // radians their heads turn, at most, either way
-const LIFT = 0.12; // radians their heads are lifted, looking up to you
+const GLANCE = [1.5, 4]; // seconds between their glances, now to one side, now back to you
 const HANDS = 1.4; // times bigger their hands are (by their bones: so their fingers bend where their joints are)
 // Each its own look (art/blender/trolls.py makes the pieces, and previews
 // these): its hair (troll-hair-0..2), a beard or not, its shape (its body's
@@ -73,7 +74,6 @@ const SPELL = 1.8; // seconds the spell's twinkles last
 const GOLD = new Color("#ffe08a");
 const GREEN = new Color("#b6ff8a");
 const Y = new Vector3(0, 1, 0);
-const X = new Vector3(1, 0, 0);
 
 interface Troll {
   model: Object3D;
@@ -93,7 +93,11 @@ interface Troll {
   /** Seconds till it gets up (dancing), and till it's up and can dance. */
   rising: number;
   standing: number;
+  /** Which way its face looks, in its head's own frame. */
+  face: Vector3;
   look: { turn: number; up: number };
+  /** A glance aside (radians round, and up), and for how much longer. */
+  glance: { turn: number; up: number; for: number };
 }
 
 interface Twinkle {
@@ -122,6 +126,15 @@ export class Trolls {
     const body = source.getObjectByName("troll")!;
     place.sitting.forEach(({ at: [x, z, floor], facing: [fx, fz], size }, k) => {
       const model = clone(body);
+      // (Which way its face looks, in its head's own frame: as it's made, in
+      // its bind pose, its face looks ahead, +z.)
+      model.traverse((o) => {
+        if (o instanceof SkinnedMesh) o.skeleton.pose();
+      });
+      model.updateMatrixWorld(true);
+      const face = new Vector3(0, 0, 1).applyQuaternion(
+        model.getObjectByName("Head")?.getWorldQuaternion(new Quaternion()).invert() ?? new Quaternion()
+      );
       const look = LOOKS[k % LOOKS.length];
       const tinted = (material: Material, tint: string) => {
         const own = material.clone() as Material & { color: Color };
@@ -166,7 +179,9 @@ export class Trolls {
         ahead: new Vector3(fx, 0, fz).multiplyScalar(STEP * size),
         rising: 0,
         standing: 0,
+        face,
         look: { turn: 0, up: 0 },
+        glance: { turn: 0, up: 0, for: 0 },
       };
       this.play(troll, "Sitting_Idle_Loop", true);
       // (Not in step with each other.)
@@ -310,31 +325,41 @@ export class Trolls {
     troll.model.position.copy(troll.seat).addScaledVector(troll.ahead, step);
   }
 
-  /** Its head turned to you (as far as it can turn). */
+  /** Its head turned to you (as far as it can turn), now and then glancing aside. */
   private watch(troll: Troll, eye: Vector3, watching: boolean, dt: number) {
-    const { head, model, look } = troll;
+    const { head, model, look, glance } = troll;
     if (!head?.parent) return;
+    glance.for -= dt;
+    if (glance.for <= 0) {
+      const aside = Math.random() < 0.45;
+      glance.turn = aside ? Math.sign(Math.random() - 0.5) * (0.25 + Math.random() * 0.3) : 0;
+      glance.up = aside ? (Math.random() - 0.5) * 0.2 : 0;
+      glance.for = GLANCE[0] + Math.random() * (GLANCE[1] - GLANCE[0]);
+    }
     model.updateMatrixWorld(true);
+    // Where its face looks, as its clip has it; and how far round and up it
+    // turns from there to look at you (as far round as its neck goes), give
+    // or take a glance. (Not near, as its clip has it.)
     const at = head.getWorldPosition(new Vector3());
-    const dx = eye.x - at.x;
-    const dz = eye.z - at.z;
-    let turn = Math.atan2(dx, dz) - troll.yaw;
-    turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-    const wants = {
-      turn: watching ? Math.max(-TURN, Math.min(TURN, turn)) : 0,
-      up: watching ? LIFT + Math.max(-0.3, Math.min(0.35, Math.atan2(eye.y - at.y, Math.hypot(dx, dz)))) : 0,
-    };
+    const world = head.getWorldQuaternion(new Quaternion());
+    const facing = troll.face.clone().applyQuaternion(world);
+    const to = eye.clone().sub(at);
+    const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+    const round = troll.yaw + Math.max(-TURN, Math.min(TURN, wrap(Math.atan2(to.x, to.z) - troll.yaw + glance.turn)));
+    const up = Math.max(-0.4, Math.min(0.5, Math.atan2(to.y, Math.hypot(to.x, to.z)) + glance.up));
+    const wants = watching
+      ? { turn: wrap(round - Math.atan2(facing.x, facing.z)), up: up - Math.asin(Math.max(-1, Math.min(1, facing.y))) }
+      : { turn: 0, up: 0 };
     const ease = Math.min(1, dt * 3);
     look.turn += (wants.turn - look.turn) * ease;
     look.up += (wants.up - look.up) * ease;
-    // (Turned in the troll's own frame, on top of what its clip does: round,
-    // then up, and back into the head's parent's.)
-    const facing = model.getWorldQuaternion(new Quaternion());
-    const turned = new Quaternion()
+    // (On top of what its clip does: up, about its face's own side, then
+    // round; and back into the head's parent's frame.)
+    const side = facing.clone().cross(Y).normalize();
+    const wanted = new Quaternion()
       .setFromAxisAngle(Y, look.turn)
-      .multiply(new Quaternion().setFromAxisAngle(X, -look.up));
-    const world = head.getWorldQuaternion(new Quaternion());
-    const wanted = facing.clone().multiply(turned).multiply(facing.clone().invert()).multiply(world);
+      .multiply(new Quaternion().setFromAxisAngle(side, look.up))
+      .multiply(world);
     head.quaternion.copy(head.parent.getWorldQuaternion(new Quaternion()).invert().multiply(wanted));
   }
 
