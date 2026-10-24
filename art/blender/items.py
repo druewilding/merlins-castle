@@ -1358,9 +1358,10 @@ for sx in (-1, 1):
     gilded_leaf(sx * (HEAD_HALF + 0.001), HEAD + Vector((0.0, -0.005)), Vector((0.3, 1)).normalized(), 0.03, 0.009)
 
 # The neck: from the head, dipping in its middle and rising to a curl at its
-# end, then turning down into the top of the soundbox.
+# end, then turning down into the top of the soundbox (and on into it, so
+# they meet).
 neck = spline([(-0.2, 0.64), (-0.12, 0.645), (-0.04, 0.62), (0.03, 0.583), (0.09, 0.567), (0.15, 0.583),
-               (0.205, 0.612), (0.245, 0.605), (0.264, 0.565), (0.25, 0.505)], 8)
+               (0.205, 0.612), (0.245, 0.605), (0.264, 0.565), (0.252, 0.505), (0.24, 0.455)], 8)
 N_HALF_W = 0.022
 
 
