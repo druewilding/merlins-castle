@@ -49,7 +49,7 @@ const FAR = 45; // metres: further off than this, they aren't drawn
 const BLEND = 0.4; // seconds from one clip to the next
 const UP = [0, 0.45, 0.2, 0.7]; // seconds after you play, each gets up
 const STEP = 0.45; // metres (at its size) each steps forward off its boulder, getting up
-const DRUM = [0.7, 0.2]; // the drum, beside its troll: how far to its side, and forward (at its size)
+const DRUM = [-0.7, 0.2]; // the drum, beside its troll: how far to its side (its right), and forward (at its size)
 const TURN = 1.0; // radians their heads turn, at most, either way
 const GLANCE = [1.5, 4]; // seconds between their glances, now to one side, now back to you
 const BLINK = [3, 7]; // seconds between their blinks (and now and then, straight after, another)
@@ -67,11 +67,20 @@ const LAP = [0.14, 0.08];
 const SPREAD = [0.1, 0.07];
 // Each its own look (art/blender/trolls.py makes the pieces, and previews
 // these): its hair (troll-hair-0..3), a beard or not, its shape (its body's
-// shape keys, 0 to 1), how big its head is, and its skin's and its moss's tints.
+// shape keys, 0 to 1), how big its head is, its skin's and its moss's tints,
+// and the colour of its eyes.
 const LOOKS = [
-  { hair: 0, beard: false, keys: { belly: 0.2 }, head: 1.0, skin: "#ffffff", moss: "#ffffff" },
-  { hair: 3, beard: true, keys: { belly: 1, fat: 1, "big-ears": 0.6 }, head: 1.08, skin: "#c9cbc4", moss: "#d8cf8a" },
-  { hair: 2, beard: false, keys: { "long-nose": 1 }, head: 0.94, skin: "#c8e29a", moss: "#8fa86e" },
+  { hair: 0, beard: false, keys: { belly: 0.2 }, head: 1.0, skin: "#ffffff", moss: "#ffffff", eyes: "#4f9a3a" },
+  {
+    hair: 3,
+    beard: true,
+    keys: { belly: 1, fat: 1, "big-ears": 0.6 },
+    head: 1.08,
+    skin: "#c9cbc4",
+    moss: "#d8cf8a",
+    eyes: "#4a86d8",
+  },
+  { hair: 2, beard: false, keys: { "long-nose": 1 }, head: 0.94, skin: "#c8e29a", moss: "#8fa86e", eyes: "#e0a020" },
   {
     hair: 1,
     beard: false,
@@ -79,8 +88,12 @@ const LOOKS = [
     head: 1.04,
     skin: "#ffc4a4",
     moss: "#e8b866",
+    eyes: "#8a5ad0",
   },
 ];
+// Where the iris is on the kit's eye picture (its middle, and how big round, in
+// its uvs): the kit's eyes are brown, and each troll's are its own colour.
+const IRIS = [0.494, 0.5, 0.1];
 const TWINKLES = 36;
 const SPELL = 1.8; // seconds the spell's twinkles last
 const GOLD = new Color("#ffe08a");
@@ -129,6 +142,32 @@ interface Twinkle {
   sprite: Sprite;
   angle: number;
   out: number;
+}
+
+/**
+ * Its eyes, their irises coloured (only the brown of them: not their pupils,
+ * their whites, or the shine on them), light and dark as the brown was.
+ */
+function eyed(material: Material, colour: string) {
+  const own = material.clone();
+  const iris = new Color(colour);
+  const rgb = `vec3(${iris.r.toFixed(4)}, ${iris.g.toFixed(4)}, ${iris.b.toFixed(4)})`;
+  own.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <map_fragment>",
+      `#include <map_fragment>
+      {
+        float round = 1.0 - smoothstep(${(IRIS[2] - 0.01).toFixed(3)}, ${IRIS[2].toFixed(3)},
+          distance(vMapUv, vec2(${IRIS[0]}, ${IRIS[1]})));
+        float top = max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b));
+        float brown = smoothstep(0.4, 0.8, (top - min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b))) / max(top, 1e-4));
+        float shade = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)) / 0.06; // (the kit's brown, about 0.06)
+        diffuseColor.rgb = mix(diffuseColor.rgb, ${rgb} * min(shade, 1.6), round * brown);
+      }`
+    );
+  };
+  own.customProgramCacheKey = () => `troll-eyes-${colour}`;
+  return own;
 }
 
 export class Trolls {
@@ -180,6 +219,7 @@ export class Trolls {
         }
         if (o.name.startsWith("troll-")) o.material = tinted(o.material as Material, look.moss);
         else if (o.name.startsWith("SuperHero")) o.material = tinted(o.material as Material, look.skin);
+        else if (o.name.startsWith("Eyes")) o.material = eyed(o.material as Material, look.eyes);
         const blink = o.morphTargetDictionary?.blink;
         const influences = o.morphTargetInfluences;
         if (blink !== undefined && influences) shut = (amount) => (influences[blink] = amount);

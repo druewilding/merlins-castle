@@ -510,7 +510,7 @@ def dragon_shape():
 # sits (radians, anticlockwise), how big it is (times the model's size), and
 # how far out from the cave's middle (metres: the bigger ones further in, off
 # the wall). The two biggest on the west, away from the way in from the east.
-TROLLS = [(1.0, 1.9, 6.15), (0.48, 2.3, 5.7), (-0.42, 1.38, 6.3), (-0.88, 1.8, 6.1)]
+TROLLS = [(0.86, 1.9, 6.1), (0.48, 2.3, 5.7), (-0.42, 1.38, 6.3), (-0.74, 1.8, 6.1)]
 TROLL_SEAT = (0.48, 0.33)  # its seat: how high, and how far behind it (at the model's size: sitting, as its clip does)
 TROLL_BODY = 0.75  # its radius, at the model's size: for bumping into, and keeping the rocks clear
 TROLL_DRUM = 2  # which of them has the drum
