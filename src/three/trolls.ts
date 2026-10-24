@@ -66,11 +66,11 @@ const LAP = [0.14, 0.08];
 // (more for the fatter ones), so their fists clear their bellies.
 const SPREAD = [0.1, 0.07];
 // Each its own look (art/blender/trolls.py makes the pieces, and previews
-// these): its hair (troll-hair-0..2), a beard or not, its shape (its body's
+// these): its hair (troll-hair-0..3), a beard or not, its shape (its body's
 // shape keys, 0 to 1), how big its head is, and its skin's and its moss's tints.
 const LOOKS = [
   { hair: 0, beard: false, keys: { belly: 0.2 }, head: 1.0, skin: "#ffffff", moss: "#ffffff" },
-  { hair: 1, beard: true, keys: { belly: 1, fat: 1, "big-ears": 0.6 }, head: 1.08, skin: "#c9cbc4", moss: "#d8cf8a" },
+  { hair: 3, beard: true, keys: { belly: 1, fat: 1, "big-ears": 0.6 }, head: 1.08, skin: "#c9cbc4", moss: "#d8cf8a" },
   { hair: 2, beard: false, keys: { "long-nose": 1 }, head: 0.94, skin: "#c8e29a", moss: "#8fa86e" },
   {
     hair: 1,

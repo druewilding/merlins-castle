@@ -270,7 +270,7 @@ for obj in faces_on:
 body.data.update()
 
 # ---- His moss: on his shoulders, down his back, and round his hips (troll-moss);
-# his hair, in three styles (troll-hair-0..2), and a beard (troll-beard): the
+# his hair, in four styles (troll-hair-0..3), and a beard (troll-beard): the
 # game gives each troll its own ----------------------------------------------
 
 rng = random.Random(5)
@@ -327,6 +327,13 @@ def tufty(i):
     if rest[i].z > crown - 0.05 and abs(rest[i].x) < 0.04:
         return 1.0, 0.0
     return (0.25, 0.6) if rest[i].y > -0.01 else (0, 0)
+
+
+def flowing(i):
+    """Long grass hanging down all round, to his shoulders, and a shorter fringe in front."""
+    if not scalp(i):
+        return 0, 0
+    return (1.0, 0.1) if rest[i].y < -0.03 else (1.0, 0.9)
 
 
 def bearded(i):
@@ -404,6 +411,7 @@ grow_moss("troll-moss", on_body, 0.25, (0.04, 0.085), (0.007, 0.012), keys=["bel
 grow_moss("troll-hair-0", wild, 0.55, (0.04, 0.085), (0.007, 0.012))
 grow_moss("troll-hair-1", shaggy, 0.55, (0.045, 0.075), (0.008, 0.013))
 grow_moss("troll-hair-2", tufty, 0.9, (0.07, 0.11), (0.007, 0.011))
+grow_moss("troll-hair-3", flowing, 0.8, (0.07, 0.11), (0.008, 0.013))
 grow_moss("troll-beard", bearded, 1.0, (0.045, 0.075), (0.008, 0.012))
 c.vertex_material().use_backface_culling = False  # (one layer, seen from both sides)
 
@@ -524,7 +532,7 @@ if preview:
     # Each of the game's four (LOOKS, in src/three/trolls.ts: their hair,
     # beard and shape keys), standing, and close up on his face; one from
     # the side; sitting (on a block for a rock), asking for a tune; and dancing.
-    LOOKS = [(0, False, {"belly": 0.2}), (1, True, {"belly": 1.0, "fat": 1.0, "big-ears": 0.6}),
+    LOOKS = [(0, False, {"belly": 0.2}), (3, True, {"belly": 1.0, "fat": 1.0, "big-ears": 0.6}),
              (2, False, {"long-nose": 1.0}), (1, False, {"belly": 0.6, "fat": 1.0, "big-ears": 1.0, "long-nose": 0.4})]
     seat = c.Builder()
     seat.add([(x, y, z) for z in (0, 0.48) for y in (0.05, 0.6) for x in (-0.35, 0.35)],
