@@ -538,7 +538,8 @@ export class Snake {
           const f = Math.max(0, Math.min(n - 1.001, s / STEP));
           const k = Math.floor(f);
           const g = f - k;
-          const belly = this.belly[Math.min(this.belly.length - 1, Math.round(s / STEP))];
+          // (Its tail's tip is a hair behind its spine's start.)
+          const belly = this.belly[Math.min(this.belly.length - 1, Math.max(0, Math.round(s / STEP)))];
           const grounded = this.grounded[k] + (this.grounded[k + 1] - this.grounded[k]) * g;
           p.lerpVectors(points[k], points[k + 1], g).addScaledVector(UP, grounded * (belly + neck(s)));
           const t = tangents[k];
