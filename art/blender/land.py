@@ -2835,14 +2835,14 @@ solid_circle(hx, hy, HUT_R)
 # The pile of leaves filling the mouth of the dragon's cave, just inside (the
 # game heaps them up there, and sweeps them aside, leaves.ts): and where they
 # go, swept, in heaps either side of the mouth, outside.
-lx, ly = DRAGON_LIP[0] + 3, DRAGON_LIP[1]
+LEAVES = (DRAGON_LIP[0] + 3, DRAGON_LIP[1])
 LEAF_HEAPS = [(DRAGON_LIP[0] - 1.2, DRAGON_LIP[1] + side * (TUNNEL_HALF + 1.4)) for side in (1, -1)]
 
 # The tunnels' mouths are obstacles on the land, 3 m down the ramp (where the
 # leaves are), reaching out over the top so you're stopped (and told why)
 # before you go down: the leaves, and the lamp tunnel's two mouths, too dark
 # to go in without the lamp.
-obstacle(["cave-entrance east"], "box", lx, -ly, 1.0, TUNNEL_HALF + 0.3)
+obstacle(["cave-entrance east"], "box", LEAVES[0], -LEAVES[1], 1.0, TUNNEL_HALF + 0.3)
 obstacle(["old-wall west"], "box", WEST_LIP[0] - 3, -WEST_LIP[1], 1.0, TUNNEL_HALF + 0.3)
 obstacle(["cave-entrance south"], "box", EAST_LIP[0], -(EAST_LIP[1] - 3), TUNNEL_HALF + 0.3, 1.0)
 
@@ -4750,15 +4750,15 @@ for z in (0.25, 1.15, DOOR_TALL - 0.15):
 # (A hasp on its end, for the padlock's shackle to go through, at the post's staple.)
 block(gate_leaf, -DOOR_WIDE - 0.01, THICK, 1.17, -DOOR_WIDE + 0.1, THICK + 0.08, 1.25, IRON, solid=False)
 gate_leaf.build("iron-gate-leaf", smooth=False).location = (gx1 - DOOR_IN, gy - THICK / 2, CAVE)
-lx, ly, lz = gx0 + DOOR_IN + 0.01, gy + THICK / 2 + 0.07, CAVE + 1.0  # the padlock's middle, on the hall's side
-block(caves, lx - 0.035, gy + 0.08, lz + 0.15, lx + 0.015, ly, lz + 0.24, IRON, solid=False)  # the staple
-block(caves, lx - 0.075, ly - 0.03, lz - 0.09, lx + 0.075, ly + 0.03, lz + 0.09, BRASS, solid=False)  # its body
-block(caves, lx - 0.016, ly + 0.03, lz - 0.01, lx + 0.016, ly + 0.036, lz + 0.035, KEYHOLE, solid=False)  # keyhole
-block(caves, lx - 0.006, ly + 0.03, lz - 0.05, lx + 0.006, ly + 0.036, lz - 0.01, KEYHOLE, solid=False)
+lock_x, lock_y, lock_z = gx0 + DOOR_IN + 0.01, gy + THICK / 2 + 0.07, CAVE + 1.0  # the padlock's middle, on the hall's side
+block(caves, lock_x - 0.035, gy + 0.08, lock_z + 0.15, lock_x + 0.015, lock_y, lock_z + 0.24, IRON, solid=False)  # the staple
+block(caves, lock_x - 0.075, lock_y - 0.03, lock_z - 0.09, lock_x + 0.075, lock_y + 0.03, lock_z + 0.09, BRASS, solid=False)  # its body
+block(caves, lock_x - 0.016, lock_y + 0.03, lock_z - 0.01, lock_x + 0.016, lock_y + 0.036, lock_z + 0.035, KEYHOLE, solid=False)  # keyhole
+block(caves, lock_x - 0.006, lock_y + 0.03, lock_z - 0.05, lock_x + 0.006, lock_y + 0.036, lock_z - 0.01, KEYHOLE, solid=False)
 shackle = c.Builder()
 for x0, x1, z0, z1 in ((-0.015, 0.015, -0.07, 0.13), (0.085, 0.115, -0.01, 0.13), (-0.015, 0.115, 0.11, 0.145)):
     block(shackle, x0, -0.015, z0, x1, 0.015, z1, STEEL, solid=False)  # (one leg longer, deep in it: lifted, it stays in on that one)
-shackle.build("padlock-shackle", smooth=False).location = (lx - 0.05, ly, lz + 0.09)
+shackle.build("padlock-shackle", smooth=False).location = (lock_x - 0.05, lock_y, lock_z + 0.09)
 obstacle(["giant south"], "box", G[0], -gy, TUNNEL_HALF + 0.3, 0.5, under=True)  # the padlocked gate
 dy = DC[1] - HALLS["dragon-cave"].r - 1.5
 obstacle(["dragon-cave south"], "box", DC[0], -dy, TUNNEL_HALF + 0.3, 1.0, under=True)  # the dragon's fire
@@ -5022,7 +5022,7 @@ if out:
                        "guards": [[round(x, 2), round(-y, 2)] for x, y in GUARDS],
                        "castle": [CASTLE[0], CASTLE[1], round(-CASTLE[3], 2), round(-CASTLE[2], 2)]},
         # The leaves in the dragon's mouth: where the pile is [x, z] (on the way's floor), and the heaps they're swept into.
-        "leaves": {"at": [round(lx, 2), round(-ly, 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
+        "leaves": {"at": [round(LEAVES[0], 2), round(-LEAVES[1], 2)], "heaps": [[round(x, 2), round(-y, 2)] for x, y in LEAF_HEAPS]},
         # The dragon: where it stands [x, z] and its floor, which way it faces [x, z], and where it breathes its
         # fire, across the mouth of the tunnel south [x, y, z].
         # The trolls: where each sits [x, z] and its floor, which way it faces [x, z], and how big it is; and
