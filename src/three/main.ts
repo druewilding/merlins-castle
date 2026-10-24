@@ -434,16 +434,16 @@ const SWING = 1.75; // radians, open
 // giant's iron gate, padlocked. Open until you come into its room, then shut
 // behind you, and open again while the key's in use there.
 const doors = new Map<Shape, Door>();
-for (const [exit, name, shackle, iron] of [
-  ["oak-door south", "oak-door-leaf", undefined, false],
-  ["giant south", "iron-gate-leaf", "padlock-shackle", true],
+for (const [exit, name, shackle, way, iron] of [
+  ["oak-door south", "oak-door-leaf", undefined, 1, false],
+  ["giant south", "iron-gate-leaf", "padlock-shackle", -1, true],
 ] as const) {
   const shape = shapeOf.get(exit);
   const leaf = model.scene.getObjectByName(name);
   if (!shape || !leaf) continue;
   doors.set(
     shape,
-    new Door(leaf, shackle && model.scene.getObjectByName(shackle), {
+    new Door(leaf, shackle && model.scene.getObjectByName(shackle), way, {
       unlock: () => ownSounds.play("unlock"),
       open: () => (iron ? ownSounds.play("creak", { rate: 0.8 }) : ownSounds.play("door")),
       shut: () => ownSounds.play(iron ? "clang" : "shut"),

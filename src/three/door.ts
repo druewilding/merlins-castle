@@ -30,6 +30,8 @@ export class Door {
     private leaf: Object3D,
     /** Its padlock's shackle (the gate's), if it has one. */
     private shackle: Object3D | undefined,
+    /** Which way round its hinge it opens: 1 hung on the way's west wall, -1 its east. */
+    private way: 1 | -1,
     private sounds: DoorSounds
   ) {
     this.lifted = shackle?.position.y ?? 0;
@@ -67,11 +69,11 @@ export class Door {
 
   private pose() {
     // (Slow to start and to stop, like a heavy old door; south, away from its hall.)
-    this.leaf.rotation.y = -SWING * ease(this.open);
+    this.leaf.rotation.y = -this.way * SWING * ease(this.open);
     if (!this.shackle) return;
     const lock = 1 - this.locked;
     this.shackle.position.y = this.lifted + LIFT * ease(lock * 2);
-    this.shackle.rotation.y = ASIDE * ease(lock * 2 - 1);
+    this.shackle.rotation.y = ASIDE * ease(lock * 2 - 1); // (its short leg, to the east, out towards you)
   }
 }
 

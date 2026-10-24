@@ -4580,7 +4580,7 @@ embers.build("embers", smooth=False)
 t_edge = T[1] + HALLS["trolls"].r + 1.5
 obstacle(["trolls north"], "box", T[0], -t_edge, TUNNEL_HALF + 0.3, 1.0, under=True)  # the trolls, in the way
 # The two locked doors across the ways south, the oak door's and the giant's
-# iron gate: each its own object, on its hinge at the way's west wall, which
+# iron gate: each its own object, on its hinge at one of the way's walls, which
 # the game swings open (south, away from its hall) and shut again. Each hangs
 # below where the roof starts to curve in (so, opening, it clears the roof),
 # under a fixed piece filling the arch over it: oak boards over the door, bars
@@ -4657,7 +4657,7 @@ gx = G[0] - HALLS["giant"].r - 1.5
 obstacle(["giant west"], "box", gx, -G[1], 1.0, TUNNEL_HALF + 0.3, under=True)  # the giant, in the way
 # The giant's iron gate: bars and rails, between iron posts at the walls, with
 # more bars fixed over it, up into the roof; padlocked, on the hall's side, to
-# a staple on the east post (the padlock, brass, stays there, its shackle its
+# a staple on the west post, its hinges on the east one (the padlock, brass, stays there, its shackle its
 # own object, steel, which the game springs open with the key).
 gy = G[1] - HALLS["giant"].r - 1.2
 gx0, gx1 = G[0] - TUNNEL_HALF, G[0] + TUNNEL_HALF
@@ -4674,15 +4674,15 @@ for k in range(BARS):
 gate_leaf = c.Builder()
 THICK = 0.16  # its thickness, at its rails
 for k in range(BARS):
-    x = 0.05 + k * (DOOR_WIDE - 0.1) / (BARS - 1)
+    x = -0.05 - k * (DOOR_WIDE - 0.1) / (BARS - 1)  # (out west from its hinge)
     block(gate_leaf, x - 0.05, THICK / 2 - 0.05, 0, x + 0.05, THICK / 2 + 0.05, DOOR_TALL, IRON, solid=False)
 for z in (0.25, 1.15, DOOR_TALL - 0.15):
-    block(gate_leaf, 0, 0, z, DOOR_WIDE, THICK, z + 0.15, IRON, solid=False)
+    block(gate_leaf, -DOOR_WIDE, 0, z, 0, THICK, z + 0.15, IRON, solid=False)
 # (A hasp on its end, for the padlock's shackle to go through, at the post's staple.)
-block(gate_leaf, DOOR_WIDE - 0.1, THICK, 1.17, DOOR_WIDE + 0.01, THICK + 0.08, 1.25, IRON, solid=False)
-gate_leaf.build("iron-gate-leaf", smooth=False).location = (gx0 + DOOR_IN, gy - THICK / 2, CAVE)
-lx, ly, lz = gx1 - DOOR_IN - 0.01, gy + THICK / 2 + 0.07, CAVE + 1.0  # the padlock's middle, on the hall's side
-block(caves, lx - 0.015, gy + 0.08, lz + 0.15, lx + 0.035, ly, lz + 0.24, IRON, solid=False)  # the staple
+block(gate_leaf, -DOOR_WIDE - 0.01, THICK, 1.17, -DOOR_WIDE + 0.1, THICK + 0.08, 1.25, IRON, solid=False)
+gate_leaf.build("iron-gate-leaf", smooth=False).location = (gx1 - DOOR_IN, gy - THICK / 2, CAVE)
+lx, ly, lz = gx0 + DOOR_IN + 0.01, gy + THICK / 2 + 0.07, CAVE + 1.0  # the padlock's middle, on the hall's side
+block(caves, lx - 0.035, gy + 0.08, lz + 0.15, lx + 0.015, ly, lz + 0.24, IRON, solid=False)  # the staple
 block(caves, lx - 0.075, ly - 0.03, lz - 0.09, lx + 0.075, ly + 0.03, lz + 0.09, BRASS, solid=False)  # its body
 block(caves, lx - 0.016, ly + 0.03, lz - 0.01, lx + 0.016, ly + 0.036, lz + 0.035, KEYHOLE, solid=False)  # keyhole
 block(caves, lx - 0.006, ly + 0.03, lz - 0.05, lx + 0.006, ly + 0.036, lz - 0.01, KEYHOLE, solid=False)
