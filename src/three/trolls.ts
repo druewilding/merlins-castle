@@ -55,6 +55,9 @@ const GLANCE = [1.5, 4]; // seconds between their glances, now to one side, now 
 const BLINK = [3, 7]; // seconds between their blinks (and now and then, straight after, another)
 const SHUT = 0.15; // seconds a blink takes, shutting and opening
 const HANDS = 1.65; // times bigger their hands are (by their bones: so their fingers bend where their joints are)
+// And how long their fingers' joints are, then (their middle and end ones,
+// pulled in towards their knuckles): stubbier, for their bigger hands.
+const FINGERS = 0.75;
 // Radians their forearms are lifted at the elbow, sitting, and more for the
 // fatter ones: their hands are bigger, and their thighs and bellies, than the
 // clips' (made for the kit's hero), so they'd rest in their laps, not on them.
@@ -88,6 +91,8 @@ interface Troll {
   model: Object3D;
   head: Object3D | undefined;
   hands: Object3D[];
+  /** Its fingers' middle and end joints, and where they are, pulled in. */
+  fingers: [Object3D, Vector3][];
   /** Its upper arms, forearms and hands, its left then its right; how far its forearms are lifted sitting, and
    * its upper arms swung out dancing (and how far they are now). */
   arms: [Object3D, Object3D, Object3D][];
@@ -193,6 +198,14 @@ export class Trolls {
         model,
         head: model.getObjectByName("Head"),
         hands: ["hand_l", "hand_r"].flatMap((name) => model.getObjectByName(name) ?? []),
+        fingers: ["thumb", "index", "middle", "ring", "pinky"].flatMap((finger) =>
+          ["02", "03", "04_leaf"].flatMap((joint) =>
+            ["l", "r"].flatMap((side) => {
+              const bone = model.getObjectByName(`${finger}_${joint}_${side}`);
+              return bone ? [[bone, bone.position.clone().multiplyScalar(FINGERS)] as [Object3D, Vector3]] : [];
+            })
+          )
+        ),
         arms: ["l", "r"].flatMap((side) => {
           const [upper, fore, hand] = ["upperarm", "lowerarm", "hand"].map((bone) =>
             model.getObjectByName(`${bone}_${side}`)
@@ -270,6 +283,7 @@ export class Trolls {
   /** Its hands and head as big as they are (each frame, after its clip: its clips set every bone's size). */
   private shape(troll: Troll) {
     for (const hand of troll.hands) hand.scale.setScalar(HANDS);
+    for (const [bone, at] of troll.fingers) bone.position.copy(at);
     troll.head?.scale.setScalar(troll.headSize);
     // (Its arms as its clip has them, kept to put back before
     // the next frame of it: the mixer only sets a bone when its clip moves it,
