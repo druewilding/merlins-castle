@@ -683,8 +683,8 @@ for (const { exit, x, z } of DEATHS) {
   scene.add(mark);
 }
 
-// A place's name, from its id (for now; PLAN-V3.md).
-const name = (id: string) => id.replace(/-/g, " ").replace(/^./, (letter) => letter.toUpperCase());
+// A place's name, in your language.
+const name = (id: string) => world.rooms[id].name;
 
 // Merlin, in his lair (merlin.ts): on its floor, anywhere clear of his
 // furniture, and not too near its walls.

@@ -11,6 +11,7 @@ export interface WorldText {
   rooms: Record<
     RoomId,
     {
+      name: string;
       description: TeletextString;
       firstVisitDescription?: TeletextString;
       crowdedDescription?: TeletextString;
@@ -31,6 +32,7 @@ export function localise(world: World, text: WorldText): World {
   for (const [id, room] of Object.entries(result.rooms)) {
     const words = text.rooms[id];
     if (!words) continue;
+    room.name = words.name;
     room.description = words.description;
     if (room.firstVisitDescription)
       room.firstVisitDescription = words.firstVisitDescription ?? room.firstVisitDescription;

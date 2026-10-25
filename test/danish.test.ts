@@ -15,6 +15,7 @@ const dansk = localise(world, da);
 function texts(w: typeof world): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [id, room] of Object.entries(w.rooms)) {
+    out[`${id}.name`] = room.name;
     out[`${id}.description`] = room.description;
     if (room.firstVisitDescription) out[`${id}.firstVisitDescription`] = room.firstVisitDescription;
     if (room.crowdedDescription) out[`${id}.crowdedDescription`] = room.crowdedDescription;

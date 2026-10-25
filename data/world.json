@@ -7,11 +7,13 @@
   "carryLimit": 5,
   "rooms": {
     "clue-spell": {
+      "name": "Lost",
       "description": "You are too weak but you get a clue:{red}Use the spell when you meet Merlin.",
       "exits": {},
       "deadEnd": true
     },
     "wizards-kitchen": {
+      "name": "Wizard's Kitchen",
       "description": "You are in the{blue}wizard's kitchen. There is a smell of toads and spices brewing. Merlin appears!",
       "exits": {
         "east": {
@@ -26,6 +28,7 @@
       }
     },
     "coach-house": {
+      "name": "Coach House",
       "description": "You are in an{yellow}ancient{yellow}coach{yellow}house. Merlin's cloak, with a missing silver button, hangs on the wall. Something rustles.",
       "exits": {
         "west": {
@@ -34,6 +37,7 @@
       }
     },
     "small-room": {
+      "name": "Small Room",
       "description": "You are in a{red}small{red}room.{white}The walls are covered with red silk. There are archways to the North and West.",
       "exits": {
         "west": {
@@ -45,6 +49,7 @@
       }
     },
     "grand-hall": {
+      "name": "Grand Hall",
       "description": "You are in a{cyan}grand{cyan}hall.{white}There are doors in all directions. A{magenta}decorated{magenta}chamber{white}is to the South. Merlin's goblins are very close.",
       "exits": {
         "south": {
@@ -76,6 +81,7 @@
       }
     },
     "dungeon": {
+      "name": "Dungeon",
       "description": "You are in an{yellow}enormous{yellow}dungeon.{white}An old, old woman guards the exit South, waiting to turn you into stone. There is a passage West.",
       "exits": {
         "south": {
@@ -93,6 +99,7 @@
       }
     },
     "merlins-lair": {
+      "name": "Merlin's Lair",
       "description": "This is{blue}Merlin{blue}the{blue}wizard's{blue}lair.{white}The walls are purple and green. A cauldron boils. The wizard comes towards you!",
       "exits": {
         "north": {
@@ -107,6 +114,7 @@
       }
     },
     "courtyard": {
+      "name": "Courtyard",
       "description": "You are in a{yellow}sunny{yellow}courtyard{white}with rambling pink roses. To the North is a{cyan}drawbridge.{white}There is a{green}coach{green}house{white}to the East. Southwards is a{magenta}hall.",
       "exits": {
         "south": {
@@ -121,6 +129,7 @@
       }
     },
     "moat": {
+      "name": "Moat",
       "description": "You are on the North bank of a{magenta}moat.{white}Some guards are at the{cyan}toll{cyan}gate.{white}A path leads North through an archway.",
       "exits": {
         "south": {
@@ -137,6 +146,7 @@
       }
     },
     "forest-edge": {
+      "name": "Forest Edge",
       "description": "You are at the edge of a{green}dense{green}forest{white}on a path running East to West. An owl hoots in the trees.",
       "exits": {
         "west": {
@@ -148,6 +158,7 @@
       }
     },
     "river-south-bank": {
+      "name": "South Bank",
       "description": "You are on the South bank of a{blue}river.{white}A{green}forest{white}lies to the West. To the South, through a stone archway, a{yellow}golden{yellow}spire{white}is shining in the sun.",
       "exits": {
         "south": {
@@ -168,6 +179,7 @@
       }
     },
     "beautiful-chamber": {
+      "name": "Beautiful Chamber",
       "description": "You are in a{magenta}beautiful{magenta}chamber.{white}The floor is covered in black and white tiles and the walls are gold. A lonely flute is playing.",
       "exits": {
         "north": {
@@ -176,6 +188,7 @@
       }
     },
     "dark-tunnels": {
+      "name": "Dark Tunnels",
       "description": "You are at a crossroads in the{blue}tunnels.{white}It is very dark.",
       "exits": {
         "south": {
@@ -199,11 +212,13 @@
       }
     },
     "clue-silver": {
+      "name": "Lost",
       "description": "You are lost but you find a clue:   {red}Give Merlin silver for his buttons.",
       "exits": {},
       "deadEnd": true
     },
     "dragon-cave": {
+      "name": "Dragon's Cave",
       "description": "You stand in a{cyan}large{cyan}cave.{white}A{red}splendid{red}dragon{white}puffing fire stands in the entrance of the tunnel South. More tunnels lead West and North.",
       "exits": {
         "south": {
@@ -224,6 +239,7 @@
       }
     },
     "cave-entrance": {
+      "name": "Cave Entrance",
       "description": "You are at the entrance to a{cyan}cave{white}going East.{white}A foot-path leads West. Southwards a{blue}tunnel{white}goes underground.",
       "exits": {
         "south": {
@@ -249,6 +265,7 @@
       }
     },
     "mountain-path": {
+      "name": "Mountain Path",
       "description": "You are on a path running North to South. Thick{green}trees{white}are at the foot of a{cyan}mountain{white}to the North.",
       "exits": {
         "south": {
@@ -266,6 +283,7 @@
       }
     },
     "evergreen-glade": {
+      "name": "Evergreen Glade",
       "description": "You are in an{green}evergreen{green}glade,{white}with{red}red{red}spotted{red}toadstools{white}growing in a ring. A path runs from East to West.",
       "exits": {
         "west": {
@@ -277,6 +295,7 @@
       }
     },
     "deep-river": {
+      "name": "Deep River",
       "description": "To the South a{blue}deep{blue}river{white}is running swiftly. Paths lead North and East. A{yellow}golden{yellow}spire{white}can be seen to the South across the water.",
       "exits": {
         "south": {
@@ -298,6 +317,7 @@
       }
     },
     "grassy-bank": {
+      "name": "Grassy Bank",
       "description": "You are standing at a cross-roads. On a{green}grassy{green}bank{white}a figure lies sleeping.",
       "exits": {
         "south": {
@@ -317,6 +337,7 @@
       "crowdedDescription": "You are by a{green}grassy{green}bank."
     },
     "old-stone-wall": {
+      "name": "Old Stone Wall",
       "description": "To the West is an{yellow}old{yellow}stone{yellow}wall{white}four metres tall. A winding track runs to the East.",
       "exits": {
         "west": {
@@ -334,6 +355,7 @@
       }
     },
     "old-wall": {
+      "name": "Old Wall",
       "description": "An{yellow}old{yellow}wall{white}is to the East. North is a path which winds into the mist. A small, dark{blue}tunnel{white}goes West. To the South are some{green}trees.",
       "exits": {
         "south": {
@@ -362,6 +384,7 @@
       }
     },
     "rusty-gate": {
+      "name": "Rusty Gate",
       "description": "You are by an{red}old{red}rusty{red}gate.{white}Mist swirls around you. A path leads South.",
       "exits": {
         "south": {
@@ -378,6 +401,7 @@
       }
     },
     "yellow-flowers": {
+      "name": "Yellow Flowers",
       "description": "The ground is covered with{yellow}tiny{yellow}yellow{yellow}flowers.{white}South is a{red}rusty{red}gate.{white}An overgrown path leads North.",
       "exits": {
         "south": {
@@ -395,6 +419,7 @@
       }
     },
     "mossy-steps": {
+      "name": "Mossy Steps",
       "description": "To the North some{green}mossy{green}steps{white}lead upwards. An overgrown path runs South. In the East you can see a{magenta}high{magenta}balcony.",
       "exits": {
         "south": {
@@ -421,6 +446,7 @@
       }
     },
     "tower": {
+      "name": "Tower",
       "description": "You enter a tower. It is dark and musty inside. The way out is covered by an{blue}enormous{blue}stone.{white}A shiver runs down your spine.",
       "exits": {
         "south": {
@@ -434,6 +460,7 @@
       }
     },
     "forest-witches": {
+      "name": "Witches' Wood",
       "description": "You are in the{green}forest.{white}Some rabbits warn you of some{magenta}witches{magenta}dancing{white}in the West.",
       "exits": {
         "south": {
@@ -457,6 +484,7 @@
       }
     },
     "forest-crossroads": {
+      "name": "Forest Crossroads",
       "description": "You are at a crossroads in the{green}forest.{white}In the distance to the South you can see some smoke.",
       "exits": {
         "south": {
@@ -474,6 +502,7 @@
       }
     },
     "charcoal-hut": {
+      "name": "Charcoal Burner's Hut",
       "description": "You are inside a{red}charcoal{red}burner's{red}hut.{white}His fire smoulders, but he is not there.",
       "exits": {
         "north": {
@@ -482,6 +511,7 @@
       }
     },
     "mountain": {
+      "name": "Mountain",
       "description": "You are on a{cyan}mountain.{white}Some{yellow}treasure{white}lies to the East. A track leads South. A{blue}maze{white}lies to the North.",
       "exits": {
         "south": {
@@ -498,6 +528,7 @@
       }
     },
     "maze": {
+      "name": "Maze",
       "description": "You are inside the{blue}maze{white}at a crossroads. You can sense danger.",
       "exits": {
         "south": {
@@ -521,6 +552,7 @@
       }
     },
     "damp-tunnels": {
+      "name": "Damp Tunnels",
       "description": "Tunnels lead West and North. The air is damp and stale.",
       "exits": {
         "west": {
@@ -532,6 +564,7 @@
       }
     },
     "trolls": {
+      "name": "Trolls' Hall",
       "description": "There are passages to the East and North. Some{magenta}trolls{white}ask you to play a tune for them.",
       "exits": {
         "north": {
@@ -548,6 +581,7 @@
       }
     },
     "treasure-room": {
+      "name": "Treasure Room",
       "description": "You are in a{yellow}treasure{yellow}room.{white}There are doors to the South, West and East.",
       "exits": {
         "south": {
@@ -568,6 +602,7 @@
       }
     },
     "giant": {
+      "name": "Giant's Cave",
       "description": "Tunnels lead South, West and East. A{magenta}hungry{magenta}looking{magenta}giant{white}is waiting in the West.",
       "exits": {
         "south": {
@@ -593,6 +628,7 @@
       }
     },
     "oak-door": {
+      "name": "Oak Door",
       "description": "There is a tunnel to the East. An{green}old{green}oak{green}door{white}bars your way South. You can hear singing from behind it.",
       "exits": {
         "south": {
@@ -609,21 +645,25 @@
       }
     },
     "clue-mask": {
+      "name": "Lost",
       "description": "You are lost but you find a clue:   {red}A{red}mask{red}hides you{red}from{red}goblins.",
       "exits": {},
       "deadEnd": true
     },
     "clue-ring": {
+      "name": "Lost",
       "description": "You are lost but you find a clue:   {red}A{red}ring helps to{red}move{red}a{red}stone.",
       "exits": {},
       "deadEnd": true
     },
     "clue-plank": {
+      "name": "Lost",
       "description": "You are lost but you find a clue:   {red}A{red}plank{red}makes a{red}bridge{red}for{red}you.",
       "exits": {},
       "deadEnd": true
     },
     "clue-rope": {
+      "name": "Lost",
       "description": "You are lost but you find a clue:   {red}Tie{red}goblins{red}up with rope if you can.",
       "exits": {},
       "deadEnd": true
