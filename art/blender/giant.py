@@ -1,15 +1,13 @@
 # The giant in his cave, as in its picture: huge and hungry, with a big
 # round belly, a bulbous nose and a grin; shaggy brown hair and a bushy
-# beard; a ragged hide round his hips; strips of cloth wound round his shins;
-# and big bare feet.
+# beard; breeches; and big bare feet.
 #
 # Made from Quaternius's kits (CC0, art/models/): a Universal Base
 # Character's whole body (his head, hands and feet made bigger, his body and
 # limbs bulked out, a belly, his nose grown), his skin recoloured. His hair
-# and beard (giant-hair, giant-beard), his hide (giant-hide, giant-apron) and his wraps
-# (giant-wraps) are made here, each moved by the bones that move the skin
-# it's on. All of
-# it shares the kits' one skeleton, so the Universal Animation Libraries'
+# and beard (giant-hair, giant-beard) are made here, moved by the bones that
+# move the skin they're on; his breeches are the Modular Character Outfits'
+# peasant's, recoloured, let out to fit him. All of it shares the kits' one skeleton, so the Universal Animation Libraries'
 # clips play on him (ANIMS): sitting. (It doesn't eat: the game lifts his
 # hand to his mouth.) The game makes him giant-sized.
 #
@@ -23,6 +21,7 @@ from pathlib import Path
 import bpy
 import numpy as np
 from mathutils import Vector, noise
+from mathutils.kdtree import KDTree
 
 HERE = Path(__file__).parent
 sys.path.append(str(HERE))
@@ -32,6 +31,7 @@ out, preview = c.args()
 c.clear()
 
 BODY = c.BODIES / "Superhero_Male_FullBody.gltf"
+LEGS = c.MODELS / "modular-character-outfits/Exports/glTF (Godot-Unreal)/Modular Parts/Male_Peasant_Legs.gltf"
 
 ANIMS = ["Sitting_Idle_Loop"]
 TEXTURE = 1024  # the size every texture is shrunk to (the kit's are 2048)
@@ -53,11 +53,7 @@ SKIN_LIGHT = np.array(c.linear("#dccabe")[:3], dtype=np.float32)
 SKIN_RUDDY = np.array(c.linear("#b48a7c")[:3], dtype=np.float32)
 HAIR = [c.linear(h) for h in ("#5a3a22", "#6e4a2a", "#4a2e1a", "#7a5634", "#3f2716", "#664026")]
 HAIR_TIP = c.linear("#9a7448")
-HIDE = c.linear("#7c7a58")
-HIDE_DARK = c.linear("#504e36")
-HIDE_LIGHT = c.linear("#9a9874")
-WRAP = c.linear("#6e5c44")
-WRAP_DARK = c.linear("#45382a")
+BREECHES = np.array(c.linear("#b4a68c")[:3], dtype=np.float32)  # their colour (the kit's peasant's, turned to it)
 
 # ---- His body, skeleton and all --------------------------------------------
 
@@ -132,6 +128,7 @@ def welded(ps, unit=False):
     return ps
 
 
+kit = list(rest)  # (and as the kit made him, kept: for fitting his breeches to him)
 normals = welded([(to_world.to_3x3() @ v.normal).normalized() for v in body.data.vertices], unit=True)
 # (The front of his body smoothed: the kit's hero's muscles, which a giant hasn't.)
 around = [[] for _ in rest]
@@ -277,8 +274,7 @@ for obj in faces_on:
                 v.co = m.inverted() @ ((m @ v.co) + Vector((apart, 0, 0)))
 body.data.update()
 
-# ---- His hair and beard (giant-hair, giant-beard), his hide (giant-hide), and the wraps
-# round his shins (giant-wraps) ---------------------------------------------------
+# ---- His hair and beard (giant-hair, giant-beard) -------------------------------
 
 rng = random.Random(9)
 normals = welded([(to_world.to_3x3() @ v.normal).normalized() for v in body.data.vertices], unit=True)
@@ -401,52 +397,59 @@ grow("giant-hair", hairy, 2.2, (0.07, 0.13), (0.004, 0.007), HAIR, HAIR_TIP, hai
      comb=lambda i: Vector((0, 0.5, 0.15)))  # (his hair swept back, off his face)
 grow("giant-beard", bearded, 4.0, (0.07, 0.12), (0.004, 0.008), HAIR, HAIR_TIP, hairs, stray=0.3, smiles=True,
      spread=0.012, bed=False)  # (all locks: under them, a bed of it, on his small chin, looked flat)
+c.vertex_material().use_backface_culling = False  # (his locks: one layer, seen from both sides)
 
+# ---- His breeches: the peasant's, let out to fit him ------------------------------
 
-# His hide: a band round his hips (and from it, over his lap, an apron:
-# giant-apron, below, made as he sits).
-def hidden(p):
-    v = p * 18
-    colour = c.mix(HIDE, HIDE_DARK, 0.4 + 0.6 * noise.noise(v))
-    colour = c.mix(colour, HIDE_LIGHT, max(0.0, noise.noise(v * 0.5 + Vector((4, 2, 7)))) * 0.3)
-    return c.vary(colour, 0.08, v * 4)
-
-
-def hide(i):
-    """The band round his hips."""
-    p, w = rest[i], weights[i]
-    hips = w.get("pelvis", 0) + w.get("thigh_l", 0) + w.get("thigh_r", 0) + w.get("spine_01", 0)
-    return (1.0, 1.0) if 0.84 < p.z < 1.06 and hips > 0.4 else (0, 0)
-
-
-HIDES = [HIDE, c.mix(HIDE, HIDE_DARK, 0.3), c.mix(HIDE, HIDE_LIGHT, 0.3), c.mix(HIDE, HIDE_DARK, 0.15)]
-grow("giant-hide", hide, 0.0, (0, 0), (0, 0), HIDES, HIDE, hidden)
-
-
-
-# The wraps round his shins: strips of cloth wound round and round, from his
-# ankles to below his knees.
-def wrapped(p):
-    a = math.atan2(p.y, abs(p.x) - 0.1)
-    band = math.sin(p.z * 90 + a * 1.0)
-    colour = c.mix(WRAP, WRAP_DARK, 0.5 * max(0.0, -band) + 0.25 * noise.noise(p * 40))
-    return c.vary(colour, 0.06, p * 60)
-
-
-def wraps(i):
-    p, w = rest[i], weights[i]
-    shin = w.get("calf_l", 0) + w.get("calf_r", 0)
-    return (1.5, 0.0) if shin > 0.5 and 0.1 < p.z < 0.42 else (0, 0)
-
-
-grow("giant-wraps", wraps, 0.0, (0, 0), (0, 0), [WRAP], WRAP, wrapped)
-c.vertex_material().use_backface_culling = False  # (one layer, seen from both sides)
+parts, _ = c.load(LEGS)
+breeches = next(o for o in parts if o.type == "MESH" and o.name.startswith("Male_Peasant_Legs"))
+c.onto(breeches, skeleton)
+c.remove([o for o in parts if o is not breeches])
+for layer in list(breeches.data.color_attributes):  # (the kit's colour masks: as on his body)
+    breeches.data.color_attributes.remove(layer)
+# (Each point moved as far as his skin under it was, made bigger and rounder,
+# and a little further: his breeches as snug on him as on the kit's hero.)
+near = KDTree(len(kit))
+for i, p in enumerate(kit):
+    near.insert(p, i)
+near.balance()
+SNUG = 0.02  # metres, at least, they're outside his skin (or it pokes through, as he moves)
+skin = KDTree(len(points))
+for i, p in enumerate(points):
+    skin.insert(p, i)
+skin.balance()
+m = breeches.matrix_world
+for v in breeches.data.vertices:
+    p = m @ v.co
+    _, i, _ = near.find(p)
+    p = p + points[i] - kit[i]
+    # (And out from his skin where they're too close to it, or inside it:
+    # his belly and his bulk, more than the hero's.)
+    for _ in range(3):
+        _, j, _ = skin.find(p)
+        gap = (p - points[j]).dot(normals[j])
+        if gap < SNUG:
+            p = p + normals[j] * (SNUG - gap)
+    v.co = m.inverted() @ p
+breeches.data.update()
+# (Matt: not the kit's bumps and shine.)
+material = breeches.data.materials[0]
+for node in list(material.node_tree.nodes):
+    name = node.image.name.lower() if node.type == "TEX_IMAGE" and node.image else ""
+    if "normal" in name or "orm" in name:
+        material.node_tree.nodes.remove(node)
+shader = next(n for n in material.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+for socket in ("Metallic", "Roughness"):
+    for link in list(shader.inputs[socket].links):  # (what fed them from the kit's map, cut too)
+        material.node_tree.links.remove(link)
+shader.inputs["Metallic"].default_value = 0.0
+shader.inputs["Roughness"].default_value = 0.9
 
 # ---- His skin: weathered, ruddy -------------------------------------------------
 
 c.drop_missing_textures()
 # (And its normal and roughness maps: the kit's hero's muscles, and his briefs
-# shiny, which the hide covers.)
+# shiny, which his breeches cover.)
 for material in bpy.data.materials:
     if material.node_tree and "superhero" in material.name.lower():
         for node in list(material.node_tree.nodes):
@@ -487,7 +490,7 @@ for image in bpy.data.images:
         cell = size // 64
         soft = light.reshape(64, cell, 64, cell).mean((1, 3)).repeat(cell, 0).repeat(cell, 1)
         light = 0.4 * light + 0.6 * soft
-        # (The kit's dark briefs, as skin: the hide covers them.)
+        # (The kit's dark briefs, as skin: his breeches cover them.)
         top, bottom = rgba[..., :3].max(-1), rgba[..., :3].min(-1)
         light = np.where((top - bottom) < 0.2 * np.maximum(top, 1e-4), 0.85, light)
         low = np.clip(light, 0, 1)[..., None]
@@ -499,6 +502,15 @@ for image in bpy.data.images:
         rgb = rgb * (1 - 0.3 * patches) + SKIN_RUDDY * 0.3 * patches * (rgb / SKIN).mean(-1, keepdims=True)
         rgb *= (0.9 + 0.2 * upsampled(size, 120, 2))[..., None]
         rgba[..., :3] = rgb
+        image.pixels.foreach_set(rgba.ravel())
+        image.update()
+    elif "peasant_basecolor" in name:
+        # His breeches: the peasant's, their shading kept, in his colour.
+        pixels = np.empty(len(image.pixels), dtype=np.float32)
+        image.pixels.foreach_get(pixels)
+        rgba = pixels.reshape(-1, 4)
+        grey = rgba[:, :3] @ np.array([0.3, 0.59, 0.11], dtype=np.float32)
+        rgba[:, :3] = np.clip(grey / max(float(np.median(grey)), 1e-4), 0, 1.5)[:, None] * BREECHES
         image.pixels.foreach_set(rgba.ravel())
         image.update()
     elif "hair" in name and "normal" not in name:
@@ -515,55 +527,6 @@ for image in bpy.data.images:
 # ---- His animations --------------------------------------------------------------
 
 c.clips(skeleton, ANIMS)
-
-# His apron (giant-apron): a sheet of hide over his lap, from his belt to his
-# knees, between his hands, its front edge falling over them, a little
-# unevenly. Made as he sits (he always does), close over his thighs as they
-# are then, and moved by his hips alone: cloth moved by his thighs' bones, in
-# the game, sank into them.
-APRON = (0.22, 0.045, 0.1, 0.015)  # metres across (his hands either side), off his thighs, how far its front edge
-# falls, and how much it sags between his legs
-APRON_GRID = (11, 8)  # its points, across and along
-c.pose(skeleton, ANIMS[0], 0)
-graph = bpy.context.evaluated_depsgraph_get()
-sitting = body.evaluated_get(graph)
-# (Only his thighs: not his belly, nor his hands on his knees.)
-lap = [sitting.matrix_world @ v.co for v, w in zip(sitting.to_mesh().vertices, weights)
-       if sum(a for b, a in w.items() if b.startswith("thigh")) > 0.5]
-sitting.to_mesh_clear()
-hips = skeleton.pose.bones["pelvis"]
-unsit = (skeleton.matrix_world @ hips.bone.matrix_local) @ (skeleton.matrix_world @ hips.matrix).inverted()
-belt = (skeleton.matrix_world @ hips.matrix).translation
-knee = (skeleton.matrix_world @ skeleton.pose.bones["calf_l"].matrix).translation
-width, off, fall, sag = APRON
-across, along = APRON_GRID
-xs = [(col / (across - 1) - 0.5) * width for col in range(across)]
-posed = []
-for row in range(along):
-    y = belt.y - 0.12 + (knee.y + 0.02 - belt.y + 0.12) * row / (along - 1)
-    # (On the top of his thigh just under it; between his legs, where there's
-    # none, across from one to the other, sagging a little.)
-    tops = [max((p.z for p in lap if abs(p.x - x) < 0.025 and abs(p.y - y) < 0.025 and p.z < belt.z + 0.15),
-                default=None) for x in xs]
-    found = [k for k, z in enumerate(tops) if z is not None]
-    for k, z in enumerate(tops):
-        if z is None and found:
-            left = max((f for f in found if f < k), default=None)
-            right = min((f for f in found if f > k), default=None)
-            ends = [tops[f] for f in (left, right) if f is not None]
-            tops[k] = sum(ends) / len(ends) - (sag if left is not None and right is not None else 0)
-    posed += [Vector((x, y, (z if z is not None else belt.z) + off)) for x, z in zip(xs, tops)]
-for drop in (1, 2):
-    # (Its front edge, falling over his knees.)
-    for col in range(across):
-        edge = posed[(along - 1) * across + col]
-        down = fall * drop / 2 * (1 + 0.25 * noise.noise(Vector((edge.x * 25, 3.0, 0))))
-        posed.append(Vector((edge.x, edge.y - 0.01 * drop, edge.z - down)))
-faces = [(r * across + k, r * across + k + 1, (r + 1) * across + k + 1, (r + 1) * across + k)
-         for r in range(along + 1) for k in range(across - 1)]
-c.skinned("giant-apron", [tuple(unsit @ q) for q in posed], faces, [hidden(q) for q in posed],
-          [{"pelvis": 1.0}] * len(posed), skeleton)
-bpy.context.scene.frame_set(0)
 
 print(f"body: {len(body.data.vertices)} points")
 
