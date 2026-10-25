@@ -3,7 +3,7 @@
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
 # The ladder, the plank, the key, the axe, the apple, the emerald, the
-# broom, the lamp, the rope, the penny, the water, the harp and the cake so far; the rest are to come (PLAN-V3.md).
+# broom, the lamp, the rope, the penny, the water, the harp, the cake and the gold so far; the rest are to come (PLAN-V3.md).
 
 import math
 import random
@@ -1601,6 +1601,116 @@ for _ in range(170):
 cake_object = cake.build("cake", smooth=True)
 cake_object.data.transform(Matrix.Scale(CAKE_SIZE, 4))
 outward(cake_object)
+
+# The gold: as in its picture, three gold bars stacked, two side by side and
+# one on top, across the gap between them, all lying the same way. Each is
+# wider at its foot than its top, its edges worn round, its faces hammered
+# and dented, with a few fine cracks; deep gold, lighter where it's rubbed.
+# Built 24 cm long, then made two and a half times that (GOLD_SIZE), so it shines out from
+# across the treasure room.
+GOLD_SIZE = 2.5
+BAR_LONG, BAR_WIDE, BAR_TALL = 0.24, 0.092, 0.066
+BAR_TAPER = 0.014  # how much narrower its top is, on each side
+BAR_ROUND = 0.012  # its top edges, worn round
+BAR_FOOT = 0.004  # and its bottom edges, a little
+BAR_GAP = 0.008  # between the two side by side
+BULLION = c.linear("#b87810")
+BULLION_LIGHT = c.linear("#e9ae35")
+BULLION_DARK = c.linear("#5e3406")
+gold_bars = c.Builder()
+
+
+def rounded_ring(half_x, half_y, corner, z):
+    """A rounded rectangle at height z, always the same number of points
+    (round its corners, and along its sides between them)."""
+    corner = max(0.0, min(corner, half_x, half_y))
+    pts = []
+    corners = [(half_x, half_y, 0.0), (-half_x, half_y, 0.5), (-half_x, -half_y, 1.0), (half_x, -half_y, 1.5)]
+    for k, (cx, cy, turn) in enumerate(corners):
+        ox = cx - math.copysign(corner, cx)
+        oy = cy - math.copysign(corner, cy)
+        for j in range(5):
+            a = (turn + 0.5 * j / 4) * math.pi
+            pts.append((ox + corner * math.cos(a), oy + corner * math.sin(a), z))
+        # (Then on to the next corner: across its ends, or along its long sides.)
+        nx, ny, _ = corners[(k + 1) % 4]
+        ex = nx - math.copysign(corner, nx)
+        ey = ny - math.copysign(corner, ny)
+        a1 = (turn + 0.5) * math.pi
+        start = (ox + corner * math.cos(a1), oy + corner * math.sin(a1))
+        end = (ex + corner * math.cos(a1), ey + corner * math.sin(a1))
+        steps = 22 if k % 2 else 7
+        for j in range(1, steps):
+            t = j / steps
+            pts.append((start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t, z))
+    return pts
+
+
+def bullion(p, seed):
+    """Gold: deep, lighter where it's rubbed, dark in its dents and cracks."""
+    v = Vector(p) * 40 + Vector((seed * 5.3, seed * 2.9, 0))
+    colour = c.mix(BULLION, BULLION_LIGHT, 0.35 + noise.noise(v * 0.6) * 0.5)
+    pit = max(0.0, noise.noise(v * 1.4) - 0.5) * 1.2
+    # (A few fine cracks: thin lines where a noise crosses zero, only in places.)
+    line = abs(noise.noise(v * 0.9 + Vector((7, 1, 3))))
+    some = noise.noise(v * 0.25 + Vector((2, 9, 4))) > 0.15
+    crack = (1 - line / 0.05) if some and line < 0.05 else 0.0
+    return c.vary(c.mix(colour, BULLION_DARK, min(0.8, 0.6 * pit + crack)), 0.06, v * 3)
+
+
+def gold_bar(x, y, z, yaw, seed):
+    """One bar, lying along y, its foot at height z."""
+    hx, hy = BAR_WIDE / 2, BAR_LONG / 2
+    # Its outline from the bottom up, as (how far in, how high): in from its
+    # middle underneath, round its foot, up its sloping sides, round over its
+    # top edges, and in across its top.
+    profile = [(min(hx, hy) - 0.002, 0.0), (BAR_FOOT * 3, 0.0)]
+    profile += [(BAR_FOOT * (1 - math.sin(a)), BAR_FOOT * (1 - math.cos(a)))
+                for a in (math.pi / 2 * k / 3 for k in range(4))]
+    side_top = BAR_TALL - BAR_ROUND
+    profile += [(BAR_TAPER * zz / BAR_TALL, zz) for zz in (side_top * k / 8 for k in range(1, 9))]
+    d0 = BAR_TAPER * side_top / BAR_TALL
+    profile += [(d0 + BAR_ROUND * (1 - math.cos(a)), side_top + BAR_ROUND * math.sin(a))
+                for a in (math.pi / 2 * k / 6 for k in range(1, 7))]
+    inner = hx - (d0 + BAR_ROUND)
+    profile += [(d0 + BAR_ROUND + inner * k / 7, BAR_TALL) for k in range(1, 7)]
+    profile += [(hx - 0.0008, BAR_TALL)]
+    turn = Matrix.Rotation(yaw, 4, "Z")
+    verts, colours, rings = [], [], []
+    for d, zz in profile:
+        ring = rounded_ring(hx - d, hy - d, max(0.0, 0.016 - d * 0.5), zz)
+        rings.append(len(verts))
+        for p in ring:
+            # (Hammered: its faces a little uneven.)
+            dent = 0.0012 * noise.noise(Vector(p) * 30 + Vector((seed * 3.1, 0, 0)))
+            q = Vector(p) * (1 + dent / max(0.03, Vector(p).length))
+            q = turn @ q + Vector((x, y, z))
+            verts.append(tuple(q))
+            colours.append(bullion(p, seed))
+    n = len(verts) // len(profile)
+    faces = []
+    for r in range(len(profile) - 1):
+        a, b = rings[r], rings[r + 1]
+        faces += [(a + k, a + (k + 1) % n, b + (k + 1) % n, b + k) for k in range(n)]
+    # (Closing its middle, under and on top.)
+    for r, up in ((0, False), (len(profile) - 1, True)):
+        mid = len(verts)
+        verts.append(tuple(turn @ Vector((0, 0, profile[r][1])) + Vector((x, y, z))))
+        colours.append(bullion((0, 0, profile[r][1]), seed))
+        a = rings[r]
+        faces += [(a + k, a + (k + 1) % n, mid) if not up else (a + (k + 1) % n, a + k, mid) for k in range(n)]
+    gold_bars.add(verts, faces, colours)
+
+
+# Two side by side, and one on top, resting on both (a little back, and
+# turned a touch, as if put down by hand).
+side = BAR_WIDE / 2 + BAR_GAP / 2
+gold_bar(-side, 0.006, 0.0, 0.02, 1)
+gold_bar(side, -0.008, 0.0, -0.015, 2)
+gold_bar(0.0, 0.018, BAR_TALL - 0.0015, 0.035, 3)
+gold_object = gold_bars.build("gold", smooth=True)
+gold_object.data.transform(Matrix.Scale(GOLD_SIZE, 4))
+outward(gold_object)
 
 if out:
     c.export(out)

@@ -19,6 +19,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshPhysicalMaterial,
+  MeshStandardMaterial,
   type Object3D,
   PCFShadowMap,
   PMREMGenerator,
@@ -249,6 +250,20 @@ if (emerald instanceof Mesh) {
     envMapIntensity: 0.55,
     emissive: new Color("#0f7a38"),
     emissiveIntensity: 1.0,
+  });
+}
+// The gold: shining, catching the little room's lights, and glowing a little
+// of its own, so it still reads as gold in the dark.
+const bullion = things.scene.getObjectByName("gold");
+if (bullion instanceof Mesh) {
+  bullion.material = new MeshStandardMaterial({
+    vertexColors: true,
+    metalness: 0.9,
+    roughness: 0.3,
+    envMap: shine,
+    envMapIntensity: 0.9,
+    emissive: new Color("#5a3204"),
+    emissiveIntensity: 0.4,
   });
 }
 // The lamp: its glass see-through, and its flame (lit, lantern.ts) bright.
