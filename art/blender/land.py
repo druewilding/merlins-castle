@@ -1639,11 +1639,15 @@ for side in (-1, 1):
     built.cone((side * 3.55, DB_TIP + 0.45, 1.5), 0.3, 0.42, STONE, sides=4, droop=0)
 # The gatehouse over the gate, between the towers either side of it, with
 # the chains' holes in its face.
-block(built, -3.2, CASTLE[3] - 1, GATEHOUSE[0], 3.2, CASTLE[3] + 1, GATEHOUSE[1], MORTAR, solid=False)
+# (Only over the gate up to the walls' tops, and its full width above them:
+# overlapping them, their faces would be in the same place, and flicker.)
+block(built, -3, CASTLE[3] - 1, GATEHOUSE[0], 3, CASTLE[3] + 1, 8, MORTAR, solid=False)
+block(built, -3.2, CASTLE[3] - 1, 8, 3.2, CASTLE[3] + 1, GATEHOUSE[1], MORTAR, solid=False)
 for x in (-3.2, -1.2, 0.8, 2.6):
     block(built, x, CASTLE[3] + 0.4, GATEHOUSE[1], x + 0.6, CASTLE[3] + 1, GATEHOUSE[1] + 0.8, c.linear("#c4b598"), solid=False)
 for x, y, z in DB_ANCHORS:
-    block(built, x - 0.12, y, z - 0.12, x + 0.12, y + 0.02, z + 0.12, c.linear("#1d1b19"), solid=False)
+    # (A shade out in front of the stones laid on the wall's face: the courtyard's courses.)
+    block(built, x - 0.12, y, z - 0.12, x + 0.12, y + 0.035, z + 0.12, c.linear("#1d1b19"), solid=False)
 # The toll booth, beside the guards: striped red and white, as in its
 # picture, under a pointed roof, its doorway to the path.
 BOOTH = (6.6, MOAT[3] + 3.4)
@@ -5777,10 +5781,15 @@ def courtyard():
     door_half = TUNNEL_HALF - 0.05
     courses(court, court_rng, (yw, yn), (-3, yn), g, 8)  # the north wall, inside, either side of the gate
     courses(court, court_rng, (3, yn), (ye, yn), g, 8)
-    courses(court, court_rng, (-3.2, yn), (3.2, yn), GATEHOUSE[0], GATEHOUSE[1])  # (and the gatehouse over it)
+    # (And the gatehouse over the gate: only over the opening, up to the wall's
+    # top, and its full width above it. Over the wall too, two lots of stones
+    # in one place would flicker.)
+    courses(court, court_rng, (-3, yn), (3, yn), GATEHOUSE[0], 8)
+    courses(court, court_rng, (-3.2, yn), (3.2, yn), 8, GATEHOUSE[1])
     courses(court, court_rng, (ye + 2, yn + 2), (3, yn + 2), g, 8, big=1.6)  # and outside
     courses(court, court_rng, (-3, yn + 2), (yw - 2, yn + 2), g, 8, big=1.6)
-    courses(court, court_rng, (3.2, yn + 2), (-3.2, yn + 2), GATEHOUSE[0], GATEHOUSE[1], big=1.6)
+    courses(court, court_rng, (3, yn + 2), (-3, yn + 2), GATEHOUSE[0], 8, big=1.6)
+    courses(court, court_rng, (3.2, yn + 2), (-3.2, yn + 2), 8, GATEHOUSE[1], big=1.6)
     courses(court, court_rng, (yw, ys), (yw, yn), g, 8)  # the west wall, inside
     courses(court, court_rng, (yw - 2, yn + 2), (yw - 2, CASTLE[2] - 1), g, 8, big=1.6)  # and outside
     courses(court, court_rng, (ye, yn), (ye, ys), g, 8)  # the east wall, inside
@@ -6029,17 +6038,22 @@ def courtyard():
     LANTERN = 1.2
 
 
+    def lit_lantern(t):
+        """A lantern on its bracket, lit (to make, for stamp). (In full: made
+        simpler, its thin arm folds over on itself, and flickers.)"""
+        made = PROPS.put(t, "Lantern_Wall", (0, 0, 0), 0, LANTERN)
+        flame(t, *PROPS.placing((0, 0, 0), 0, LANTERN)((0, -1.0, 0.55)), 0.14)
+        return made
+
     def lantern(x, y, z, face):
         """A lantern on a wall, lit, its arm out the way it faces."""
-        yaw = facing_yaw(*face)
-        PROPS.put(court, "Lantern_Wall", (x, y, z), yaw, LANTERN, 0.2)
-        move = PROPS.placing((x, y, z), yaw, LANTERN)
-        flame(court, *move((0, -1.0, 0.55)), 0.14)
+        stamp("lantern-wall-lit", lit_lantern, (x, y, z), facing_yaw(*face), solid=False)
 
 
     for side in (-1, 1):
-        lantern(GH[0] + side * 2.7, ys, g + 2.4, (0, 1))
-        lantern(side * 4.6, yn, g + 2.6, (0, -1))
+        # (Their backplates on the stones, not in them: in the wall's face, they'd flicker.)
+        lantern(GH[0] + side * 2.7, ys + 0.06, g + 2.4, (0, 1))
+        lantern(side * 4.6, yn - 0.06, g + 2.6, (0, -1))
     BANNER = 1.9
     # (Each a sign on a bracket: its post against the wall, its arm straight out, the banner hanging under it.)
     for x, tint in ((-5.4, "#9e2b25"), (5.4, "#2f4f8a")):
