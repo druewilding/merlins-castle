@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.14.0](https://github.com/druewilding/merlins-castle/compare/v2.13.0...v2.14.0) (2026-10-25)
+
+
+### Features
+
+* Build the beautiful chamber and the flute playing music inside ([#114](https://github.com/druewilding/merlins-castle/issues/114)) ([1c7298a](https://github.com/druewilding/merlins-castle/commit/1c7298a5ecebe85014f6631316d2e24e67c6bf3a))
+* Build the giant, the cake eating, and the turned to mouse death scene ([#110](https://github.com/druewilding/merlins-castle/issues/110)) ([fffda1b](https://github.com/druewilding/merlins-castle/commit/fffda1be50f2c6e0d3f43c7b592fd2ec32f6f551))
+* Build the gold, silver and treasure room ([#113](https://github.com/druewilding/merlins-castle/issues/113)) ([3915e1b](https://github.com/druewilding/merlins-castle/commit/3915e1b46e3c6cca2449b6ac8fcfc4a527e31f07))
+* Build the ring and enable it to roll away the stone ([#115](https://github.com/druewilding/merlins-castle/issues/115)) ([7e250d8](https://github.com/druewilding/merlins-castle/commit/7e250d871f587c16578e0384546d80f34eee7406))
+* Design the courtyard and the coach house ([#116](https://github.com/druewilding/merlins-castle/issues/116)) ([f77504b](https://github.com/druewilding/merlins-castle/commit/f77504bda80abde7c1cec37038fb6149078d5fa9))
+* Give each place its own name in English and Danish ([#111](https://github.com/druewilding/merlins-castle/issues/111)) ([1815ae9](https://github.com/druewilding/merlins-castle/commit/1815ae9bfa616a59cf15a367d34b40a5e80840f5))
+
+
+### Bug Fixes
+
+* Stop the witches' fade from jolting the scene as they fly off ([#112](https://github.com/druewilding/merlins-castle/issues/112)) ([e565e5b](https://github.com/druewilding/merlins-castle/commit/e565e5ba5adc6df46eb6e59c83c5ce40d58222c5))
+
 ## [2.13.0](https://github.com/druewilding/merlins-castle/compare/v2.12.0...v2.13.0) (2026-10-24)
 
 
