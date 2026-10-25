@@ -2,10 +2,9 @@
 // you into a mouse." You turn to look up at him; he lifts his hand and points
 // at you, and poof: a puff of glittering smoke, and the world shoots up round
 // you as you shrink to the floor. Squeak! You scurry across the floor to his
-// feet; and up there, huge, the giant leans down to peer at you, his head on
-// one side, beaming, and chuckles (giant.ts).
-// The curtain comes down over the end of it (from a little before `ends`),
-// and you go on twitching your whiskers behind it, and he goes on peering.
+// feet; and up there, huge, the giant leans down to peer at you, beaming,
+// and chuckles (giant.ts). The curtain comes down over the end of it (from a
+// little before `ends`), and he goes on peering at you behind it.
 
 import {
   AdditiveBlending,
@@ -37,7 +36,7 @@ const EYE = 1.65; // your eye above the floor (as in player.ts)
 const MOUSE = 0.12; // and a mouse's
 const NEAR = 2.4; // metres from the middle of his seat you scurry to (at his size: before his feet)
 const SCAMPERS = 9; // little steps a second, scurrying
-const FOLLOW = 4; // how quickly you look round as his face moves (each second, of the way to it)
+const FOLLOW = 1.5; // how quickly you look round as his face moves (each second, of the way to it)
 
 export class Shrunk {
   readonly ends = ENDS;
@@ -69,7 +68,7 @@ export class Shrunk {
     giant.enchant();
   }
 
-  /** Each frame (on behind the curtain, too: you twitching, him peering). */
+  /** Each frame (on behind the curtain, too: him peering). */
   update(dt: number) {
     const was = this.t;
     this.t += dt;
@@ -102,12 +101,7 @@ export class Shrunk {
     this.seen.lerp(this.giant.faceAt(), Math.min(1, dt * FOLLOW));
     const to = this.seen.clone().sub(this.eye);
     const wobble = still ? 0 : 0.25 * Math.sin(Math.PI * s) * Math.sin(t * 18);
-    // (A mouse: now and then a quick sniff, your nose twitching up and down.)
-    const sniffing = !still && t > SHRUNK ? Math.max(0, Math.sin(t * 1.9)) ** 6 : 0;
-    const sniff = 0.025 * sniffing * Math.sin(t * 45);
-    this.look.setFromEuler(
-      this.euler.set(Math.atan2(to.y, Math.hypot(to.x, to.z)) + sniff, Math.atan2(-to.x, -to.z) + 0.5 * sniff, wobble)
-    );
+    this.look.setFromEuler(this.euler.set(Math.atan2(to.y, Math.hypot(to.x, to.z)), Math.atan2(-to.x, -to.z), wobble));
     this.camera.position.copy(this.eye);
     // (Turning to him, at first, from however you were looking.)
     this.camera.quaternion.slerpQuaternions(this.facing, this.look, ease(t / 0.5));

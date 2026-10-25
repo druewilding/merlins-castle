@@ -53,9 +53,8 @@ const CAKE_SIZE = [0.23, 0.1]; // the one you carry: its radius, and half its he
 const PALM = 0.025; // how far over his palm's middle its top is (at the model's size): the cake sits on it
 // Turning you into a mouse, in seconds from walking into the way:
 const POINT = [0.3, 0.75, 1.5, 2.1]; // his hand lifted to point at you, pointing, held there till, and put down again
-const LEAN = [1.7, 3.1, 0.95]; // leaning down to peer at you, from, till, and how far (radians, his back bent)
+const LEAN = [1.7, 3.1, 0.75]; // leaning down to peer at you, from, till, and how far (radians, his back bent)
 const CHUCKLE = [0.9, 0.28, 0.06]; // and a chuckle: seconds, each "ho" in it, and how far his shoulders shake with each (radians)
-const TILT = 0.06; // his head on one side, peering (radians)
 const UP = new Vector3(0, 1, 0);
 
 type Doing = "hungry" | "catching" | "eating" | "fed" | "enchanting";
@@ -101,7 +100,8 @@ export class Giant {
   private from = new Vector3();
   private bitten = 0;
   private chuckled = CHUCKLE[0]; // seconds since he began to chuckle
-  private tilt = 0;
+  /** Peering at you, turning you into a mouse (0 to 1): his face turned straight to you, the shortest way (no twist, bent over). */
+  private peering = 0;
 
   constructor(
     scene: Scene,
@@ -221,7 +221,7 @@ export class Giant {
     this.doing = "hungry";
     this.head?.quaternion.copy(this.posed);
     this.arms.forEach((bone, k) => bone.quaternion.copy(this.armsPosed[k]));
-    this.tilt = 0;
+    this.peering = 0;
     this.chuckled = CHUCKLE[0];
     this.hungry();
   }
@@ -329,7 +329,7 @@ export class Giant {
       c < CHUCKLE[0] ? CHUCKLE[2] * Math.abs(Math.sin((Math.PI * c) / CHUCKLE[1])) * (1 - c / CHUCKLE[0]) : 0;
     const leaned = ease((t - LEAN[0]) / (LEAN[1] - LEAN[0]));
     this.lean(LEAN[2] * leaned - shake, eye);
-    this.tilt = TILT * leaned;
+    this.peering = leaned;
     if (pointing > 0) {
       const [upper] = this.right.bones;
       const shoulder = upper.getWorldPosition(new Vector3());
@@ -347,7 +347,7 @@ export class Giant {
     this.head?.quaternion.copy(this.posed);
     this.arms.forEach((bone, k) => bone.quaternion.copy(this.armsPosed[k]));
     this.lean(LEAN[2], eye);
-    this.tilt = TILT;
+    this.peering = 1;
     this.glance.turn = this.glance.up = 0;
     this.glance.for = Infinity;
     this.watch(eye, true, 1);
@@ -524,9 +524,11 @@ export class Giant {
     const side = facing.clone().cross(UP).normalize();
     const wanted = new Quaternion()
       .setFromAxisAngle(UP, look.turn + shake)
-      .multiply(new Quaternion().setFromAxisAngle(side, look.up + nod))
-      .multiply(new Quaternion().setFromAxisAngle(facing, this.tilt))
-      .multiply(world);
+      .multiply(new Quaternion().setFromAxisAngle(side, look.up + nod));
+    // (Bent over, peering down at you, turning round and then up twists his
+    // face: so, straight to you.)
+    if (this.peering > 0) wanted.slerp(new Quaternion().setFromUnitVectors(facing, to.normalize()), this.peering);
+    wanted.multiply(world);
     head.quaternion.copy(head.parent.getWorldQuaternion(new Quaternion()).invert().multiply(wanted));
   }
 }
