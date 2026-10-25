@@ -5359,6 +5359,7 @@ def charcoal_hut(b, hall):
 # crates, the bucket, the benches, the banners).
 VILLAGE = c.Kit(HERE.parent / "models/medieval-village-megakit/glTF")
 court = c.Builder()
+window_glass = c.Builder()  # (its windows' glass: the game draws it see-through, shining)
 court_rng = random.Random("courtyard")  # (its own: a change anywhere else doesn't move what's here)
 YARD = (CASTLE[0] + 1, CASTLE[1] - 1, KEEP_NORTH, CASTLE[3] - 1)  # its walls' faces: west, east, south, north
 YARD_FLOOR = height(0, (YARD[2] + YARD[3]) / 2)  # (the castle stands on flat ground)
@@ -5669,6 +5670,23 @@ def roses_at(kind, x, y, z, yaw):
     """Roses of a kind, there, turned by yaw (facing -y at 0), not solid (what's
     under them, or the bed they're in, is)."""
     stamp(kind, ROSE_KINDS[kind], (x, y, z), yaw, solid=False)
+
+
+def kit_window(name, at, yaw, scale, room):
+    """One of the kit's windows (its back to the wall): its frame; its glass,
+    to see through; and, `room` (as the kit measures) back behind the
+    glass, the dark of the room it lights, glowing a little low down, as if
+    a candle were lit in there (in the shape of its glass, so nothing shows
+    round it)."""
+    VILLAGE.put(court, name, at, yaw, scale, where=lambda material: "Glass" not in material)
+    VILLAGE.put(window_glass, name, at, yaw, scale, where=lambda material: "Glass" in material)
+    move = VILLAGE.placing(at, yaw, scale)
+    panes = [pts for pts, _, material in VILLAGE.faces(name) if "Glass" in material]
+    low, high = min(p[2] for pts in panes for p in pts), max(p[2] for pts in panes for p in pts)
+    for pts in panes:
+        back = [move((x, y + room, z)) for x, y, z in pts]
+        glow = [smooth(1 - (z - low) / (high - low) * 1.6) for _, _, z in pts]
+        court.add(back, [tuple(range(len(back)))], [c.mix(c.linear("#15131a"), c.linear("#6a4222"), 0.7 * t) for t in glow])
 
 
 def facing_yaw(fx, fy):
@@ -6001,10 +6019,9 @@ def courtyard():
     # side of its door, and banners.
     WINDOW = 1.5  # times the kit's size
     for x in (-36, -27, -18, -9, 9, 18, 27, 36):
-        at = (x, ys + 0.12, g + 5.0 - 1.02 * WINDOW)
-        block(court, x - 0.62 * WINDOW, ys, at[2] + 1.05 * WINDOW, x + 0.62 * WINDOW, ys + 0.03, at[2] + 2.7 * WINDOW,
-              c.linear("#1c1a22"), solid=False)  # (dark, behind it)
-        VILLAGE.put(court, "Window_Wide_Round1", at, math.pi, WINDOW, 0.5)
+        # (Its glass 22 cm out from the wall, its frame's back in it; the room behind 17 cm back.)
+        at = (x, ys + 0.22, g + 5.0 - 1.02 * WINDOW)
+        kit_window("Window_Wide_Round1", at, math.pi, WINDOW, 0.17 / WINDOW)
         VILLAGE.put(court, "WindowShutters_Wide_Round_Open", at, math.pi, WINDOW)
     for x in (-13.5, 13.5, -31.5, 31.5, -40.5, 40.5, -22.5, 22.5):
         if abs(x) < 40:
@@ -6142,9 +6159,9 @@ def courtyard():
     # The roof.
     TILES = (BARN_E - BARN.x + 0.1) / 4.0, (BARN_N - BARN_S) / 14.0, (BARN_RIDGE - BARN_EAVE) / 6.0
     VILLAGE.put(court, "Roof_RoundTiles_8x14", (BARN.x, BARN.y, BARN_EAVE), 0, TILES, 0.6)
-    # Little windows up in its gables.
-    for y, yaw in ((BARN_N + 0.1, 0.0), (BARN_S - 0.1, math.pi)):
-        VILLAGE.put(court, "Window_Thin_Round1", (BARN.x, y, BARN_EAVE + 0.2), yaw, 1.1, 0.5)
+    # Little windows up in its gables, facing out (their glass 15 cm out from its boards' wall).
+    for y, yaw in ((BARN_N + 0.15, facing_yaw(0, 1)), (BARN_S - 0.15, facing_yaw(0, -1))):
+        kit_window("Window_Thin_Round1", (BARN.x, y, BARN_EAVE + 0.2), yaw, 1.1, 0.09 / 1.1)
     # Roses up its corners by the doors, and on its north wall, facing the gate.
     for x, y, face in ((BARN_W - 0.03, BARN_N - 1.0, (-1, 0)), (BARN_W - 0.03, BARN_S + 1.2, (-1, 0)), (BARN.x - 3.5, BARN_N + 0.03, (0, 1)),
                        (BARN.x + 4.5, BARN_N + 0.03, (0, 1))):
@@ -6179,6 +6196,7 @@ def courtyard():
     solid_box(*TROUGH, 0.45, 1.05)
 
     court.build("courtyard", smooth=False)
+    window_glass.build("window-glass", smooth=False)
 
 
 courtyard()

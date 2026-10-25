@@ -274,12 +274,15 @@ class Kit:
 
         return move
 
-    def put(self, builder, name, at, yaw=0.0, scale=1.0, ratio=None, tint=None):
+    def put(self, builder, name, at, yaw=0.0, scale=1.0, ratio=None, tint=None, where=None):
         """A model into a builder (see placing; tint, an RGBA colour mixed in
-        by its alpha). Its footprint there, as (x0, y0, x1, y1), and its top."""
+        by its alpha; where, which of its materials to take, given each one's
+        name). Its footprint there, as (x0, y0, x1, y1), and its top."""
         move = self.placing(at, yaw, scale)
         xs, ys, top = [], [], at[2]
-        for pts, colours, _ in self.faces(name, ratio):
+        for pts, colours, material in self.faces(name, ratio):
+            if where and not where(material):
+                continue
             moved = [move(p) for p in pts]
             xs += [p[0] for p in moved]
             ys += [p[1] for p in moved]
