@@ -6,7 +6,7 @@
 # Made from Quaternius's kits (CC0, art/models/): a Universal Base
 # Character's whole body (his head, hands and feet made bigger, his body and
 # limbs bulked out, a belly, his nose grown), his skin recoloured. His hair
-# and beard (giant-hair, giant-beard), his hide (giant-hide, giant-apron, giant-flap) and his wraps
+# and beard (giant-hair, giant-beard), his hide (giant-hide, giant-apron) and his wraps
 # (giant-wraps) are made here, each moved by the bones that move the skin
 # it's on. All of
 # it shares the kits' one skeleton, so the Universal Animation Libraries'
@@ -403,8 +403,7 @@ grow("giant-beard", bearded, 4.0, (0.07, 0.12), (0.004, 0.008), HAIR, HAIR_TIP, 
      spread=0.012, bed=False)  # (all locks: under them, a bed of it, on his small chin, looked flat)
 
 
-# His hide: a band round his hips, and hanging from it, a panel of it
-# behind, a sheet, its hem a little uneven (and one in front, over his lap:
+# His hide: a band round his hips (and from it, over his lap, an apron:
 # giant-apron, below, made as he sits).
 def hidden(p):
     v = p * 18
@@ -423,38 +422,6 @@ def hide(i):
 HIDES = [HIDE, c.mix(HIDE, HIDE_DARK, 0.3), c.mix(HIDE, HIDE_LIGHT, 0.3), c.mix(HIDE, HIDE_DARK, 0.15)]
 grow("giant-hide", hide, 0.0, (0, 0), (0, 0), HIDES, HIDE, hidden)
 
-PANEL = (0.36, 0.96, 0.3, 0.025)  # metres across, how high its top is, how long, and how far off his skin
-PANEL_GRID = (9, 7)  # its points, across and down
-
-
-def panel(name):
-    """A sheet of hide, hung from his belt behind, moved by his hips: hanging
-    straight down."""
-    width, top, long, off = PANEL
-    across, down = PANEL_GRID
-    side = 1  # (behind him: his front is -y)
-    near = [p for p in points if p.y * side > 0 and top - long - 0.05 < p.z < top + 0.05 and abs(p.x) < width]
-    verts, colours_, weights_ = [], [], []
-    for row in range(down):
-        t = row / (down - 1)
-        for col in range(across):
-            u = col / (across - 1)
-            x = (u - 0.5) * width
-            z = top - long * t
-            if row == down - 1:
-                z += 0.012 * noise.noise(Vector((x * 30, 9.0, 0)))  # (its hem, a little uneven)
-            # (Over his skin there: the furthest out of it, near that spot.)
-            by = [p.y for p in near if abs(p.x - x) < 0.03 and abs(p.z - z) < 0.03]
-            y = (max(by, key=lambda v: v * side) if by else side * 0.1) + side * (off + 0.01 * t)
-            verts.append((x, y, z))
-            colours_.append(hidden(Vector((x, y, z))))
-            weights_.append({"pelvis": 1.0})
-    faces = [(r * across + k, r * across + k + 1, (r + 1) * across + k + 1, (r + 1) * across + k)
-             for r in range(down - 1) for k in range(across - 1)]
-    c.skinned(name, verts, faces, colours_, weights_, skeleton)
-
-
-panel("giant-flap")
 
 
 # The wraps round his shins: strips of cloth wound round and round, from his
@@ -550,10 +517,12 @@ for image in bpy.data.images:
 c.clips(skeleton, ANIMS)
 
 # His apron (giant-apron): a sheet of hide over his lap, from his belt to his
-# knees, its front edge falling over them, a little unevenly. Made as he sits
-# (he always does), over his thighs as they are then, and moved by his hips
-# alone: cloth moved by his thighs' bones, in the game, sank into them.
-APRON = (0.4, 0.02, 0.1)  # metres across, how far over his thighs, and how far its front edge falls
+# knees, between his hands, its front edge falling over them, a little
+# unevenly. Made as he sits (he always does), close over his thighs as they
+# are then, and moved by his hips alone: cloth moved by his thighs' bones, in
+# the game, sank into them.
+APRON = (0.22, 0.045, 0.1, 0.015)  # metres across (his hands either side), off his thighs, how far its front edge
+# falls, and how much it sags between his legs
 APRON_GRID = (11, 8)  # its points, across and along
 c.pose(skeleton, ANIMS[0], 0)
 graph = bpy.context.evaluated_depsgraph_get()
@@ -561,34 +530,39 @@ sitting = body.evaluated_get(graph)
 # (Only his thighs: not his belly, nor his hands on his knees.)
 lap = [sitting.matrix_world @ v.co for v, w in zip(sitting.to_mesh().vertices, weights)
        if sum(a for b, a in w.items() if b.startswith("thigh")) > 0.5]
+sitting.to_mesh_clear()
 hips = skeleton.pose.bones["pelvis"]
 unsit = (skeleton.matrix_world @ hips.bone.matrix_local) @ (skeleton.matrix_world @ hips.matrix).inverted()
 belt = (skeleton.matrix_world @ hips.matrix).translation
 knee = (skeleton.matrix_world @ skeleton.pose.bones["calf_l"].matrix).translation
-width, off, fall = APRON
+width, off, fall, sag = APRON
 across, along = APRON_GRID
-verts, colours_, posed = [], [], []
-for row in range(along + 2):
+xs = [(col / (across - 1) - 0.5) * width for col in range(across)]
+posed = []
+for row in range(along):
+    y = belt.y - 0.12 + (knee.y + 0.02 - belt.y + 0.12) * row / (along - 1)
+    # (On the top of his thigh just under it; between his legs, where there's
+    # none, across from one to the other, sagging a little.)
+    tops = [max((p.z for p in lap if abs(p.x - x) < 0.025 and abs(p.y - y) < 0.025 and p.z < belt.z + 0.15),
+                default=None) for x in xs]
+    found = [k for k, z in enumerate(tops) if z is not None]
+    for k, z in enumerate(tops):
+        if z is None and found:
+            left = max((f for f in found if f < k), default=None)
+            right = min((f for f in found if f > k), default=None)
+            ends = [tops[f] for f in (left, right) if f is not None]
+            tops[k] = sum(ends) / len(ends) - (sag if left is not None and right is not None else 0)
+    posed += [Vector((x, y, (z if z is not None else belt.z) + off)) for x, z in zip(xs, tops)]
+for drop in (1, 2):
+    # (Its front edge, falling over his knees.)
     for col in range(across):
-        x = (col / (across - 1) - 0.5) * width
-        if row < along:
-            # (On the tops of his thighs, and across between them.)
-            y = belt.y - 0.12 + (knee.y + 0.02 - belt.y + 0.12) * row / (along - 1)
-            # (Not up round his hips, where his thighs move his skin too.)
-            tops = [p.z for p in lap if abs(p.x - x) < 0.06 and abs(p.y - y) < 0.03 and p.z < belt.z + 0.15]
-            q = Vector((x, y, (max(tops) if tops else belt.z) + off))
-        else:
-            # (Its front edge, falling over his knees.)
-            edge = posed[(along - 1) * across + col]
-            drop = fall * (row - along + 1) / 2 * (1 + 0.25 * noise.noise(Vector((x * 25, 3.0, 0))))
-            q = Vector((edge[0], edge[1] - 0.01 * (row - along + 1), edge[2] - drop))
-        posed.append(q)
-        verts.append(tuple(unsit @ q))
-        colours_.append(hidden(q))
+        edge = posed[(along - 1) * across + col]
+        down = fall * drop / 2 * (1 + 0.25 * noise.noise(Vector((edge.x * 25, 3.0, 0))))
+        posed.append(Vector((edge.x, edge.y - 0.01 * drop, edge.z - down)))
 faces = [(r * across + k, r * across + k + 1, (r + 1) * across + k + 1, (r + 1) * across + k)
          for r in range(along + 1) for k in range(across - 1)]
-c.skinned("giant-apron", verts, faces, colours_, [{"pelvis": 1.0}] * len(verts), skeleton)
-sitting.to_mesh_clear()
+c.skinned("giant-apron", [tuple(unsit @ q) for q in posed], faces, [hidden(q) for q in posed],
+          [{"pelvis": 1.0}] * len(posed), skeleton)
 bpy.context.scene.frame_set(0)
 
 print(f"body: {len(body.data.vertices)} points")
