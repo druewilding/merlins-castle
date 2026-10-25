@@ -45,6 +45,8 @@ const SHUT = 0.15; // seconds a blink takes
 const HANDS = 1.3; // times bigger his hands are (by their bones: so his fingers bend where their joints are)
 const FINGERS = 0.85; // and how long their middle and end joints are, pulled in towards his knuckles
 const CAKE = 2.0; // the cake in his hand, times the one you carry (growing as it flies to him: a cake for a giant)
+const CAKE_SIZE = [0.23, 0.1]; // the one you carry: its radius, and half its height (metres)
+const PALM = 0.025; // how far over his palm's middle its top is (at the model's size): the cake sits on it
 const UP = new Vector3(0, 1, 0);
 
 type Doing = "hungry" | "catching" | "eating" | "fed";
@@ -214,9 +216,9 @@ export class Giant {
   private act() {
     if (this.doing === "catching") {
       // The cake in the air, along an arc, turning over, into his hand.
-      const flight = Math.min(FLIGHT[1], Math.max(FLIGHT[0], this.from.distanceTo(this.palm()) / 8));
+      const flight = Math.min(FLIGHT[1], Math.max(FLIGHT[0], this.from.distanceTo(this.held()) / 8));
       const u = Math.min(1, this.time / flight);
-      this.cake.position.lerpVectors(this.from, this.palm(), u).addScaledVector(UP, 3 * u * (1 - u));
+      this.cake.position.lerpVectors(this.from, this.held(), u).addScaledVector(UP, 3 * u * (1 - u));
       this.cake.rotation.set(this.time * 6, this.time * 2, 0);
       this.cake.scale.setScalar(1 + (CAKE - 1) * u);
       if (u >= 1) {
@@ -249,10 +251,15 @@ export class Giant {
     return wrist.lerp(knuckle, 0.6);
   }
 
+  /** Where the cake's middle is, held: sitting on his palm. */
+  private held() {
+    return this.palm().addScaledVector(UP, CAKE_SIZE[1] * this.cake.scale.x + PALM * this.model.scale.x);
+  }
+
   /** The cake in his hand, eating it (upright, its cut towards him). */
   private hold() {
     if (this.doing !== "eating" || !this.cake.visible) return;
-    this.cake.position.copy(this.palm());
+    this.cake.position.copy(this.held());
     this.cake.rotation.set(0, this.yaw + Math.PI / 2, 0);
   }
 
@@ -279,12 +286,14 @@ export class Giant {
     const size = this.model.scale.x;
     const facing = new Quaternion().setFromAxisAngle(UP, this.yaw);
     const ahead = new Vector3(0, 0, 1).applyQuaternion(facing);
-    // (His mouth, and the cake's middle in front of it: its edge at his lips.)
+    // (His mouth; the cake's middle in front of it, its edge at his lips; and his palm under it.)
     const mouth = this.head
       .getWorldPosition(new Vector3())
       .addScaledVector(ahead, MOUTH[0] * size)
       .addScaledVector(UP, MOUTH[1] * size);
-    const target = mouth.addScaledVector(ahead, 0.3).addScaledVector(UP, -0.1);
+    const target = mouth
+      .addScaledVector(ahead, CAKE_SIZE[0] * this.cake.scale.x + 0.04)
+      .addScaledVector(UP, -(CAKE_SIZE[1] * this.cake.scale.x + PALM * size));
     const shoulder = upper.getWorldPosition(new Vector3());
     const elbow = fore.getWorldPosition(new Vector3());
     const wrist = this.palm();
