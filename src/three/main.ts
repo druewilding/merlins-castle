@@ -326,20 +326,31 @@ if (drink instanceof Mesh) {
 }
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
-  node.castShadow = !["paths", "water", "embers", "archway-ivy", "maze-ivy"].includes(node.name);
-  node.receiveShadow = !["water", "embers"].includes(node.name);
+  node.castShadow = !["paths", "water", "embers", "brazier-flames", "archway-ivy", "maze-ivy"].includes(node.name);
+  node.receiveShadow = !["water", "embers", "brazier-flames"].includes(node.name);
 });
 // The rock underground, grainy and cracked.
 dressRock(model.scene);
 // The maze, in stone.
 dressMaze(model.scene, renderer);
-// Merlin's treasure, shining.
+// Merlin's treasure, shining (and the treasure room's gold).
 dressTreasure(model.scene, renderer);
 // The charcoal burner's fire: its embers glowing (not lit: they shine, even
 // in the hut's gloom, flickering with its light: lightFor), and its smoke.
 const embers = model.scene.getObjectByName("embers");
 const emberLook = new MeshBasicMaterial({ vertexColors: true });
 if (embers instanceof Mesh) embers.material = emberLook;
+// The treasure room's braziers: their fire glowing, added to what's behind it.
+const braziers = model.scene.getObjectByName("brazier-flames");
+if (braziers instanceof Mesh) {
+  braziers.material = new MeshBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false,
+  });
+}
 const smoke = new Smoke(scene, land.hut, reducedMotion);
 scene.add(model.scene);
 const spots = land.trees as TreeSpots;
