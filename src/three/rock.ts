@@ -30,16 +30,17 @@ function rocky(material: Material) {
   const own = material.clone();
   own.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", "#include <common>\nvarying vec3 rockAt;")
+      .replace("#include <common>", "#include <common>\nvarying vec3 rockAt;\nvarying vec3 rockNormal;")
       .replace(
         "#include <begin_vertex>",
-        "#include <begin_vertex>\nrockAt = (modelMatrix * vec4(transformed, 1.0)).xyz;"
+        "#include <begin_vertex>\nrockAt = (modelMatrix * vec4(transformed, 1.0)).xyz;\nrockNormal = mat3(modelMatrix) * objectNormal;"
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
         `#include <common>
         varying vec3 rockAt;
+        varying vec3 rockNormal;
         float rockHeight;
         float rockHash(vec3 p) {
           p = fract(p * 0.3183099 + 0.1) * 17.0;
@@ -85,8 +86,11 @@ function rocky(material: Material) {
           float cracksSeen = 1.0 - smoothstep(0.05, 0.16, size * ${CRACKS});
           float grain = (rockNoise(rockAt * ${GRAIN}.0) * 0.6 + rockNoise(rockAt * ${GRAIN * 2.3}) * 0.4 - 0.5) * grainSeen;
           float blotch = rockNoise(rockAt * ${BLOTCHES}) * 0.6 + rockNoise(rockAt * ${BLOTCHES * 2.7}) * 0.4 - 0.5;
-          // (Which way it faces: up, a floor, or a wall or roof.)
-          vec3 facing = normalize(cross(dFdx(rockAt), dFdy(rockAt)));
+          // (Which way it faces: up, a floor, or a wall or roof. From its
+          // normals, not from how it changes across the screen: that wavers a
+          // little from pixel to pixel, and its bumps, from how their height
+          // changes, made the wavering, between floor and wall, a speckle.)
+          vec3 facing = normalize(rockNormal);
           facing *= sign(dot(facing, cameraPosition - rockAt)); // (the side of it you see)
           float floor = smoothstep(0.6, 0.9, facing.y);
           // Its floors: worn, with a few faint cracks, wandering.
