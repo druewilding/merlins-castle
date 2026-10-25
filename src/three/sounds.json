@@ -22,5 +22,7 @@
   "munch": { "file": "merlin/munch.wav", "volume": 0.35 },
   "poof": { "file": "merlin/poof.wav", "volume": 0.6 },
   "squeak": { "file": "merlin/squeak.wav", "volume": 0.4 },
-  "flute": { "file": "merlin/flute.wav", "volume": 0.5 }
+  "flute": { "file": "merlin/flute.wav", "volume": 0.5 },
+  "charm": { "file": "merlin/charm.wav", "volume": 0.5 },
+  "rumble": { "file": "merlin/rumble.wav", "volume": 0.9 }
 }

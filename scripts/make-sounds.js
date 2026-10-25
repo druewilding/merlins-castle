@@ -498,3 +498,36 @@ function flute(freq, seconds, amp = 1, soft = 0.06) {
   }
   save("flute", track, 0.45, loop);
 }
+
+// The ring's magic: its stone flashing, a shimmer of bells climbing high and
+// ringing on, and sparkles, as its light streams out to the stone.
+{
+  const track = new Track(2.6);
+  ["E6", "G6", "B6", "E7", "G7", "B7", "E8"].forEach((n, i) =>
+    track.add(i * 0.07, bell(note(n), 1.6, 0.5 - i * 0.04), 0.7 * Math.sin(i * 1.1))
+  );
+  sparkle(track, 0.3, 1.4, 12, 0.22);
+  save("charm", track, 0.45);
+}
+
+// The enormous stone rolling aside: a deep, heavy rumble, a bump each time
+// round, grinding to a stop.
+{
+  const track = new Track(2.8);
+  const envelope = (t) => rise(t, 0, 0.3) * (1 - rise(t, 1.8, 2.6)) * (0.75 + 0.25 * Math.sin(t * 9));
+  track.add(0, rush(2.7, 0.012, envelope), -0.15);
+  track.add(0.02, rush(2.7, 0.012, envelope), 0.15);
+  track.add(
+    0,
+    rush(2.7, 0.06, (t) => envelope(t) * 0.18),
+    0
+  );
+  for (const at of [0.35, 1.05, 1.7]) {
+    track.add(
+      at,
+      rush(0.35, 0.02, (t) => 0.7 * rise(t, 0, 0.01) * Math.exp(-t / 0.08)),
+      0
+    );
+  }
+  save("rumble", track, 0.3);
+}
