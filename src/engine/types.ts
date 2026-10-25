@@ -55,6 +55,7 @@ export interface Messages {
 export type TeletextString = string;
 
 export interface Room {
+  name: string; // what the place is called (the 3D version's label, top left)
   description: TeletextString;
   firstVisitDescription?: TeletextString; // grassy bank: "You wake up on a grassy bank…"
   crowdedDescription?: TeletextString; // grassy bank with >12 items on it

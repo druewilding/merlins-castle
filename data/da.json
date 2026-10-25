@@ -21,9 +21,11 @@
   },
   "rooms": {
     "clue-spell": {
+      "name": "Faret vild",
       "description": "Du er for svag, men du får et spor:  {red}Brug{red}trylleformularen,{red}når{red}du{red}møder{red}Merlin."
     },
     "wizards-kitchen": {
+      "name": "Troldmandens køkken",
       "description": "Du er i{blue}troldmandens køkken. Det lugter af tudser og krydderier, der simrer. Merlin dukker op!",
       "exits": {
         "east": {
@@ -33,12 +35,15 @@
       }
     },
     "coach-house": {
+      "name": "Vognhus",
       "description": "Du er i et{yellow}ældgammelt{yellow}vognhus. Merlins kappe, som mangler en sølvknap, hænger på væggen. Noget rasler."
     },
     "small-room": {
+      "name": "Lille rum",
       "description": "Du er i et{red}lille{red}rum.{white}Væggene er beklædt med rød silke. Der er buegange mod nord og vest."
     },
     "grand-hall": {
+      "name": "Stor hal",
       "description": "Du er i en{cyan}stor{cyan}hal.{white}Der er døre i alle retninger. Et{magenta}udsmykket{magenta}kammer{white}ligger mod syd. Merlins gobliner er meget tæt på.",
       "exits": {
         "south": {
@@ -56,6 +61,7 @@
       }
     },
     "dungeon": {
+      "name": "Fangehul",
       "description": "Du er i et{yellow}enormt{yellow}fangehul.{white}En gammel, gammel kone vogter udgangen mod syd og venter på at forvandle dig til sten. Der er en gang mod vest.",
       "exits": {
         "south": {
@@ -65,6 +71,7 @@
       }
     },
     "merlins-lair": {
+      "name": "Merlins hule",
       "description": "Dette er{blue}troldmanden{blue}Merlins{blue}hule.{white}Væggene er lilla og grønne. En kedel bobler. Troldmanden kommer hen imod dig!",
       "exits": {
         "north": {
@@ -74,9 +81,11 @@
       }
     },
     "courtyard": {
+      "name": "Borggård",
       "description": "Du er i en{yellow}solrig{yellow}borggård{white}med vildtvoksende lyserøde roser. Mod nord er en{cyan}vindebro.{white}Der er et{green}vognhus{white}mod øst. Mod syd er en{magenta}hal."
     },
     "moat": {
+      "name": "Voldgrav",
       "description": "Du er på nordbredden af en{magenta}voldgrav.{white}Nogle vagter står ved{cyan}toldbommen.{white}En sti fører mod nord gennem en buegang.",
       "exits": {
         "south": {
@@ -86,9 +95,11 @@
       }
     },
     "forest-edge": {
+      "name": "Skovbryn",
       "description": "Du er ved kanten af en{green}tæt{green}skov{white}på en sti, der løber fra øst til vest. En ugle tuder i træerne."
     },
     "river-south-bank": {
+      "name": "Sydbredden",
       "description": "Du er på sydbredden af en{blue}flod.{white}En{green}skov{white}ligger mod vest. Mod syd, gennem en stenbue, skinner et{yellow}gyldent{yellow}spir{white}i solen.",
       "exits": {
         "north": {
@@ -99,9 +110,11 @@
       }
     },
     "beautiful-chamber": {
+      "name": "Smukt kammer",
       "description": "Du er i et{magenta}smukt{magenta}kammer.{white}Gulvet er dækket af sorte og hvide fliser, og væggene er af guld. En ensom fløjte spiller."
     },
     "dark-tunnels": {
+      "name": "Mørke tunneler",
       "description": "Du er ved en korsvej i{blue}tunnelerne.{white}Der er meget mørkt.",
       "exits": {
         "south": {
@@ -111,9 +124,11 @@
       }
     },
     "clue-silver": {
+      "name": "Faret vild",
       "description": "Du er faret vild, men finder et spor:{red}Giv{red}Merlin{red}sølv{red}til{red}hans{red}knapper."
     },
     "dragon-cave": {
+      "name": "Dragens hule",
       "description": "Du står i en{cyan}stor{cyan}hule.{white}En{red}prægtig{red}drage,{white}der puster ild, står ved indgangen til tunnelen mod syd. Flere tunneler fører mod vest og nord.",
       "exits": {
         "south": {
@@ -126,6 +141,7 @@
       }
     },
     "cave-entrance": {
+      "name": "Huleindgang",
       "description": "Du er ved indgangen til en{cyan}hule,{white}der går mod øst. En gangsti fører mod vest. Mod syd går en{blue}tunnel{white}under jorden.",
       "exits": {
         "south": {
@@ -140,6 +156,7 @@
       }
     },
     "mountain-path": {
+      "name": "Bjergsti",
       "description": "Du er på en sti, der løber fra nord til syd. Tætte{green}træer{white}står ved foden af et{cyan}bjerg{white}mod nord.",
       "exits": {
         "north": {
@@ -150,9 +167,11 @@
       }
     },
     "evergreen-glade": {
+      "name": "Stedsegrøn lysning",
       "description": "Du er i en{green}stedsegrøn{green}lysning,{white}hvor{red}rødprikkede{red}paddehatte{white}vokser i en ring. En sti løber fra øst til vest."
     },
     "deep-river": {
+      "name": "Dyb flod",
       "description": "Mod syd strømmer en{blue}dyb{blue}flod{white}hurtigt forbi. Stier fører mod nord og øst. Et{yellow}gyldent{yellow}spir{white}kan ses mod syd på den anden side af vandet.",
       "exits": {
         "south": {
@@ -163,11 +182,13 @@
       }
     },
     "grassy-bank": {
+      "name": "Græsklædt skrænt",
       "description": "Du står ved en korsvej. På en{green}græsklædt{green}skrænt{white}ligger en skikkelse og sover.",
       "firstVisitDescription": "Du vågner på en{green}græsklædt{green}skrænt{white}ved en korsvej. Det er varmt, og bierne summer. Der er en følelse af magi og mystik overalt omkring dig.",
       "crowdedDescription": "Du er ved en{green}græsklædt{green}skrænt."
     },
     "old-stone-wall": {
+      "name": "Gammel stenmur",
       "description": "Mod vest er en{yellow}gammel{yellow}stenmur,{white}der er fire meter høj. Et snoet spor løber mod øst.",
       "exits": {
         "west": {
@@ -178,6 +199,7 @@
       }
     },
     "old-wall": {
+      "name": "Gammel mur",
       "description": "En{yellow}gammel{yellow}mur{white}ligger mod øst. Mod nord er en sti, der snor sig ind i tågen. En lille, mørk{blue}tunnel{white}går mod vest. Mod syd står nogle{green}træer.",
       "exits": {
         "west": {
@@ -192,6 +214,7 @@
       }
     },
     "rusty-gate": {
+      "name": "Rusten port",
       "description": "Du er ved en{red}gammel{red}rusten{red}port.{white}Tågen hvirvler omkring dig. En sti fører mod syd.",
       "exits": {
         "north": {
@@ -201,6 +224,7 @@
       }
     },
     "yellow-flowers": {
+      "name": "Gule blomster",
       "description": "Jorden er dækket af{yellow}bittesmå{yellow}gule{yellow}blomster.{white}Mod syd er en{red}rusten{red}port.{white}En tilgroet sti fører mod nord.",
       "exits": {
         "south": {
@@ -211,6 +235,7 @@
       }
     },
     "mossy-steps": {
+      "name": "Mosgroede trin",
       "description": "Mod nord fører nogle{green}mosgroede{green}trin{white}opad. En tilgroet sti løber mod syd. Mod øst kan du se en{magenta}høj{magenta}balkon.",
       "exits": {
         "north": {
@@ -225,6 +250,7 @@
       }
     },
     "tower": {
+      "name": "Tårn",
       "description": "Du går ind i et tårn. Der er mørkt og muggent indenfor. Udgangen er spærret af en{blue}enorm{blue}sten.{white}Det løber dig koldt ned ad ryggen.",
       "exits": {
         "south": {
@@ -234,6 +260,7 @@
       }
     },
     "forest-witches": {
+      "name": "Heksenes skov",
       "description": "Du er i{green}skoven.{white}Nogle kaniner advarer dig mod nogle{magenta}dansende{magenta}hekse{white}mod vest.",
       "exits": {
         "west": {
@@ -243,12 +270,15 @@
       }
     },
     "forest-crossroads": {
+      "name": "Korsvej i skoven",
       "description": "Du er ved en korsvej i{green}skoven.{white}Langt borte mod syd kan du se noget røg."
     },
     "charcoal-hut": {
+      "name": "Kulsvierens hytte",
       "description": "Du er inde i en{red}kulsviers{red}hytte.{white}Hans ild ulmer, men han er her ikke."
     },
     "mountain": {
+      "name": "Bjerg",
       "description": "Du er på et{cyan}bjerg.{white}En{yellow}skat{white}ligger mod øst. Et spor fører mod syd. En{blue}labyrint{white}ligger mod nord.",
       "exits": {
         "east": {
@@ -257,6 +287,7 @@
       }
     },
     "maze": {
+      "name": "Labyrint",
       "description": "Du er inde i{blue}labyrinten{white}ved en korsvej. Du kan mærke fare.",
       "exits": {
         "north": {
@@ -266,9 +297,11 @@
       }
     },
     "damp-tunnels": {
+      "name": "Fugtige tunneler",
       "description": "Tunneler fører mod vest og nord. Luften er fugtig og indelukket."
     },
     "trolls": {
+      "name": "Troldenes hal",
       "description": "Der er gange mod øst og nord. Nogle{magenta}trolde{white}beder dig spille en melodi for dem.",
       "exits": {
         "north": {
@@ -278,6 +311,7 @@
       }
     },
     "treasure-room": {
+      "name": "Skatkammer",
       "description": "Du er i et{yellow}skatkammer.{white}Der er døre mod syd, vest og øst.",
       "exits": {
         "south": {
@@ -287,6 +321,7 @@
       }
     },
     "giant": {
+      "name": "Kæmpens hule",
       "description": "Tunneler fører mod syd, vest og øst. En{magenta}sulten{magenta}kæmpe{white}venter mod vest.",
       "exits": {
         "south": {
@@ -300,6 +335,7 @@
       }
     },
     "oak-door": {
+      "name": "Egetræsdør",
       "description": "Der er en tunnel mod øst. En{green}gammel{green}egetræsdør{white}spærrer vejen mod syd. Du kan høre sang bag den.",
       "exits": {
         "south": {
@@ -309,38 +345,122 @@
       }
     },
     "clue-mask": {
+      "name": "Faret vild",
       "description": "Du er faret vild, men finder et spor:{red}En{red}maske{red}skjuler{red}dig{red}for{red}gobliner."
     },
     "clue-ring": {
+      "name": "Faret vild",
       "description": "Du er faret vild, men finder et spor:{red}En{red}ring{red}hjælper{red}med{red}at{red}flytte{red}en{red}sten."
     },
     "clue-plank": {
+      "name": "Faret vild",
       "description": "Du er faret vild, men finder et spor:{red}En{red}planke{red}bliver{red}til{red}en{red}bro{red}for{red}dig."
     },
     "clue-rope": {
+      "name": "Faret vild",
       "description": "Du er faret vild, men finder et spor:{red}Bind{red}goblinerne{red}med{red}reb,{red}hvis{red}du{red}kan."
     }
   },
   "items": {
-    "cake": { "name": "kage", "article": "en", "definite": "kagen" },
-    "water": { "name": "vand", "article": "noget", "definite": "vandet" },
-    "mask": { "name": "maske", "article": "en", "definite": "masken" },
-    "key": { "name": "nøgle", "article": "en", "definite": "nøglen" },
-    "spell": { "name": "trylleformular", "article": "en", "definite": "trylleformularen" },
-    "rope": { "name": "reb", "article": "et", "definite": "rebet" },
-    "plank": { "name": "planke", "article": "en", "definite": "planken" },
-    "ladder": { "name": "stige", "article": "en", "definite": "stigen" },
-    "pearl": { "name": "perle", "article": "en", "definite": "perlen" },
-    "gold": { "name": "guld", "article": "noget", "definite": "guldet" },
-    "emerald": { "name": "smaragd", "article": "en", "definite": "smaragden" },
-    "ring": { "name": "ring", "article": "en", "definite": "ringen" },
-    "axe": { "name": "økse", "article": "en", "definite": "øksen" },
-    "lamp": { "name": "lampe", "article": "en", "definite": "lampen" },
-    "penny": { "name": "skilling", "article": "en", "definite": "skillingen" },
-    "apple": { "name": "æble", "article": "et", "definite": "æblet" },
-    "broom": { "name": "kost", "article": "en", "definite": "kosten" },
-    "harp": { "name": "harpe", "article": "en", "definite": "harpen" },
-    "mirror": { "name": "spejl", "article": "et", "definite": "spejlet" },
-    "silver": { "name": "sølv", "article": "noget", "definite": "sølvet" }
+    "cake": {
+      "name": "kage",
+      "article": "en",
+      "definite": "kagen"
+    },
+    "water": {
+      "name": "vand",
+      "article": "noget",
+      "definite": "vandet"
+    },
+    "mask": {
+      "name": "maske",
+      "article": "en",
+      "definite": "masken"
+    },
+    "key": {
+      "name": "nøgle",
+      "article": "en",
+      "definite": "nøglen"
+    },
+    "spell": {
+      "name": "trylleformular",
+      "article": "en",
+      "definite": "trylleformularen"
+    },
+    "rope": {
+      "name": "reb",
+      "article": "et",
+      "definite": "rebet"
+    },
+    "plank": {
+      "name": "planke",
+      "article": "en",
+      "definite": "planken"
+    },
+    "ladder": {
+      "name": "stige",
+      "article": "en",
+      "definite": "stigen"
+    },
+    "pearl": {
+      "name": "perle",
+      "article": "en",
+      "definite": "perlen"
+    },
+    "gold": {
+      "name": "guld",
+      "article": "noget",
+      "definite": "guldet"
+    },
+    "emerald": {
+      "name": "smaragd",
+      "article": "en",
+      "definite": "smaragden"
+    },
+    "ring": {
+      "name": "ring",
+      "article": "en",
+      "definite": "ringen"
+    },
+    "axe": {
+      "name": "økse",
+      "article": "en",
+      "definite": "øksen"
+    },
+    "lamp": {
+      "name": "lampe",
+      "article": "en",
+      "definite": "lampen"
+    },
+    "penny": {
+      "name": "skilling",
+      "article": "en",
+      "definite": "skillingen"
+    },
+    "apple": {
+      "name": "æble",
+      "article": "et",
+      "definite": "æblet"
+    },
+    "broom": {
+      "name": "kost",
+      "article": "en",
+      "definite": "kosten"
+    },
+    "harp": {
+      "name": "harpe",
+      "article": "en",
+      "definite": "harpen"
+    },
+    "mirror": {
+      "name": "spejl",
+      "article": "et",
+      "definite": "spejlet"
+    },
+    "silver": {
+      "name": "sølv",
+      "article": "noget",
+      "definite": "sølvet"
+    }
   }
 }

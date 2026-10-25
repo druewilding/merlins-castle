@@ -474,10 +474,9 @@ or free model.
   too. `src/three/debug.ts` and `debug.css` are only loaded with `?debug`,
   so nobody else downloads them.
 - **Names over the places** (L, in the debug panel only; off to start with)
-  while the world is grey, and the place you're in at the top left. For now
-  they're made from the code's names (so "Merlins lair",
-  without its apostrophe); they should become the original's own names, in
-  English and Danish, when the game is wired in.
+  while the world is grey, and the place you're in at the top left: each
+  place's own name, in English and Danish (`name` in `data/world.json` and
+  `data/da.json`).
 
 ## Still to decide
 
