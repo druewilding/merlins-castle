@@ -1563,7 +1563,8 @@ renderer.setAnimationLoop((time) => {
   dragon.update(dt, player.camera.position, room === "dragon-cave");
   trolls.update(dt, player.camera.position, room === "trolls");
   giant.update(dt, player.camera.position, room === "giant");
-  flute.update(dt, player.camera, player.under !== undefined);
+  // (Heard in the dark tunnels, and on along the ways from them, or in its chamber.)
+  flute.update(dt, player.camera, room === "dark-tunnels" || room === "beautiful-chamber");
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)

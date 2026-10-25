@@ -128,8 +128,12 @@ export class Flute {
     });
   }
 
-  /** Each frame: your camera, and whether you're underground (it can't be heard up on the land). */
-  update(dt: number, camera: PerspectiveCamera, underground: boolean) {
+  /**
+   * Each frame: your camera, and whether it can be heard where you are (only
+   * where it carries, along the ways to it: not through the rock to some
+   * other tunnel that happens to pass near, nor up on the land).
+   */
+  update(dt: number, camera: PerspectiveCamera, heard: boolean) {
     this.time += dt;
     const far = camera.position.distanceTo(this.rest);
     // Floating, bobbing and turning.
@@ -141,7 +145,7 @@ export class Flute {
     }
     // How it sounds from here.
     if (this.gain && this.pan) {
-      const loud = underground && effectsOn() ? loudness(far) : 0;
+      const loud = heard && effectsOn() ? loudness(far) : 0;
       const now = this.gain.context.currentTime;
       this.gain.gain.setTargetAtTime(this.volume * loud, now, 0.15);
       this.toward.copy(this.rest).sub(camera.position).applyQuaternion(camera.quaternion.clone().invert());
