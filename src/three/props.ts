@@ -2,7 +2,17 @@
 // each kind once in land.glb ("prop-<kind>", at the origin), stamped
 // wherever land.json says one stands (props in art/blender/land.py).
 
-import { InstancedMesh, Matrix4, type Mesh, type Object3D, Quaternion, type Scene, Vector3 } from "three";
+import {
+  DoubleSide,
+  InstancedMesh,
+  type Material,
+  Matrix4,
+  type Mesh,
+  type Object3D,
+  Quaternion,
+  type Scene,
+  Vector3,
+} from "three";
 
 /** Where they stand: [kind, x, y, z, yaw]. */
 export interface PropSpots {
@@ -19,7 +29,11 @@ export function stampProps(scene: Scene, land: Object3D, spots: PropSpots) {
     const model = land.getObjectByName(`prop-${kind}`) as Mesh;
     model.removeFromParent();
     const here = spots.at.filter(([of]) => of === k);
-    const many = new InstancedMesh(model.geometry, model.material, here.length);
+    // (Roses: their leaves and petals, seen from either side.)
+    const material = kind.startsWith("rose-")
+      ? Object.assign((model.material as Material).clone(), { side: DoubleSide })
+      : model.material;
+    const many = new InstancedMesh(model.geometry, material, here.length);
     here.forEach(([, x, y, z, yaw], i) => {
       many.setMatrixAt(i, matrix.compose(new Vector3(x, y, z), turn.setFromAxisAngle(up, yaw), one));
     });

@@ -262,12 +262,15 @@ class Kit:
     @staticmethod
     def placing(at, yaw=0.0, scale=1.0):
         """Where a point of a model goes, its origin at `at`, turned by yaw
-        (radians, anticlockwise: 0 faces -y, the way the packs face)."""
+        (radians, anticlockwise: 0 faces -y, the way the packs face). Scale
+        is a number, or (across, along, up), to stretch it to fit."""
         x, y, z = at
         cos, sin = math.cos(yaw), math.sin(yaw)
+        sx, sy, sz = scale if isinstance(scale, tuple) else (scale, scale, scale)
 
         def move(p):
-            return x + (p[0] * cos - p[1] * sin) * scale, y + (p[0] * sin + p[1] * cos) * scale, z + p[2] * scale
+            px, py = p[0] * sx, p[1] * sy
+            return x + px * cos - py * sin, y + px * sin + py * cos, z + p[2] * sz
 
         return move
 
