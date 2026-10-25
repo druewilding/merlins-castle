@@ -26,9 +26,9 @@ import { puff } from "./smoke";
 // The scene's beats, in seconds from walking into it.
 const POOF = 0.4; // as he points at you: a puff of smoke
 const SHRUNK = 0.5; // and you're a mouse, on the floor
-const SQUEAK = 0.6;
+const SQUEAKS = [0.6, 3.3]; // squeak! (as you drop; and again, looking up at him, just before the curtain)
 const TURN = [0.7, 1.6]; // turning to look up at him, from and till
-const ENDS = 6;
+const ENDS = 5.2;
 
 const EYE = 1.65; // your eye above the floor (as in player.ts)
 const MOUSE = 0.12; // and a mouse's
@@ -70,7 +70,7 @@ export class Shrunk {
       this.play("poof");
       this.poof.start(this.from.clone().setY(this.floor));
     }
-    if (crossed(SQUEAK)) this.play("squeak");
+    for (const beat of SQUEAKS) if (crossed(beat)) this.play("squeak");
     this.poof.update(dt, still);
 
     // Shrinking: straight down to the floor, where you stand.

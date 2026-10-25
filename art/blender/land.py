@@ -532,8 +532,8 @@ def troll_spots():
 # The giant (giant.py), sitting on a boulder beside the way west out of his
 # cave, north of it, facing in: in the way's reach, so you bump into it with
 # him by you, watching you.
-GIANT_SIZE = 3.2  # times the model's size
-GIANT_SEAT = (0.5, 2.6)  # where he sits: radians round from the way west (north of it), and metres in from the wall
+GIANT_SIZE = 4.0  # times the model's size
+GIANT_SEAT = (0.5, 3.1)  # where he sits: radians round from the way west (north of it), and metres in from the wall
 GIANT_BODY = 0.6  # his radius sitting, at the model's size: for bumping into, and keeping the rocks clear
 
 
