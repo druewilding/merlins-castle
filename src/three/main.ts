@@ -358,7 +358,9 @@ if (drink instanceof Mesh) {
 }
 model.scene.traverse((node) => {
   if (!(node instanceof Mesh)) return;
-  node.castShadow = !["paths", "water", "embers", "brazier-flames", "archway-ivy", "maze-ivy"].includes(node.name);
+  node.castShadow = !["paths", "water", "embers", "brazier-flames", "archway-ivy", "maze-ivy", "window-glass"].includes(
+    node.name
+  );
   node.receiveShadow = !["water", "embers", "brazier-flames"].includes(node.name);
 });
 // The rock underground, grainy and cracked.
@@ -383,6 +385,33 @@ if (braziers instanceof Mesh) {
     depthWrite: false,
     toneMapped: false,
   });
+}
+// The courtyard's windows: their glass faintly blue, clear face on (the dark
+// of the room behind shows through), and shining with the sky at a slant.
+const windowGlass = model.scene.getObjectByName("window-glass");
+if (windowGlass instanceof Mesh) {
+  const glass = new MeshPhysicalMaterial({
+    color: "#c8d8e8",
+    transparent: true,
+    opacity: 0.18,
+    roughness: 0.04,
+    envMap: shine,
+    envMapIntensity: 1.4,
+    clearcoat: 1,
+    side: DoubleSide,
+    depthWrite: false,
+  });
+  windowGlass.material = glass;
+  windowGlass.renderOrder = 1;
+  glass.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <opaque_fragment>",
+      `float slant = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 2.0);
+      diffuseColor.a = mix(diffuseColor.a, 0.75, slant);
+      outgoingLight = mix(outgoingLight, vec3(0.8, 0.88, 0.98), 0.5 * slant);
+      #include <opaque_fragment>`
+    );
+  };
 }
 // The beautiful chamber's flute, floating, playing (flute.ts).
 const flute = new Flute(scene, model.scene.getObjectByName("flute")!, shine, reducedMotion);

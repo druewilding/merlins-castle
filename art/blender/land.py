@@ -66,10 +66,11 @@ ROCK = c.linear("#8a8478")
 CRAG = c.linear("#6f6a66")  # the mountain's cliffs, darker
 SNOW = c.linear("#f2f4f7")
 RIVERBED = c.linear("#55655c")
-FLAGS = c.linear("#a39d90")
+FLAGS = c.linear("#6f6656")  # (the joints between the courtyard's cobbles)
 STONE = c.linear("#9a978a")
 WATER = c.linear("#3d7fa8")
 GREY = c.linear("#b9b4a8")
+MORTAR = c.linear("#8e8676")  # (between the castle's stones: the courtyard)
 ROOF = c.linear("#6d6a78")
 GOLD = c.linear("#e8b84a")
 
@@ -624,8 +625,9 @@ WAYS = {
     "small-lair": Way([(*SR, LAIR_FLOOR), (ML[0], SR[1], LAIR_FLOOR)], indoor=True),
     "lair-hall": Way([(*ML, LAIR_FLOOR), (ML[0], LAIR_STAIRS_FOOT, LAIR_FLOOR), (GH[0], LAIR_STAIRS_TOP, 0.4), (*GH, 0.4)],
                      indoor=True),
-    # And in through the coach house's wide doors.
-    "coach-door": Way([(CH[0] - HALLS["coach-house"].w - 1.8, CH[1], None), (*CH, 0.4)], half=2.4, indoor=True),
+    # And in through the coach house's wide doors (its own doorway: courtyard).
+    "coach-door": Way([(CH[0] - HALLS["coach-house"].w - 1.8, CH[1], None), (*CH, 0.4)], half=2.4, indoor=True,
+                      open=True),
     # In at the tower's door, and the hut's.
     "tower-door": Way([(*TOWER_LIP, None), (*TOWER, None)], half=1.3, indoor=True),
     "hut-door": Way([(*HUT_LIP, None), (*HUT, None)], half=1.2, indoor=True, open=True),
@@ -1100,6 +1102,8 @@ def off_the_land(x, y):
     end of it.)"""
     if abs(x) <= 3.3 and CASTLE[3] - 1.2 <= y <= -127 * K:
         return True
+    if CASTLE[0] <= x <= CASTLE[1] and CASTLE[2] <= y <= CASTLE[3]:
+        return True  # (in the castle: its courtyard is cobbled)
     return deck(x, y) is None and (from_river(x, y) < BANK + 0.5 or in_moat(x, y))
 
 
@@ -1635,11 +1639,15 @@ for side in (-1, 1):
     built.cone((side * 3.55, DB_TIP + 0.45, 1.5), 0.3, 0.42, STONE, sides=4, droop=0)
 # The gatehouse over the gate, between the towers either side of it, with
 # the chains' holes in its face.
-block(built, -3.2, CASTLE[3] - 1, GATEHOUSE[0], 3.2, CASTLE[3] + 1, GATEHOUSE[1], GREY, solid=False)
+# (Only over the gate up to the walls' tops, and its full width above them:
+# overlapping them, their faces would be in the same place, and flicker.)
+block(built, -3, CASTLE[3] - 1, GATEHOUSE[0], 3, CASTLE[3] + 1, 8, MORTAR, solid=False)
+block(built, -3.2, CASTLE[3] - 1, 8, 3.2, CASTLE[3] + 1, GATEHOUSE[1], MORTAR, solid=False)
 for x in (-3.2, -1.2, 0.8, 2.6):
-    block(built, x, CASTLE[3] + 0.4, GATEHOUSE[1], x + 0.6, CASTLE[3] + 1, GATEHOUSE[1] + 0.8, GREY, solid=False)
+    block(built, x, CASTLE[3] + 0.4, GATEHOUSE[1], x + 0.6, CASTLE[3] + 1, GATEHOUSE[1] + 0.8, c.linear("#c4b598"), solid=False)
 for x, y, z in DB_ANCHORS:
-    block(built, x - 0.12, y, z - 0.12, x + 0.12, y + 0.02, z + 0.12, c.linear("#1d1b19"), solid=False)
+    # (A shade out in front of the stones laid on the wall's face: the courtyard's courses.)
+    block(built, x - 0.12, y, z - 0.12, x + 0.12, y + 0.035, z + 0.12, c.linear("#1d1b19"), solid=False)
 # The toll booth, beside the guards: striped red and white, as in its
 # picture, under a pointed roof, its doorway to the path.
 BOOTH = (6.6, MOAT[3] + 3.4)
@@ -2431,13 +2439,14 @@ def stone_shade(rnd, base, z, foot):
     return colour
 
 
-def stone_courses(b, rnd, at, corners, r, z0, z1, holes, foot):
+def stone_courses(b, rnd, at, corners, r, z0, z1, holes, foot, course=COURSE, shade=None):
     """The tower's wall in courses of blocks, from z0 to z1 (at: the point on
     the wall's face at an angle; corners: its corners' angles, where a block
     is split to lie flat on it; r: about how far out it is), each block a
     little longer or shorter, the joints never in line with the course's
     below, and none where the wall's open (holes: a0, a1, z0, z1, with
-    angles from 0 to 4 pi)."""
+    angles from 0 to 4 pi). (Course: how tall they are, from and to; shade:
+    each one's colour, given rnd, how high it is and the foot.)"""
 
     def on_wall(a0, a1, lo, hi, colour):
         cuts = [a0] + [k for k in corners if a0 < k < a1] + [a1]
@@ -2464,11 +2473,11 @@ def stone_courses(b, rnd, at, corners, r, z0, z1, holes, foot):
 
     z = z0
     while z < z1 - 0.05:
-        h = min(rnd.uniform(*COURSE), z1 - z)
+        h = min(rnd.uniform(*course), z1 - z)
         start = a = rnd.uniform(0.2, 0.7) / r
         while a < start + 2 * math.pi - 0.3 / r:
             a1 = min(a + rnd.uniform(0.55, 1.15) / r, start + 2 * math.pi)
-            colour = stone_shade(rnd, TOWER_BLOCK, z, foot)
+            colour = shade(rnd, z, foot) if shade else stone_shade(rnd, TOWER_BLOCK, z, foot)
             for a0_, a1_, z0_, z1_ in clear((a + JOINT / r / 2, a1 - JOINT / r / 2, z + JOINT / 2, z + h - JOINT / 2)):
                 if (a1_ - a0_) * r > 0.04 and z1_ - z0_ > 0.04:
                     on_wall(a0_, a1_, z0_, z1_, colour)
@@ -3034,14 +3043,16 @@ built.blob((RIVER[-1][0] + 5, RIVER[-1][1] + 3, -1.5), 9, ROCK, squash=0.7, lump
 # The castle: walls with a gate to the north, and corner towers.
 cw, ce_, cs, cn = CASTLE
 for x0, x1 in ((cw, -3), (3, ce_)):
-    block(built, x0, cn - 1, 0, x1, cn + 1, 8, GREY)
-block(built, cw, cs - 1, 0, ce_, cs + 1, 8, GREY)
-block(built, cw - 1, cs, 0, cw + 1, cn, 8, GREY)
-block(built, ce_ - 1, cs, 0, ce_ + 1, cn, 8, GREY)
+    block(built, x0, cn - 1, 0, x1, cn + 1, 8, MORTAR)
+block(built, cw, cs - 1, 0, ce_, cs + 1, 8, MORTAR)
+block(built, cw - 1, cs, 0, cw + 1, cn, 8, MORTAR)
+block(built, ce_ - 1, cs, 0, ce_ + 1, cn, 8, MORTAR)
 for tx, ty in ((cw, cn), (ce_, cn), (cw, cs), (ce_, cs)):
-    tower(built, tx, ty, 5, 13, GREY, ROOF, 8)
+    tower(built, tx, ty, 5, 13, MORTAR, ROOF, 8)
 for tx in (-6, 6):
-    tower(built, tx, cn, 3, 11, GREY, ROOF, 5)
+    tower(built, tx, cn, 3, 11, MORTAR, ROOF, 5)
+# (Their stonework, and the courtyard in front of the keep, the coach house
+# and the well: the courtyard, below.)
 # The keep across the south of the courtyard, with its door to the grand
 # hall; the golden spire rises from the hall, through the roof. All of the
 # castle's other rooms are inside it.
@@ -3052,10 +3063,10 @@ kw, ke, ks, kn = KEEP
 # doorway: any wider, and there's a slit between them, into the keep.)
 door = TUNNEL_HALF - 0.05
 for x0, x1 in ((kw, GH[0] - door), (GH[0] + door, ke)):
-    block(built, x0, kn - 1, 0, x1, kn, KEEP_TALL, GREY, solid=False)
+    block(built, x0, kn - 1, 0, x1, kn, KEEP_TALL, MORTAR, solid=False)
 # (Over the door: a shade below the doorway's roof, not level with it,
 # where the two would flicker against each other in blocky stripes.)
-block(built, GH[0] - door, kn - 1, TUNNEL_TALL + 0.4 - LINTEL_DROP, GH[0] + door, kn, KEEP_TALL, GREY, solid=False)
+block(built, GH[0] - door, kn - 1, TUNNEL_TALL + 0.4 - LINTEL_DROP, GH[0] + door, kn, KEEP_TALL, MORTAR, solid=False)
 block(built, kw, ks, 0, ke, ks + 1, KEEP_TALL, GREY, solid=False)
 # (Its sides between its front and back, and its roof between its walls:
 # over them, their faces would be in the same place, and flicker.)
@@ -3064,7 +3075,7 @@ block(built, ke - 1, ks + 1, 0, ke, kn - 1, KEEP_TALL, GREY, solid=False)
 block(built, kw + 1, ks + 1, KEEP_TALL - 0.4, ke - 1, kn - 1, KEEP_TALL, c.linear("#8d8a80"), solid=False)
 x = kw
 while x < ke - 1:
-    block(built, x, kn - 1, KEEP_TALL, x + 1, kn, KEEP_TALL + 1, GREY, solid=False)  # battlements
+    block(built, x, kn - 1, KEEP_TALL, x + 1, kn, KEEP_TALL + 1, c.linear("#c4b598"), solid=False)  # battlements
     x += 2
 gx, gy = GH
 built.cylinder((gx, gy - 6, KEEP_TALL - 0.5), (gx, gy - 6, 32), 4, 3.6, GREY, sides=14)
@@ -3072,33 +3083,6 @@ built.cone((gx, gy - 6, 32), 16, 4.6, GOLD, sides=12, droop=0)
 kitchen = HALLS["wizards-kitchen"]
 block(built, kitchen.x - kitchen.w, kitchen.y - 1, KEEP_TALL - 0.5, kitchen.x - kitchen.w + 2, kitchen.y + 1, KEEP_TALL + 4,
       ROCK, solid=False)  # the chimney, over the hearth
-
-# The coach house: a barn in the courtyard, its wide doors facing west.
-coach = HALLS["coach-house"]
-cw0, cw1, cd0, cd1 = coach.x - coach.w - 0.6, coach.x + coach.w + 0.6, coach.y - coach.d - 0.6, coach.y + coach.d + 0.6
-BARN = c.linear("#7a5634")
-wide = 2.4 - 0.05  # (a shade narrower than the way in, as at the keep's door)
-block(built, cw0, cd0, 0, cw1, cd0 + 0.5, 6.8, BARN, solid=False)
-block(built, cw0, cd1 - 0.5, 0, cw1, cd1, 6.8, BARN, solid=False)
-block(built, cw1 - 0.5, cd0, 0, cw1, cd1, 6.8, BARN, solid=False)
-block(built, cw0, cd0, 0, cw0 + 0.5, coach.y - wide, 6.8, BARN, solid=False)
-block(built, cw0, coach.y + wide, 0, cw0 + 0.5, cd1, 6.8, BARN, solid=False)
-block(built, cw0, coach.y - wide, TUNNEL_TALL + 0.4 - LINTEL_DROP, cw0 + 0.5, coach.y + wide, 6.8, BARN, solid=False)  # (a shade low, as over the keep's door)
-built.cone((coach.x, coach.y, 6.8), 4.5, max(coach.w, coach.d) * 1.5, c.linear("#9a4c32"), sides=4, droop=0)
-
-# The well, and flowers along the walls.
-cx, cy = P["courtyard"]
-tower(built, cx + 4, cy - 2, 1.2, 1.0, STONE)
-block(built, cx + 3.1, cy - 2.1, 1.4, cx + 3.3, cy - 1.9, 3.2, c.linear("#5e3b1f"), solid=False)
-block(built, cx + 4.7, cy - 2.1, 1.4, cx + 4.9, cy - 1.9, 3.2, c.linear("#5e3b1f"), solid=False)
-built.cone((cx + 4, cy - 2, 3.1), 1.0, 1.7, c.linear("#8a4a2e"), sides=4, droop=0)
-for k, (fx, fy) in enumerate([(CASTLE[0] + 3, cy + 8), (CASTLE[0] + 3, cy - 4), (CASTLE[0] + 3, KEEP_NORTH + 3),
-                              (-12, CASTLE[3] - 3), (12, CASTLE[3] - 3), (-24, CASTLE[3] - 3), (-8, KEEP_NORTH + 2.5)]):
-    built.blob((fx, fy, 0.5), 1.6, c.linear("#4e7a34"), squash=0.5, lumpy=0.3, seed=20 + k)
-    for m in range(5):
-        a = m * 1.3 + k
-        built.blob((fx + math.cos(a) * 1.0, fy + math.sin(a) * 0.9, 1.1), 0.35, c.linear(["#e0607e", "#f2a3b8", "#fff1c8"][m % 3]),
-                   squash=0.8, lumpy=0.2, seed=k * 5 + m, subdivisions=1)
 
 built.build("built", smooth=False)
 
@@ -4661,10 +4645,12 @@ def floor_colour(hall, i, j, x, y):
     if hall.place == "dungeon":
         straw = noise.noise(Vector((x / 3, y / 3, 11.0))) > 0.2
         return (c.linear("#a88a48") if straw else hall.ground), 0.15
-    if hall.place in ("small-room", "coach-house"):
+    if hall.place == "coach-house":
+        # Flagstones, under drifts of straw.
+        straw = smooth((noise.noise(Vector((x / 3, y / 3, 12.0))) + 0.35) / 0.5)
+        return c.mix(c.linear("#8f7f66"), c.linear("#bf9f55"), straw), 0.05
+    if hall.place == "small-room":
         plank = c.mix(hall.ground, DARK_WOOD, 0.3 if i % 2 else 0.0)  # boards, running north and south
-        if hall.place == "coach-house" and noise.noise(Vector((x / 2.5, y / 2.5, 12.0))) > 0.1:
-            plank = c.linear("#c9a85a")  # straw
         return plank, 0.06
     return hall.ground, 0.12
 
@@ -4886,7 +4872,13 @@ def room(b, hall):
             x1, y1 = min(hx + i + 1, fx1), min(hy + j + 1, fy1)
             colour, vary = floor_colour(hall, i, j, x0, y0)
             fl = f - 0.06  # (a shade lower than the corridors' floors, where they overlap)
-            quad(b, [(x0, y0, fl), (x1, y0, fl), (x1, y1, fl), (x0, y1, fl)], colour, vary)
+            pts = [(x0, y0, fl), (x1, y0, fl), (x1, y1, fl), (x0, y1, fl)]
+            if hall.place == "coach-house":  # (its straw and flags blending, corner to corner)
+                b.add(pts, [(0, 1, 2, 3)], [floor_colour(hall, i, j, x, y)[0] for x, y, _ in pts])
+                continue
+            quad(b, pts, colour, vary)
+    if hall.place == "coach-house":
+        return coach_house(b, hall)  # (a barn's walls, and open up to its roof: the courtyard, below)
     E = ROOM_EDGE
     corners = [(hx - W - E, hy - D - E), (hx + W + E, hy - D - E), (hx + W + E, hy + D + E), (hx - W - E, hy + D + E)]
     band = c.mix(hall.wall, c.linear("#000000"), 0.3)
@@ -5010,20 +5002,7 @@ def room(b, hall):
             wall_panel(b, px, hy - D - 0.3, (0.35, 0), f, f, f + 4.4, c.linear("#7e1f1d"))
     elif hall.place == "merlins-lair":
         lair(b, hall)
-    elif hall.place == "coach-house":
-        # The red coach on its four wheels, and hay.
-        cxx, cyy = hx + 1.5, hy
-        furniture(b, cxx - 1.7, cyy - 0.85, cxx + 1.7, cyy + 0.85, f + 0.8, f + 2.3, c.linear("#a5281e"))
-        block(b, cxx - 1.9, cyy - 1.0, f + 2.3, cxx + 1.9, cyy + 1.0, f + 2.45, c.linear("#2a1a12"), solid=False)
-        for wx in (cxx - 1.1, cxx + 1.1):
-            for wy in (cyy - 0.95, cyy + 0.95):
-                b.cylinder((wx, wy - 0.06, f + 0.65), (wx, wy + 0.06, f + 0.65), 0.65, 0.65, c.linear("#3a2416"), sides=14)
-        for k, (px, py) in enumerate(((hx + W - 1.3, hy - D + 1.3), (hx + W - 1.3, hy + D - 1.3), (hx - 2, hy + D - 1.2))):
-            b.blob((px, py, f + 0.4), 1.3, c.linear("#d6b25a"), squash=0.6, lumpy=0.35, seed=30 + k)
-            under_circle(px, py, 1.2)
-        for px in (hx - 4.5, hx - 3.6):
-            b.cylinder((px, hy - D + 0.8, f), (px, hy - D + 0.8, f + 1.1), 0.4, 0.42, WOOD, sides=10)
-            under_circle(px, hy - D + 0.8, 0.45)
+
 
 
 # The tower's stonework, in front of its floor and wall (which are the dark
@@ -5366,6 +5345,1140 @@ def charcoal_hut(b, hall):
     log(b, (*at(3.4, a), f + 2.0), (*at(3.25, a), f + 2.05), 0.03, DARK_WOOD)
     # The fire, glowing, and where its smoke goes out (the game draws it).
     HUT_FIRE.update(x=hx, y=hy, floor=f, hole=hut_roof(HUT_HOLE_R), r=HUT_HOLE_R)
+
+# ---------------------------------------------------------------- the courtyard and the coach house
+
+# The castle's courtyard, as in its picture: sunny, cobbled in warm stone,
+# with the well in the middle under its little roof, roses round its foot;
+# rambling pink roses up the walls and the towers, and in beds along their
+# feet, behind low kerbs; a rose garden in its west half, a pergola of roses
+# over a walk between beds; the keep's front, with its windows (their
+# shutters open), lanterns by its door and banners; and in the east, the
+# coach house: a timber barn on a stone footing under a tiled roof, its
+# great doors open, a cart and barrels outside it. Inside, the red coach on
+# the straw, hay, tack on the wall, and Merlin's cloak (as in its picture).
+# Some of it is Quaternius's, from the Medieval Village MegaKit
+# (art/models/medieval-village-megakit: the roofs, the windows and their
+# shutters, the cart) and the Fantasy Props MegaKit (the lanterns, barrels,
+# crates, the bucket, the benches, the banners).
+VILLAGE = c.Kit(HERE.parent / "models/medieval-village-megakit/glTF")
+court = c.Builder()
+window_glass = c.Builder()  # (its windows' glass: the game draws it see-through, shining)
+court_rng = random.Random("courtyard")  # (its own: a change anywhere else doesn't move what's here)
+YARD = (CASTLE[0] + 1, CASTLE[1] - 1, KEEP_NORTH, CASTLE[3] - 1)  # its walls' faces: west, east, south, north
+YARD_FLOOR = height(0, (YARD[2] + YARD[3]) / 2)  # (the castle stands on flat ground)
+WELL = (0.0, (YARD[2] + YARD[3]) / 2)
+CASTLE_STONE = [c.linear(h) for h in ("#cdbf9f", "#c0ae8b", "#d8cbae", "#b6a586", "#c8b595", "#bfb39b")]
+COBBLES = [c.linear(h) for h in ("#cbb68e", "#bca57d", "#d9c7a0", "#b09a74", "#c5aa82", "#d2bc92")]
+ROSES = [c.linear(h) for h in ("#f27aa6", "#f7a1c2", "#e9578f", "#ffc8dc", "#dc4a80")]
+ROSE_HEART = c.linear("#a8204f")
+ROSE_LEAVES = [c.linear(h) for h in ("#2c5a22", "#3a6c2a", "#477d31", "#25491c", "#56893a")]
+ROSE_CANE = c.linear("#4d5a2a")
+SOIL = c.linear("#4a3424")
+BOARDS = [c.linear(h) for h in ("#7a5232", "#6e4a2c", "#86603a", "#73502f", "#68452a")]
+
+
+def castle_stone(rnd, z, foot):
+    """A block of the castle's stone: warm, each its own shade, damp and now
+    and then mossy near the ground."""
+    colour = rnd.choice(CASTLE_STONE)
+    t = rnd.uniform(-0.12, 0.2)
+    colour = c.mix(colour, c.linear("#000000"), t) if t > 0 else c.mix(colour, c.linear("#ffffff"), -t)
+    low = max(0.0, 1 - (z - foot) / 1.2)
+    if rnd.random() < low * 0.6:
+        colour = c.mix(colour, TOWER_DAMP, rnd.uniform(0.15, 0.4))
+    if rnd.random() < low * 0.25:
+        colour = c.mix(colour, TOWER_MOSS, rnd.uniform(0.2, 0.45))
+    return colour
+
+
+def clear_of(rect, holes):
+    """The parts of a block (t0, t1, z0, z1) clear of the openings (the same)."""
+    out = [rect]
+    for lo, hi, h0, h1 in holes:
+        left = []
+        for a0, a1, za, zb in out:
+            if a1 <= lo or a0 >= hi or zb <= h0 or za >= h1:
+                left.append((a0, a1, za, zb))
+                continue
+            left += [(a0, a1, za, h0)] if za < h0 else []
+            left += [(a0, a1, h1, zb)] if zb > h1 else []
+            zl, zh = max(za, h0), min(zb, h1)
+            left += [(a0, lo, zl, zh)] if a0 < lo else []
+            left += [(hi, a1, zl, zh)] if a1 > hi else []
+        out = left
+    return out
+
+
+def courses(b, rnd, p0, p1, z0, z1, holes=(), big=1.0, foot=None):
+    """A straight wall's face, from p0 to p1 (facing out to the right, looking
+    along it), in courses of blocks from z0 to z1, just in front of it (the
+    wall behind is the mortar between them): each a little longer or
+    shorter, the joints never in line with the course's below. Holes: (t0,
+    t1, z0, z1), along it from p0, where it's open."""
+    (ax, ay), (bx, by) = p0, p1
+    length = math.hypot(bx - ax, by - ay)
+    ux, uy = (bx - ax) / length, (by - ay) / length
+    ox, oy = uy * 0.02, -ux * 0.02
+
+    def at(t, z):
+        return ax + ux * t + ox, ay + uy * t + oy, z
+
+    z = z0
+    while z < z1 - 0.05:
+        h = min(rnd.uniform(0.42, 0.58) * big, z1 - z)
+        t = -rnd.uniform(0.0, 0.9) * big
+        while t < length:
+            t1 = t + rnd.uniform(0.75, 1.45) * big
+            colour = castle_stone(rnd, z, z0 if foot is None else foot)
+            for a, e, lo, hi in clear_of((max(t, 0) + JOINT / 2, min(t1, length) - JOINT / 2, z + JOINT / 2,
+                                          z + h - JOINT / 2), holes):
+                if e - a > 0.04 and hi - lo > 0.04:
+                    b.add([at(a, lo), at(e, lo), at(e, hi), at(a, hi)], [(0, 1, 2, 3)],
+                          [c.vary(colour, 0.05, Vector((a, lo, z0)))] * 4)
+            t = t1
+        z += h
+
+
+def round_courses(b, rnd, x, y, r, sides, z0, z1):
+    """A round tower's wall in courses of blocks, as the tower's (stone_courses)."""
+
+    def at(a):
+        side = math.floor(a / (2 * math.pi / sides))
+        middle = (side + 0.5) * 2 * math.pi / sides
+        d = (r + 0.02) * math.cos(math.pi / sides) / math.cos(a - middle)
+        return x + math.cos(a) * d, y + math.sin(a) * d
+
+    stone_courses(b, rnd, at, [2 * math.pi * k / sides for k in range(2 * sides + 1)], r, z0, z1, [], z0,
+                  course=(0.44, 0.6), shade=castle_stone)
+
+
+def oriented(b, at, across, x0, x1, y0, y1, z0, z1, colour, vary=0.1):
+    """A box in a frame of its own: from `at`, x along `across` (level), y
+    out to its left, z up."""
+    ax, ay = across
+    ox, oy = -ay, ax
+
+    def p(x, y, z):
+        return at[0] + ax * x + ox * y, at[1] + ay * x + oy * y, at[2] + z
+
+    v = [p(x0, y0, z0), p(x1, y0, z0), p(x1, y1, z0), p(x0, y1, z0), p(x0, y0, z1), p(x1, y0, z1), p(x1, y1, z1),
+         p(x0, y1, z1)]
+    b.add(v, [(0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7), (4, 5, 6, 7), (0, 3, 2, 1)],
+          [c.vary(colour, vary, Vector(q) * 2) for q in v])
+
+
+def timber(b, p0, p1, w, colour, h=None):
+    """A squared timber from one end to the other, w wide (and h deep), any way up."""
+    p0, p1 = Vector(p0), Vector(p1)
+    along = (p1 - p0).normalized()
+    side = along.cross(Vector((0, 0, 1)) if abs(along.z) < 0.95 else Vector((1, 0, 0))).normalized()
+    top = side.cross(along)
+    h = h or w
+    corners = [side * sx * w / 2 + top * tz * h / 2 for sx, tz in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    verts = [tuple(p0 + q) for q in corners] + [tuple(p1 + q) for q in corners]
+    b.add(verts, [(4, 5, 1, 0), (5, 6, 2, 1), (6, 7, 3, 2), (7, 4, 0, 3), (1, 2, 3, 0), (7, 6, 5, 4)],
+          [c.vary(colour, 0.12, Vector(v) * 3) for v in verts])
+
+
+def both_ways(b, verts, faces, colours):
+    """Something thin (a leaf, a petal), seen from either side."""
+    n = len(verts)
+    b.add(verts + verts, faces + [tuple(i + n for i in f[::-1]) for f in faces], colours + colours)
+
+
+def sett(b, rnd, pts, z, colour):
+    """A cobble, set in the ground: its top rounded down into the joints round it."""
+    n = len(pts)
+    mx, my = sum(p[0] for p in pts) / n, sum(p[1] for p in pts) / n
+    low = [(mx + (x - mx) * 0.88, my + (y - my) * 0.88) for x, y in pts]
+    top = [(mx + (x - mx) * 0.6, my + (y - my) * 0.6) for x, y in pts]
+    h = rnd.uniform(0.04, 0.065)
+    edge = c.mix(colour, c.linear("#000000"), 0.2)
+    verts = [(x, y, z + 0.006) for x, y in low] + [(x, y, z + h) for x, y in top]
+    faces = [tuple(range(n, 2 * n))] + [(k, (k + 1) % n, n + (k + 1) % n, n + k) for k in range(n)]
+    b.add(verts, faces, [edge] * n + [c.vary(colour, 0.05, Vector((mx, my, 3.0)))] * n)
+
+
+def cobble_colour(rnd, x, y):
+    colour = rnd.choice(COBBLES)
+    t = rnd.uniform(-0.1, 0.18)
+    colour = c.mix(colour, c.linear("#000000"), t) if t > 0 else c.mix(colour, c.linear("#fff4dc"), -t)
+    if rnd.random() < 0.06:
+        colour = c.mix(colour, c.linear("#7d8a4a"), rnd.uniform(0.15, 0.35))  # (a little moss)
+    return colour
+
+
+def rose_leaf(b, rnd, p, out, size, shade=1.0):
+    """A rose's leaf: a little folded diamond, facing about `out`, turned any
+    way. (Only one side of it: the game draws roses from either side.)"""
+    n = (Vector(out).normalized() + Vector((rnd.uniform(-0.8, 0.8), rnd.uniform(-0.8, 0.8),
+                                            rnd.uniform(-0.4, 0.8)))).normalized()
+    t = n.orthogonal().normalized()
+    a = rnd.uniform(0, 2 * math.pi)
+    t = t * math.cos(a) + n.cross(t) * math.sin(a)
+    s = n.cross(t)
+    p = Vector(p)
+    pts = [p - t * size * 0.45, p + s * size * 0.27 + n * size * 0.1, p + t * size * 0.55,
+           p - s * size * 0.27 + n * size * 0.1]
+    colour = c.mix(rnd.choice(ROSE_LEAVES), c.linear("#000000"), 1 - shade)
+    b.add([tuple(q) for q in pts], [(0, 1, 2), (0, 2, 3)], [colour, c.mix(colour, c.linear("#ffffff"), 0.08),
+                                                                     colour, colour])
+
+
+def rose(b, rnd, p, out, size):
+    """A rose, open, facing about `out`: a ring of petals round a cupped ring
+    of deeper ones, round its heart."""
+    n = (Vector(out).normalized() + Vector([rnd.uniform(-0.45, 0.45) for _ in range(3)])).normalized()
+    t = n.orthogonal().normalized()
+    s = n.cross(t)
+    p = Vector(p)
+    colour = rnd.choice(ROSES)
+    turn = rnd.uniform(0, 2 * math.pi)
+    for count, r_in, r_out, lift, wide, shade in ((5, 0.15, 1.0, 0.22, 0.45, c.mix(colour, c.linear("#ffffff"), 0.22)),
+                                                  (5, 0.1, 0.62, 0.5, 0.36, colour)):
+        for k in range(count):
+            a = turn + 2 * math.pi * k / count
+            d = t * math.cos(a) + s * math.sin(a)
+            e = t * math.cos(a + math.pi / 2) + s * math.sin(a + math.pi / 2)
+            pts = [p + (d * r_in - e * wide * 0.4) * size, p + (d * r_out - e * wide + n * lift) * size,
+                   p + (d * r_out * 1.1 + n * lift * 1.1) * size, p + (d * r_out + e * wide + n * lift) * size,
+                   p + (d * r_in + e * wide * 0.4) * size]
+            b.add([tuple(q) for q in pts], [(0, 1, 2, 3, 4)], [c.mix(shade, ROSE_HEART, 0.25)] + [shade] * 4)
+        turn += math.pi / count
+    heart = [tuple(p + (t * math.cos(a) + s * math.sin(a)) * 0.22 * size + n * 0.3 * size)
+             for a in (2 * math.pi * k / 5 for k in range(5))]
+    b.add(heart + [tuple(p + n * 0.55 * size)], [(k, (k + 1) % 5, 5) for k in range(5)],
+          [c.mix(colour, ROSE_HEART, 0.6)] * 5 + [ROSE_HEART])
+
+
+def rose_bush(variant, R=0.75, H=0.95):
+    """A rose bush (to make, for stamp): a mound of leaves, roses all over it."""
+
+    def make(t):
+        rnd = random.Random(f"rose bush {variant}")
+        t.blob((0, 0, H * 0.4), R * 0.8, c.linear("#22401a"), squash=H / R * 0.75, lumpy=0.3, seed=variant)
+        offset = Vector((variant * 3.1, 1.7, 0.4))
+
+        def on(d, lift=1.0):
+            r = rnd.uniform(0.8, 1.04) * (1 + 0.2 * noise.noise(d * 2 + offset)) * lift
+            return (d.x * R * r, d.y * R * r, H * 0.42 + d.z * H * 0.58 * r)
+
+        def direction():
+            while True:
+                d = Vector((rnd.gauss(0, 1), rnd.gauss(0, 1), rnd.gauss(0, 1))).normalized()
+                if d.z > -0.72:
+                    return d
+
+        for _ in range(620):
+            d = direction()
+            rose_leaf(t, rnd, on(d), d, rnd.uniform(0.12, 0.17), shade=0.72 + 0.28 * (d.z * 0.5 + 0.5))
+        for _ in range(24 + variant * 3):
+            d = direction()
+            if d.z > -0.3:
+                rose(t, rnd, on(d, 1.06), d, rnd.uniform(0.07, 0.095))
+        return (-R, -R, R, R), H
+
+    return make
+
+
+def rose_climber(variant, wide, tall):
+    """Rambling roses (to make, for stamp), climbing a wall at its back (y =
+    0), into the room in front of it (-y): canes from its foot fanning up
+    over it, arching over at their tops, in leaf, with roses all along them."""
+
+    def make(t):
+        rnd = random.Random(f"rose climber {variant}")
+        canes = max(3, round(wide * 2.4))
+        for k in range(canes):
+            x, z = rnd.uniform(-0.25, 0.25) * min(wide, 1.2), 0.0
+            # (Up, leaning out towards its own part of the wall, then over.)
+            aim = (k + 0.5) / canes - 0.5
+            heading = aim * 1.6 + rnd.uniform(-0.2, 0.2)
+            top = tall * rnd.uniform(0.55, 1.0) * (1 - 0.35 * abs(aim) * 2)
+            step, length, arching = 0.26, 0.0, False
+            if k % 2 == 0:
+                log(t, (x, -0.15, 0), (x + math.sin(heading) * 0.8, -0.14, 0.8), 0.025, ROSE_CANE, sides=5)
+            while length < tall * 1.7:
+                x += math.sin(heading) * step
+                z += math.cos(heading) * step
+                length += step
+                heading += rnd.uniform(-0.25, 0.25)
+                if abs(x) > wide / 2 + 0.15:
+                    break  # (no further: past its own part of the wall, it'd sprawl over a door or a window)
+                if abs(x) > wide / 2 - 0.2:
+                    heading -= 0.3 * math.copysign(1, x)
+                if z > top:
+                    arching = True
+                if arching:
+                    heading += 0.22 * (1 if heading >= 0 else -1)
+                    if abs(heading) > 2.6:
+                        break
+                if z < 0.3 and arching:
+                    break
+                for _ in range(6):
+                    p = (x + rnd.uniform(-0.28, 0.28), rnd.uniform(-0.42, -0.05), z + rnd.uniform(-0.26, 0.26))
+                    rose_leaf(t, rnd, p, (rnd.uniform(-0.4, 0.4), -1, 0.3), rnd.uniform(0.15, 0.21),
+                              shade=0.62 + 0.38 * min(1.0, -p[1] / 0.4))
+                if z > 0.6 and rnd.random() < 0.45:
+                    for _ in range(rnd.choice((1, 1, 2, 3))):
+                        rose(t, rnd, (x + rnd.uniform(-0.2, 0.2), rnd.uniform(-0.48, -0.3), z + rnd.uniform(-0.2, 0.2)),
+                             (0, -1, 0.2), rnd.uniform(0.075, 0.1))
+        return (-wide / 2, -0.5, wide / 2, 0), tall
+
+    return make
+
+
+def rose_canopy(variant, wide, deep):
+    """Roses over the top of a pergola (to make, for stamp): leaves lying
+    over it, wide across and deep along it, and sprays hanging down its
+    sides, in flower."""
+
+    def make(t):
+        rnd = random.Random(f"rose canopy {variant}")
+        for _ in range(int(wide * deep * 70)):
+            p = (rnd.uniform(-wide / 2, wide / 2), rnd.uniform(-deep / 2, deep / 2), rnd.uniform(0.0, 0.32))
+            rose_leaf(t, rnd, p, (0, 0, 1), rnd.uniform(0.13, 0.19), shade=0.65 + 0.35 * p[2] / 0.32)
+        for side in (-1, 1):
+            y = rnd.uniform(-deep / 2, -deep / 2 + 0.4)
+            while y < deep / 2:
+                drop = rnd.uniform(0.3, 1.1)
+                z = 0.0
+                while z > -drop:
+                    p = (side * (wide / 2 + rnd.uniform(-0.15, 0.05)), y + rnd.uniform(-0.15, 0.15), z)
+                    rose_leaf(t, rnd, p, (side, 0, 0), rnd.uniform(0.12, 0.17), shade=0.85)
+                    if rnd.random() < 0.18:
+                        rose(t, rnd, p, (side, 0, -0.3), rnd.uniform(0.07, 0.09))
+                    z -= 0.07
+                y += rnd.uniform(0.3, 0.6)
+        for _ in range(int(wide * deep * 5)):
+            rose(t, rnd, (rnd.uniform(-wide / 2, wide / 2), rnd.uniform(-deep / 2, deep / 2), 0.34), (0, 0, 1),
+                 rnd.uniform(0.075, 0.1))
+        return (-wide / 2, -deep / 2, wide / 2, deep / 2), 0.4
+
+    return make
+
+
+# Each kind of rose: what makes it.
+ROSE_KINDS = {
+    "rose-bush-1": rose_bush(1),
+    "rose-bush-2": rose_bush(2, R=0.65, H=0.85),
+    "rose-bush-3": rose_bush(3, R=0.85, H=1.05),
+    "rose-climber-1": rose_climber(1, 3.4, 6.2),
+    "rose-climber-2": rose_climber(2, 4.0, 4.2),
+    "rose-climber-3": rose_climber(3, 1.4, 5.0),
+    "rose-climber-4": rose_climber(4, 1.0, 2.8),
+    "rose-canopy": rose_canopy(1, 4.0, 3.1),
+}
+
+
+def roses_at(kind, x, y, z, yaw):
+    """Roses of a kind, there, turned by yaw (facing -y at 0), not solid (what's
+    under them, or the bed they're in, is)."""
+    stamp(kind, ROSE_KINDS[kind], (x, y, z), yaw, solid=False)
+
+
+def kit_window(name, at, yaw, scale, room):
+    """One of the kit's windows (its back to the wall): its frame; its glass,
+    to see through; and, `room` (as the kit measures) back behind the
+    glass, the dark of the room it lights, glowing a little low down, as if
+    a candle were lit in there (in the shape of its glass, so nothing shows
+    round it)."""
+    VILLAGE.put(court, name, at, yaw, scale, where=lambda material: "Glass" not in material)
+    VILLAGE.put(window_glass, name, at, yaw, scale, where=lambda material: "Glass" in material)
+    move = VILLAGE.placing(at, yaw, scale)
+    panes = [pts for pts, _, material in VILLAGE.faces(name) if "Glass" in material]
+    low, high = min(p[2] for pts in panes for p in pts), max(p[2] for pts in panes for p in pts)
+    for pts in panes:
+        back = [move((x, y + room, z)) for x, y, z in pts]
+        glow = [smooth(1 - (z - low) / (high - low) * 1.6) for _, _, z in pts]
+        court.add(back, [tuple(range(len(back)))], [c.mix(c.linear("#15131a"), c.linear("#6a4222"), 0.7 * t) for t in glow])
+
+
+def facing_yaw(fx, fy):
+    """The yaw that turns what faces -y to face (fx, fy)."""
+    return math.atan2(fx, -fy)
+
+
+# The coach house, a barn (its outside: courtyard; its inside: coach_house):
+# its walls' outer faces, west, east, south and north, and how it's built up.
+BARN = HALLS["coach-house"]
+BARN_W, BARN_E = BARN.x - BARN.w - 0.6, BARN.x + BARN.w + 0.6
+BARN_S, BARN_N = BARN.y - BARN.d - 0.6, BARN.y + BARN.d + 0.6
+BARN_SHELL = 0.25  # from its walls' faces outside to inside
+BARN_EAVE = BARN.floor + 5.6
+BARN_RIDGE = BARN_EAVE + 4.6
+BARN_FOOTING = YARD_FLOOR + 0.85
+BARN_DOOR = 2.4 - 0.05  # (a shade narrower than the way in, as at the keep's door)
+BARN_DOOR_TOP = BARN.floor + 4.5  # (tall enough for the coach, and its lintel still under the eaves)
+
+
+def roof_line(x):
+    """How high its roof's underside is, over a point across it."""
+    return BARN_EAVE + (BARN_RIDGE - BARN_EAVE) * max(0.0, 1 - abs(x - BARN.x) / (BARN_E - BARN.x))
+
+
+def barn_wall(b, p0, p1, z_top, holes, inside):
+    """One of its walls' faces, boards upright from its footing up to z_top(t)
+    (along it, from p0), facing out to the right as you look along it:
+    outside, on its stone footing; inside, boards all the way down."""
+    (ax, ay), (bx, by) = p0, p1
+    length = math.hypot(bx - ax, by - ay)
+    ux, uy = (bx - ax) / length, (by - ay) / length
+    ox, oy = uy * 0.03, -ux * 0.03
+    rnd = random.Random(f"barn {p0} {p1}")
+    low = BARN.floor - 0.06 if inside else BARN_FOOTING
+    if not inside:
+        courses(court, court_rng, p0, p1, YARD_FLOOR - 0.1, BARN_FOOTING, holes, big=0.7)
+    t = 0.0
+    while t < length - 0.02:
+        t1 = min(length, t + rnd.uniform(0.26, 0.32))
+        mid = (t + t1) / 2
+        hi = z_top(mid)
+        colour = rnd.choice(BOARDS)
+        if inside:
+            colour = c.mix(colour, c.linear("#c9a26a"), 0.2)
+        for a, e, lo, top in clear_of((t + 0.012, t1 - 0.012, low, hi), holes):
+            pts = [(ax + ux * a + ox, ay + uy * a + oy, lo), (ax + ux * e + ox, ay + uy * e + oy, lo),
+                   (ax + ux * e + ox, ay + uy * e + oy, min(top, z_top(e))),
+                   (ax + ux * a + ox, ay + uy * a + oy, min(top, z_top(a)))]
+            b.add(pts, [(0, 1, 2, 3)], [c.vary(colour, 0.08, Vector((a, lo, 1.0))), colour,
+                                        c.mix(colour, c.linear("#ffffff"), 0.05), colour])
+        t = t1
+
+
+def barn_frame(b, p0, p1, posts_at, holes, out):
+    """Its oak frame on a wall's face: posts (at those distances along it),
+    a sill on the footing, a rail and a plate along the top, and braces."""
+    (ax, ay), (bx, by) = p0, p1
+    length = math.hypot(bx - ax, by - ay)
+    ux, uy = (bx - ax) / length, (by - ay) / length
+    o = (uy * out, -ux * out)
+
+    def at(t, z):
+        return ax + ux * t + o[0], ay + uy * t + o[1], z
+
+    low = BARN_FOOTING if out > 0 else BARN.floor
+    for t in posts_at:
+        timber(b, at(t, low - 0.02), at(t, BARN_EAVE), 0.3, TIMBER)
+    for z in (low + 0.1, BARN_EAVE - 0.15):
+        for a, e, lo, hi in clear_of((0, length, z - 0.12, z + 0.12), holes):
+            timber(b, at(a, z), at(e, z), 0.24, TIMBER)
+    # (Braces, from the posts up to the plate, at either end of each bay.)
+    for t0, t1 in zip(posts_at, posts_at[1:]):
+        if any(a < (t0 + t1) / 2 < e and z0 < low + 1 for a, e, z0, _ in holes):
+            continue
+        timber(b, at(t0 + 0.15, BARN_EAVE - 1.6), at(t0 + 1.4, BARN_EAVE - 0.2), 0.16, TIMBER)
+        timber(b, at(t1 - 0.15, BARN_EAVE - 1.6), at(t1 - 1.4, BARN_EAVE - 0.2), 0.16, TIMBER)
+
+
+def courtyard():
+    """Builds it all (the coach house's inside is coach_house's)."""
+    g = YARD_FLOOR
+    yw, ye, ys, yn = YARD
+
+    # The castle's stonework: its walls (inside and out), the keep's front, the
+    # gatehouse and the towers, in courses of blocks (the walls themselves, the
+    # mortar between: MORTAR); and battlements along the tops of its walls.
+    door_half = TUNNEL_HALF - 0.05
+    courses(court, court_rng, (yw, yn), (-3, yn), g, 8)  # the north wall, inside, either side of the gate
+    courses(court, court_rng, (3, yn), (ye, yn), g, 8)
+    # (And the gatehouse over the gate: only over the opening, up to the wall's
+    # top, and its full width above it. Over the wall too, two lots of stones
+    # in one place would flicker.)
+    courses(court, court_rng, (-3, yn), (3, yn), GATEHOUSE[0], 8)
+    courses(court, court_rng, (-3.2, yn), (3.2, yn), 8, GATEHOUSE[1])
+    courses(court, court_rng, (ye + 2, yn + 2), (3, yn + 2), g, 8, big=1.6)  # and outside
+    courses(court, court_rng, (-3, yn + 2), (yw - 2, yn + 2), g, 8, big=1.6)
+    courses(court, court_rng, (3, yn + 2), (-3, yn + 2), GATEHOUSE[0], 8, big=1.6)
+    courses(court, court_rng, (3.2, yn + 2), (-3.2, yn + 2), 8, GATEHOUSE[1], big=1.6)
+    courses(court, court_rng, (yw, ys), (yw, yn), g, 8)  # the west wall, inside
+    courses(court, court_rng, (yw - 2, yn + 2), (yw - 2, CASTLE[2] - 1), g, 8, big=1.6)  # and outside
+    courses(court, court_rng, (ye, yn), (ye, ys), g, 8)  # the east wall, inside
+    courses(court, court_rng, (ye + 2, CASTLE[2] - 1), (ye + 2, yn + 2), g, 8, big=1.6)  # and outside
+    # The keep's front, round its door.
+    courses(court, court_rng, (ye, ys), (yw, ys), g, KEEP_TALL, [(ye - GH[0] - door_half, ye - GH[0] + door_half, 0,
+                                                                 TUNNEL_TALL + 0.4)])
+    for tx, ty, r, tall in ((CASTLE[0], CASTLE[3], 5, 13), (CASTLE[1], CASTLE[3], 5, 13), (CASTLE[0], CASTLE[2], 5, 13),
+                            (CASTLE[1], CASTLE[2], 5, 13), (-6, CASTLE[3], 3, 11), (6, CASTLE[3], 3, 11)):
+        round_courses(court, court_rng, tx, ty, r, 12, g, height(tx, ty) - 0.5 + tall)
+    # Battlements along the walls, but where the towers stand.
+    for (x0, y0), (x1, y1), across in (((CASTLE[0], CASTLE[3]), (CASTLE[1], CASTLE[3]), (0, 1)),
+                                       ((CASTLE[0], CASTLE[2]), (CASTLE[1], CASTLE[2]), (0, 1)),
+                                       ((CASTLE[0], CASTLE[2]), (CASTLE[0], CASTLE[3]), (1, 0)),
+                                       ((CASTLE[1], CASTLE[2]), (CASTLE[1], CASTLE[3]), (1, 0))):
+        length = math.hypot(x1 - x0, y1 - y0)
+        t = 0.6
+        while t < length - 1.2:
+            mx, my = x0 + (x1 - x0) * (t + 0.55) / length, y0 + (y1 - y0) * (t + 0.55) / length
+            clear = all(math.hypot(mx - tx, my - ty) > r + 0.8 for tx, ty, r in (
+                (CASTLE[0], CASTLE[3], 5), (CASTLE[1], CASTLE[3], 5), (CASTLE[0], CASTLE[2], 5), (CASTLE[1], CASTLE[2], 5),
+                (-6, CASTLE[3], 3), (6, CASTLE[3], 3)))
+            if clear and not (across == (0, 1) and y0 == CASTLE[3] and abs(mx) < 3.6):
+                ax, ay = (x1 - x0) / length, (y1 - y0) / length
+                p = (x0 + ax * t, y0 + ay * t)
+                q = (x0 + ax * (t + 1.1), y0 + ay * (t + 1.1))
+                block(court, min(p[0], q[0]) - across[0], min(p[1], q[1]) - across[1], 8, max(p[0], q[0]) + across[0],
+                      max(p[1], q[1]) + across[1], 9.1, castle_stone(court_rng, 9, 0), solid=False)
+            t += 2.2
+
+    # Dressed stones round the keep's door and the gate: big corner stones up
+    # their sides, alternately long and short, and a lintel over the door.
+    for side in (-1, 1):
+        for k in range(7):
+            z = g + k * 0.45
+            if z + 0.43 > TUNNEL_TALL + 0.4:
+                break
+            long_ = 0.8 if k % 2 else 0.5
+            x0 = GH[0] + side * (door_half + 0.02)
+            block(court, min(x0, x0 + side * long_), ys, z + 0.02, max(x0, x0 + side * long_), ys + 0.1, z + 0.43,
+                  c.mix(castle_stone(court_rng, z + 2, 0), c.linear("#fff6e2"), 0.25), solid=False)
+        for k in range(15):
+            z = g + k * 0.45
+            long_ = 0.75 if k % 2 else 0.45
+            x0 = side * 3.02
+            block(court, min(x0, x0 + side * long_), yn - 0.1, z + 0.02, max(x0, x0 + side * long_), yn, z + 0.43,
+                  c.mix(castle_stone(court_rng, z + 2, 0), c.linear("#fff6e2"), 0.25), solid=False)
+    block(court, GH[0] - door_half - 0.9, ys, TUNNEL_TALL + 0.4, GH[0] + door_half + 0.9, ys + 0.14, TUNNEL_TALL + 1.05,
+          c.mix(CASTLE_STONE[2], c.linear("#fff6e2"), 0.2), solid=False)
+
+    # The cobbles, all over it but for the beds, the well's ring and the coach house.
+    WELL_R = 1.15  # its wall, round
+    WELL_RING = (WELL_R + 0.12, WELL_R + 1.85)  # the ring of stones round it
+    BEDS = []  # rose beds: x0, y0, x1, y1, and which side is against a wall ("n", "s", "e", "w" or "")
+    TOWERS_IN = [(CASTLE[0], CASTLE[3], 5), (CASTLE[1], CASTLE[3], 5), (-6, CASTLE[3], 3), (6, CASTLE[3], 3)]
+
+
+    def in_bed(x, y, margin=0.0):
+        return any(x0 - margin <= x <= x1 + margin and y0 - margin <= y <= y1 + margin for x0, y0, x1, y1, _ in BEDS)
+
+
+    def bed(x0, y0, x1, y1, wall=""):
+        BEDS.append((x0, y0, x1, y1, wall))
+
+
+    # Along the north wall, either side of the gate, between the towers; along
+    # the west and east walls; and along the keep's front, either side of its door.
+    bed(CASTLE[0] + 5.2, yn - 2.0, -9.2, yn, "n")
+    bed(9.2, yn - 2.0, CASTLE[1] - 5.2, yn, "n")
+    bed(yw, ys + 2.6, yw + 2.0, yn - 4.6, "w")
+    bed(ye - 2.0, ys + 2.6, ye, yn - 4.6, "e")
+    bed(yw + 2.6, ys, -4.2, ys + 2.0, "s")
+    bed(4.2, ys, ye - 2.6, ys + 2.0, "s")
+    # In the rose garden, either side of the pergola.
+    PERGOLA = (-27.0, ys + 5.0, ys + 23.0, 1.7)  # its middle (x), from and to (y), and half its width
+    bed(PERGOLA[0] - 6.4, PERGOLA[1] + 0.5, PERGOLA[0] - 3.0, PERGOLA[2] - 0.5)
+    bed(PERGOLA[0] + 3.0, PERGOLA[1] + 0.5, PERGOLA[0] + 6.4, PERGOLA[2] - 0.5)
+
+
+    def cobbled(x, y):
+        if in_bed(x, y, 0.1) or in_building(x, y) or math.hypot(x - WELL[0], y - WELL[1]) < WELL_RING[1] + 0.1:
+            return False
+        return all(math.hypot(x - tx, y - ty) > r + 0.15 for tx, ty, r in TOWERS_IN)
+
+
+    CELL = 0.8
+    nx_, ny_ = math.ceil((ye - yw) / CELL), math.ceil((yn - ys) / CELL)
+    corner = {}
+    for i in range(nx_ + 1):
+        for j in range(ny_ + 1):
+            jx = court_rng.uniform(-0.22, 0.22) * CELL if 0 < i < nx_ else 0.0
+            jy = court_rng.uniform(-0.22, 0.22) * CELL if 0 < j < ny_ else 0.0
+            corner[i, j] = (min(ye, yw + i * CELL + jx), min(yn, ys + j * CELL + jy))
+    for i in range(nx_):
+        for j in range(ny_):
+            pts = [corner[i, j], corner[i + 1, j], corner[i + 1, j + 1], corner[i, j + 1]]
+            mx, my = sum(p[0] for p in pts) / 4, sum(p[1] for p in pts) / 4
+            if cobbled(mx, my):
+                sett(court, court_rng, pts, g, cobble_colour(court_rng, mx, my))
+    # Round the well, in rings.
+    for r0, r1 in ((WELL_RING[0], WELL_RING[0] + 0.6), (WELL_RING[0] + 0.6, WELL_RING[0] + 1.2), (WELL_RING[0] + 1.2, WELL_RING[1])):
+        n = round(2 * math.pi * (r0 + r1) / 2 / 0.62)
+        turn = court_rng.uniform(0, 1)
+        for k in range(n):
+            a0, a1 = 2 * math.pi * (k + turn) / n, 2 * math.pi * (k + 1 + turn) / n
+            pts = [(WELL[0] + math.cos(a) * r, WELL[1] + math.sin(a) * r) for r, a in ((r0, a0), (r1, a0), (r1, a1), (r0, a1))]
+            colour = cobble_colour(court_rng, *pts[0])
+            sett(court, court_rng, pts, g, c.mix(colour, c.linear("#ffffff"), 0.08))
+    # Tufts of grass between them, more near the walls and the beds.
+    for _ in range(900):
+        x, y = court_rng.uniform(yw, ye), court_rng.uniform(ys, yn)
+        near = min(x - yw, ye - x, y - ys, yn - y)
+        if not cobbled(x, y) or court_rng.random() > 0.25 + 0.75 * smooth(1 - near / 3):
+            continue
+        for k in range(3):
+            a = court_rng.uniform(0, 2 * math.pi)
+            tall = court_rng.uniform(0.08, 0.2)
+            tip = (x + math.cos(a) * 0.06, y + math.sin(a) * 0.06, g + tall)
+            pts = [(x - math.sin(a) * 0.025, y + math.cos(a) * 0.025, g + 0.01), (x + math.sin(a) * 0.025,
+                                                                                  y - math.cos(a) * 0.025, g + 0.01), tip]
+            both_ways(court, pts, [(0, 1, 2)], [c.linear("#4c6e2a"), c.linear("#4c6e2a"), c.linear("#8fae4c")])
+
+    # The beds: earth, a low kerb of stones along their open sides, roses in
+    # them, and climbing the wall behind.
+    for x0, y0, x1, y1, wall in BEDS:
+        quad(court, [(x0, y0, g + 0.12), (x1, y0, g + 0.12), (x1, y1, g + 0.12), (x0, y1, g + 0.12)], SOIL, 0.15)
+        sides = {"s": ((x0, y0), (x1, y0)), "e": ((x1, y0), (x1, y1)), "n": ((x1, y1), (x0, y1)),
+                 "w": ((x0, y1), (x0, y0))}
+        for name, ((ax, ay), (bx, by)) in sides.items():
+            if name == wall:
+                continue
+            length = math.hypot(bx - ax, by - ay)
+            ux, uy = (bx - ax) / length, (by - ay) / length
+            t = 0.0
+            while t < length - 0.05:
+                t1 = min(length, t + court_rng.uniform(0.45, 0.7))
+                oriented(court, (ax + ux * t, ay + uy * t, g), (ux, uy), 0.015, t1 - t - 0.015, -0.12, 0.12, -0.05,
+                         court_rng.uniform(0.22, 0.28), c.mix(castle_stone(court_rng, 2, 0), c.linear("#ffffff"), 0.1), 0.05)
+                t = t1
+        solid_box((x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2)
+        # Roses all along it, in a row (two, if it's deep enough).
+        along_x = x1 - x0 >= y1 - y0
+        length, deep = (x1 - x0, y1 - y0) if along_x else (y1 - y0, x1 - x0)
+        rows = 1 if deep < 2.6 else 2
+        for row in range(rows):
+            t = court_rng.uniform(0.6, 1.0)
+            while t < length - 0.6:
+                across = deep * (row + 0.5) / rows + court_rng.uniform(-0.15, 0.15)
+                if wall in ("n", "e"):
+                    across = deep - across
+                x, y = (x0 + t, y0 + across) if along_x else (x0 + across, y0 + t)
+                roses_at(f"rose-bush-{court_rng.randint(1, 3)}", x, y, g + 0.1, court_rng.uniform(0, 2 * math.pi))
+                t += court_rng.uniform(1.25, 1.7)
+    # Climbing the walls behind the beds.
+    for x0, x1, y, face in ((CASTLE[0] + 5.6, -9.4, yn, (0, -1)), (9.4, CASTLE[1] - 5.6, yn, (0, -1)),
+                            (-44.0, -4.6, ys, (0, 1)), (4.6, 44.0, ys, (0, 1))):
+        x = x0 + court_rng.uniform(1.0, 2.5)
+        while x < x1 - 1.0:
+            kind = court_rng.choice(("rose-climber-1", "rose-climber-1", "rose-climber-2", "rose-climber-3"))
+            roses_at(kind, x, y, g + 0.1, facing_yaw(*face))
+            x += court_rng.uniform(3.6, 6.0)
+    for x, face in ((yw, (1, 0)), (ye, (-1, 0))):
+        y = ys + 3.5 + court_rng.uniform(0, 1.5)
+        while y < yn - 6:
+            kind = court_rng.choice(("rose-climber-1", "rose-climber-2", "rose-climber-3"))
+            roses_at(kind, x, y, g + 0.1, facing_yaw(*face))
+            y += court_rng.uniform(3.8, 6.0)
+    # Up the towers (on their sides to the courtyard), and either side of the gate.
+    for tx, ty, r, angles in ((CASTLE[0], CASTLE[3], 5, (-0.35, -1.2)), (CASTLE[1], CASTLE[3], 5, (-1.95, -2.8)),
+                              (-6, CASTLE[3], 3, (-1.2, -2.3)), (6, CASTLE[3], 3, (-0.85, -1.95))):
+        for a in angles:
+            x, y = tx + math.cos(a) * (r * 0.97), ty + math.sin(a) * (r * 0.97)
+            roses_at("rose-climber-3", x, y, g, facing_yaw(math.cos(a), math.sin(a)))
+            solid_circle(x + math.cos(a) * 0.25, y + math.sin(a) * 0.25, 0.45)
+
+    # The well, in the middle: a round wall of stone, capped with a ring of
+    # flat stones, the dark shaft and the water far down; two oak posts, the
+    # windlass between them with its rope wound round it and its crank, the
+    # bucket hanging, and a little roof of shingles over it. Roses round its foot.
+    wx, wy = WELL
+    WELL_TALL, WELL_IN, WELL_SIDES = 0.85, 0.8, 20
+    ring = [(math.cos(2 * math.pi * k / WELL_SIDES), math.sin(2 * math.pi * k / WELL_SIDES)) for k in range(WELL_SIDES)]
+    court.cylinder((wx, wy, g - 0.2), (wx, wy, g + WELL_TALL), WELL_R, WELL_R, MORTAR, sides=WELL_SIDES)
+    stone_courses(court, court_rng, lambda a: (wx + math.cos(a) * (WELL_R + 0.015) / math.cos(
+        a - (math.floor(a / (2 * math.pi / WELL_SIDES)) + 0.5) * 2 * math.pi / WELL_SIDES) * math.cos(math.pi / WELL_SIDES),
+                                               wy + math.sin(a) * (WELL_R + 0.015) / math.cos(
+        a - (math.floor(a / (2 * math.pi / WELL_SIDES)) + 0.5) * 2 * math.pi / WELL_SIDES) * math.cos(math.pi / WELL_SIDES)),
+                  [2 * math.pi * k / WELL_SIDES for k in range(2 * WELL_SIDES + 1)], WELL_R, g, g + WELL_TALL - 0.14, [], g,
+                  course=(0.2, 0.27), shade=castle_stone)
+    # (Its shaft, inside, facing in, dark; and the water.)
+    for k in range(WELL_SIDES):
+        (ca, sa), (cb, sb) = ring[k], ring[(k + 1) % WELL_SIDES]
+        court.add([(wx + cb * WELL_IN, wy + sb * WELL_IN, g - 1.6), (wx + ca * WELL_IN, wy + sa * WELL_IN, g - 1.6),
+                   (wx + ca * WELL_IN, wy + sa * WELL_IN, g + WELL_TALL), (wx + cb * WELL_IN, wy + sb * WELL_IN, g + WELL_TALL)],
+                  [(0, 1, 2, 3)], [c.linear("#0e0d0b")] * 2 + [c.linear("#4a4236")] * 2)
+    court.add([(wx, wy, g - 1.4)] + [(wx + ca * WELL_IN, wy + sa * WELL_IN, g - 1.4) for ca, sa in ring],
+              [(0, 1 + k, 1 + (k + 1) % WELL_SIDES) for k in range(WELL_SIDES)], [c.linear("#1d3a40")] + [c.linear("#0b1a1e")] * WELL_SIDES)
+    # The cap: flat stones round its top.
+    caps = 14
+    for k in range(caps):
+        a0, a1 = 2 * math.pi * (k + 0.03) / caps, 2 * math.pi * (k + 0.97) / caps
+        pts = [(wx + math.cos(a) * r, wy + math.sin(a) * r) for r, a in ((WELL_IN - 0.03, a0), (WELL_R + 0.07, a0),
+                                                                           (WELL_R + 0.07, a1), (WELL_IN - 0.03, a1))]
+        colour = c.mix(castle_stone(court_rng, 3, 0), c.linear("#ffffff"), 0.1)
+        court.add([(x, y, g + WELL_TALL - 0.14) for x, y in pts] + [(x, y, g + WELL_TALL) for x, y in pts],
+                  [(4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)], [colour] * 8)
+    solid_circle(wx, wy, WELL_R + 0.1)
+    # The posts, the windlass and its crank, the rope and the bucket.
+    OAK_POST = c.linear("#6a4528")
+    POST_TOP = g + 3.05
+    for side in (-1, 1):
+        px = wx + side * (WELL_R - 0.12)
+        block(court, px - 0.1, wy - 0.1, g + WELL_TALL, px + 0.1, wy + 0.1, POST_TOP, OAK_POST, solid=False)
+        timber(court, (px, wy, g + WELL_TALL + 0.02), (px - side * 0.0, wy + 0.42, g + WELL_TALL - 0.02), 0.07, OAK_POST)
+    timber(court, (wx - WELL_R - 0.05, wy, POST_TOP - 0.06), (wx + WELL_R + 0.05, wy, POST_TOP - 0.06), 0.14, OAK_POST)
+    AXLE = g + 1.95
+    log(court, (wx - WELL_R + 0.02, wy, AXLE), (wx + WELL_R + 0.25, wy, AXLE), 0.07, c.linear("#7a5634"), sides=8)
+    log(court, (wx - 0.38, wy, AXLE), (wx + 0.38, wy, AXLE), 0.12, c.linear("#b4955f"), sides=8)  # (the rope, wound)
+    crank = wx + WELL_R + 0.22
+    timber(court, (crank, wy, AXLE), (crank, wy - 0.05, AXLE - 0.36), 0.05, IRON)
+    timber(court, (crank, wy - 0.05, AXLE - 0.36), (crank + 0.24, wy - 0.05, AXLE - 0.36), 0.045, IRON)
+    BUCKET = 1.6  # times the kit's size
+    bucket_z = g + WELL_TALL + 0.32
+    log(court, (wx, wy - 0.12, AXLE - 0.05), (wx, wy, bucket_z + 0.29 * BUCKET + 0.06), 0.014, c.linear("#b4955f"),
+        sides=4)
+    PROPS.put(court, "Bucket_Wooden_1", (wx, wy, bucket_z), 0.4, BUCKET, 0.4)
+    for yaw in (0.0, math.pi):
+        VILLAGE.put(court, "Roof_Wooden_2x1", (wx, wy, POST_TOP + 0.08), yaw, 1.12)
+    # Roses round its foot.
+    for a in (0.65, 2.35, 3.9):
+        x, y = wx + math.cos(a) * (WELL_R + 0.45), wy + math.sin(a) * (WELL_R + 0.45)
+        roses_at("rose-bush-2", x, y, g, a)
+        solid_circle(x, y, 0.55)
+
+    # The keep's front: windows high up, their shutters open; lanterns either
+    # side of its door, and banners.
+    WINDOW = 1.5  # times the kit's size
+    for x in (-36, -27, -18, -9, 9, 18, 27, 36):
+        # (Its glass 22 cm out from the wall, its frame's back in it; the room behind 17 cm back.)
+        at = (x, ys + 0.22, g + 5.0 - 1.02 * WINDOW)
+        kit_window("Window_Wide_Round1", at, math.pi, WINDOW, 0.17 / WINDOW)
+        VILLAGE.put(court, "WindowShutters_Wide_Round_Open", at, math.pi, WINDOW)
+    for x in (-13.5, 13.5, -31.5, 31.5, -40.5, 40.5, -22.5, 22.5):
+        if abs(x) < 40:
+            roses_at(court_rng.choice(("rose-climber-1", "rose-climber-3")), x, ys, g + 0.1, facing_yaw(0, 1))
+    LANTERN = 1.2
+
+
+    def lit_lantern(t):
+        """A lantern on its bracket, lit (to make, for stamp). (In full: made
+        simpler, its thin arm folds over on itself, and flickers.)"""
+        made = PROPS.put(t, "Lantern_Wall", (0, 0, 0), 0, LANTERN)
+        flame(t, *PROPS.placing((0, 0, 0), 0, LANTERN)((0, -1.0, 0.55)), 0.14)
+        return made
+
+    def lantern(x, y, z, face):
+        """A lantern on a wall, lit, its arm out the way it faces."""
+        stamp("lantern-wall-lit", lit_lantern, (x, y, z), facing_yaw(*face), solid=False)
+
+
+    for side in (-1, 1):
+        # (Their backplates on the stones, not in them: in the wall's face, they'd flicker.)
+        lantern(GH[0] + side * 2.7, ys + 0.06, g + 2.4, (0, 1))
+        lantern(side * 4.6, yn - 0.06, g + 2.6, (0, -1))
+    BANNER = 1.9
+    # (Each a sign on a bracket: its post against the wall, its arm straight out, the banner hanging under it.)
+    for x, tint in ((-5.4, "#9e2b25"), (5.4, "#2f4f8a")):
+        PROPS.put(court, "Banner_1", (x, ys + 0.05, g + 7.6), math.pi / 2, BANNER, 0.5, tint=(*c.linear(tint)[:3], 0.6))
+
+    # The rose garden: a pergola of oak, roses over it and up its posts, along
+    # a walk between two beds, with benches under it.
+    px_, py0, py1, half = PERGOLA
+    OAK_LIGHT = c.linear("#7a5634")
+    posts = [py0 + k * (py1 - py0) / 6 for k in range(7)]
+    for y in posts:
+        for side in (-1, 1):
+            x = px_ + side * half
+            block(court, x - 0.11, y - 0.11, g, x + 0.11, y + 0.11, g + 2.75, OAK_LIGHT, solid=False)
+            solid_circle(x, y, 0.2)
+            roses_at("rose-climber-4", x + side * 0.12, y, g, facing_yaw(side, 0))
+    for side in (-1, 1):
+        block(court, px_ + side * half - 0.1, py0 - 0.4, g + 2.75, px_ + side * half + 0.1, py1 + 0.4, g + 2.97, OAK_LIGHT,
+              solid=False)
+    y = py0 - 0.2
+    while y < py1 + 0.3:
+        block(court, px_ - half - 0.55, y - 0.05, g + 2.97, px_ + half + 0.55, y + 0.05, g + 3.09, OAK_LIGHT, solid=False)
+        y += 0.7
+    for k in range(6):
+        roses_at("rose-canopy", px_ + court_rng.uniform(-0.15, 0.15), (posts[k] + posts[k + 1]) / 2, g + 3.0,
+                 court_rng.choice((0, math.pi)))
+    for y in (posts[1] + 1.4, posts[4] + 1.6):
+        PROPS.put(court, "Bench", (px_ - half + 0.42, y, g), facing_yaw(1, 0), 1.2)
+        solid_box(px_ - half + 0.42, y, 0.35, 1.7)
+    # The sundial, beside the rose garden (in the shade: out in the sun, its
+    # gnomon's shadow is too fine for the sun's shadows, and blurs).
+    sx_, sy_ = px_ - 11.0, (py0 + py1) / 2
+    court.cylinder((sx_, sy_, g), (sx_, sy_, g + 0.2), 0.55, 0.5, castle_stone(court_rng, 2, 0), sides=10)
+    quad_ring = [(sx_ + math.cos(2 * math.pi * k / 10) * 0.5, sy_ + math.sin(2 * math.pi * k / 10) * 0.5, g + 0.2)
+                 for k in range(10)]
+    court.add(quad_ring, [tuple(range(10))], [castle_stone(court_rng, 2, 0)] * 10)  # (its step's top)
+    court.cylinder((sx_, sy_, g + 0.2), (sx_, sy_, g + 0.95), 0.2, 0.17, castle_stone(court_rng, 2, 0), sides=10)
+    court.cylinder((sx_, sy_, g + 0.95), (sx_, sy_, g + 1.05), 0.36, 0.38, castle_stone(court_rng, 2, 0), sides=14)
+    court.add([(sx_, sy_, g + 1.05)] + [(sx_ + math.cos(2 * math.pi * k / 14) * 0.38, sy_ + math.sin(2 * math.pi * k / 14) * 0.38,
+                                         g + 1.05) for k in range(14)], [(0, 1 + k, 1 + (k + 1) % 14) for k in range(14)],
+              [c.linear("#c9a04a")] * 15)
+    # (Its gnomon: a wedge of bronze, standing on it.)
+    bronze = c.linear("#6a5430")
+    wedge = [(y, z) for y, z in ((sy_ - 0.26, g + 1.05), (sy_ + 0.22, g + 1.05), (sy_ - 0.26, g + 1.32))]
+    left, right = [(sx_ - 0.012, y, z) for y, z in wedge], [(sx_ + 0.012, y, z) for y, z in wedge]
+    facing(court, left, [bronze] * 3, (-1, 0, 0))
+    facing(court, right, [bronze] * 3, (1, 0, 0))
+    for k, out in ((0, (0, 0, -1)), (1, (0, 0.27, 0.48)), (2, (0, -1, 0))):
+        n = (k + 1) % 3
+        facing(court, [left[k], left[n], right[n], right[k]], [bronze] * 4, out)
+    solid_circle(sx_, sy_, 0.55)
+
+    # The coach house: on a footing of stone, walls of boards, upright, between
+    # oak posts and beams (braced at the corners), under a roof of red tiles
+    # (the kit's, stretched to fit: its ridge north and south, its eaves over the
+    # doors); its great doors open out, its lantern lit; roses up its corners.
+    door_t = (BARN_N - BARN.y - BARN_DOOR, BARN_N - BARN.y + BARN_DOOR)  # (along its west face, from the north)
+    walls = [  # p0, p1 (facing out to the right), its holes
+        ((BARN_W, BARN_S), (BARN_E, BARN_S), []),
+        ((BARN_E, BARN_S), (BARN_E, BARN_N), []),
+        ((BARN_E, BARN_N), (BARN_W, BARN_N), []),
+        ((BARN_W, BARN_N), (BARN_W, BARN_S), [(door_t[0], door_t[1], -1, BARN_DOOR_TOP)]),
+    ]
+    for p0, p1, holes in walls:
+        gable = abs(p1[1] - p0[1]) < 0.01  # (the north and south walls rise under the roof's ends)
+        (ax, ay), (bx, by) = p0, p1
+        length = math.hypot(bx - ax, by - ay)
+        ux, uy = (bx - ax) / length, (by - ay) / length
+
+        def top(t, ax=ax, ux=ux, gable=gable):
+            return roof_line(ax + ux * t) - 0.05 if gable else BARN_EAVE + 0.35
+
+        barn_wall(court, p0, p1, top, holes, inside=False)
+        posts_at = [0.2, length / 3, 2 * length / 3, length - 0.2]
+        if holes:
+            posts_at = [0.2, holes[0][0] - 0.2, holes[0][1] + 0.2, length - 0.2]
+        barn_frame(court, p0, p1, posts_at, holes, 0.14)
+        # (The wall itself, behind the boards: dark, between them.)
+        ix, iy = -uy * BARN_SHELL, ux * BARN_SHELL  # (in)
+        for a, e, lo, hi in clear_of((0, length, g - 0.2, BARN_EAVE + 0.35), holes):
+            q0, q1 = (ax + ux * a, ay + uy * a), (ax + ux * e, ay + uy * e)
+            oriented(court, (q0[0], q0[1], 0), (ux, uy), 0, e - a, 0, BARN_SHELL, lo, hi, c.linear("#2a1e14"), 0.05)
+        if gable:
+            pts = [(ax, ay, BARN_EAVE + 0.3), (bx, by, BARN_EAVE + 0.3), (BARN.x, ay, BARN_RIDGE - 0.05)]
+            facing(court, pts, [c.linear("#2a1e14")] * 3, (uy, -ux, 0))
+            inner = [(x + ix, y + iy, z) for x, y, z in pts]
+            facing(court, inner, [c.linear("#2a1e14")] * 3, (-uy, ux, 0))
+    # The lintel over the doors, and the doors, open out (planks on ledges,
+    # with iron straps across them), and the lantern beside them.
+    # (Its underside a shade below the wall's over the doorway, and out in front of it: level, they'd flicker.)
+    timber(court, (BARN_W - 0.16, BARN.y - BARN_DOOR - 0.5, BARN_DOOR_TOP + 0.15),
+           (BARN_W - 0.16, BARN.y + BARN_DOOR + 0.5, BARN_DOOR_TOP + 0.15), 0.3, TIMBER, 0.36)
+    LEAF = BARN_DOOR - 0.02
+    for side in (-1, 1):
+        hinge = (BARN_W - 0.05, BARN.y + side * BARN_DOOR, g + 0.04)
+        swing = math.radians(100)  # (from shut)
+        shut = (0, -side)
+        across = (shut[0] * math.cos(-side * swing) - shut[1] * math.sin(-side * swing),
+                  shut[0] * math.sin(-side * swing) + shut[1] * math.cos(-side * swing))
+        u = 0.0
+        k = 0
+        while u < LEAF - 0.02:
+            u1 = min(LEAF, u + 0.29)
+            oriented(court, hinge, across, u + 0.008, u1 - 0.008, -0.05, 0.05, 0, BARN_DOOR_TOP - 0.1 - g,
+                     BOARDS[(k * 3) % len(BOARDS)], 0.06)
+            u, k = u1, k + 1
+        for z in (0.45, BARN_DOOR_TOP - g - 0.6):
+            for face in (-1, 1):
+                oriented(court, hinge, across, 0.05, LEAF - 0.1, face * 0.05, face * 0.085, z - 0.11, z + 0.11, TIMBER, 0.06)
+        for z in (0.75, (BARN_DOOR_TOP - g) / 2, BARN_DOOR_TOP - g - 0.9):
+            for face in (-1, 1):
+                oriented(court, hinge, across, -0.02, LEAF * 0.7, face * 0.055, face * 0.1, z - 0.05, z + 0.05, IRON, 0.04)
+        end = (hinge[0] + across[0] * LEAF, hinge[1] + across[1] * LEAF)
+        solid_box((hinge[0] + end[0]) / 2, (hinge[1] + end[1]) / 2, abs(end[0] - hinge[0]) / 2 + 0.12,
+                  abs(end[1] - hinge[1]) / 2 + 0.12)
+    lantern(BARN_W - 0.17, BARN.y + BARN_DOOR + 1.2, g + 2.6, (-1, 0))
+    # The roof.
+    TILES = (BARN_E - BARN.x + 0.1) / 4.0, (BARN_N - BARN_S) / 14.0, (BARN_RIDGE - BARN_EAVE) / 6.0
+    VILLAGE.put(court, "Roof_RoundTiles_8x14", (BARN.x, BARN.y, BARN_EAVE), 0, TILES, 0.6)
+    # Little windows up in its gables, facing out (their glass 15 cm out from its boards' wall).
+    for y, yaw in ((BARN_N + 0.15, facing_yaw(0, 1)), (BARN_S - 0.15, facing_yaw(0, -1))):
+        kit_window("Window_Thin_Round1", (BARN.x, y, BARN_EAVE + 0.2), yaw, 1.1, 0.09 / 1.1)
+    # Roses up its corners by the doors (narrow ones, clear of them), and on
+    # its north wall, facing the gate.
+    for x, y, face in ((BARN_W - 0.03, BARN_N - 0.8, (-1, 0)), (BARN_W - 0.03, BARN_S + 0.8, (-1, 0)),
+                       (BARN.x - 3.5, BARN_N + 0.03, (0, 1)), (BARN.x + 4.5, BARN_N + 0.03, (0, 1))):
+        kind = court_rng.choice(("rose-climber-2", "rose-climber-3"))
+        roses_at("rose-climber-3" if face[0] else kind, x, y, g, facing_yaw(*face))
+        solid_box(x + face[0] * 0.3, y + face[1] * 0.3, 0.3 if face[0] else 1.6, 1.6 if face[0] else 0.3)
+    # Straw blown out of its doors, over the cobbles.
+    for _ in range(500):
+        r, a = court_rng.uniform(0, 3.4) ** 1.3 / 3.4 ** 0.3, court_rng.uniform(-1.4, 1.4)
+        x, y = BARN_W - 0.2 - abs(math.cos(a)) * r, BARN.y + math.sin(a) * r * 1.2
+        turn = court_rng.uniform(0, math.pi)
+        lx, ly = math.cos(turn) * 0.09, math.sin(turn) * 0.09
+        both_ways(court, [(x - lx, y - ly, g + 0.07), (x + lx, y + ly, g + 0.07), (x + ly * 0.15, y - lx * 0.15, g + 0.075)],
+                  [(0, 1, 2)], [c.linear(court_rng.choice(("#d8b862", "#c9a24e", "#e6cc7a")))] * 3)
+
+    # Outside it: a cart, barrels and crates, and a water trough.
+    # (In full: made simpler, its wheels lose their round. Solid all along it,
+    # from its shafts to its tail: its bed is 2 m across, 4 long, in the kit.)
+    cart = ((BARN_W - 5.0, BARN_N + 1.8, g), facing_yaw(-0.5, 1), 1.15)
+    VILLAGE.put(court, "Prop_Wagon", *cart)
+    for along in (-0.5, 0.4, 1.3, 2.2, 3.0):
+        solid_circle(*VILLAGE.placing(*cart)((0, along, 0))[:2], 1.15)
+    for dx, dy, kind in ((-0.6, -1.0, "Barrel"), (-1.35, -1.5, "Barrel"), (-0.6, -1.85, "Barrel")):
+        PROPS.put(court, kind, (BARN_W + dx, BARN_S - dy, g), court_rng.uniform(0, 6), 1.1, 0.5)
+    for dx, dy, z, turn in ((-2.3, 1.2, 0, 0.2), (-2.4, 1.15, 0.88, 0.5)):
+        PROPS.put(court, "Crate_Wooden", (BARN_W + dx, BARN_S + dy, g + z), turn, 1.0, 0.3)
+    solid_box(BARN_W - 1.4, BARN_S + 1.5, 1.4, 1.2)
+    TROUGH = (BARN_W - 0.55, BARN.y + BARN_DOOR + 2.9)
+    block(court, TROUGH[0] - 0.4, TROUGH[1] - 1.0, g, TROUGH[0] + 0.4, TROUGH[1] + 1.0, g + 0.62, TIMBER, solid=False)
+    quad(court, [(TROUGH[0] - 0.32, TROUGH[1] - 0.92, g + 0.55), (TROUGH[0] + 0.32, TROUGH[1] - 0.92, g + 0.55),
+                 (TROUGH[0] + 0.32, TROUGH[1] + 0.92, g + 0.55), (TROUGH[0] - 0.32, TROUGH[1] + 0.92, g + 0.55)],
+         c.linear("#3d6f86"), 0.05)
+    solid_box(*TROUGH, 0.45, 1.05)
+
+    court.build("courtyard", smooth=False)
+    window_glass.build("window-glass", smooth=False)
+
+
+courtyard()
+
+
+def coach(b, x, y, f):
+    """The red coach, as in its picture (facing west, its pole to the doors):
+    a body curved underneath, red, its windows curtained, edged in gold,
+    a crest on its door; lamps at its front corners, the driver's seat up in
+    front, and four spoked wheels, the back ones bigger."""
+    RED_COACH = c.linear("#a3221c")
+    GILT = c.linear("#d9a640")
+    WHEEL_WOOD = c.linear("#6e4426")
+    # The body: its side's outline (along it, up), out to either side.
+    outline = [(-0.72, 0.98), (-0.45, 0.8), (0.55, 0.8), (0.98, 0.98), (1.12, 1.45), (1.05, 2.1), (-0.82, 2.1),
+               (-0.86, 1.45)]
+    half = 0.72
+    verts = [(x + u, y - half, f + z) for u, z in outline] + [(x + u, y + half, f + z) for u, z in outline]
+    n = len(outline)
+    faces = [tuple(range(n))[::-1], tuple(range(n, 2 * n))]
+    faces += [(k, (k + 1) % n, n + (k + 1) % n, n + k)[::-1] for k in range(n)]
+    b.add(verts, faces, [c.vary(RED_COACH, 0.08, Vector(v) * 4) for v in verts])
+    # (Which way round those go: the first face is its side facing -y.)
+    # On each side: its windows (in gilt frames, curtained), its door (edged in
+    # gilt, its crest on it) and gilt bands along it: each layer standing a
+    # little further out from the body than what it's on, or they'd flicker.
+    for side in (-1, 1):
+
+        def layer(u0, u1, z0, z1, out, colour, vary=0.05, side=side):
+            """A layer on its side, from the body out to `out`."""
+            y0, y1 = (half + 0.002, half + out) if side > 0 else (-half - out, -half - 0.002)
+            oriented(b, (x, y, f), (1, 0), u0, u1, y0, y1, z0, z1, colour, vary)
+
+        for u0, u1 in ((-0.62, -0.18), (-0.06, 0.38), (0.5, 0.92)):
+            layer(u0 - 0.05, u1 + 0.05, 1.38, 2.0, 0.008, GILT)
+            layer(u0 + 0.01, u1 - 0.01, 1.44, 1.94, 0.014, c.linear("#3a1420"), 0.04)  # (its edges behind the curtains')
+            layer(u0, u0 + 0.1, 1.43, 1.95, 0.02, c.linear("#c83a52"))
+            layer(u1 - 0.1, u1, 1.43, 1.95, 0.02, c.linear("#c83a52"))
+        layer(-0.1, 0.42, 0.85, 1.34, 0.008, GILT)  # (the door)
+        layer(-0.06, 0.38, 0.89, 1.3, 0.014, RED_COACH)
+        for z in (2.08, 1.36):
+            layer(-0.84, 1.1, z - 0.025, z + 0.025, 0.026, GILT)
+        # (Its crest: a round of gilt on the door, facing out.)
+        crest_y = y + side * (half + 0.02)
+        crest = [(x + 0.16 + math.cos(2 * math.pi * k / 12) * 0.11, crest_y, f + 1.09 + math.sin(2 * math.pi * k / 12) * 0.13)
+                 for k in range(12)]
+        facing(b, crest, [GILT] * 12, (0, side, 0))
+    block(b, x - 0.92, y - half - 0.08, f + 2.1, x + 1.15, y + half + 0.08, f + 2.18, c.linear("#3a1a14"), solid=False)
+    for u in (-0.9, -0.3, 0.3, 0.9):
+        for side in (-1, 1):
+            block(b, x + u - 0.02, y + side * (half + 0.04) - 0.02, f + 2.18, x + u + 0.02, y + side * (half + 0.04) + 0.02,
+                  f + 2.36, GILT, solid=False)
+    for side in (-1, 1):
+        block(b, x - 0.92, y + side * (half + 0.04) - 0.02, f + 2.33, x + 1.12, y + side * (half + 0.04) + 0.02, f + 2.37,
+              GILT, solid=False)
+    # Its lamps, lit.
+    for side in (-1, 1):
+        lx, ly = x - 0.9, y + side * (half + 0.1)
+        block(b, lx - 0.08, ly - 0.08, f + 1.62, lx + 0.08, ly + 0.08, f + 1.9, c.linear("#3a3532"), solid=False)
+        block(b, lx - 0.065, ly - 0.065, f + 1.66, lx + 0.065, ly + 0.065, f + 1.86, c.linear("#ffd27a"), solid=False)
+        b.cone((lx, ly, f + 1.9), 0.12, 0.1, c.linear("#3a3532"), sides=4, droop=0)
+    # The undercarriage, the driver's seat and footboard, and the pole.
+    timber(b, (x - 1.25, y, f + 0.62), (x + 1.2, y, f + 0.72), 0.14, c.linear("#3a2416"))
+    for ax_, az in ((-1.2, 0.6), (1.1, 0.78)):
+        timber(b, (x + ax_, y - 1.0, f + az), (x + ax_, y + 1.0, f + az), 0.1, c.linear("#2a2522"))
+        timber(b, (x + ax_, y, f + az), (x + ax_ * 0.65, y, f + 0.85), 0.1, c.linear("#3a2416"))
+    block(b, x - 1.5, y - 0.62, f + 1.5, x - 0.9, y + 0.62, f + 1.68, c.linear("#5a1814"), solid=False)
+    block(b, x - 1.0, y - 0.62, f + 1.68, x - 0.9, y + 0.62, f + 2.0, c.linear("#5a1814"), solid=False)
+    timber(b, (x - 1.85, y, f + 1.1), (x - 1.4, y, f + 1.15), 0.08, c.linear("#3a2416"), 1.1)
+    timber(b, (x - 1.4, y, f + 1.15), (x - 1.2, y, f + 0.6), 0.1, c.linear("#3a2416"))
+    timber(b, (x - 1.2, y, f + 0.6), (x - 3.4, y, f + 0.12), 0.09, c.linear("#3a2416"))
+    # The wheels: rims, spokes and hubs.
+    for wx_, r in ((-1.2, 0.6), (1.1, 0.78)):
+        for side in (-1, 1):
+            cx_, cy_, cz = x + wx_, y + side * 0.98, f + r
+            # (Its wooden rim, its iron tyre round the outside of it, down to
+            # the floor, and its spokes from inside its hub to inside its rim:
+            # their ends buried, not a shade from another face, where they'd
+            # flicker.)
+            wood = r - 0.06
+
+            def ring(radius, cx_=cx_, cy_=cy_, cz=cz):
+                return [(cx_ + math.cos(2 * math.pi * k / 20) * radius, cy_, cz + math.sin(2 * math.pi * k / 20) * radius)
+                        for k in range(20)]
+
+            rim, tyre = ring(wood), ring(wood + 0.045)
+            for k in range(20):
+                timber(b, rim[k], rim[(k + 1) % 20], 0.07, WHEEL_WOOD, 0.07)
+                timber(b, tyre[k], tyre[(k + 1) % 20], 0.05, c.linear("#2a2522"), 0.025)
+            for k in range(12):
+                a = 2 * math.pi * k / 12
+                timber(b, (cx_ + math.cos(a) * 0.06, cy_, cz + math.sin(a) * 0.06),
+                       (cx_ + math.cos(a) * wood, cy_, cz + math.sin(a) * wood), 0.035, c.linear("#c08a40"))
+            log(b, (cx_, cy_ - 0.12, cz), (cx_, cy_ + 0.12, cz), 0.1, c.linear("#3a2416"), sides=8)
+            for end in (-1, 1):  # (its hub's ends, capped)
+                facing(b, [(cx_ + math.cos(2 * math.pi * k / 8) * 0.1, cy_ + end * 0.12, cz + math.sin(2 * math.pi * k / 8) * 0.1)
+                           for k in range(8)], [c.linear("#2a1a10")] * 8, (0, end, 0))
+
+
+def hay_bale(b, x, y, z, turn, rnd):
+    """A bale of hay, tied with twine."""
+    across = (math.cos(turn), math.sin(turn))
+    straw = c.mix(c.linear("#d6b25a"), c.linear("#b8923c"), rnd.uniform(0, 1))
+    oriented(b, (x, y, z), across, -0.55, 0.55, -0.28, 0.28, 0, 0.45, straw, 0.12)
+    for u in (-0.25, 0.25):
+        oriented(b, (x, y, z), across, u - 0.02, u + 0.02, -0.285, 0.285, -0.005, 0.455, c.linear("#6a5030"), 0.05)
+
+
+def coach_house(b, hall):
+    """Inside the coach house, as in its picture: its walls boards between oak
+    posts and beams, and open up to its roof, tie beams across under it;
+    the red coach on the straw, hay stacked in the corner, barrels, crates
+    and sacks, satchels and a bucket on pegs, a horse's collar, a shelf of pots, a cart
+    wheel against the wall, a lantern hung from a beam, and Merlin's
+    cloak, blue with silver stars (a button missing), hanging on the back wall."""
+    hx, hy, f, W, D = hall.x, hall.y, hall.floor, hall.w, hall.d
+    rnd = random.Random("coach house inside")
+    E = ROOM_EDGE
+    x0, x1, y0, y1 = hx - W - E, hx + W + E, hy - D - E, hy + D + E
+    # Its walls, inside: boards, on the shell (faces to the room).
+    inner = [((x0, y1), (x0, y0), [((y1 - hy) - BARN_DOOR, (y1 - hy) + BARN_DOOR, -1, BARN_DOOR_TOP)]),
+             ((x0, y0), (x1, y0), []), ((x1, y0), (x1, y1), []), ((x1, y1), (x0, y1), [])]
+    for p0, p1, holes in inner:
+        # (Facing in: walking it the other way round, its right is the room.)
+        q0, q1 = p1, p0
+        gable = abs(p1[1] - p0[1]) < 0.01
+        length = math.hypot(q1[0] - q0[0], q1[1] - q0[1])
+        ux = (q1[0] - q0[0]) / length
+        flipped = [(length - e, length - a, lo, hi) for a, e, lo, hi in holes]
+
+        def top(t, ax=q0[0], ux=ux, gable=gable):
+            return roof_line(ax + ux * t) - 0.08 if gable else BARN_EAVE + 0.3
+
+        barn_wall(b, q0, q1, top, flipped, inside=True)
+        barn_frame(b, q0, q1, [0.2, length / 3, 2 * length / 3, length - 0.2] if not flipped else
+                   [0.2, flipped[0][0] - 0.2, flipped[0][1] + 0.2, length - 0.2], flipped, 0.14)
+    # Tie beams across under the roof, a post up from each to the ridge,
+    # and struts.
+    for k in range(4):
+        y = y0 + 0.2 + k * (y1 - y0 - 0.4) / 3
+        timber(b, (x0, y, BARN_EAVE - 0.15), (x1, y, BARN_EAVE - 0.15), 0.3, TIMBER, 0.34)
+        timber(b, (hx, y, BARN_EAVE), (hx, y, BARN_RIDGE - 0.35), 0.26, TIMBER)
+        for side in (-1, 1):
+            timber(b, (hx + side * 0.15, y, BARN_EAVE + 0.1), (hx + side * 4.2, y, roof_line(hx + side * 4.2) - 0.25), 0.18,
+                 TIMBER)
+    # Loose straw all over the floor (thick where it's straw, and thin over the flags).
+    for _ in range(2600):
+        x, y = rnd.uniform(x0 + 0.2, x1 - 0.2), rnd.uniform(y0 + 0.2, y1 - 0.2)
+        if rnd.random() > 0.2 + 0.8 * smooth((noise.noise(Vector((x / 3, y / 3, 12.0))) + 0.35) / 0.5):
+            continue
+        turn = rnd.uniform(0, math.pi)
+        lx, ly = math.cos(turn) * 0.1, math.sin(turn) * 0.1
+        z = f - 0.05 + rnd.uniform(0.0, 0.03)
+        b.add([(x - lx, y - ly, z), (x + ly * 0.2, y - lx * 0.2, z), (x + lx, y + ly, z)], [(0, 1, 2)],
+              [c.linear(rnd.choice(("#e0c06a", "#c9a24e", "#ecd488", "#b8923c")))] * 3)
+    # The coach, half as big again as it's made (as grand as in its picture),
+    # by the south wall (room to walk round it: 1.4 m clear of the wall's
+    # posts), its pole towards the doors; solid from its front wheels to its
+    # back ones (its pole, lying low, you can step over).
+    COACH_SIZE = 1.5
+    made = c.Builder()
+    coach(made, 0, 0, 0)
+    cx_, cy_ = hx + 0.6, y0 + 0.3 + 1.4 + 1.1 * COACH_SIZE
+    b.add([(cx_ + px * COACH_SIZE, cy_ + py * COACH_SIZE, f + pz * COACH_SIZE) for px, py, pz in made.verts], made.faces,
+          made.colours)
+    under_box(cx_ - 0.03 * COACH_SIZE, cy_, 1.98 * COACH_SIZE, 1.1 * COACH_SIZE, top=f + 2.4 * COACH_SIZE)
+    # A lantern hung from a beam, lit.
+    ly = y0 + 0.2 + (y1 - y0 - 0.4) / 3
+    log(b, (hx + 1.0, ly, BARN_EAVE - 0.32), (hx + 1.0, ly, BARN_EAVE - 1.3), 0.012, IRON, sides=4)
+    block(b, hx + 0.88, ly - 0.12, BARN_EAVE - 1.65, hx + 1.12, ly + 0.12, BARN_EAVE - 1.3, c.linear("#3a3532"), solid=False)
+    flame(b, hx + 1.0, ly, BARN_EAVE - 1.6, 0.2)
+    # Hay: bales stacked in the north-east corner, and loose straw heaped about.
+    for k, (u, v, z, turn) in enumerate(((6.9, 5.6, 0, 0), (5.75, 5.6, 0, 0), (7.4, 4.3, 0, math.pi / 2),
+                                          (6.3, 5.55, 0.45, 0.05), (7.35, 4.4, 0.45, math.pi / 2), (6.8, 5.0, 0.9, 0.3))):
+        hay_bale(b, hx + u, hy + v, f + z, turn, rnd)
+    under_box(hx + 6.6, hy + 5.0, 1.6, 1.3, top=f + 1.35)
+    for k, (u, v, r) in enumerate(((5.3, 4.2, 1.1), (7.0, -4.9, 1.2), (-3.2, 5.2, 0.9))):
+        b.blob((hx + u, hy + v, f + 0.25), r, c.linear("#d6b25a"), squash=0.45, lumpy=0.35, seed=30 + k)
+        under_circle(hx + u, hy + v, r * 0.85)
+    # Barrels, crates and sacks in the south-west corner, by the doors.
+    for u, v, kind in ((-7.4, -5.5, "Barrel"), (-6.6, -5.6, "Barrel"), (-7.3, -4.7, "Barrel")):
+        PROPS.put(b, kind, (hx + u, hy + v, f), rnd.uniform(0, 6), 1.1, 0.5)
+        under_circle(hx + u, hy + v, 0.42)
+    for u, v, z in ((7.5, -2.8, 0.0), (7.5, -2.8, 0.88), (7.4, -1.9, 0.0)):
+        PROPS.put(b, "Crate_Wooden", (hx + u, hy + v, f + z), rnd.uniform(-0.2, 0.2), 1.0, 0.5)
+    under_box(hx + 7.45, hy - 2.35, 0.5, 0.95, top=f + 1.8)
+    for u, v in ((-5.8, -5.9), (-5.3, -5.7)):
+        PROPS.put(b, "Bag", (hx + u, hy + v, f), rnd.uniform(0, 6), 1.2, 0.5)
+    # Satchels and a bucket on pegs, and a horse's collar, on the north wall;
+    # a shelf of pots. (Facing into the room, between the wall's posts: at hx
+    # -2.8 and +2.8. Nothing like the objects you carry: no rope, no apples.)
+    wall_y = y1 - 0.04
+    RACK = 1.4  # times the kit's size
+    rack = (hx - 5.0, wall_y, f + 2.2)
+    PROPS.put(b, "Peg_Rack", rack, 0.0, RACK, 0.6)
+    pegs = [rack[0] + x * RACK for x in (-0.47, -0.28, -0.09, 0.1, 0.29, 0.485)]  # (as the kit has them)
+    SATCHEL = 1.8  # times the kit's pouch
+    for peg in (pegs[0], pegs[5]):
+        PROPS.put(b, "Pouch_Large", (peg, wall_y - 0.2, rack[2] + 0.02 - 0.16 * SATCHEL), 0.0, SATCHEL, 0.6)
+    PROPS.put(b, "Bucket_Metal", (pegs[3], wall_y - 0.27, rack[2] + 0.02 - 0.36), 0.0, 1.0, 0.6)  # (by its handle)
+    collar = (hx - 0.9, wall_y - 0.12, f + 1.75)
+    for k in range(14):
+        a0, a1 = 2 * math.pi * k / 14, 2 * math.pi * (k + 1) / 14
+        p0 = (collar[0] + math.cos(a0) * 0.36, collar[1], collar[2] + math.sin(a0) * 0.46)
+        p1 = (collar[0] + math.cos(a1) * 0.36, collar[1], collar[2] + math.sin(a1) * 0.46)
+        timber(b, p0, p1, 0.12, c.linear("#5a3a22"), 0.1)
+    PROPS.put(b, "Shelf_Simple", (hx + 0.9, wall_y, f + 2.9), 0.0, 1.4, 0.6)
+    for u, kind in ((0.4, "Pot_1"), (0.85, "Vase_2"), (1.3, "Pot_1"), (1.5, "Bottle_1")):
+        PROPS.put(b, kind, (hx + u, wall_y - 0.25, f + 2.9 + 0.11 * 1.4 + 0.01), rnd.uniform(0, 6), 1.0, 0.4)
+    # A cart wheel, leaning on the south wall (past the coach).
+    wc = (hx + 5.0, y0 + 0.3, f + 0.7)
+    lean = 0.2
+    rim = [(wc[0] + math.cos(2 * math.pi * k / 18) * 0.7, wc[1] + math.sin(2 * math.pi * k / 18) * 0.7 * math.sin(lean) + 0.0,
+            wc[2] + math.sin(2 * math.pi * k / 18) * 0.7 * math.cos(lean)) for k in range(18)]
+    for k in range(18):
+        timber(b, rim[k], rim[(k + 1) % 18], 0.08, c.linear("#5e3b1f"), 0.08)
+    for k in range(10):
+        timber(b, wc, rim[(k * 18) // 10], 0.04, c.linear("#7a5232"))
+    under_box(wc[0], wc[1] + 0.1, 0.75, 0.2)
+    # Merlin's cloak, on a peg on the back wall, facing the doors: deep blue,
+    # hooded, folds falling to its hem, scattered with silver stars, silver
+    # buttons down its front (one missing).
+    cloak(b, x1 - 0.05, hy + 1.4, f + 3.3)
+
+
+def cloak(b, x, y, top):
+    """Merlin's cloak, hanging from a peg on a wall (facing -x)."""
+    BLUE = c.linear("#22306e")
+    log(b, (x, y, top + 0.02), (x - 0.2, y, top + 0.05), 0.035, DARK_WOOD)
+    rows, cols = 10, 12
+    pts, colours = [], []
+    for i in range(rows + 1):
+        t = i / rows
+        z = top - 0.05 - t * 2.1
+        half = 0.3 + 0.55 * t ** 0.8
+        for j in range(cols + 1):
+            s = j / cols * 2 - 1
+            fold = 0.07 * math.sin(s * math.pi * 3 + 0.5) * t
+            out = 0.12 + 0.18 * (1 - s * s) * (0.4 + 0.6 * t) + fold
+            pts.append((x - out, y + s * half, z))
+            light = 0.8 + 0.25 * math.sin(s * math.pi * 3 + 0.5)
+            colours.append(c.mix(BLUE, c.linear("#000000"), 0.25 * (1 - light)) if light < 1 else
+                           c.mix(BLUE, c.linear("#6a7ac8"), (light - 1) * 0.8))
+    faces = [(i * (cols + 1) + j, i * (cols + 1) + j + 1, (i + 1) * (cols + 1) + j + 1, (i + 1) * (cols + 1) + j)
+             for i in range(rows) for j in range(cols)]
+    b.add(pts, faces, colours)
+    # Its hood, folded back over its shoulders.
+    b.blob((x - 0.2, y, top - 0.2), 0.28, BLUE, squash=0.8, lumpy=0.2, seed=5)
+    # Stars, and its buttons (the third one gone).
+    rnd = random.Random("merlin's cloak")
+    for _ in range(26):
+        i, j = rnd.randint(1, rows - 1), rnd.randint(1, cols - 1)
+        px, py, pz = pts[i * (cols + 1) + j]
+        r = 0.045
+        star = [(px - 0.02, py + math.cos(2 * math.pi * k / 10) * r * (1 if k % 2 == 0 else 0.45),
+                 pz + math.sin(2 * math.pi * k / 10) * r * (1 if k % 2 == 0 else 0.45)) for k in range(10)]
+        b.add([(px - 0.02, py, pz)] + star, [(0, 1 + k, 1 + (k + 1) % 10)[::-1] for k in range(10)],
+              [c.linear("#e8ecf4")] * 11)
+    for k in range(5):
+        if k == 2:
+            continue
+        pz = top - 0.35 - k * 0.32
+        b.blob((x - 0.32, y, pz), 0.035, c.linear("#d8dce4"), squash=0.6, lumpy=0.0, seed=k, subdivisions=1)
+
 
 for hall in HALLS.values():
     if hall.place == "charcoal-hut":
@@ -5826,7 +6939,9 @@ if out:
         # The bridges' decks, for walking on at exactly their height: [x, z, half x, half z, top].
         "decks": [[round(x, 2), round(-y, 2), round(hx, 2), round(hy, 2), top] for x, y, hx, hy, top in DECKS],
         # Floors over the ground, for lying on: [x, z, half x, half z, how far up]. (The maze's.)
-        "floors": [[round(MZ[0], 2), round(-MZ[1], 2), round(MAZE_HALF, 2), round(MAZE_HALF, 2), MAZE_FLOOR]],
+        "floors": [[round(MZ[0], 2), round(-MZ[1], 2), round(MAZE_HALF, 2), round(MAZE_HALF, 2), MAZE_FLOOR],
+                   [round((YARD[0] + YARD[1]) / 2, 2), round(-(YARD[2] + YARD[3]) / 2, 2), round((YARD[1] - YARD[0]) / 2, 2),
+                    round((YARD[3] - YARD[2]) / 2, 2), 0.05]],  # (and the courtyard's cobbles)
         # The paths, lying a little above the ground (so what's dropped on
         # one lies on it, not in it): each its line [x, z], in three.js's
         # axes, how far either side of it it goes, and how far up it is.
