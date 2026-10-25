@@ -784,6 +784,9 @@ function tell(exit: string) {
   if (way?.message && !way.fatal) say(way.message);
   told = exit;
 }
+// (A way that kills you, come into the free way: once you're in its place, a
+// step back is going that way.)
+player.isIn = (exit) => exit.startsWith(`${room} `);
 player.onBump = (exit) => {
   if (dying(exit)) return;
   const [id, direction] = exit.split(" ");

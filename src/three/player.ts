@@ -16,7 +16,8 @@ export interface Circle {
   allRound?: boolean;
   /**
    * Going through it kills you: come into it the free way, you can step back
-   * and forth in it (only walking into it again from its far side does).
+   * and forth in it (only walking into it again from its far side does), until
+   * you're in the place it goes from (isIn).
    */
   fatal?: boolean;
   /** The height of its top, if it's low enough to climb onto. */
@@ -37,7 +38,8 @@ export interface Box {
   allRound?: boolean;
   /**
    * Going through it kills you: come into it the free way, you can step back
-   * and forth in it (only walking into it again from its far side does).
+   * and forth in it (only walking into it again from its far side does), until
+   * you're in the place it goes from (isIn).
    */
   fatal?: boolean;
   top?: number;
@@ -220,6 +222,8 @@ export class Player {
   under: Under | undefined;
   /** Called when you bounce off an obstacle, with the exit you were trying ("moat south"). */
   onBump: (exit: string) => void = () => {};
+  /** Whether you're in the place an exit goes from ("giant west": in the giant's cave). */
+  isIn: (exit: string) => boolean = () => false;
   /** Called at each footstep (and landing from a jump), walking or running, and how loud (1 is a step at full speed). */
   onStep: (kind: "walk" | "run", loudness: number) => void = () => {};
 
@@ -798,11 +802,12 @@ export class Player {
   // Going through an obstacle the free way, once you're past its middle you
   // can't turn back through it: a step back towards it stops, and it says why
   // (no bounce: you're already in its reach, maybe right by it, landed over a wall).
+  // One that kills you, you can step back through, until you're in the place
+  // it goes from: then a step back towards it is going that way.
   private turnedBack(thing: Circle | Box) {
-    if (thing.fatal) return;
     const p = this.position;
     const exit = thing.names && wayThrough(thing.names, thing.x, thing.z, p.x, p.z);
-    if (!exit) return;
+    if (!exit || (thing.fatal && !this.isIn(exit))) return;
     const b = this.before;
     // (Not the step across its middle, going on: only one back, on this side.)
     if (wayThrough(thing.names!, thing.x, thing.z, b.x, b.z) !== exit) return;
