@@ -3,7 +3,7 @@
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
 # The ladder, the plank, the key, the axe, the apple, the emerald, the
-# broom, the lamp, the rope, the penny, the water, the harp, the cake, the gold and the silver so far; the rest are to come (PLAN-V3.md).
+# broom, the lamp, the rope, the penny, the water, the harp, the cake, the gold, the silver and the ring so far; the rest are to come (PLAN-V3.md).
 
 import math
 import random
@@ -1745,6 +1745,212 @@ metal_bar(silver_bar, SILVER_BAR, silvery, 0.0, 0.0, 0.0, 0.0, 4)
 silver_object = silver_bar.build("silver", smooth=True)
 silver_object.data.transform(Matrix.Scale(SILVER_SIZE, 4))
 outward(silver_object)
+
+# The ring: as in its picture, a gold ring, its band thin underneath and
+# swelling, wider and thicker, up its shoulders to its setting; scrolls of
+# gold raised along its shoulders, a big curl either side of the setting; a
+# gold cup (a collet) on top, holding an oval purple stone in four claws,
+# each ending in a little drop. It lies on its side, as a ring does, resting
+# on the edge of its band and the rim of its setting (wider than the band),
+# so it tips a little, its stone turned up a touch. (Made standing, its
+# stone on top, then laid down.) Built at a ring's size, 2.3 cm across, then made sixteen times that (RING_SIZE), a
+# little bigger than the key. The stone (`ring-gem`) is faceted, and dressed in the game.
+RING_SIZE = 16.0
+RING_IN = 0.0088  # its inside, round the finger
+RING_GOLD = c.linear("#c8902a")
+RING_GOLD_LIGHT = c.linear("#f2c866")
+RING_GOLD_DARK = c.linear("#6a4210")
+AMETHYST = [c.linear(h) for h in ("#3b1468", "#7234c0", "#9a5ae0", "#d9a8ff")]  # under it, its crown, higher, its table
+GEM_LONG, GEM_WIDE = 0.0056, 0.0046  # half the stone's length (along the band) and width
+ring_band = c.Builder()
+ring_gem = c.Builder()
+
+
+def ring_shape(a):
+    """How wide (half) and thick the band is, a round from its top: more up its shoulders."""
+    s = max(0.0, math.cos(a)) ** 2
+    return 0.0018 + 0.0014 * s, 0.0014 + 0.0011 * s
+
+
+RING_MID = RING_IN + ring_shape(math.pi)[1]  # (its middle, so its foot is at z = 0)
+
+
+def round_ring(a):
+    """Out from the ring's middle, a round from its top (towards +y)."""
+    return Vector((0, math.sin(a), math.cos(a)))
+
+
+def on_band(a, xf, lift=0.0):
+    """A point on the band's outside, a round from its top and xf across it
+    (-1 to 1), lifted off it; and which way is out there."""
+    half, thick = ring_shape(a)
+    r = RING_IN + thick / 2 + thick / 2 * max(0.0, 1 - abs(xf) ** 4) ** 0.25 + lift
+    return Vector((half * xf, 0, RING_MID)) + round_ring(a) * r, round_ring(a)
+
+
+def ring_gold(p, t=0.0, a=0.0):
+    """Gold: warm, lighter where it's rubbed and on top, dark in its hollows."""
+    v = Vector(p) * 900
+    colour = c.mix(RING_GOLD, RING_GOLD_LIGHT, 0.3 + 0.4 * noise.noise(v * 0.4) + 0.25 * (p[2] / (2 * RING_MID)))
+    return c.vary(colour, 0.06, v)
+
+
+# The band, ring by ring round it, each its cross-section: flat inside,
+# rounded outside; its shoulders' faces a little darker (the scrolls stand
+# out against them).
+AROUND, ACROSS = 120, 16
+verts, colours = [], []
+for k in range(AROUND):
+    a = 2 * math.pi * k / AROUND
+    half, thick = ring_shape(a)
+    for j in range(ACROSS):
+        f = 2 * math.pi * j / ACROSS
+        cf, sf = math.cos(f), math.sin(f)
+        r = RING_IN + thick / 2 + thick / 2 * math.copysign(abs(cf) ** (0.5 if cf > 0 else 0.2), cf)
+        p = Vector((half * math.copysign(abs(sf) ** 0.5, sf), 0, RING_MID)) + round_ring(a) * r
+        verts.append(tuple(p))
+        shoulder = max(0.0, math.cos(a)) * max(0.0, cf) * (1 - abs(sf))
+        colours.append(c.mix(ring_gold(p), RING_GOLD_DARK, 0.35 * shoulder))
+faces = [(k * ACROSS + j, k * ACROSS + (j + 1) % ACROSS, ((k + 1) % AROUND) * ACROSS + (j + 1) % ACROSS,
+          ((k + 1) % AROUND) * ACROSS + j) for k in range(AROUND) for j in range(ACROSS)]
+ring_band.add(verts, faces, colours)
+
+
+def scroll(points, radii, sides=6):
+    """A raised gold scroll along the band: points (a round from its top, xf
+    across it), radii at each; round, sitting on it, a drop at its end."""
+    rings_, verts, colours = [], [], []
+    path = [on_band(a, xf) for a, xf in points]
+    for k, (p, out_) in enumerate(path):
+        p = p + out_ * radii[k] * 0.5
+        tangent = (path[min(k + 1, len(path) - 1)][0] - path[max(k - 1, 0)][0]).normalized()
+        across = tangent.cross(out_).normalized()
+        up = across.cross(tangent).normalized()
+        for j in range(sides):
+            f = 2 * math.pi * j / sides
+            v = p + (across * math.cos(f) + up * math.sin(f)) * radii[k]
+            verts.append(tuple(v))
+            colours.append(c.mix(ring_gold(v), RING_GOLD_LIGHT, 0.3 * max(0.0, math.sin(f))))
+    n = len(path)
+    faces = [(k * sides + j, k * sides + (j + 1) % sides, (k + 1) * sides + (j + 1) % sides, (k + 1) * sides + j)
+             for k in range(n - 1) for j in range(sides)]
+    faces += [tuple(range(sides))[::-1], tuple((n - 1) * sides + j for j in range(sides))]
+    ring_band.add(verts, faces, colours)
+    end, out_ = path[-1]
+    ring_band.blob(tuple(end + out_ * radii[-1]), radii[-1] * 1.6, RING_GOLD_LIGHT, lumpy=0.0, subdivisions=1)
+
+
+def curl(a0, xf0, size, turns, way, step):
+    """A spiral, in to its middle: from a round a0 and xf0 across, size (metres) out."""
+    _, thick = ring_shape(a0)
+    half, _ = ring_shape(a0)
+    points, n = [], 14
+    for k in range(n + 1):
+        t = k / n
+        f = way * 2 * math.pi * turns * t + step
+        r = size * (1 - 0.8 * t)
+        points.append((a0 + r * math.cos(f) / (RING_IN + thick), max(-0.95, min(0.95, xf0 + r * math.sin(f) / half))))
+    return points
+
+
+for side_ in (-1, 1):
+    # A big curl beside the setting, either side.
+    points = curl(side_ * 0.34, 0.0, 0.0020, 1.15, side_, 0.0)
+    scroll(points, [0.0008 - 0.0003 * k / (len(points) - 1) for k in range(len(points))])
+    # A stem down the shoulder, swaying across it, a curl off each sway.
+    vine = [(side_ * (0.5 + 0.6 * k / 16), 0.3 * math.sin(k / 16 * 2 * math.pi)) for k in range(17)]
+    scroll(vine, [0.0006 - 0.00025 * k / 16 for k in range(17)])
+    for n, (s_, xf) in enumerate(((0.66, 0.45), (0.94, -0.45))):
+        points = curl(side_ * s_, xf, 0.0013 - 0.0003 * n, 1.0, side_ * (1 if xf > 0 else -1), math.pi)
+        scroll(points, [0.00058 - 0.00022 * k / (len(points) - 1) for k in range(len(points))])
+
+# The collet: an oval gold cup on top, from down in the band, flaring out to
+# a rim round the stone; and its four claws, up over the stone's edge.
+SEAT = RING_MID + RING_IN + ring_shape(0)[1] - 0.0004  # (its foot, in the top of the band)
+
+
+def collet_at(s, h, f):
+    return (GEM_WIDE * s * math.cos(f), GEM_LONG * s * math.sin(f), SEAT + h)
+
+
+cup = [(0.55, -0.0004), (0.8, 0.0008), (1.0, 0.0022), (1.1, 0.0034), (1.12, 0.0039), (1.02, 0.0041), (0.9, 0.0036),
+       (0.0, 0.0036)]
+SIDES = 32
+verts, colours = [], []
+for s, h in cup:
+    for j in range(SIDES):
+        p = collet_at(s, h, 2 * math.pi * j / SIDES)
+        verts.append(p)
+        colours.append(ring_gold(p))
+faces = [(k * SIDES + j, k * SIDES + (j + 1) % SIDES, (k + 1) * SIDES + (j + 1) % SIDES, (k + 1) * SIDES + j)
+         for k in range(len(cup) - 1) for j in range(SIDES)]
+faces.append(tuple(range(SIDES))[::-1])
+ring_band.add(verts, faces, colours)
+for n in range(4):
+    f = math.pi / 4 + math.pi / 2 * n
+    claw = [collet_at(s, h, f) for s, h in ((1.08, 0.0026), (1.06, 0.0040), (0.99, 0.0046), (0.9, 0.0051))]
+    round_tube(ring_band, claw, [0.0006, 0.00055, 0.0005, 0.00045], lambda p, t, a: ring_gold(p), sides=7)
+    ring_band.blob(claw[-1], 0.00072, RING_GOLD_LIGHT, squash=0.8, lumpy=0.0, subdivisions=2)
+
+# The stone: an oval, cut in facets: from its girdle (just over the rim) up
+# in two rows of facets to its flat table, and down under it to a point (in
+# the cup). Each facet its own purple, lighter higher up.
+GIRDLE = 0.0040
+gem_rings = [(0.97, GIRDLE, 0.0), (0.82, GIRDLE + 0.0016, 0.5), (0.58, GIRDLE + 0.0028, 1.0)]
+pavilion = [(0.97, GIRDLE, 0.0), (0.55, GIRDLE - 0.0016, 0.5)]
+GEM_SIDES = 16
+
+
+def gem_ring(s, h, turn):
+    return [Vector(collet_at(s, h, 2 * math.pi * (j + turn) / GEM_SIDES)) for j in range(GEM_SIDES)]
+
+
+def facet(pts, colour, seed):
+    ring_gem.add([tuple(p) for p in pts], [tuple(range(len(pts)))], [c.vary(colour, 0.2, Vector((seed, len(pts), 1.0)))] * len(pts))
+
+
+for rows, colours_ in ((gem_rings, (AMETHYST[1], AMETHYST[2])), (pavilion, (AMETHYST[0],))):
+    for r_, ((s0, h0, t0), (s1, h1, t1)) in enumerate(zip(rows, rows[1:])):
+        lo, hi = gem_ring(s0, h0, t0), gem_ring(s1, h1, t1)
+        if t1 < t0:  # (the table's ring, half a facet on from the one under it)
+            hi = hi[1:] + hi[:1]
+        for j in range(GEM_SIDES):
+            j1 = (j + 1) % GEM_SIDES
+            facet([lo[j], lo[j1], hi[j]], colours_[r_], j * 2 + r_ * 40)
+            facet([hi[j], lo[j1], hi[j1]], colours_[r_], j * 2 + 1 + r_ * 40)
+table = gem_ring(*gem_rings[-1])
+facet(table, AMETHYST[3], 99)
+under = gem_ring(*pavilion[-1])
+point = Vector(collet_at(0, GIRDLE - 0.0034, 0))
+for j in range(GEM_SIDES):
+    facet([under[(j + 1) % GEM_SIDES], under[j], point], AMETHYST[0], 200 + j)
+
+ring_object = ring_band.build("ring", smooth=True)
+ring_gem_object = ring_gem.build("ring-gem", smooth=False)
+
+
+def lying_ring(turn):
+    """Its points laid over by turn (radians, round y: a quarter turn lays it flat)."""
+    return [Matrix.Rotation(turn, 3, "Y") @ v.co for part in (ring_object, ring_gem_object) for v in part.data.vertices]
+
+
+# Laid down: turned until it rests on both sides of its middle (the band's
+# edge, and its setting's rim), as low on one as on the other.
+def rocking(turn):
+    pts = lying_ring(turn)
+    mid = sum(p.x for p in pts) / len(pts)
+    return abs(min(p.z for p in pts if p.x > mid) - min(p.z for p in pts if p.x < mid))
+
+
+turn = min((math.pi / 2 - math.radians(d / 4) for d in range(0, 160)), key=rocking)
+pts = lying_ring(turn)
+low, across = min(p.z for p in pts), (min(p.x for p in pts) + max(p.x for p in pts)) / 2
+for part in (ring_object, ring_gem_object):
+    part.data.transform(Matrix.Translation((-across, 0, -low)) @ Matrix.Rotation(turn, 4, "Y"))
+    part.data.transform(Matrix.Scale(RING_SIZE, 4))
+outward(ring_object)
+outward(ring_gem_object)
+ring_gem_object.parent = ring_object
 
 if out:
     c.export(out)

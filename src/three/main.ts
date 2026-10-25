@@ -280,6 +280,35 @@ if (silver instanceof Mesh) {
     emissiveIntensity: 0.3,
   });
 }
+// The ring: its gold shining as the gold does, and its stone glassy and
+// purple, glowing a little from within, as the emerald does.
+const ring = things.scene.getObjectByName("ring");
+if (ring instanceof Mesh) {
+  ring.material = new MeshStandardMaterial({
+    vertexColors: true,
+    metalness: 0.9,
+    roughness: 0.25,
+    envMap: shine,
+    envMapIntensity: 1.0,
+    emissive: new Color("#5a3204"),
+    emissiveIntensity: 0.4,
+  });
+}
+const amethyst = things.scene.getObjectByName("ring-gem");
+if (amethyst instanceof Mesh) {
+  amethyst.material = new MeshPhysicalMaterial({
+    vertexColors: true,
+    flatShading: true,
+    roughness: 0.1,
+    metalness: 0.9,
+    clearcoat: 0.3,
+    clearcoatRoughness: 0.05,
+    envMap: shine,
+    envMapIntensity: 0.6,
+    emissive: new Color("#6a2ab8"),
+    emissiveIntensity: 0.9,
+  });
+}
 // The lamp: its glass see-through, and its flame (lit, lantern.ts) bright.
 dressLamp(things.scene.getObjectByName("lamp")!);
 // The water: its flask's glass clear and shining, and the water in it a
