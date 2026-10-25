@@ -37,6 +37,7 @@ ANIMS = ["Sitting_Idle_Loop"]
 TEXTURE = 1024  # the size every texture is shrunk to (the kit's are 2048)
 
 HEAD_SIZE = 1.15  # times bigger, his head...
+HEAD_WIDE = 1.1  # (and wider than that, side to side: a broad face)
 FEET = 1.3  # ...and his feet (his hands are made bigger in the game, by their bones)
 BULK = (0.02, 0.022)  # metres his limbs and his body are bulked out
 BELLY = (0.085, 1.1, 0.2, 0.14)  # metres his belly sticks out, at its middle (its height), and how far it goes up and down
@@ -87,11 +88,14 @@ def side_weight(w, starts, side):
 HEAD_AT = bone_at("Head")
 
 
-def grown(p, w):
+def grown(p, w, wide=True):
     """Where a point of him goes: his head and feet bigger (blended by how
-    much each bone moves it, so nothing tears)."""
+    much each bone moves it, so nothing tears), and his head wider (not wide,
+    an eye: it's moved out whole, not stretched)."""
     head = w.get("Head", 0.0)
     p = HEAD_AT + (p - HEAD_AT) * (1 + (HEAD_SIZE - 1) * head)
+    if wide:
+        p.x = HEAD_AT.x + (p.x - HEAD_AT.x) * (1 + (HEAD_WIDE - 1) * head)
     for side in ("l", "r"):
         foot = side_weight(w, ("foot", "ball"), side)
         if foot:
@@ -260,8 +264,17 @@ for obj in faces_on:
     if obj.name.startswith("Eyebrows"):
         for v in obj.data.vertices:
             v.co.z += BROWS[0] + BROWS[1] * math.sin(math.pi * min(1.0, abs(v.co.x) / 0.062))
+    eye = obj.name.startswith("Eyes")
     for v, w in zip(obj.data.vertices, weights_of(obj)):
-        v.co = m.inverted() @ grown(m @ v.co, w or {"Head": 1.0})
+        v.co = m.inverted() @ grown(m @ v.co, w or {"Head": 1.0}, wide=not eye)
+    if eye:
+        # (Each eye moved out whole, as far as its middle is by his head's being wider.)
+        for side in (1, -1):
+            ball = [v for v in obj.data.vertices if (m @ v.co).x * side > 0]
+            middle = sum(((m @ v.co).x for v in ball), 0.0) / len(ball)
+            apart = (middle - HEAD_AT.x) * (HEAD_WIDE - 1)
+            for v in ball:
+                v.co = m.inverted() @ ((m @ v.co) + Vector((apart, 0, 0)))
 body.data.update()
 
 # ---- His hair and beard (giant-hair, giant-beard), his hide (giant-hide), and the wraps
