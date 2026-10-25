@@ -625,8 +625,9 @@ WAYS = {
     "small-lair": Way([(*SR, LAIR_FLOOR), (ML[0], SR[1], LAIR_FLOOR)], indoor=True),
     "lair-hall": Way([(*ML, LAIR_FLOOR), (ML[0], LAIR_STAIRS_FOOT, LAIR_FLOOR), (GH[0], LAIR_STAIRS_TOP, 0.4), (*GH, 0.4)],
                      indoor=True),
-    # And in through the coach house's wide doors.
-    "coach-door": Way([(CH[0] - HALLS["coach-house"].w - 1.8, CH[1], None), (*CH, 0.4)], half=2.4, indoor=True),
+    # And in through the coach house's wide doors (its own doorway: courtyard).
+    "coach-door": Way([(CH[0] - HALLS["coach-house"].w - 1.8, CH[1], None), (*CH, 0.4)], half=2.4, indoor=True,
+                      open=True),
     # In at the tower's door, and the hut's.
     "tower-door": Way([(*TOWER_LIP, None), (*TOWER, None)], half=1.3, indoor=True),
     "hut-door": Way([(*HUT_LIP, None), (*HUT, None)], half=1.2, indoor=True, open=True),
@@ -6023,11 +6024,12 @@ def courtyard():
         lantern(GH[0] + side * 2.7, ys, g + 2.4, (0, 1))
         lantern(side * 4.6, yn, g + 2.6, (0, -1))
     BANNER = 1.9
-    for x, tint in ((-6.2, "#9e2b25"), (4.2, "#2f4f8a")):
-        PROPS.put(court, "Banner_1", (x, ys + 0.12, g + 9.0), math.pi, BANNER, 0.5, tint=(*c.linear(tint)[:3], 0.6))
+    # (Each a sign on a bracket: its post against the wall, its arm straight out, the banner hanging under it.)
+    for x, tint in ((-5.4, "#9e2b25"), (5.4, "#2f4f8a")):
+        PROPS.put(court, "Banner_1", (x, ys + 0.05, g + 7.6), math.pi / 2, BANNER, 0.5, tint=(*c.linear(tint)[:3], 0.6))
 
     # The rose garden: a pergola of oak, roses over it and up its posts, along
-    # a walk between two beds, with benches under it; and a sundial.
+    # a walk between two beds, with benches under it.
     px_, py0, py1, half = PERGOLA
     OAK_LIGHT = c.linear("#7a5634")
     posts = [py0 + k * (py1 - py0) / 6 for k in range(7)]
@@ -6050,19 +6052,27 @@ def courtyard():
     for y in (posts[1] + 1.4, posts[4] + 1.6):
         PROPS.put(court, "Bench", (px_ - half + 0.42, y, g), facing_yaw(1, 0), 1.2)
         solid_box(px_ - half + 0.42, y, 0.35, 1.7)
-    # The sundial, out in the sun.
-    sx_, sy_ = px_ - 13.0 + 2, (py0 + py1) / 2
+    # The sundial, beside the rose garden (in the shade: out in the sun, its
+    # gnomon's shadow is too fine for the sun's shadows, and blurs).
+    sx_, sy_ = px_ - 11.0, (py0 + py1) / 2
     court.cylinder((sx_, sy_, g), (sx_, sy_, g + 0.2), 0.55, 0.5, castle_stone(court_rng, 2, 0), sides=10)
+    quad_ring = [(sx_ + math.cos(2 * math.pi * k / 10) * 0.5, sy_ + math.sin(2 * math.pi * k / 10) * 0.5, g + 0.2)
+                 for k in range(10)]
+    court.add(quad_ring, [tuple(range(10))], [castle_stone(court_rng, 2, 0)] * 10)  # (its step's top)
     court.cylinder((sx_, sy_, g + 0.2), (sx_, sy_, g + 0.95), 0.2, 0.17, castle_stone(court_rng, 2, 0), sides=10)
     court.cylinder((sx_, sy_, g + 0.95), (sx_, sy_, g + 1.05), 0.36, 0.38, castle_stone(court_rng, 2, 0), sides=14)
     court.add([(sx_, sy_, g + 1.05)] + [(sx_ + math.cos(2 * math.pi * k / 14) * 0.38, sy_ + math.sin(2 * math.pi * k / 14) * 0.38,
                                          g + 1.05) for k in range(14)], [(0, 1 + k, 1 + (k + 1) % 14) for k in range(14)],
               [c.linear("#c9a04a")] * 15)
-    oriented(court, (sx_, sy_, g + 1.05), (0, 1), -0.25, 0.2, -0.01, 0.01, 0, 0.0, IRON)
-    court.add([(sx_, sy_ - 0.26, g + 1.06), (sx_, sy_ + 0.22, g + 1.06), (sx_, sy_ - 0.26, g + 1.32)], [(0, 1, 2)],
-              [c.linear("#5a4a2a")] * 3)
-    court.add([(sx_, sy_ - 0.26, g + 1.32), (sx_, sy_ + 0.22, g + 1.06), (sx_, sy_ - 0.26, g + 1.06)], [(0, 1, 2)],
-              [c.linear("#5a4a2a")] * 3)
+    # (Its gnomon: a wedge of bronze, standing on it.)
+    bronze = c.linear("#6a5430")
+    wedge = [(y, z) for y, z in ((sy_ - 0.26, g + 1.05), (sy_ + 0.22, g + 1.05), (sy_ - 0.26, g + 1.32))]
+    left, right = [(sx_ - 0.012, y, z) for y, z in wedge], [(sx_ + 0.012, y, z) for y, z in wedge]
+    facing(court, left, [bronze] * 3, (-1, 0, 0))
+    facing(court, right, [bronze] * 3, (1, 0, 0))
+    for k, out in ((0, (0, 0, -1)), (1, (0, 0.27, 0.48)), (2, (0, -1, 0))):
+        n = (k + 1) % 3
+        facing(court, [left[k], left[n], right[n], right[k]], [bronze] * 4, out)
     solid_circle(sx_, sy_, 0.55)
 
     # The coach house: on a footing of stone, walls of boards, upright, between
@@ -6102,8 +6112,9 @@ def courtyard():
             facing(court, inner, [c.linear("#2a1e14")] * 3, (-uy, ux, 0))
     # The lintel over the doors, and the doors, open out (planks on ledges,
     # with iron straps across them), and the lantern beside them.
-    timber(court, (BARN_W - 0.12, BARN.y - BARN_DOOR - 0.5, BARN_DOOR_TOP + 0.18), (BARN_W - 0.12, BARN.y + BARN_DOOR + 0.5, BARN_DOOR_TOP + 0.18),
-         0.34, TIMBER, 0.36)
+    # (Its underside a shade below the wall's over the doorway, and out in front of it: level, they'd flicker.)
+    timber(court, (BARN_W - 0.16, BARN.y - BARN_DOOR - 0.5, BARN_DOOR_TOP + 0.15),
+           (BARN_W - 0.16, BARN.y + BARN_DOOR + 0.5, BARN_DOOR_TOP + 0.15), 0.3, TIMBER, 0.36)
     LEAF = BARN_DOOR - 0.02
     for side in (-1, 1):
         hinge = (BARN_W - 0.05, BARN.y + side * BARN_DOOR, g + 0.04)
