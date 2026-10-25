@@ -9,9 +9,9 @@
 # and beard (giant-hair), his hide (giant-hide) and his wraps (giant-wraps)
 # are made here, each moved by the bones that move the skin it's on. All of
 # it shares the kits' one skeleton, so the Universal Animation Libraries'
-# clips play on him (ANIMS): crouching, waiting; standing; nodding; walking;
-# and sitting down. (None of them eats: the game lifts his hand to his mouth.)
-# The game makes him giant-sized.
+# clips play on him (ANIMS): sitting, and sitting asking for something to
+# eat. (Neither eats: the game lifts his hand to his mouth.) The game makes
+# him giant-sized.
 #
 # He stands in a T-pose, his feet at z = 0, facing -y (the way the kits face).
 
@@ -33,7 +33,7 @@ c.clear()
 
 BODY = c.BODIES / "Superhero_Male_FullBody.gltf"
 
-ANIMS = ["Crouch_Idle_Loop", "Idle_Loop", "Yes", "Walk_Loop", "Sitting_Enter", "Sitting_Idle_Loop"]
+ANIMS = ["Sitting_Idle_Loop", "Sitting_Talking_Loop"]
 TEXTURE = 1024  # the size every texture is shrunk to (the kit's are 2048)
 
 HEAD_SIZE = 1.15  # times bigger, his head...
@@ -483,8 +483,8 @@ if out:
     c.export(out, use_selection=True, export_animation_mode="NLA_TRACKS", export_image_format="WEBP")
 
 if preview:
-    # Standing, from the front and the side; close up on his face (and blinking);
-    # crouching, waiting; and sitting (on a block for a rock).
+    # Standing, from the front and the back; close up on his face (and blinking);
+    # and sitting (on a block for a rock).
     for track in skeleton.animation_data.nla_tracks:
         track.mute = True
     bpy.context.scene.frame_set(0)
@@ -495,8 +495,6 @@ if preview:
     keys["blink"].value = 1.0
     c.preview(preview.replace(".png", "-blink.png"), (0.1, -0.45, 1.69), (0.02, 0, 1.69), (0.4, 0.8, -1), lens=60)
     keys["blink"].value = 0.0
-    c.pose(skeleton, "Crouch_Idle_Loop", 20)
-    c.preview(preview.replace(".png", "-crouch.png"), (1.8, -3.6, 1.0), (0, 0, 0.6), (0.4, 0.8, -1), lens=40)
     seat = c.Builder()
     seat.add([(x, y, z) for z in (0, 0.48) for y in (0.05, 0.6) for x in (-0.35, 0.35)],
              [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)],

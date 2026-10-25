@@ -1,20 +1,19 @@
-// The giant in his cave (his model: art/blender/giant.py), crouching in front
-// of the way west (land.py), as in its picture, watching you as you go about,
-// hungry. Walking into the way, he shakes his head at you.
-// Given a cake (thrown from your hand), he catches it, stands up, eats it in
-// three big bites, nods, and goes and sits on his boulder beside the way (and
-// lets you by); and once you've gone, he's back where he was.
+// The giant in his cave (his model: art/blender/giant.py), sitting on his
+// boulder beside the way west (land.py), hungry, watching you as you go
+// about; come near, and he holds out his hands, asking for something to eat.
+// Walking into the way, he shakes his head at you.
+// Given a cake (thrown from your hand), he catches it, eats it in three big
+// bites, and nods (and lets you by); and once you've gone, he's hungry again.
 //
 // His clips are the Universal Animation Libraries', named as they are there.
-// None of them eats: his hand's lifted to his mouth here, on top of his
-// standing clip (reach).
+// Neither eats: his hand's lifted to his mouth here, on top of his sitting
+// clip (reach).
 
 import {
   type AnimationAction,
   type AnimationClip,
   AnimationMixer,
   Group,
-  LoopOnce,
   Mesh,
   type Object3D,
   Quaternion,
@@ -23,25 +22,24 @@ import {
   Vector3,
 } from "three";
 
-/** The giant (land.json): where he crouches [x, z] and his floor, where he sits [x, z] and which way he faces there [x, z], and how big he is. */
+/** The giant (land.json): where he sits [x, z] and his floor, which way he faces [x, z], and how big he is. */
 export interface GiantPlace {
-  crouching: number[];
-  sitting: number[];
+  at: number[];
   facing: number[];
   size: number;
 }
 
-const WATCH = 16; // metres: this near, he watches you
+const WATCH = 16; // metres: this near, he watches you...
+const ASK = 9; // ...and this near, hungry, he asks you for something to eat
 const FAR = 45; // metres: further off than this, he isn't drawn
 const BLEND = 0.5; // seconds from one clip to the next
 const FLIGHT = [0.6, 1.2]; // seconds the cake takes to reach his hand, at least and at most
 const BITES = 3; // he eats it in this many bites...
 const BITE = [0.5, 0.35, 0.55]; // ...each: seconds lifting it to his mouth, at it (a bite, halfway), and lowering it
 const MOUTH = [0.12, -0.03]; // where his mouth is from his head's bone: forward, and up (at the model's size)
-const WALK = 1.15; // metres a second he walks (at the model's size: his strides are as big as he is)
-const TURNING = 2; // radians a second he turns
 const TURN = 0.9; // radians his head turns, at most, either way
-const SHAKE = [1.4, 13, 0.35]; // seconds he shakes his head, how fast (radians a second), and how far (radians)
+const SHAKE = [1.4, 13, 0.35]; // seconds he shakes his head (no), how fast (radians a second), and how far (radians)
+const NOD = [1.2, 9, 0.18]; // and nods (yes, fed)
 const GLANCE = [1.5, 4]; // seconds between his glances, now to one side, now back to you
 const BLINK = [2.5, 6]; // seconds between his blinks
 const SHUT = 0.15; // seconds a blink takes
@@ -50,7 +48,7 @@ const FINGERS = 0.85; // and how long their middle and end joints are, pulled in
 const CAKE = 2.0; // the cake in his hand, times the one you carry (growing as it flies to him: a cake for a giant)
 const UP = new Vector3(0, 1, 0);
 
-type Doing = "waiting" | "catching" | "eating" | "nodding" | "walking" | "turning" | "sitting down" | "sitting";
+type Doing = "hungry" | "catching" | "eating" | "fed";
 
 export class Giant {
   private model: Object3D;
@@ -65,13 +63,9 @@ export class Giant {
   private mixer: AnimationMixer;
   private clips: Map<string, AnimationAction>;
   private playing: AnimationAction | undefined;
-  private doing: Doing = "waiting";
+  private doing: Doing = "hungry";
   private time = 0; // seconds into what he's doing
-  private crouch: Vector3;
-  private seat: Vector3;
   private yaw: number;
-  private crouchYaw: number;
-  private seatYaw: number;
   /** Which way his face looks, in his head's own frame. */
   private face: Vector3;
   /** His head, as his clip has it (before it's turned to you). */
@@ -79,6 +73,7 @@ export class Giant {
   private look = { turn: 0, up: 0 };
   private glance = { turn: 0, up: 0, for: 0 };
   private shaking = SHAKE[0];
+  private nodding = NOD[0];
   private shut: (amount: number) => void = () => {};
   private lids = { wait: BLINK[0], at: -1 };
   private cake = new Group();
@@ -95,8 +90,7 @@ export class Giant {
     private munch: () => void
   ) {
     const {
-      crouching: [x, z, floor],
-      sitting: [sx, sz],
+      at: [x, z, floor],
       facing: [fx, fz],
       size,
     } = place;
@@ -118,11 +112,9 @@ export class Giant {
       const influences = o.morphTargetInfluences;
       if (blink !== undefined && influences) this.shut = (amount) => (influences[blink] = amount);
     });
-    this.crouch = new Vector3(x, floor, z);
-    this.seat = new Vector3(sx, floor, sz);
-    this.crouchYaw = Math.PI / 2; // (facing east, into his cave, across the way west)
-    this.seatYaw = Math.atan2(fx, fz);
-    this.yaw = this.crouchYaw;
+    this.yaw = Math.atan2(fx, fz);
+    this.model.position.set(x, floor, z);
+    this.model.rotation.y = this.yaw;
     this.model.scale.setScalar(size);
     scene.add(this.model);
     this.head = this.model.getObjectByName("Head");
@@ -140,11 +132,6 @@ export class Giant {
     );
     this.mixer = new AnimationMixer(this.model);
     this.clips = new Map(clips.map((clip) => [clip.name, this.mixer.clipAction(clip)]));
-    for (const name of ["Yes", "Sitting_Enter"]) {
-      const once = this.clips.get(name);
-      once?.setLoop(LoopOnce, 1);
-      if (once) once.clampWhenFinished = true;
-    }
     // The cake he's given: a copy of the one you carry, its middle at its middle.
     const copy = cakeModel.clone();
     copy.position.set(0, -0.1, 0);
@@ -152,12 +139,10 @@ export class Giant {
     this.cake.add(copy);
     this.cake.visible = false;
     scene.add(this.cake);
-    this.back();
-  }
-
-  /** Whether he's had his cake (and isn't in the way). */
-  get fed() {
-    return this.doing !== "waiting";
+    this.play("Sitting_Idle_Loop", true);
+    this.mixer.update(0);
+    this.shape();
+    this.posed.copy(this.head?.quaternion ?? this.posed);
   }
 
   private play(name: string, now = false) {
@@ -169,41 +154,22 @@ export class Giant {
     this.playing = next;
   }
 
-  private placed(at: Vector3, yaw: number) {
-    this.model.position.copy(at);
-    this.yaw = yaw;
-    this.model.rotation.y = yaw;
-  }
-
-  /** Straight to it, still: a clip's first frame, his hands and head shaped. */
-  private pose(name: string) {
-    this.play(name, true);
-    this.mixer.update(0);
-    this.shape();
-    this.posed.copy(this.head?.quaternion ?? this.posed);
-  }
-
-  /** Crouching in front of the way, hungry (a game loaded without the cake in use here, or you've gone). */
-  back() {
-    if (this.doing === "waiting" && this.playing) return;
-    this.doing = "waiting";
+  /** Hungry again (a game loaded without the cake in use here, or you've gone). */
+  hungry() {
+    this.doing = "hungry";
     this.cake.visible = false;
-    this.placed(this.crouch, this.crouchYaw);
-    this.pose("Crouch_Idle_Loop");
   }
 
-  /** Sitting on his boulder, fed (a game loaded with the cake in use here). */
-  away() {
-    this.doing = "sitting";
+  /** Fed (a game loaded with the cake in use here). */
+  fed() {
+    this.doing = "fed";
     this.cake.visible = false;
-    this.placed(this.seat, this.seatYaw);
-    this.pose("Sitting_Idle_Loop");
   }
 
   /** You've used the cake here: you throw it to him, from your hand. */
   feed(from: Vector3) {
-    if (this.doing !== "waiting") return;
-    if (this.reducedMotion) return this.away();
+    if (this.doing !== "hungry") return;
+    if (this.reducedMotion) return this.fed();
     this.doing = "catching";
     this.time = 0;
     this.bitten = 0;
@@ -211,24 +177,24 @@ export class Giant {
     this.cake.scale.setScalar(1);
     this.cake.position.copy(from);
     this.cake.visible = true;
-    this.play("Idle_Loop");
   }
 
   /** Walking into the way, with no cake: he shakes his head at you. */
   refuse() {
-    if (this.doing === "waiting") this.shaking = 0;
+    if (this.doing === "hungry") this.shaking = 0;
   }
 
   /** Each frame: your eyes, and whether you're in his cave. */
   update(dt: number, eye: Vector3, here: boolean) {
     const far = this.model.position.distanceTo(eye);
     this.model.visible = here || far < FAR;
-    if (!this.model.visible) return;
-    if (this.reducedMotion) return;
+    if (!this.model.visible || this.reducedMotion) return;
     this.time += dt;
-    this.act(dt);
-    // (The mixer only sets a bone when its clip moves it: held still, the
-    // head would keep the turn it was given last frame, and turn again.)
+    this.act();
+    // Hungry, he asks you for something to eat when you're near: his hands out.
+    this.play(this.doing === "hungry" && here && far < ASK ? "Sitting_Talking_Loop" : "Sitting_Idle_Loop");
+    // (The mixer only sets a bone when its clip moves it: held still, his head
+    // and arm would keep the turn they were given last frame, and turn again.)
     this.head?.quaternion.copy(this.posed);
     this.arm.slice(0, 2).forEach((bone, k) => bone.quaternion.copy(this.armPosed[k]));
     this.mixer.update(dt);
@@ -236,17 +202,15 @@ export class Giant {
     this.posed.copy(this.head?.quaternion ?? this.posed);
     this.arm.slice(0, 2).forEach((bone, k) => this.armPosed[k].copy(bone.quaternion));
     if (this.doing === "eating") this.reach(this.lifted());
-    const watching = here && far < WATCH && (this.doing === "waiting" || this.doing === "sitting");
-    this.watch(eye, watching, dt);
+    this.watch(eye, here && far < WATCH && this.doing !== "eating", dt);
     this.blink(dt);
     this.hold();
   }
 
-  /** What he's doing, and on to the next thing, when it's done. */
-  private act(dt: number) {
-    const clip = this.playing?.getClip().duration ?? 1;
+  /** Catching the cake, and eating it. */
+  private act() {
     if (this.doing === "catching") {
-      // The cake in the air, along an arc, turning over, into his hand (as he stands up).
+      // The cake in the air, along an arc, turning over, into his hand.
       const flight = Math.min(FLIGHT[1], Math.max(FLIGHT[0], this.from.distanceTo(this.palm()) / 8));
       const u = Math.min(1, this.time / flight);
       this.cake.position.lerpVectors(this.from, this.palm(), u).addScaledVector(UP, 3 * u * (1 - u));
@@ -258,7 +222,7 @@ export class Giant {
       }
     } else if (this.doing === "eating") {
       // A bite each time his hand's at his mouth, the cake smaller each time;
-      // the last, and it's gone.
+      // the last, and it's gone, and he nods.
       const each = BITE[0] + BITE[1] + BITE[2];
       const bites = Math.min(BITES, Math.floor((this.time - BITE[0] - BITE[1] / 2) / each + 1));
       if (bites > this.bitten) {
@@ -267,43 +231,14 @@ export class Giant {
         this.cake.scale.setScalar(CAKE * Math.cbrt(1 - bites / BITES));
         this.cake.visible = bites < BITES;
       }
-      if (this.time > each * BITES) this.next("nodding", "Yes");
-    } else if (this.doing === "nodding") {
-      if (this.time > clip) this.next("walking", "Walk_Loop");
-    } else if (this.doing === "walking") {
-      // Over to his boulder, turning to go that way.
-      const to = this.seat.clone().sub(this.model.position).setY(0);
-      const step = WALK * this.model.scale.x * dt;
-      this.turnTo(Math.atan2(to.x, to.z), dt);
-      if (to.length() <= step) {
-        this.model.position.copy(this.seat);
-        this.next("turning", "Idle_Loop");
-      } else this.model.position.addScaledVector(to.normalize(), step);
-    } else if (this.doing === "turning") {
-      // Round, his back to it, and down he sits.
-      if (this.turnTo(this.seatYaw, dt)) this.next("sitting down", "Sitting_Enter");
-    } else if (this.doing === "sitting down") {
-      if (this.time > clip) this.next("sitting", "Sitting_Idle_Loop");
+      if (this.time > each * BITES) {
+        this.doing = "fed";
+        this.nodding = 0;
+      }
     }
   }
 
-  private next(doing: Doing, clip: string) {
-    this.doing = doing;
-    this.time = 0;
-    this.play(clip);
-  }
-
-  /** Turned towards a way (radians round), as fast as he turns; and whether he's facing it. */
-  private turnTo(yaw: number, dt: number) {
-    const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
-    const off = wrap(yaw - this.yaw);
-    const step = TURNING * dt;
-    this.yaw = Math.abs(off) <= step ? yaw : this.yaw + Math.sign(off) * step;
-    this.model.rotation.y = this.yaw;
-    return this.yaw === yaw;
-  }
-
-  /** The middle of his right hand's palm, where he holds the cake. */
+  /** The middle of his left hand's palm, where he holds the cake. */
   private palm() {
     this.model.updateMatrixWorld(true);
     const wrist = this.hand?.getWorldPosition(new Vector3()) ?? this.model.position.clone();
@@ -375,7 +310,7 @@ export class Giant {
     turn(fore, this.palm().sub(now), shoulder.clone().addScaledVector(way, d).sub(now));
   }
 
-  /** His hands and head as big as they are (each frame, after his clip: his clips set every bone's size). */
+  /** His hands as big as they are (each frame, after his clip: his clips set every bone's size). */
   private shape() {
     for (const hand of this.hands) hand.scale.setScalar(HANDS);
     for (const [bone, at] of this.fingers) bone.position.copy(at);
@@ -397,7 +332,7 @@ export class Giant {
     lids.wait = Math.random() < 0.2 ? 0.12 : BLINK[0] + Math.random() * (BLINK[1] - BLINK[0]);
   }
 
-  /** His head turned to you (as far as it can turn), now and then glancing aside; or shaking, no. */
+  /** His head turned to you (as far as it can turn), now and then glancing aside; or shaking, no; or nodding, yes. */
   private watch(eye: Vector3, watching: boolean, dt: number) {
     const { head, model, look, glance } = this;
     if (!head?.parent) return;
@@ -425,16 +360,19 @@ export class Giant {
     const ease = Math.min(1, dt * 3);
     look.turn += (wants.turn - look.turn) * ease;
     look.up += (wants.up - look.up) * ease;
-    // (And shaking his head at you: no, side to side, dying away.)
+    // (And shaking his head at you, side to side, or nodding, up and down,
+    // dying away.)
     this.shaking += dt;
-    const fading = Math.max(0, 1 - this.shaking / SHAKE[0]);
-    const shake = Math.sin(this.shaking * SHAKE[1]) * SHAKE[2] * fading;
+    this.nodding += dt;
+    const swing = ([long, fast, far]: number[], t: number) => Math.sin(t * fast) * far * Math.max(0, 1 - t / long);
+    const shake = swing(SHAKE, this.shaking);
+    const nod = swing(NOD, this.nodding);
     // (On top of what his clip does: up, about his face's own side, then
     // round; and back into the head's parent's frame.)
     const side = facing.clone().cross(UP).normalize();
     const wanted = new Quaternion()
       .setFromAxisAngle(UP, look.turn + shake)
-      .multiply(new Quaternion().setFromAxisAngle(side, look.up))
+      .multiply(new Quaternion().setFromAxisAngle(side, look.up + nod))
       .multiply(world);
     head.quaternion.copy(head.parent.getWorldQuaternion(new Quaternion()).invert().multiply(wanted));
   }

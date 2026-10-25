@@ -581,8 +581,8 @@ const dragon = new Dragon(
 // one on the harp, they dance (trolls.ts).
 const pleased = shapeOf.get("trolls north");
 const trolls = new Trolls(scene, trolly.scene, trolly.animations, land.trolls as TrollsPlace, reducedMotion);
-// The giant in front of the way west from his cave, hungry; given a cake, he
-// eats it, and goes and sits down (giant.ts).
+// The giant beside the way west from his cave, hungry; given a cake, he eats
+// it (giant.ts).
 const hungry = shapeOf.get("giant west");
 const giant = new Giant(
   scene,
@@ -931,13 +931,12 @@ function inUse() {
   if (fiery && opened.has(fiery)) {
     dragon.douse(instantly ? undefined : player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
   } else dragon.relight();
-  // The cake thrown to the giant, from your hand: he eats it, and goes and
-  // sits down (or, loading, he's sitting there); and once you've gone, he's
-  // back in the way.
+  // The cake thrown to the giant, from your hand: he eats it (or, loading,
+  // he's had it); and once you've gone, he's hungry again.
   if (hungry && opened.has(hungry)) {
-    if (instantly) giant.away();
+    if (instantly) giant.fed();
     else giant.feed(player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
-  } else if (here !== "giant") giant.back();
+  } else giant.hungry();
   // The harp played to the trolls: up they get and dance, to its tune (or,
   // loading, they're dancing); and once you've gone, they sit down again.
   if (pleased && opened.has(pleased)) {
