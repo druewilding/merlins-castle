@@ -6214,7 +6214,7 @@ def coach(b, x, y, f):
 
         for u0, u1 in ((-0.62, -0.18), (-0.06, 0.38), (0.5, 0.92)):
             layer(u0 - 0.05, u1 + 0.05, 1.38, 2.0, 0.008, GILT)
-            layer(u0, u1, 1.43, 1.95, 0.014, c.linear("#3a1420"), 0.04)
+            layer(u0 + 0.01, u1 - 0.01, 1.44, 1.94, 0.014, c.linear("#3a1420"), 0.04)  # (its edges behind the curtains')
             layer(u0, u0 + 0.1, 1.43, 1.95, 0.02, c.linear("#c83a52"))
             layer(u1 - 0.1, u1, 1.43, 1.95, 0.02, c.linear("#c83a52"))
         layer(-0.1, 0.42, 0.85, 1.34, 0.008, GILT)  # (the door)
