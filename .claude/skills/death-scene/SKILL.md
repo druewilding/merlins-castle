@@ -6,7 +6,7 @@ description: Build a short death scene for Merlin's Castle 3D, played from where
 # Making a death scene
 
 How the death scenes were made, written down so the next one goes faster.
-The six built so far each live in their own file:
+The seven built so far each live in their own file:
 
 | The words                             | The way                         | The scene                |
 | ------------------------------------- | ------------------------------- | ------------------------ |
@@ -16,9 +16,14 @@ The six built so far each live in their own file:
 | Oh dear! Merlin's trap is that way.   | mountain east                   | `trap.ts` (`Trapped`)    |
 | You slip down a deep, deep hole.      | maze north, treasure-room south | `hole.ts` (`Slipped`)    |
 | You fall over in the dark.            | dark-tunnels south              | `tripped.ts` (`Tripped`) |
+| The giant turns you into a mouse.     | giant west                      | `mouse.ts` (`Shrunk`)    |
 
-`tripped.ts` is the newest and the simplest to copy. `trap.ts` shows a prop of
-its own that goes on moving behind the curtain.
+`tripped.ts` is the simplest to copy. `trap.ts` shows a prop of its own that
+goes on moving behind the curtain. `mouse.ts` is the newest, and shows a
+creature taking part: the scene starts it (`giant.enchant()`), cues it at its
+beats (`giant.chuckle()`), and looks at it (`giant.faceAt()`); the creature
+poses itself on top of its clip, and puts itself right in `restart()`
+(`giant.reset()`).
 
 Keep the README and PLAN-V3 spoiler-free: never write there what kills you or
 where. Commit messages may.
@@ -62,8 +67,6 @@ The scenes still to make, and the ideas for them:
   slow, and the picture settles grey and still, with a faint chime.
 - **Turned into a frog** (merlins-lair north): a green puff, the camera drops to
   ankle height, the room looms huge, a hop or two, "ribbit".
-- **Turned into a mouse by the giant** (giant west): a puff, the world shoots
-  up, the giant's huge face peers down chuckling, a squeak.
 - (**Falling into darkness**, treasure-room south, shares the deep hole's scene
   for now. Its own idea: drifting slowly down, Alice-style, past faint motes
   of light.)
@@ -157,6 +160,12 @@ button` (Continue) and look behind the score card too. Combine them with
 ## What the first looks caught (check these first)
 
 - **Too long getting there:** a slow lead-in dulls it. Get to the moment.
+- **Too far to matter:** shrunk to a mouse where you bumped into the way, the
+  giant was small and far off. Move the camera to where the moment is (the
+  mouse scurries to his feet), and bend a creature further than seems right
+  (his lean, 0.55 rad, barely showed from in front: 0.95 did).
+- **Aimed where you were:** with reduced motion, a creature posed once looks
+  at where you stood, not where the scene takes you. Pose it every frame.
 - **Black in the dark:** underground, falling away from your glow, you saw
   nothing. Carry the glow with you.
 - **Small, dull effects:** the stars first looked like dim buttons: a glow too

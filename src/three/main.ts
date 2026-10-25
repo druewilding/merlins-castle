@@ -83,6 +83,7 @@ import rabbitModel from "./models/rabbits.glb?url";
 import snakeModel from "./models/snake.glb?url";
 import trollModel from "./models/trolls.glb?url";
 import witchModel from "./models/witches.glb?url";
+import { Poof, Shrunk } from "./mouse";
 import { Notes, type NoteSpot } from "./notes";
 import { Plank } from "./plank";
 import { type Growth, Plants } from "./plants";
@@ -999,14 +1000,18 @@ if (handoff && !at) arrive(handoff);
 // Dying: walking into a way that kills you, its scene plays out (climbing
 // the ladder propped under the balcony, fall.ts; wading into the deep river,
 // swept.ts; walking into the witches, caught.ts; going for Merlin's
-// treasure, trap.ts; going on into the dark tunnels, tripped.ts); then a curtain falls, with the original's words, and after it
-// your score, as in the illustrated version.
+// treasure, trap.ts; going on into the dark tunnels, tripped.ts; going on
+// past the giant, mouse.ts); then a curtain falls, with the original's words,
+// and after it your score, as in the illustrated version.
 const BALCONY = "mossy-steps east";
 const RIVER = "deep-river south";
 const WITCHES = "forest-witches west";
 const DARK_WAY = "dark-tunnels south";
+const GIANT_WAY = "giant west";
 // (Seen stars, fallen over in the dark.)
 const stars = new Stars(scene);
+// (The giant's spell, turning you into a mouse.)
+const poof = new Poof(scene);
 // (Each scene plays on behind the curtain, which starts to come down a
 // little before its end, so the end is seen through it, not cut off.)
 interface Scene3d {
@@ -1054,6 +1059,13 @@ const scenes: Record<string, () => Scene3d | undefined> = {
           stars,
           reducedMotion,
           (sound) => (sound === "step" ? ownSounds.play("walk", { volume: 0.7 }) : ownSounds.play(sound))
+        ),
+  // (Not with the cake in use: he's eaten it.)
+  [GIANT_WAY]: () =>
+    effects(world, items.state).includes("cake")
+      ? undefined
+      : new Shrunk(player.camera, giant, land.giant as GiantPlace, poof, reducedMotion, (sound) =>
+          ownSounds.play(sound)
         ),
   // (Not with the rope across it.)
   ...Object.fromEntries(
@@ -1325,6 +1337,8 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   witches.free();
   net.reset();
   stars.hide();
+  poof.hide();
+  giant.reset();
   arrive(game);
   instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
   inUse();

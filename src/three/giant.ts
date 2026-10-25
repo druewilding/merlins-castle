@@ -4,6 +4,9 @@
 // Given a cake (thrown from your hand), he catches it, eats it in three big
 // bites, and nods, smiling broadly (and lets you by); and once you've gone,
 // he's hungry again.
+// Walking into the way with no cake, he turns you into a mouse (mouse.ts):
+// he points at you, poof, and then leans down to peer at you, beaming,
+// chuckling (enchant, chuckle).
 //
 // His clip is the Universal Animation Libraries', named as it is there. It
 // doesn't eat: his hand's lifted to his mouth here, on top of it (reach).
@@ -48,17 +51,29 @@ const FINGERS = 0.85; // and how long their middle and end joints are, pulled in
 const CAKE = 2.0; // the cake in his hand, times the one you carry (growing as it flies to him: a cake for a giant)
 const CAKE_SIZE = [0.23, 0.1]; // the one you carry: its radius, and half its height (metres)
 const PALM = 0.025; // how far over his palm's middle its top is (at the model's size): the cake sits on it
+// Turning you into a mouse, in seconds from walking into the way:
+const POINT = [0.3, 0.75, 1.5, 2.1]; // his hand lifted to point at you, pointing, held there till, and put down again
+const LEAN = [1.7, 3.1, 0.95]; // leaning down to peer at you, from, till, and how far (radians, his back bent)
+const CHUCKLE = [0.9, 0.28, 0.06]; // and a chuckle: seconds, each "ho" in it, and how far his shoulders shake with each (radians)
+const TILT = 0.06; // his head on one side, peering (radians)
 const UP = new Vector3(0, 1, 0);
 
-type Doing = "hungry" | "catching" | "eating" | "fed";
+type Doing = "hungry" | "catching" | "eating" | "fed" | "enchanting";
+
+/** An arm: its bones (upper, fore, hand), its middle finger's knuckle, and which way its elbow goes out (1, his left; -1, his right). */
+interface Arm {
+  bones: Object3D[];
+  knuckle: Object3D | undefined;
+  out: number;
+}
 
 export class Giant {
   private model: Object3D;
   private head: Object3D | undefined;
-  private hand: Object3D | undefined;
-  private knuckle: Object3D | undefined;
-  /** His left arm (upper, fore, hand), which eats. */
-  private arm: Object3D[];
+  /** His left arm, which eats; and his right, which points. */
+  private left: Arm;
+  private right: Arm;
+  private spine: Object3D[];
   /** His back's, neck's and arms' bones; as his clip has them (put back before the next frame of it); and as they are, steadied. */
   private arms: Object3D[];
   private armsPosed: Quaternion[];
@@ -85,6 +100,8 @@ export class Giant {
   private cake = new Group();
   private from = new Vector3();
   private bitten = 0;
+  private chuckled = CHUCKLE[0]; // seconds since he began to chuckle
+  private tilt = 0;
 
   constructor(
     scene: Scene,
@@ -126,9 +143,14 @@ export class Giant {
     this.model.scale.setScalar(size);
     scene.add(this.model);
     this.head = this.model.getObjectByName("Head");
-    this.hand = this.model.getObjectByName("hand_l");
-    this.knuckle = this.model.getObjectByName("middle_01_l");
-    this.arm = ["upperarm_l", "lowerarm_l", "hand_l"].flatMap((name) => this.model.getObjectByName(name) ?? []);
+    const arm = (side: string, out: number) => ({
+      bones: ["upperarm", "lowerarm", "hand"].flatMap((bone) => this.model.getObjectByName(`${bone}_${side}`) ?? []),
+      knuckle: this.model.getObjectByName(`middle_01_${side}`),
+      out,
+    });
+    this.left = arm("l", 1);
+    this.right = arm("r", -1);
+    this.spine = ["spine_01", "spine_02", "spine_03"].flatMap((name) => this.model.getObjectByName(name) ?? []);
     this.arms = [
       "spine_01",
       "spine_02",
@@ -166,8 +188,9 @@ export class Giant {
     for (const beam of this.beams) beam(amount);
   }
 
-  /** Hungry again (a game loaded without the cake in use here, or you've gone). */
+  /** Hungry again (a game loaded without the cake in use here, or you've gone): but not while he's turning you into a mouse. */
   hungry() {
+    if (this.doing === "enchanting") return;
     this.doing = "hungry";
     this.cake.visible = false;
     this.beam((this.smiling = 0));
@@ -193,6 +216,34 @@ export class Giant {
     this.cake.visible = true;
   }
 
+  /** Himself again, a new game (sitting up, and hungry). */
+  reset() {
+    this.doing = "hungry";
+    this.head?.quaternion.copy(this.posed);
+    this.arms.forEach((bone, k) => bone.quaternion.copy(this.armsPosed[k]));
+    this.tilt = 0;
+    this.chuckled = CHUCKLE[0];
+    this.hungry();
+  }
+
+  /** Walking into the way with no cake: he turns you into a mouse (pointing at you, then leaning down to peer at you, beaming). */
+  enchant() {
+    this.doing = "enchanting";
+    this.time = 0;
+    this.cake.visible = false;
+  }
+
+  /** And chuckles (ho, ho, ho), his shoulders shaking. */
+  chuckle() {
+    this.chuckled = 0;
+  }
+
+  /** Where his face is (between his eyes, about). */
+  faceAt() {
+    this.model.updateMatrixWorld(true);
+    return this.head?.localToWorld(this.face.clone().multiplyScalar(0.1)) ?? this.model.position.clone();
+  }
+
   /** Walking into the way, with no cake: he shakes his head at you. */
   refuse() {
     if (this.doing === "hungry") this.shaking = 0;
@@ -202,7 +253,8 @@ export class Giant {
   update(dt: number, eye: Vector3, here: boolean) {
     const far = this.model.position.distanceTo(eye);
     this.model.visible = here || far < FAR;
-    if (!this.model.visible || this.reducedMotion) return;
+    if (!this.model.visible) return;
+    if (this.reducedMotion) return this.still(eye);
     this.time += dt;
     this.act();
     // (The mixer only sets a bone when its clip moves it: held still, his head
@@ -219,9 +271,12 @@ export class Giant {
       bone.quaternion.copy(this.armsSteady[k].slerp(this.armsPosed[k], steady));
     });
     if (this.doing === "eating") this.reach(this.lifted());
+    if (this.doing === "enchanting") this.enchanting(eye, dt);
     this.watch(eye, here && far < WATCH && this.doing !== "eating", dt);
-    // Fed, he smiles broadly (as the last bite goes down).
-    this.smiling += ((this.doing === "fed" ? 1 : 0) - this.smiling) * Math.min(1, dt * 3);
+    // Fed, he smiles broadly (as the last bite goes down); and turning you
+    // into a mouse, pleased with himself.
+    const beaming = this.doing === "fed" || (this.doing === "enchanting" && this.time > POINT[1]);
+    this.smiling += ((beaming ? 1 : 0) - this.smiling) * Math.min(1, dt * 3);
     this.beam(this.smiling);
     this.blink(dt);
     this.hold();
@@ -258,12 +313,72 @@ export class Giant {
     }
   }
 
-  /** The middle of his left hand's palm, where he holds the cake. */
-  private palm() {
+  /** Turning you into a mouse: pointing at you, and leaning down to peer at you, chuckling. */
+  private enchanting(eye: Vector3, dt: number) {
+    const ease = (u: number) => {
+      const v = Math.min(1, Math.max(0, u));
+      return v * v * (3 - 2 * v);
+    };
+    const t = this.time;
+    const [lift, pointed, held, down] = POINT;
+    const pointing = t < held ? ease((t - lift) / (pointed - lift)) : ease(1 - (t - held) / (down - held));
+    // (Each "ho", his shoulders up and down once, the last ones smaller.)
+    this.chuckled += dt;
+    const c = this.chuckled;
+    const shake =
+      c < CHUCKLE[0] ? CHUCKLE[2] * Math.abs(Math.sin((Math.PI * c) / CHUCKLE[1])) * (1 - c / CHUCKLE[0]) : 0;
+    const leaned = ease((t - LEAN[0]) / (LEAN[1] - LEAN[0]));
+    this.lean(LEAN[2] * leaned - shake, eye);
+    this.tilt = TILT * leaned;
+    if (pointing > 0) {
+      const [upper] = this.right.bones;
+      const shoulder = upper.getWorldPosition(new Vector3());
+      this.bend(
+        this.right,
+        pointing,
+        shoulder.addScaledVector(eye.clone().sub(shoulder).normalize(), 0.95 * this.long(this.right))
+      );
+    }
+  }
+
+  /** With reduced motion, turning you into a mouse: leaning down to peer at you, beaming, at once (as his clip has him, still, and bent). */
+  private still(eye: Vector3) {
+    if (this.doing !== "enchanting") return;
+    this.head?.quaternion.copy(this.posed);
+    this.arms.forEach((bone, k) => bone.quaternion.copy(this.armsPosed[k]));
+    this.lean(LEAN[2], eye);
+    this.tilt = TILT;
+    this.glance.turn = this.glance.up = 0;
+    this.glance.for = Infinity;
+    this.watch(eye, true, 1);
+    this.beam((this.smiling = 1));
+  }
+
+  /** His back bent forward, towards you (radians, all told), on top of his clip. */
+  private lean(by: number, eye: Vector3) {
     this.model.updateMatrixWorld(true);
-    const wrist = this.hand?.getWorldPosition(new Vector3()) ?? this.model.position.clone();
-    const knuckle = this.knuckle?.getWorldPosition(new Vector3()) ?? wrist;
+    const to = eye.clone().sub(this.model.position).setY(0).normalize();
+    const bend = new Quaternion().setFromAxisAngle(UP.clone().cross(to).normalize(), by / this.spine.length);
+    for (const bone of this.spine) {
+      const world = bone.getWorldQuaternion(new Quaternion()).premultiply(bend);
+      bone.quaternion.copy(bone.parent!.getWorldQuaternion(new Quaternion()).invert().multiply(world));
+      bone.updateMatrixWorld(true);
+    }
+  }
+
+  /** The middle of an arm's palm (his left's, where he holds the cake). */
+  private palm(arm = this.left) {
+    this.model.updateMatrixWorld(true);
+    const wrist = arm.bones[2]?.getWorldPosition(new Vector3()) ?? this.model.position.clone();
+    const knuckle = arm.knuckle?.getWorldPosition(new Vector3()) ?? wrist;
     return wrist.lerp(knuckle, 0.6);
+  }
+
+  /** How long an arm is, shoulder to palm. */
+  private long(arm: Arm) {
+    const [upper, fore] = arm.bones;
+    const elbow = fore.getWorldPosition(new Vector3());
+    return upper.getWorldPosition(new Vector3()).distanceTo(elbow) + elbow.distanceTo(this.palm(arm));
   }
 
   /** Where the cake's middle is, held: sitting on his palm. */
@@ -289,18 +404,12 @@ export class Giant {
     return ease(1 - (t - BITE[0] - BITE[1]) / BITE[2]);
   }
 
-  /**
-   * His left arm turned (as much as lift, 0 to 1) to bring the cake in his
-   * hand to his mouth: his elbow bent and down by his side, his forearm up
-   * to it (two bones, each turned the least way that gets it there).
-   */
+  /** His left arm turned (as much as lift, 0 to 1) to bring the cake in his hand to his mouth. */
   private reach(lift: number) {
-    const [upper, fore, hand] = this.arm;
-    if (!upper || !fore || !hand || !this.head || lift <= 0) return;
+    if (!this.head || lift <= 0) return;
     this.model.updateMatrixWorld(true);
     const size = this.model.scale.x;
-    const facing = new Quaternion().setFromAxisAngle(UP, this.yaw);
-    const ahead = new Vector3(0, 0, 1).applyQuaternion(facing);
+    const ahead = new Vector3(0, 0, 1).applyAxisAngle(UP, this.yaw);
     // (His mouth; the cake's middle in front of it, its edge at his lips; and his palm under it.)
     const mouth = this.head
       .getWorldPosition(new Vector3())
@@ -309,16 +418,29 @@ export class Giant {
     const target = mouth
       .addScaledVector(ahead, CAKE_SIZE[0] * this.cake.scale.x + 0.04)
       .addScaledVector(UP, -(CAKE_SIZE[1] * this.cake.scale.x + PALM * size));
+    this.bend(this.left, lift, target);
+  }
+
+  /**
+   * An arm turned (as much as lift, 0 to 1) to bring its palm to target:
+   * its elbow bent, down and out to his side (two bones, each turned the
+   * least way that gets it there).
+   */
+  private bend(arm: Arm, lift: number, target: Vector3) {
+    const [upper, fore, hand] = arm.bones;
+    if (!upper || !fore || !hand || lift <= 0) return;
+    this.model.updateMatrixWorld(true);
+    const facing = new Quaternion().setFromAxisAngle(UP, this.yaw);
     const shoulder = upper.getWorldPosition(new Vector3());
     const elbow = fore.getWorldPosition(new Vector3());
-    const wrist = this.palm();
+    const wrist = this.palm(arm);
     const a = elbow.distanceTo(shoulder);
     const b = wrist.distanceTo(elbow);
     const to = target.clone().sub(shoulder);
     const d = Math.min(a + b - 1e-3, Math.max(Math.abs(a - b) + 1e-3, to.length()));
     const way = to.normalize();
-    // (Its elbow down, and out to his left.)
-    const pole = new Vector3(0.6, -1, 0).applyQuaternion(facing);
+    // (Its elbow down, and out to his side.)
+    const pole = new Vector3(0.6 * arm.out, -1, 0).applyQuaternion(facing);
     pole.addScaledVector(way, -pole.dot(way)).normalize();
     const cos = (a * a + d * d - b * b) / (2 * a * d);
     const bent = shoulder
@@ -334,7 +456,7 @@ export class Giant {
     };
     turn(upper, elbow.clone().sub(shoulder), bent.clone().sub(shoulder));
     const now = fore.getWorldPosition(new Vector3());
-    turn(fore, this.palm().sub(now), shoulder.clone().addScaledVector(way, d).sub(now));
+    turn(fore, this.palm(arm).sub(now), shoulder.clone().addScaledVector(way, d).sub(now));
   }
 
   /** His hands as big as they are (each frame, after his clip: his clips set every bone's size). */
@@ -380,7 +502,10 @@ export class Giant {
     const to = eye.clone().sub(at);
     const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
     const round = this.yaw + Math.max(-TURN, Math.min(TURN, wrap(Math.atan2(to.x, to.z) - this.yaw + glance.turn)));
-    const up = Math.max(-0.6, Math.min(0.5, Math.atan2(to.y, Math.hypot(to.x, to.z)) + glance.up));
+    const up = Math.max(
+      this.doing === "enchanting" ? -1 : -0.6,
+      Math.min(0.5, Math.atan2(to.y, Math.hypot(to.x, to.z)) + glance.up)
+    );
     const wants = watching
       ? { turn: wrap(round - Math.atan2(facing.x, facing.z)), up: up - Math.asin(Math.max(-1, Math.min(1, facing.y))) }
       : { turn: 0, up: 0 };
@@ -400,6 +525,7 @@ export class Giant {
     const wanted = new Quaternion()
       .setFromAxisAngle(UP, look.turn + shake)
       .multiply(new Quaternion().setFromAxisAngle(side, look.up + nod))
+      .multiply(new Quaternion().setFromAxisAngle(facing, this.tilt))
       .multiply(world);
     head.quaternion.copy(head.parent.getWorldQuaternion(new Quaternion()).invert().multiply(wanted));
   }

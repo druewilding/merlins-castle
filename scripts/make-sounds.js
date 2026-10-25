@@ -384,3 +384,91 @@ const rise = (t, from, to) => Math.min(1, Math.max(0, (t - from) / (to - from)))
   });
   save("munch", track, 0.15);
 }
+
+// Turned into a mouse: poof! A soft burst of smoke, and twinkles tumbling
+// down and down (you, shrinking).
+{
+  const track = new Track(1.6);
+  track.add(
+    0,
+    rush(0.9, 0.15, (t) => rise(t, 0, 0.02) * Math.exp(-t / 0.18)),
+    0
+  );
+  ["C8", "A7", "G7", "E7", "D7", "C7", "A6", "G6", "E6", "C6"].forEach((n, i) =>
+    track.add(0.04 + i * 0.05, bell(note(n), 0.6, 0.55), 0.6 * Math.sin(i * 1.3))
+  );
+  sparkle(track, 0, 0.4, 6, 0.2);
+  save("poof", track, 0.35);
+}
+
+// A mouse's squeak: two little chirps, up and down, the second smaller.
+{
+  const track = new Track(0.45);
+  [
+    [0, 0.13, 1],
+    [0.17, 0.09, 0.6],
+  ].forEach(([at, long, amp]) => {
+    const out = new Float32Array(Math.round(long * RATE));
+    let phase = 0;
+    for (let i = 0; i < out.length; i++) {
+      const u = i / out.length;
+      const freq = 3200 + 1100 * Math.sin(Math.PI * Math.min(1, u * 1.4)) + 120 * Math.sin(i / 90);
+      phase += (2 * Math.PI * freq) / RATE;
+      out[i] = amp * Math.sin(Math.PI * u) ** 0.7 * (Math.sin(phase) + 0.2 * Math.sin(2 * phase));
+    }
+    track.add(at, release(out), 0.1);
+  });
+  save("squeak", track, 0.2);
+}
+
+// A voice: a buzz at pitch(t) (or, as voiced(t) falls, a breath of noise)
+// through resonances [hertz, width, gain] that make its vowel, shaped by
+// envelope(t).
+function voice(seconds, pitch, voiced, formants, envelope) {
+  const out = new Float32Array(Math.round(seconds * RATE));
+  const filters = formants.map(([freq, width, gain]) => {
+    const r = Math.exp((-Math.PI * width) / RATE);
+    return { r, c: 2 * r * Math.cos((2 * Math.PI * freq) / RATE), gain, y1: 0, y2: 0 };
+  });
+  let phase = 0;
+  for (let i = 0; i < out.length; i++) {
+    const t = i / RATE;
+    phase = (phase + pitch(t) / RATE) % 1;
+    const source = voiced(t) * (1 - 2 * phase) + (1 - voiced(t)) * (random() * 2 - 1) * 0.5;
+    let sum = 0;
+    for (const f of filters) {
+      const y = (1 - f.r) * source + f.c * f.y1 - f.r * f.r * f.y2;
+      f.y2 = f.y1;
+      f.y1 = y;
+      sum += y * f.gain;
+    }
+    out[i] = sum * envelope(t);
+  }
+  return release(out);
+}
+
+// The giant chuckling: a deep, warm "ho, ho, ho", each lower and softer.
+{
+  const track = new Track(1.4);
+  const O = [
+    [420, 90, 1],
+    [760, 110, 0.6],
+    [2600, 200, 0.08],
+  ];
+  [0, 0.28, 0.56].forEach((at, k) => {
+    const long = 0.24;
+    const low = 88 - k * 8;
+    track.add(
+      at,
+      voice(
+        long,
+        (t) => low * (1.08 - 0.15 * (t / long)),
+        (t) => rise(t, 0.02, 0.06),
+        O,
+        (t) => (1 - 0.25 * k) * rise(t, 0, 0.015) * (1 - rise(t, long * 0.6, long))
+      ),
+      0
+    );
+  });
+  save("chuckle", track, 0.45);
+}
