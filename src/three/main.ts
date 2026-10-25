@@ -55,6 +55,7 @@ import {
 } from "../shared/storage";
 import { LANGUAGE, savedDate, savedTime, T } from "../shared/strings";
 import { Caught } from "./caught";
+import { Charm } from "./charm";
 import { Door } from "./door";
 import { Dragon, type DragonCave, type DragonSpot } from "./dragon";
 import { Drawbridge, type DrawbridgeSpot, wantedDown } from "./drawbridge";
@@ -556,10 +557,13 @@ scene.add(gemLight, halo);
 const gemAt = new Vector3();
 let gemGlow = 0; // 1 lying there, 0 carried
 // The stone, rolling from beside the tower's door across it, once you're in,
-// and back with the ring: turning as it goes.
+// and back with the ring: turning as it goes, rumbling. The ring's magic
+// (charm.ts) takes hold of it first.
 const stone = model.scene.getObjectByName("stone");
 const { r: STONE_R, aside, door } = land.stone;
 let rolled: number | undefined; // 0 beside the door, 1 across it
+let rolling = false;
+const charm = new Charm(scene, things.scene.getObjectByName("ring")!, STONE_R, reducedMotion);
 const ROLL = 0.45; // of the way, a second
 // The ways too dark to go without the lamp (the long tunnel's mouths, and on
 // from the dark tunnels), and the places they're from: dark, till it's lit.
@@ -983,6 +987,11 @@ function inUse() {
     ownSounds.play("coins");
     drawbridge.set(true);
   }
+  // The ring used on the stone, from your hand.
+  if (shut && !opened.has(shut) && exits.some((exit) => shapeOf.get(exit) === shut) && !instantly) {
+    charm.cast();
+    ownSounds.play("charm");
+  }
   opened = new Set(exits.map((exit) => shapeOf.get(exit)!));
   if (instantly) drawbridge.set(bridgeDown(here), true);
   solidify();
@@ -1249,6 +1258,7 @@ if (debugMode) {
       trolls,
       giant,
       flute,
+      charm,
       merlin,
       guards,
       witches,
@@ -1411,6 +1421,7 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   witches.free();
   net.reset();
   stars.hide();
+  charm.stop();
   poof.hide();
   giant.reset();
   arrive(game);
@@ -1603,13 +1614,20 @@ renderer.setAnimationLoop((time) => {
   }
   if (stone) {
     const wants = room === "tower" && shut && !opened.has(shut) && !allOpen ? 1 : 0;
-    rolled =
-      rolled === undefined ? wants : rolled + Math.sign(wants - rolled) * Math.min(Math.abs(wants - rolled), dt * ROLL);
+    const was = rolled;
+    if (rolled === undefined) rolled = wants;
+    else if (!charm.holding) rolled += Math.sign(wants - rolled) * Math.min(Math.abs(wants - rolled), dt * ROLL);
+    // (Rumbling as it sets off.)
+    const moving = rolled !== was;
+    if (moving && !rolling && was !== undefined) ownSounds.play("rumble");
+    rolling = moving;
     const t = rolled * rolled * (3 - 2 * rolled);
     stone.position.set(
       ...(([0, 2, 1] as const).map((k) => aside[k] + (door[k] - aside[k]) * t) as [number, number, number])
     );
     stone.rotation.z = (-(door[0] - aside[0]) * t) / STONE_R;
+    charm.update(dt, player.camera, stone.position);
+    stone.position.add(charm.shake);
   }
   // (Fading as you pick it up, and in as you put it down: where it was, meanwhile.)
   const gem = items.lyingAt("emerald");
