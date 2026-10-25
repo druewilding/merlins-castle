@@ -3771,6 +3771,7 @@ FIRE, FIRE_HEART = c.linear("#ff6a10"), c.linear("#ffc23a")  # (the game adds th
 SEAM = 0.02  # the mortar between stones, either side
 gilding = c.Builder()  # (gold: the game makes it shine, as Merlin's treasure does)
 brazier_flames = c.Builder()  # (and the braziers' fire glow)
+hoard_jewels = c.Builder()  # (and the jewels in its chests, glassy, as the treasure's are)
 # Carvings, from the painting: (left, top, right, bottom) in its pixels.
 CARVED = {"lion": (297, 108, 380, 297), "lion facing left": (1166, 108, 1249, 297),
           "griffin": (707, 237, 832, 325)}
@@ -4316,13 +4317,33 @@ for hall in HALLS.values():
                 flank = facing_out(x + ux * 0.4, y + uy * 0.4, f, -uy, ux, ux, uy)
                 plaque(flank, -0.26, 0.26, 0.35, 1.02, 0.005)
             under_box(x, y, 0.5, 0.5)
-        # The chests, open, by the altar: one blue, one red, their lids up,
-        # turned to the room.
-        for x, y, tint in ((hx - 3.9, hy + 2.4, (*c.linear("#1e5ae0")[:3], 0.85)),
-                           (hx + 3.9, hy + 2.4, (*c.linear("#9a2f22")[:3], 0.5))):
-            (x0, y0, x1, y1), _ = PROPS.put(cave_made, "Chest_Wood", (x, y, f - 0.045), math.atan2(hx - x, y - hy), 1.3,
-                                              tint=tint)
+        # The chests, open, by the altar, turned to the room: full to their
+        # rims with coins, heaps of them, and rubies and emeralds among them
+        # (a goblet in one).
+        (cx0, cy0, cx1, cy1), _ = PROPS.put(c.Builder(), "Chest_Wood", (0, 0, 0), 0, 1.3)  # (its size, as it's made)
+        for n, (x, y) in enumerate(((hx - 3.9, hy + 2.4), (hx + 3.9, hy + 2.4))):
+            yaw = math.atan2(hx - x, y - hy)
+            (x0, y0, x1, y1), _ = PROPS.put(cave_made, "Chest_Wood", (x, y, f - 0.045), yaw, 1.3)
             under_box((x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2)
+            inside = c.Kit.placing((x, y, f + 0.46), yaw)
+
+            def anywhere(margin):
+                """Somewhere inside it, its middle (from above), and how high."""
+                u = luck.uniform(cx0 + 0.14 + margin, cx1 - 0.14 - margin)
+                v = luck.uniform(cy0 + 0.12 + margin, cy1 - 0.12 - margin)
+                return inside((u, v, luck.uniform(0, 0.04)))
+
+            for spot, model in (((-0.22, 0.0), "Coin_Pile_2"), ((0.2, 0.03), "Coin_Pile"), ((0.0, -0.02), "Coin_Pile")):
+                PROPS.put(gilding, model, inside((*spot, -0.06)), luck.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
+            for k in range(36):
+                PROPS.put(gilding, "Coin", anywhere(0.0), luck.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
+            if n == 1:
+                PROPS.put(gilding, "Chalice", inside((0.15, 0.0, 0.0)), 0.8, 2.2, tint=GOLD)
+            for k in range(6):
+                size = luck.uniform(0.07, 0.1)
+                sx, sy, sz = anywhere(0.05)
+                hoard_jewels.blob((sx, sy, sz + size * 0.5), size, JEWELS["ruby" if k % 2 else "emerald"],
+                                  squash=0.75, lumpy=0.0, seed=k + 10 * n, subdivisions=0)
         # Rubble, fallen at the foot of the walls.
         for degrees in (30, 150, 205, 335):
             for k in range(5):
@@ -5291,6 +5312,7 @@ caves.build("caves", smooth=False)
 cave_made.build("cave-made", smooth=False)
 gilding.build("gilding", smooth=False)
 brazier_flames.build("brazier-flames", smooth=False)
+hoard_jewels.build("hoard-jewels", smooth=False)
 pit.build("pit", smooth=False)
 
 # Rocks either side of the mouths. (Their buried halves reach down a long
