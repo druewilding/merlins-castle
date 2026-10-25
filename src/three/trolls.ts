@@ -51,6 +51,11 @@ const UP = [0, 0.45, 0.2, 0.7]; // seconds after you play, each gets up
 const STEP = 0.45; // metres (at its size) each steps forward off its boulder, getting up
 const DRUM = [-0.7, 0.2]; // the drum, beside its troll: how far to its side (its right), and forward (at its size)
 const TURN = 1.0; // radians their heads turn, at most, either way
+// How quickly their backs and arms follow their clips, sitting (each second,
+// of the way to where they have them): their keys are few, with straight
+// turns between them, and the little kinks at each, bigger on a troll, shook
+// their hands as they rested.
+const STEADY = 8;
 const GLANCE = [1.5, 4]; // seconds between their glances, now to one side, now back to you
 const BLINK = [3, 7]; // seconds between their blinks (and now and then, straight after, another)
 const SHUT = 0.15; // seconds a blink takes, shutting and opening
@@ -111,6 +116,10 @@ interface Troll {
   arms: [Object3D, Object3D, Object3D][];
   /** Its arms as its clip has them (before they're lifted, or swung out). */
   armsPosed: Quaternion[];
+  /** Its back's, neck's and arms' bones; as its clip has them (put back before the next frame of it); and as they are, steadied. */
+  steadied: Object3D[];
+  steadyPosed: Quaternion[];
+  steadyNow: Quaternion[];
   lapLift: number;
   lap: number;
   spreadOut: number;
@@ -253,6 +262,17 @@ export class Trolls {
           return upper && fore && hand ? [[upper, fore, hand] as [Object3D, Object3D, Object3D]] : [];
         }),
         armsPosed: [0, 1, 2, 3, 4, 5].map(() => new Quaternion()),
+        steadied: [
+          "spine_01",
+          "spine_02",
+          "spine_03",
+          "neck_01",
+          ...["l", "r"].flatMap((side) =>
+            ["clavicle", "upperarm", "lowerarm", "hand"].map((bone) => `${bone}_${side}`)
+          ),
+        ].flatMap((name) => model.getObjectByName(name) ?? []),
+        steadyPosed: [],
+        steadyNow: [],
         lapLift: LAP[0] + ("fat" in look.keys ? LAP[1] : 0),
         lap: LAP[0] + ("fat" in look.keys ? LAP[1] : 0),
         spreadOut: SPREAD[0] + ("fat" in look.keys ? SPREAD[1] : 0),
@@ -274,7 +294,10 @@ export class Trolls {
       };
       this.play(troll, "Sitting_Idle_Loop", true);
       // (Not in step with each other.)
+      troll.steadyPosed = troll.steadied.map(() => new Quaternion());
+      troll.steadyNow = troll.steadied.map(() => new Quaternion());
       mixer.update(k * 1.7);
+      this.steady(troll, 1);
       this.shape(troll);
       troll.posed.copy(troll.head?.quaternion ?? troll.posed);
       this.trolls.push(troll);
@@ -362,9 +385,20 @@ export class Trolls {
     }
   }
 
-  /** Its arms put back as its clip had them (before the next frame of it). */
+  /** Its arms (and back) put back as its clip had them (before the next frame of it). */
   private unshape(troll: Troll) {
     troll.arms.flat().forEach((bone, k) => bone.quaternion.copy(troll.armsPosed[k]));
+    troll.steadied.forEach((bone, k) => bone.quaternion.copy(troll.steadyPosed[k]));
+  }
+
+  /** Its back and arms steadied (after its clip): following it, but smoothly (by: of the way there; 1, straight there). */
+  private steady(troll: Troll, by: number) {
+    troll.steadied.forEach((bone, k) => {
+      troll.steadyPosed[k].copy(bone.quaternion);
+      bone.quaternion.copy(
+        by >= 1 ? troll.steadyNow[k].copy(troll.steadyPosed[k]) : troll.steadyNow[k].slerp(troll.steadyPosed[k], by)
+      );
+    });
   }
 
   /** The harp played: up they get, one after another, and dance (or, loading, they're dancing). */
@@ -376,6 +410,7 @@ export class Trolls {
         this.play(troll, "Dance_Loop", true);
         this.unshape(troll);
         troll.mixer.update(k * 0.6);
+        this.steady(troll, 1);
         troll.lap = 0;
         troll.spread = troll.spreadOut;
         this.shape(troll);
@@ -398,6 +433,7 @@ export class Trolls {
       this.play(troll, "Sitting_Idle_Loop", true);
       this.unshape(troll);
       troll.mixer.update(k * 1.7);
+      this.steady(troll, 1);
       troll.lap = troll.lapLift;
       troll.spread = 0;
       this.shape(troll);
@@ -438,6 +474,8 @@ export class Trolls {
       troll.head?.quaternion.copy(troll.posed);
       this.unshape(troll);
       troll.mixer.update(dt);
+      // (Sitting, where the kinks showed: dancing, its arms swing as the clip has them, clear of its belly.)
+      this.steady(troll, this.dancing ? 1 : Math.min(1, dt * STEADY));
       this.shape(troll);
       troll.posed.copy(troll.head?.quaternion ?? troll.posed);
       if (!this.dancing) this.watch(troll, eye, here && far < ASK * 1.5, dt);
