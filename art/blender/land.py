@@ -3957,12 +3957,12 @@ def arch_front(at, a, spring, top, blind=False, stones_=(TREASURE_STONE, GOLD_ST
 # The beautiful chamber, as in its painting: gold walls, in arched panels
 # carved with the painting's own gold fleurs, between gold columns, candles
 # burning in sconces either side of each panel, and over it all a cornice,
-# and a dome (blue-grey, as the painting's is), gold ribs up it. An arch over
+# and a dome of paler gold, gold ribs up it. An arch over
 # its doorway, and in the middle, on a stepped pedestal, the flute, floating,
 # playing (the game makes it bob and turn, and plays its tune).
 CHAMBER_GOLD = c.linear("#d9a640")  # (its walls' gold, as the hall's)
 CHAMBER_DEEP = c.linear("#b9842c")  # (the gold in the panels, and its plinths and cornice)
-CHAMBER_DOME = c.linear("#5468a0")
+CHAMBER_DOME = c.linear("#f2d58e")
 CHAMBER_STONES = (CHAMBER_GOLD, c.linear("#ecc066"), c.linear("#5a3c14"))  # (its arch's: as arch_front's)
 CANDLE = c.linear("#f3ead6")
 SILVER, SILVER_DARK = c.linear("#e4e8ee"), c.linear("#80858e")
