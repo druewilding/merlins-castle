@@ -18,5 +18,8 @@
   "shut": { "file": "kenney_rpg-audio/Audio/doorClose_4.ogg", "volume": 0.7 },
   "clang": { "file": "kenney_impact-sounds/Audio/impactMetal_heavy_000.ogg", "volume": 0.5 },
   "jig": { "file": "merlin/jig.wav", "volume": 0.8 },
-  "spell": { "file": "merlin/spell.wav", "volume": 0.6 }
+  "spell": { "file": "merlin/spell.wav", "volume": 0.6 },
+  "munch": { "file": "merlin/munch.wav", "volume": 0.35 },
+  "poof": { "file": "merlin/poof.wav", "volume": 0.6 },
+  "squeak": { "file": "merlin/squeak.wav", "volume": 0.4 }
 }

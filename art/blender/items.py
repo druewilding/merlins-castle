@@ -3,7 +3,7 @@
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
 # The ladder, the plank, the key, the axe, the apple, the emerald, the
-# broom, the lamp, the rope, the penny, the water and the harp so far; the rest are to come (PLAN-V3.md).
+# broom, the lamp, the rope, the penny, the water, the harp and the cake so far; the rest are to come (PLAN-V3.md).
 
 import math
 import random
@@ -1407,9 +1407,209 @@ harp_object = harp.build("harp", smooth=True)
 harp_object.data.transform(Matrix.Scale(HARP_SIZE, 4))
 outward(harp_object)
 
+# The cake: as in its picture, a round cake covered in swirled cream, a slice
+# cut out of it; in the cut, three layers of golden sponge with cherries in
+# jam between them, under a little cream. Round the edge of its top, piped
+# rosettes of cream, a shiny cherry on its stalk on each; and flakes of
+# chocolate scattered all over it, top and sides. Built 23 cm across, then made
+# twice that (CAKE_SIZE), so you can spot it from across a cave.
+CAKE_SIZE = 2.0
+CAKE_R, CAKE_TALL = 0.115, 0.1  # its radius and height, as built
+CUT = (-0.42, 0.42)  # the slice cut out: radians round, from and to
+CREAM = c.linear("#f4e4bc")
+CREAM_SHADE = c.linear("#dcc392")
+SPONGE = c.linear("#e3b45c")
+SPONGE_DARK = c.linear("#c08a3a")
+JAM = c.linear("#8a1222")
+CHERRY = c.linear("#c41420")
+CHERRY_DARK = c.linear("#62060e")
+CHERRY_SHINE = c.linear("#ff9c8a")
+CHERRY_STALK = c.linear("#7d7a2c")
+CHERRY_STALK_TIP = c.linear("#5a3a1a")
+CHOCOLATE = c.linear("#5c2f17")
+CHOCOLATE_LIGHT = c.linear("#86502a")
+cake = c.Builder()
+cake_rng = random.Random(11)
+
+
+def creamy(p, shade=0.0):
+    """Cream: swirled, a little shadow in the hollows of its swirls."""
+    v = Vector(p) * 60
+    return c.vary(c.mix(CREAM, CREAM_SHADE, shade + 0.25 * max(0.0, noise.noise(v))), 0.03, v)
+
+
+def cream_out(a, z):
+    """How far out its cream is, round at a and up at z: swirled by the knife."""
+    v = Vector((math.cos(a) * 3, math.sin(a) * 3, z * 25))
+    return 0.004 * noise.noise(v) + 0.0025 * math.sin(7 * a + 40 * z + 2 * noise.noise(v * 0.5))
+
+
+# Its cream, round its side and over its top: a profile (out, up) from its
+# foot up over its rounded edge to its middle, turned round all but the cut.
+CAKE_PROFILE = [(CAKE_R, 0.0), (CAKE_R, 0.25 * CAKE_TALL), (CAKE_R, 0.5 * CAKE_TALL), (CAKE_R, 0.75 * CAKE_TALL),
+                (CAKE_R, CAKE_TALL - 0.012), (CAKE_R - 0.004, CAKE_TALL - 0.004), (CAKE_R - 0.012, CAKE_TALL),
+                (CAKE_R * 0.66, CAKE_TALL), (CAKE_R * 0.33, CAKE_TALL), (0.0, CAKE_TALL)]
+CAKE_AROUND = 64
+arc = [CUT[1] + (2 * math.pi - (CUT[1] - CUT[0])) * j / CAKE_AROUND for j in range(CAKE_AROUND + 1)]
+verts, colours = [], []
+for a in arc:
+    for k, (r, z) in enumerate(CAKE_PROFILE):
+        out_by = cream_out(a, z) * (r / CAKE_R) if 0 < k < len(CAKE_PROFILE) - 1 else 0.0
+        p = (math.cos(a) * (r + out_by), math.sin(a) * (r + out_by), z + (out_by * 0.5 if k > 5 else 0.0))
+        verts.append(p)
+        colours.append(creamy(p, 0.35 if k == 0 else 0.0))
+n = len(CAKE_PROFILE)
+faces = [(j * n + k, (j + 1) * n + k, (j + 1) * n + k + 1, j * n + k + 1) for j in range(CAKE_AROUND) for k in range(n - 1)]
+cake.add(verts, faces, colours)
+# (Its underside.)
+cake.add([(0, 0, 0)] + [(math.cos(a) * CAKE_R, math.sin(a) * CAKE_R, 0) for a in arc],
+         [(0, j + 2, j + 1) for j in range(CAKE_AROUND)], [CREAM_SHADE] * (CAKE_AROUND + 2))
+
+def cherry_skin(p, d, colour):
+    """Shiny: deep red, darker underneath, with a bright spot where the light catches it."""
+    colour = c.mix(CHERRY, CHERRY_DARK, max(0.0, -d.z) * 0.7)
+    shine = max(0.0, d.dot(Vector((-0.4, -0.3, 0.87))))
+    return c.mix(colour, CHERRY_SHINE, shine ** 12)
+
+
+# The cut: each face of it in layers, from the bottom up, sponge, cream,
+# cherries in jam, sponge, cream, jam, sponge, and the cream on top; and the
+# cream round its outside, a thin rim.
+LAYERS = [(0.0, 0.24, SPONGE), (0.24, 0.27, CREAM), (0.27, 0.37, JAM), (0.37, 0.58, SPONGE), (0.58, 0.61, CREAM),
+          (0.61, 0.71, JAM), (0.71, 0.92, SPONGE), (0.92, 1.0, CREAM)]
+RIM = 0.007  # metres of cream round its outside, as built
+
+
+def layer_colour(colour, p):
+    v = Vector(p) * 220
+    if colour is SPONGE:
+        crumb = noise.noise(v) + 0.5 * noise.noise(v * 2.3)
+        return c.vary(c.mix(SPONGE, SPONGE_DARK, max(0.0, crumb) * 0.9), 0.08, v)  # (crumbly: holes in it)
+    if colour is JAM:
+        return c.vary(c.mix(JAM, CHERRY, 0.3 + 0.3 * noise.noise(v * 0.3)), 0.06, v)
+    return creamy(p)
+
+
+for side, a in ((1, CUT[0]), (-1, CUT[1])):
+    out_ = Vector((math.cos(a), math.sin(a), 0))
+    facing = Vector((math.sin(a), -math.cos(a), 0)) * side  # (out of the cut face)
+    for z0, z1, colour in LAYERS:
+        for r0, r1, colour_ in ((0.0, CAKE_R - RIM, colour), (CAKE_R - RIM, CAKE_R, CREAM)):
+            # (The top corner rounded, as the cream is.)
+            top_r1 = r1 - (0.012 if z1 == 1.0 and r1 == CAKE_R else 0.0)
+            quad = [out_ * r0 + Vector((0, 0, z0 * CAKE_TALL)), out_ * r1 + Vector((0, 0, z0 * CAKE_TALL)),
+                    out_ * top_r1 + Vector((0, 0, z1 * CAKE_TALL)), out_ * r0 + Vector((0, 0, z1 * CAKE_TALL))]
+            # (Each layer a grid of quads, so its colour can vary: the sponge's crumb finest.)
+            steps, rows = (24, 6) if colour_ is SPONGE else (12, 1) if colour_ is JAM else (2, 1)
+            verts = [tuple(quad[0].lerp(quad[1], s / steps).lerp(quad[3].lerp(quad[2], s / steps), m / rows))
+                     for s in range(steps + 1) for m in range(rows + 1)]
+            faces = [(s * (rows + 1) + m, (s + 1) * (rows + 1) + m, (s + 1) * (rows + 1) + m + 1, s * (rows + 1) + m + 1)
+                     for s in range(steps) for m in range(rows)]
+            if side < 0:
+                faces = [f[::-1] for f in faces]
+            cake.add(verts, faces, [layer_colour(colour_, p) for p in verts])
+    # The cherries in its jam, halfway into the cut.
+    for z0, z1, colour in LAYERS:
+        if colour is not JAM:
+            continue
+        for k in range(9):
+            r = 0.008 + (CAKE_R - RIM - 0.014) * (k + cake_rng.uniform(0.2, 0.8)) / 9
+            z = (z0 + z1) / 2 * CAKE_TALL + cake_rng.uniform(-0.0015, 0.0015)
+            cake.blob(tuple(out_ * r + Vector((0, 0, z)) - facing * 0.0015), 0.0045, CHERRY, lumpy=0.1,
+                      subdivisions=2, seed=k, shade=cherry_skin, lit=False)
+
+
+def piped(builder, x, y, z, size):
+    """A rosette of piped cream: twisted ridges, round, up to a curl on top."""
+    sides, rows = 20, 7
+    profile = [(1.0, 0.0), (1.05, 0.25), (0.95, 0.5), (0.75, 0.75), (0.5, 1.0), (0.25, 1.2), (0.0, 1.3)]
+    verts, colours = [], []
+    for r, h in profile:
+        for j in range(sides):
+            a = 2 * math.pi * j / sides
+            ridge = 1 + 0.24 * math.cos(6 * a + 5 * h) * min(1.0, r * 2)
+            p = (x + math.cos(a) * r * ridge * size, y + math.sin(a) * r * ridge * size, z + h * size * 0.9)
+            verts.append(p)
+            colours.append(creamy(p, 0.45 * (1 - ridge + 0.24) / 0.48))
+    faces = [(k * sides + j, k * sides + (j + 1) % sides, (k + 1) * sides + (j + 1) % sides, (k + 1) * sides + j)
+             for k in range(rows - 1) for j in range(sides)]
+    builder.add(verts, faces, colours)
+
+
+# The rosettes, each with its cherry and stalk, round the top, between the cut's sides.
+ROSETTES = 9
+ROSETTE_R = CAKE_R - 0.024  # how far out they stand
+ROSETTE_SIZE = 0.021
+CHERRY_R = 0.0115
+rosettes = []
+for k in range(ROSETTES):
+    a = CUT[1] + 0.3 + (2 * math.pi - (CUT[1] - CUT[0]) - 0.6) * k / (ROSETTES - 1)
+    x, y = math.cos(a) * ROSETTE_R, math.sin(a) * ROSETTE_R
+    rosettes.append((x, y))
+    piped(cake, x, y, CAKE_TALL - 0.003, ROSETTE_SIZE)
+    top = Vector((x, y, CAKE_TALL + ROSETTE_SIZE * 0.9 + CHERRY_R * 0.75))
+    cake.blob(tuple(top), CHERRY_R, CHERRY, squash=0.92, lumpy=0.04, seed=k, shade=cherry_skin, lit=False,
+              subdivisions=3)
+    # (Its stalk, from deep in its dimple, curving up and over to one side.)
+    lean = cake_rng.uniform(0, 2 * math.pi)
+    stalk_path = [top + Vector((math.cos(lean) * 0.014 * t * t, math.sin(lean) * 0.014 * t * t, CHERRY_R * 0.6 + 0.034 * t))
+                  for t in (s / 6 for s in range(7))]
+    round_tube(cake, [tuple(p) for p in stalk_path], [0.0016 - 0.0004 * s / 6 for s in range(7)],
+               lambda p, t, a_: c.mix(CHERRY_STALK, CHERRY_STALK_TIP, smooth_step((t - 0.8) / 0.2)), sides=5)
+
+
+def flake(at, along, up, size):
+    """A flake of chocolate, flat against what it's on: a thin, ragged-edged sliver."""
+    across = up.cross(along).normalized()
+    long_, wide = size * cake_rng.uniform(0.8, 1.4), size * cake_rng.uniform(0.35, 0.6)
+    thick = 0.0012
+    corners = [along * long_ + across * wide * 0.2, across * wide, -along * long_ * 0.8 + across * wide * 0.3,
+               -along * long_ * 0.6 - across * wide, along * long_ * 0.5 - across * wide * 0.7]
+    low = [tuple(at + q) for q in corners]
+    high = [tuple(at + q + up * thick) for q in corners]
+    m = len(corners)
+    faces = [tuple(range(m))[::-1], tuple(range(m, 2 * m))] + [(j, (j + 1) % m, m + (j + 1) % m, m + j) for j in range(m)]
+    colour = c.mix(CHOCOLATE, CHOCOLATE_LIGHT, cake_rng.random())
+    cake.add(low + high, faces, [c.mix(colour, (0, 0, 0, 1), 0.25)] * m + [colour] * m)
+
+
+def in_cut(a):
+    """Whether round at a is in the slice cut out (or right by it)."""
+    return math.cos(a - (CUT[0] + CUT[1]) / 2) > math.cos((CUT[1] - CUT[0]) / 2 + 0.08)
+
+
+# Flakes over its top (not on the rosettes), and round its side.
+for _ in range(110):
+    a, r = cake_rng.uniform(0, 2 * math.pi), CAKE_R * math.sqrt(cake_rng.uniform(0.02, 0.85))
+    x, y = math.cos(a) * r, math.sin(a) * r
+    if in_cut(a) or any(math.hypot(x - rx, y - ry) < ROSETTE_SIZE * 1.15 for rx, ry in rosettes):
+        continue
+    spin = cake_rng.uniform(0, 2 * math.pi)
+    tilt = Vector((cake_rng.uniform(-0.3, 0.3), cake_rng.uniform(-0.3, 0.3), 1)).normalized()
+    along = Vector((math.cos(spin), math.sin(spin), 0))
+    along = (along - tilt * along.dot(tilt)).normalized()
+    flake(Vector((x, y, CAKE_TALL + 0.0015)), along, tilt, 0.0055)
+for _ in range(170):
+    a, z = cake_rng.uniform(0, 2 * math.pi), cake_rng.uniform(0.06, 0.86) * CAKE_TALL
+    if in_cut(a):
+        continue
+    out_ = Vector((math.cos(a), math.sin(a), 0))
+    spin = cake_rng.uniform(0, math.pi)
+    along = (Vector((-out_.y, out_.x, 0)) * math.cos(spin) + Vector((0, 0, 1)) * math.sin(spin)).normalized()
+    flake(out_ * (CAKE_R + cream_out(a, z) + 0.0012) + Vector((0, 0, z)), along, out_, 0.005)
+
+cake_object = cake.build("cake", smooth=True)
+cake_object.data.transform(Matrix.Scale(CAKE_SIZE, 4))
+outward(cake_object)
+
 if out:
     c.export(out)
     print(f"Exported {out}")
 if preview:
     c.preview(preview, (2.5, -3.5, 2.5), (0, 0, 0), (-0.7, 0.5, -0.45), lens=35)
     c.preview(preview.replace(".png", "-penny.png"), (0.0, -0.25, 0.45), (0, 0, 0), (-0.7, 0.5, -0.45), lens=50)
+    # (And the cake, close up, from its cut side; the others moved out of the way.)
+    for o in bpy.data.objects:
+        if o.type == "MESH" and o.name != "cake" and o.parent is None:
+            o.location.x += 50
+    c.preview(preview.replace(".png", "-cake.png"), (0.75, -0.35, 0.45), (0, 0, 0.1), (-0.7, 0.5, -0.45), lens=50)

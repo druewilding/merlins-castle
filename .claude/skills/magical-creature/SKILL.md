@@ -5,9 +5,13 @@ description: Build a creature for Merlin's Castle 3D (a beast, a goblin, a troll
 
 # Making a magical creature
 
-How the dragon was made (`art/blender/dragon.py`, `src/three/dragon.ts`), written
-down so the next creature goes faster. Follow the steps in order; each ends with
-something to look at before going on.
+How the dragon (`art/blender/dragon.py`, `src/three/dragon.ts`), the trolls
+(`art/blender/trolls.py`, `src/three/trolls.ts`) and the giant
+(`art/blender/giant.py`, `src/three/giant.ts`) were made, written down so the
+next creature goes faster. The dragon is the beast route, built from scratch;
+the trolls and the giant are the human-shaped route, built on the kit and its
+clips. Follow
+the steps in order; each ends with something to look at before going on.
 
 Keep the README and PLAN-V3 spoiler-free: never write there which object gets you
 past a creature. Commit messages may.
@@ -23,24 +27,33 @@ past a creature. Commit messages may.
   the painting or the style; the user prefers ours.
 - **Human-shaped** (goblins, trolls, a giant): start from Quaternius's base
   characters and outfits on their one skeleton, with the Universal Animation
-  Library's clips, as `merlin.py`, `guards.py` and `witches.py` do. Add our own
-  pieces with `c.skinned(...)`, weighted to its bones. Scale the whole of it for
-  a giant (and its clips play at any size). Turn bones on top of clips in code,
-  as `guards.ts` turns their heads.
+  Library's clips, as `merlin.py`, `guards.py`, `witches.py` and `trolls.py`
+  do. Follow 2b.
 - **Not human-shaped** (a beast): build it all in Blender from code, with its
   own skeleton and no clips, as `dragon.py` does. The game turns its bones.
+  Follow 2a.
+- More than one of them (a band of goblins, a family of trolls): plan from the
+  start for each to look different and for them to fill their place (see
+  "Many of them" in 2b).
 
 ## 2. The model, in code
 
-Conventions (`art/blender/common.py`):
+Conventions, for both routes (`art/blender/common.py`):
 
 - Metres; z up; it stands on z = 0, facing -y. Exported, three.js sees it
   facing +z, y up, its left +x.
 - Vertex colours, one material. Names use hyphens (three.js drops dots).
+- Print its point count and scale; keep the `.glb` well under 1 MB.
+- Previews: render several views with `--preview` (front, side, back, plus
+  close-ups of the head and anything fiddly; for the kit route, also each of
+  its looks, sitting or posed as its clips have it, and blinking), and combine
+  them with `magick` to look at side by side.
+
+### 2a. A beast, from scratch
+
 - Make it at whatever size is easy, then scale every point and bone to its
   height (`TALL`) **before** making the objects. (Applying a transform to an
   armature with children afterwards scales them twice.)
-- Print its point count and scale; keep the `.glb` well under 1 MB.
 
 Shapes (all in `dragon.py`, reuse them):
 
@@ -64,6 +77,9 @@ Shapes (all in `dragon.py`, reuse them):
 - Membranes (wings): their own mesh, triangle panels subdivided, scalloped
   between the fingertips, with a little billow. Materials are double-sided, so
   one layer is enough: never two coplanar layers.
+- Anything the game bends along a path each frame (the snake's body): clamp
+  every lookup by position along it to the ends of its arrays. A point a hair
+  past the end rounds to index -1 and turns the whole mesh NaN.
 
 Skin:
 
@@ -78,7 +94,7 @@ Skin:
   one behind: from the tail to the head on the body, and **down** the legs.
   glTF flips V on export, so the shader uses 1 - v.
 
-Skeleton (a beast's own):
+Skeleton:
 
 - Chains along the body tube by distance along it: tail bones, a body bone, neck
   bones, head, jaw. Weights blend between neighbouring bones near the ends of
@@ -86,18 +102,111 @@ Skeleton (a beast's own):
 - Add an empty bone where things come out: a `mouth` at the nose, pointing
   forward, for fire, breath and aim.
 
-Previews: render several views with `--preview` (front, side, back, plus
-close-ups of the head, horns and legs), and combine them with `magick` to look
-at side by side.
+### 2b. Human-shaped, from the kit
+
+The body:
+
+- One Universal Base Character's whole body, reshaped in code (`trolls.py`'s
+  `grown`, `faced`, `trolled`). Scale the whole of it for a giant; its clips
+  play at any size.
+- **The kit's mesh is split along its UV seams**: each point on a seam is two
+  or three. Move them as one (`welded`), or the seams open into holes (the
+  trolls' waist had a dark band that was really a gap).
+- Bulk it out by moving points along their normals, by how much each is
+  weighted to the limb or trunk bones. Keep bulges to the part that moves as
+  one: a belly on the tummy, not over the hips, which bend their own way and
+  stretch it when it dances.
+- **Go gently with exaggeration.** The trolls' bellies took four rounds of
+  shrinking. Start smaller than you think, and offer more.
+- Smooth away the kit hero's muscles (a six-pack reads wrong on a troll), and
+  replace its normal and roughness maps: the kit's are muscles and shiny
+  briefs. Clear its colour masks too, or the game darkens the skin by them.
+- Variations as **shape keys** on the body (bigger belly, fatter all over, a
+  long nose, big ears, `blink`), mixed per creature in the game. A shape key
+  that fattens must leave alone where the clips rest a hand (the fronts of the
+  thighs, sitting).
+- A friendly face: lift the corners of the mouth and push the cheeks up and
+  out; arch the brows over each eye (tilted ones look worried); keep the nose
+  clear of the mouth.
+- **Which points are its face:** those weighted to the head bone more than
+  0.6. The mouth and chin are only about 0.76 the head's (the neck moves them
+  a little), so a 0.9 cut-off leaves them out, and a smile does nothing.
+- A broad smile (a `smile` shape key): lift mostly **above** the line between
+  the lips, and push the corners back only a few millimetres. Lifting below it
+  too, or pushing the corners in, makes the whole lower face look caved in
+  from below.
+- A wider head: widen its points side to side by their head weight, and move
+  each eye out **whole** (as far as its middle moves); stretched, they go
+  oval.
+- Its eyes: a `blink` shape key, with the lids meeting a little below the
+  middle. Eye colour by tinting the iris on the kit's eye picture (find its
+  middle and size in its UVs).
+
+Its own pieces (hair, moss, a beard):
+
+- Skin them to the kit's skeleton with `c.skinned(...)`, each blade or piece
+  weighted as the skin it grows from. Give them the body's shape keys too
+  (`grow_moss(..., keys=...)`), or they float or sink when it's fatter.
+- **What hangs must hang from the right bone.** Grass growing from the thighs
+  swings forward with them when it sits, and lies along its lap. To hang
+  straight down whatever it does, weight it to the hips (`troll-fringe`).
+- Look for gaps from low down and while it sits: between the legs, under the
+  arms, the back of the neck. Cover them with something that belongs (a
+  fringe of moss, a beard), not by moving the body.
+- Hair combed back: points at the front of the head must never lean forward,
+  or a lock falls across the forehead.
+
+Clothes: **use the outfits kit's** (Modular Character Outfits, "Modular
+Parts": each piece is made for this skeleton, so it bends with the skin), as
+`giant.py`'s breeches are. Home-made cloth didn't work on the giant: blades
+read as spikes, flat sheets as card floating off him, and cloth weighted to
+his thigh bones sat right in Blender but sank into his thighs in the game
+(never explained). A piece from the kit:
+
+- `c.load` its part, `c.onto(piece, skeleton)`, and remove the rest of what
+  loaded.
+- **Let it out to fit the reshaped body**: move each of its points as far as
+  the nearest point of the kit's own body was moved (keep the body's points
+  as the kit made them, `kit`, before reshaping), then push any point less
+  than a little way outside the skin out to it (`SNUG`: 1.5 cm left skin
+  showing, 3 cm swallowed the hands resting on it; 2 cm was right).
+- Clear its colour masks, as on the body, and take out its normal and ORM
+  maps **and cut their links** into Metallic and Roughness: left linked, it
+  exports fully metallic, and comes out black in the caves.
+- Recolour its base picture by its brightness, keeping its folds and patches.
+  Pick the colour in the caves' light: warm browns turn the colour of the
+  skin under the orange torches; a greyer one reads as cloth.
+
+**The clips are made for the kit's slim hero.** Anything bigger (hands,
+thighs, a belly) ends up inside the skin where the clip puts a hand. Fix it in
+the game (section 4), never by squashing the body round the hand.
+
+Many of them:
+
+- One table of looks in the game (`LOOKS` in `trolls.ts`): hair, beard, shape
+  keys, head size, skin and moss tints, eye colour. The model carries every
+  piece once; each creature shows its own.
+- Different sizes, to fill the place: the user wanted them to take up space.
+  Size their seats, solid circles and the clearing round them to match (3).
 
 ## 3. In its place (`art/blender/land.py`)
 
+- Something it sits on (a boulder): its own seat height, from where its hips
+  are in its clip. The giant's legs are longer than a troll's, and on the
+  trolls' boulder height he hovered (`GIANT_ROCK`). Look from the side.
+- Big and in a cave: out from the wall enough to be seen as soon as you come
+  in. Its obstacle's `reach` sets where you bump: far enough that its face is
+  still in view (the giant's is 7.5 m; at the usual 5 you were at his knees).
+  The tests (in view when you bump, the ways past clear) leave a narrow
+  window: work it out rather than guess.
+
 - Choose its spot, which way it faces, and where its action goes. Export them
-  to `land.json` (as `"dragon"` is).
+  to `land.json` (as `"dragon"` and `"trolls"` are).
 - Make it solid: circles of its outline (`under_circle` underground,
   `solid_circle` on the land), scaled as the model is.
 - Clear the place round it. Keep stalactites away from its head and stalagmites
-  away from every circle of its outline, its tail included.
+  away from every circle of its outline, its tail included. Do it so every
+  other cave stays exactly as it was.
 - Check the roof: its height against the roof's curve where its head and horns
   are, and leave it a little room.
 - The exit it blocks stays an `obstacle(...)`; the creature only shows why.
@@ -106,9 +215,11 @@ at side by side.
 
 - A class: a constructor taking the scene, its model, its spot, `reducedMotion`
   and callbacks for sounds. Then `update(dt, eye, here)` and the verbs the
-  story needs (the dragon's are `douse`, `relight` and `blaze`).
+  story needs (the dragon's are `douse`, `relight` and `blaze`; the trolls',
+  `dance`).
 - Skinned meshes: set `frustumCulled = false` (bones move it out of its
-  bounds). Hide it when far off.
+  bounds). Hide it when far off. Several from one model: `clone` from
+  `SkeletonUtils`, each with its own mixer.
 - Turning bones about the **model's** axes: keep each bone's rest quaternion
   and its rest rotation in the model, Q. Each frame, set
   `bone.quaternion = rest * Q⁻¹ * turn * Q`. The turn then composes down the
@@ -118,18 +229,72 @@ at side by side.
   opposite turn.
 - Axes in model space: +x across (a positive turn about it pitches forward and
   down; a jaw opens with a positive angle), +y up, +z ahead.
-- Wiring in `main.ts`: load its `.glb` with the others, then make it.
-  - Find its exit's shape with `shapeOf.get("<place> <dir>")`, and add it to the
-    shapes `inUse()` may open.
-  - Call its verbs from `inUse()`. When loading (`instantly`), it's straight to
-    the end state, with no animation.
-  - Call `update` from the frame loop. React to `player.onBump(exit)` for "you
-    tried to go past".
-  - Add it to `window.world` (the `?debug` object) for testing.
+
+On top of clips (the kit route):
+
+- **Put back the clip's pose before adding to it.** The mixer only sets a
+  bone when its clip moves it, so a turn added each frame piles on the last
+  (the trolls' hands drifted up to their faces in a second). After
+  `mixer.update`, keep each bone you change (`armsPosed`), change it, and copy
+  it back before the next update (`shape` / `unshape` in `trolls.ts`).
+- Clips set every bone's size and position each frame, so anything you change
+  there goes back every frame, after the mixer:
+  - **Bigger hands, head:** scale their bones, not the mesh. Then the fingers
+    bend where their joints are. A bigger hand mesh on the hero's joints bends
+    mid-finger and folds through the palm.
+  - **Shorter fingers:** pull their middle and end joints in towards the
+    knuckles (`FINGERS`).
+- **Keep hands out of the body**, adjusting the clip's arms in world space:
+  sitting, lift each forearm at the elbow and turn the hand back as much, so it
+  lies flat on the lap (`LAP`); dancing, swing the upper arms out (`SPREAD`).
+  More for the fatter ones. **Blend the adjustments through every change of
+  clip**: standing up, they push off their knees, and if the lap lift drops
+  before the spread comes in, the wrist goes through the thigh.
+- **Steady sparse clips.** A clip with few keys and straight turns between
+  them shakes at a giant's size (the kinks at each key, many times bigger).
+  Each frame, put back the clip's pose, run the mixer, keep its new pose, then
+  ease each bone towards it (`slerp` by `min(1, dt * STEADY)`) from where it
+  was: spine, neck and arms, not only the hands.
+- **A clip that doesn't do it:** the kit's `Consume` only raises a fist beside
+  the head. To lift something to the mouth, turn the arm in code (`reach` and
+  `bend` in `giant.ts`: two bones, each turned the least way that gets the
+  palm to its target, the elbow down and out).
+- **Aim the head from where its face points now**, not from the body's angle
+  to you: the clip already turns the head (the trolls all looked a little to
+  your right). Measure its face's direction each frame and turn the rest of the
+  way, up to how far its neck goes.
+- **Make it alive:** glances to either side and back every few seconds, a blink
+  now and then (sometimes two together).
+- **Don't all do the same thing at once.** One asks at a time, for a few
+  seconds each; the rest idle. Stagger shared moments (one after another getting
+  up), and start each one's clip at a different time.
+
+Wiring in `main.ts`:
+
+- Load its `.glb` with the others, then make it.
+- Find its exit's shape with `shapeOf.get("<place> <dir>")`, and add it to the
+  shapes `inUse()` may open.
+- Call its verbs from `inUse()`. When loading (`instantly`), it's straight to
+  the end state, with no animation.
+- Call `update` from the frame loop. React to `player.onBump(exit)` for "you
+  tried to go past".
+- Add it to `window.world` (the `?debug` object) for testing.
+
+Behaviour:
+
 - **Make it obvious.** The way's shut the moment you arrive, and again the
   moment you try it: no waiting for a timer.
-- **Keep it gentle** (storybook): fire across the way, never at you.
+- **Keep it gentle** (storybook): fire across the way, never at you; a spell is
+  a swirl of twinkles round your head.
 - Reduced motion: posed once, still, with its effect hanging in the air.
+- **In a death scene** (`death-scene` skill), the scene starts it (the
+  giant's `enchant()`), looks at it (`faceAt()`), and the creature poses
+  itself on top of its clip. Guard what `inUse()` calls each change (`hungry()`)
+  so it doesn't cut the scene short, and give it a `reset()` for `restart()`.
+  A head bent far over: turn it straight to what it looks at
+  (`setFromUnitVectors`), or turning round then up twists it onto one side.
+- Eating: one big gulp, then a broad smile, suited the game better than three
+  bites.
 
 Effects (sprites):
 
@@ -143,8 +308,8 @@ Effects (sprites):
   intensity, never the number of lights (that makes every material rebuild).
 
 Sounds: synthesise them in `scripts/make-sounds.js` (filtered noise for fire, a
-hiss for steam), list them in `src/three/sounds.json`, and run
-`npm run art:build`.
+hiss for steam, a jig, a twinkling spell), list them in `src/three/sounds.json`,
+and run `npm run art:build`.
 
 ## 5. Check it
 
@@ -152,22 +317,45 @@ hiss for steam), list them in `src/three/sounds.json`, and run
   clear of the walls; its effect lands in front of the obstacle; the ways across
   its place stay clear of its outline (more than the player's body plus a
   margin).
-- Screenshots: a temporary `*.t.mjs` in the repo root (webkit, English,
-  `/3d?debug&at=x,z,yaw`, wait for `window.world?.player`, then delete it).
+- Screenshots: a temporary `*.t.mjs` in the repo root, run against
+  `npx vite --port 5179`. Launch with `chromium.launch({ channel: "chrome" })`
+  (Playwright's own browsers aren't installed), English,
+  `/3d?debug&at=x,z,yaw`, wait for `window.world?.player`, then delete the
+  script and stop vite.
   For close-ups, render from your own camera inside `page.evaluate`, with
   `renderer.render(scene, cam)` then `canvas.toDataURL()`, placed with
-  `model.localToWorld`.
+  `model.localToWorld`. Look from where the user would stand, and from low
+  down.
 - Flicker: cast rays through the suspect pixels against the named meshes, and
   report pairs of hits under a centimetre apart with parallel normals. Opposite
   normals mean a folded or doubled face; equal ones mean coplanar overlap. Fix
   the geometry so it doesn't overlap; moving faces apart alone isn't enough.
+- **Parts through the body:** measure, don't eyeball. Over a few seconds of
+  every clip, for every creature, test each fingertip (and anything else that
+  swings close) for being inside the skin, and count. Then **film the changes
+  between clips** (getting up, sitting down) frame by frame, from the user's
+  view: the measuring was unreliable there, and that's where the wrist went
+  through the leg.
+- Run it for a good while: anything added each frame shows only after a
+  second or more (the drifting hands), and timers only after they fire twice.
 - Drive the story for real: give yourself the object (`items.restart` with
   `itemLocations.<id> = "carried"`), press keys with `KeyboardEvent`, and log
   its state over time.
+- Watch the console for warnings (a NaN mesh names no one: find it by its
+  point count).
+- **Don't trust `getVertexPosition` for skinned meshes** to check what's
+  drawn: on the giant it put his legs well away from where they were drawn.
+  Look instead: colour the piece red (`vertexColors = false`), hide the body,
+  draw the body as a wireframe or the piece with `depthTest = false`.
+- In Blender scripts, `out` is the output path from `c.args()`: a loop
+  variable called `out` overwrites it, and the export fails ("expected a
+  string type, not float").
+- Its previews in Blender render the kit's skin black: the game's look is the
+  one to judge it by.
 - Then `npx prettier --check src test`, `npx eslint src test`,
   `npx tsc --noEmit -p .` and `npx vitest run`.
 
-## What the review caught on the dragon (check these first)
+## What the review caught on the dragon (a beast)
 
 - The jaw opened upwards (wrong sign); the head should tip back as it opens.
 - Its tail passed through a stalagmite: clear the place by its outline.
@@ -184,3 +372,35 @@ hiss for steam), list them in `src/three/sounds.json`, and run
   moment (a hiss, a burst of steam) must reset its own timer when it fires,
   not rely on the state it moves to. Drive it and log each sound for a good
   while after, not just the first few seconds.
+
+## What the review caught on the trolls (human-shaped)
+
+- All alike, all doing the same thing: give each its own look, and take turns.
+- Fingers folded through their hands, and were too long: scale hands by their
+  bones, shorten the finger joints in the game.
+- Not friendly enough: lift the smile, arch the brows, smooth the muscles.
+- A hole at the waist: the kit's seams opened; weld them.
+- They all looked a little to your right: aim from where the face points now.
+- They never blinked: add a blink shape key, and glances.
+- Pot bellies too big, and stretching when dancing: smaller, higher, off the
+  hips. It took four rounds.
+- Hands and thumbs inside bellies and thighs: lift the forearms sitting, swing
+  the arms out dancing; and keep the fronts of the thighs slim.
+- The wrist through the leg, standing up: blend the arm adjustments through
+  every change of clip.
+- A gap to see into between the legs: a fringe of moss, hung from the hips.
+- Too small for their big cave: size them up, and their boulders with them.
+
+## What the review caught on the giant (human-shaped, sitting)
+
+- He blocked the way: sitting beside it on a boulder, as a warning, is enough.
+- His hands shook, his leg too: steady the clip's bones (the trolls' as well).
+- His hand went through the cake: sit it on the palm (`held()`), lifted to the
+  mouth by code.
+- The smile did nothing, then caved his face in: the face cut-off, then lift
+  above the lips.
+- A lock of hair through his forehead: comb the front back.
+- Too far off to matter when you bump: a longer `reach`.
+- Hovering over his boulder: a seat height of his own.
+- Home-made cloth: spikes, then card, then sinking into his thighs: the
+  outfits kit's breeches, let out to fit him, matt, recoloured.

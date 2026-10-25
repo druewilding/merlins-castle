@@ -59,6 +59,7 @@ import { Dragon, type DragonCave, type DragonSpot } from "./dragon";
 import { Drawbridge, type DrawbridgeSpot, wantedDown } from "./drawbridge";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
+import { Giant, type GiantPlace } from "./giant";
 import { Golden } from "./golden";
 import { Guards } from "./guards";
 import { haze } from "./haze";
@@ -71,6 +72,7 @@ import { Leaves } from "./leaves";
 import { dressMaze } from "./maze";
 import { Merlin } from "./merlin";
 import dragonModel from "./models/dragon.glb?url";
+import giantModel from "./models/giant.glb?url";
 import guardModel from "./models/guards.glb?url";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
@@ -81,6 +83,7 @@ import rabbitModel from "./models/rabbits.glb?url";
 import snakeModel from "./models/snake.glb?url";
 import trollModel from "./models/trolls.glb?url";
 import witchModel from "./models/witches.glb?url";
+import { Poof, Shrunk } from "./mouse";
 import { Notes, type NoteSpot } from "./notes";
 import { Plank } from "./plank";
 import { type Growth, Plants } from "./plants";
@@ -196,7 +199,7 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky, wizard, hags, bunnies, sentries, dragony, trolly] = await Promise.all([
+const [model, file, things, snaky, wizard, hags, bunnies, sentries, dragony, trolly, gianty] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
@@ -207,6 +210,7 @@ const [model, file, things, snaky, wizard, hags, bunnies, sentries, dragony, tro
   loader.loadAsync(guardModel),
   loader.loadAsync(dragonModel),
   loader.loadAsync(trollModel),
+  loader.loadAsync(giantModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -578,6 +582,18 @@ const dragon = new Dragon(
 // one on the harp, they dance (trolls.ts).
 const pleased = shapeOf.get("trolls north");
 const trolls = new Trolls(scene, trolly.scene, trolly.animations, land.trolls as TrollsPlace, reducedMotion);
+// The giant beside the way west from his cave, hungry; given a cake, he eats
+// it (giant.ts).
+const hungry = shapeOf.get("giant west");
+const giant = new Giant(
+  scene,
+  gianty.scene,
+  gianty.animations,
+  things.scene.getObjectByName("cake")!,
+  land.giant as GiantPlace,
+  reducedMotion,
+  () => ownSounds.play("munch", { rate: 0.9 + Math.random() * 0.2 })
+);
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 // A way that kills you even with the object (the balcony) has no far side
@@ -768,6 +784,9 @@ function tell(exit: string) {
   if (way?.message && !way.fatal) say(way.message);
   told = exit;
 }
+// (A way that kills you, come into the free way: once you're in its place, a
+// step back is going that way.)
+player.isIn = (exit) => exit.startsWith(`${room} `);
 player.onBump = (exit) => {
   if (dying(exit)) return;
   const [id, direction] = exit.split(" ");
@@ -778,6 +797,7 @@ player.onBump = (exit) => {
   say(way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo);
   sounds.play("blocked");
   if (fiery?.names.includes(exit)) dragon.blaze();
+  if (hungry?.names.includes(exit)) giant.refuse();
   if (pleased?.names.includes(exit)) {
     trolls.spell(player.camera);
     ownSounds.play("spell");
@@ -859,7 +879,7 @@ function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
   // (Only the ways the 3D world can open so far: walls to climb, gates, doors, the dense trees, the snake, the river,
-  // the leaves, the witches, the moat, the dragon, the dark.)
+  // the leaves, the witches, the moat, the dragon, the trolls, the giant, the dark.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
     const shape = shapeOf.get(`${here} ${direction}`);
@@ -879,6 +899,7 @@ function inUse() {
         shape === tolled ||
         shape === fiery ||
         shape === pleased ||
+        shape === hungry ||
         unlit.has(shape))
       ? [`${here} ${direction}`]
       : [];
@@ -914,6 +935,12 @@ function inUse() {
   if (fiery && opened.has(fiery)) {
     dragon.douse(instantly ? undefined : player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
   } else dragon.relight();
+  // The cake thrown to the giant, from your hand: he eats it (or, loading,
+  // he's had it); and once you've gone, he's hungry again.
+  if (hungry && opened.has(hungry)) {
+    if (instantly) giant.fed();
+    else giant.feed(player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
+  } else giant.hungry();
   // The harp played to the trolls: up they get and dance, to its tune (or,
   // loading, they're dancing); and once you've gone, they sit down again.
   if (pleased && opened.has(pleased)) {
@@ -976,14 +1003,18 @@ if (handoff && !at) arrive(handoff);
 // Dying: walking into a way that kills you, its scene plays out (climbing
 // the ladder propped under the balcony, fall.ts; wading into the deep river,
 // swept.ts; walking into the witches, caught.ts; going for Merlin's
-// treasure, trap.ts; going on into the dark tunnels, tripped.ts); then a curtain falls, with the original's words, and after it
-// your score, as in the illustrated version.
+// treasure, trap.ts; going on into the dark tunnels, tripped.ts; going on
+// past the giant, mouse.ts); then a curtain falls, with the original's words,
+// and after it your score, as in the illustrated version.
 const BALCONY = "mossy-steps east";
 const RIVER = "deep-river south";
 const WITCHES = "forest-witches west";
 const DARK_WAY = "dark-tunnels south";
+const GIANT_WAY = "giant west";
 // (Seen stars, fallen over in the dark.)
 const stars = new Stars(scene);
+// (The giant's spell, turning you into a mouse.)
+const poof = new Poof(scene);
 // (Each scene plays on behind the curtain, which starts to come down a
 // little before its end, so the end is seen through it, not cut off.)
 interface Scene3d {
@@ -1032,6 +1063,11 @@ const scenes: Record<string, () => Scene3d | undefined> = {
           reducedMotion,
           (sound) => (sound === "step" ? ownSounds.play("walk", { volume: 0.7 }) : ownSounds.play(sound))
         ),
+  // (Not with the cake in use: he's eaten it.)
+  [GIANT_WAY]: () =>
+    effects(world, items.state).includes("cake")
+      ? undefined
+      : new Shrunk(player.camera, giant, poof, reducedMotion, (sound) => ownSounds.play(sound)),
   // (Not with the rope across it.)
   ...Object.fromEntries(
     ["maze north", "treasure-room south"].map((exit) => [
@@ -1139,6 +1175,7 @@ if (debugMode) {
       snake,
       dragon,
       trolls,
+      giant,
       merlin,
       guards,
       witches,
@@ -1301,6 +1338,8 @@ function restart(game: { state: GameState; three?: ThreeSave }) {
   witches.free();
   net.reset();
   stars.hide();
+  poof.hide();
+  giant.reset();
   arrive(game);
   instantly = true; // (what's in use is as it was: no gate swinging open, no chopping)
   inUse();
@@ -1477,6 +1516,7 @@ renderer.setAnimationLoop((time) => {
   rabbits.update(dt, player.position);
   dragon.update(dt, player.camera.position, room === "dragon-cave");
   trolls.update(dt, player.camera.position, room === "trolls");
+  giant.update(dt, player.camera.position, room === "giant");
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)
