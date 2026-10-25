@@ -33,6 +33,18 @@ def outward(obj):
     bm.free()
 
 
+def out_from(obj, centre):
+    """Every face facing away from centre: for a cut stone, whose facets are
+    each their own (not joined, so outward can't tell which way is out)."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    for f in bm.faces:
+        if f.normal.dot(f.calc_center_median() - Vector(centre)) < 0:
+            f.normal_flip()
+    bm.to_mesh(obj.data)
+    bm.free()
+
+
 WOOD = c.linear("#8a5a33")
 RUNG = c.linear("#a2703f")
 
@@ -396,7 +408,7 @@ outward(apple_object)
 # The emerald: as in its picture, a step-cut one, an octagon (a rectangle
 # with its corners cut) with a broad flat table on top, stepping down to its
 # girdle and in again underneath, to a little flat base it lies on. Each
-# facet its own shade of green, lighter on top; 30 cm long (big, like the
+# facet its own shade of deep green (bluer than the grass), lighter on top; 30 cm long (big, like the
 # key, so you can spot it).
 emerald = c.Builder()
 EM_HALF, EM_WIDE, EM_CUT = 0.15, 0.12, 0.04  # half its length and width, at its girdle, and its corners cut
@@ -411,14 +423,14 @@ def octagon(scale, z):
 # From its base up: the base, the girdle (bottom and top), a step on the
 # crown, and the table.
 rings = [octagon(0.4, 0.0), octagon(1.0, 0.09), octagon(1.0, 0.11), octagon(0.85, 0.15), octagon(0.6, 0.18)]
-EM_COLOURS = [c.linear(h) for h in ("#0f5c2e", "#167a3c", "#2aa85a", "#3cc46e")]  # the pavilion, girdle, crown and step
+EM_COLOURS = [c.linear(h) for h in ("#02381f", "#065c34", "#0c8a48", "#22b866")]  # the pavilion, girdle, crown and step
 for ring_, (lo, hi) in enumerate(zip(rings, rings[1:])):
     for k in range(8):
         pts = [lo[k], lo[(k + 1) % 8], hi[(k + 1) % 8], hi[k]]
         emerald.add(pts, [(0, 1, 2, 3)], [c.vary(EM_COLOURS[ring_], 0.18, Vector((k, ring_, 1.0)))] * 4)
-emerald.add(rings[0][::-1], [tuple(range(8))], [c.linear("#0b4a24")] * 8)
-emerald.add(rings[-1], [tuple(range(8))], [c.linear("#34c26c")] * 8)
-outward(emerald.build("emerald", smooth=False))
+emerald.add(rings[0][::-1], [tuple(range(8))], [c.linear("#022c18")] * 8)
+emerald.add(rings[-1], [tuple(range(8))], [c.linear("#0f9a50")] * 8)
+out_from(emerald.build("emerald", smooth=False), (0, 0, 0.1))
 
 # The broom: as in its picture, a witch's besom. A long, knobbly handle,
 # bent a little, swelling to a knob at its end, and a bundle of twigs bound
@@ -1949,7 +1961,8 @@ for part in (ring_object, ring_gem_object):
     part.data.transform(Matrix.Translation((-across, 0, -low)) @ Matrix.Rotation(turn, 4, "Y"))
     part.data.transform(Matrix.Scale(RING_SIZE, 4))
 outward(ring_object)
-outward(ring_gem_object)
+gem_points = ring_gem_object.data.vertices
+out_from(ring_gem_object, sum((v.co for v in gem_points), Vector()) / len(gem_points))
 ring_gem_object.parent = ring_object
 
 if out:

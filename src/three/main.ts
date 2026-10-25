@@ -234,7 +234,8 @@ if (cobwebs instanceof Mesh) {
   cobwebs.receiveShadow = false;
 }
 // The emerald, glassy: a little room's lights caught in its facets (its own,
-// not the scene's), and a glow from within, so it shines even in the tower.
+// not the scene's), and a glow from within, so it shines even in the tower
+// (only in the dark: in daylight, on the grass, it would glow as green as it).
 // (The flask's glass catches them too.)
 const pmrem = new PMREMGenerator(renderer);
 const shine = pmrem.fromScene(new RoomEnvironment(), 0.02).texture;
@@ -246,11 +247,11 @@ if (emerald instanceof Mesh) {
     flatShading: true,
     roughness: 0.12,
     metalness: 0.9, // (its reflections green, as in its picture: white only in a thin coat over them)
-    clearcoat: 0.2,
+    clearcoat: 0.5,
     clearcoatRoughness: 0.05,
     envMap: shine,
     envMapIntensity: 0.55,
-    emissive: new Color("#0f7a38"),
+    emissive: new Color("#0a6e3c"),
     emissiveIntensity: 1.0,
   });
 }
@@ -1637,11 +1638,12 @@ renderer.setAnimationLoop((time) => {
   const kept = Math.hypot(gemAt.x - chestX, gemAt.z - chestZ) < 0.8 ? 0.18 + 0.82 * lidOpen : 1;
   // (Only a glimmer in daylight: it shows in the dark.)
   gemLight.position.copy(gemAt);
-  gemLight.intensity = gemGlow * breath * kept * (0.15 + 1.0 * dark);
+  gemLight.intensity = gemGlow * breath * kept * (0.02 + 1.13 * dark);
+  if (emerald instanceof Mesh) (emerald.material as MeshPhysicalMaterial).emissiveIntensity = 0.25 + 0.75 * dark;
   // (The halo a little towards you, so the ground doesn't cut it off.)
   halo.position.copy(gemAt).addScaledVector(player.camera.position.clone().sub(gemAt).normalize(), 0.15);
   halo.visible = gemGlow > 0.01;
-  halo.material.opacity = gemGlow * breath * (0.05 + 0.3 * dark);
+  halo.material.opacity = gemGlow * breath * (0.01 + 0.34 * dark);
   if (lid) {
     const near =
       player.under?.hall === "tower" && Math.hypot(player.position.x - chestX, player.position.z - chestZ) < 2.5;
