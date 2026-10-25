@@ -38,6 +38,7 @@ const HAND = new Vector3(0.1, -0.12, -0.45); // where you hold it, from your eye
 const HELD = 0.22; // its size in your hand (it's made big, to be spotted on the ground)
 const UP = new Vector3(0, 1, 0);
 const SHAKE = 0.035; // metres the stone trembles
+const LUMPS = 1.35; // how far out its lumps can come, of its radius (land.py's stone: lumpy 0.18)
 // (Holding it up, its stone on top, facing you: it's made lying down, flat,
 // its stone towards +x. Stood up on its edge, then turned stone up.)
 const UPRIGHT = new Quaternion()
@@ -163,9 +164,10 @@ export class Charm {
         ? 0
         : Math.sin(((t - TREMBLE[0]) / (TREMBLE[1] - TREMBLE[0])) * Math.PI);
     this.shake.set(Math.sin(t * 53) * SHAKE * shaking, Math.abs(Math.sin(t * 37)) * SHAKE * 0.4 * shaking, 0);
-    // (Its side towards you: the glow and the sparkles on it, not inside it.)
+    // (Its side towards you: the glow and the sparkles just in front of it,
+    // clear of its lumps, so none cut through.)
     this.across.set(camera.position.x - stone.x, 0, camera.position.z - stone.z).normalize();
-    this.face.copy(stone).addScaledVector(this.across, this.radius);
+    this.face.copy(stone).addScaledVector(this.across, this.radius * LUMPS);
     this.across.set(-this.across.z, 0, this.across.x);
     // The glow round it, and fading.
     const fading = 1 - ease((t - FADES[0]) / (FADES[1] - FADES[0]));
