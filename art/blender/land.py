@@ -6384,20 +6384,21 @@ def coach_house(b, hall):
     for u, v in ((-5.8, -5.9), (-5.3, -5.7)):
         PROPS.put(b, "Bag", (hx + u, hy + v, f), rnd.uniform(0, 6), 1.2, 0.5)
     # Tack on pegs, and a horse's collar, on the north wall; a shelf of pots.
+    # (Facing into the room, between the wall's posts: at hx -2.8 and +2.8.)
     wall_y = y1 - 0.04
-    PROPS.put(b, "Peg_Rack", (hx - 3.2, wall_y, f + 2.2), 0.0 + math.pi, 1.4, 0.6)
-    for k, u in enumerate((-3.85, -3.4, -2.95, -2.5)):
+    PROPS.put(b, "Peg_Rack", (hx - 5.0, wall_y, f + 2.2), 0.0, 1.4, 0.6)
+    for k, u in enumerate((-5.65, -5.2, -4.75, -4.3)):
         for d in (-0.06, 0.06):
             timber(b, (hx + u + d, wall_y - 0.12, f + 2.15), (hx + u + d * 3, wall_y - 0.1, f + 1.2 - 0.15 * (k % 2)), 0.03,
-                 c.linear("#4a2c18"), 0.012)
+                   c.linear("#4a2c18"), 0.012)
     collar = (hx - 0.9, wall_y - 0.12, f + 1.75)
     for k in range(14):
         a0, a1 = 2 * math.pi * k / 14, 2 * math.pi * (k + 1) / 14
         p0 = (collar[0] + math.cos(a0) * 0.36, collar[1], collar[2] + math.sin(a0) * 0.46)
         p1 = (collar[0] + math.cos(a1) * 0.36, collar[1], collar[2] + math.sin(a1) * 0.46)
         timber(b, p0, p1, 0.12, c.linear("#5a3a22"), 0.1)
-    PROPS.put(b, "Shelf_Simple", (hx + 2.4, wall_y, f + 2.9), math.pi, 1.4, 0.6)
-    for u, kind in ((1.9, "Pot_1"), (2.35, "Vase_2"), (2.8, "Pot_1"), (3.0, "Bottle_1")):
+    PROPS.put(b, "Shelf_Simple", (hx + 0.9, wall_y, f + 2.9), 0.0, 1.4, 0.6)
+    for u, kind in ((0.4, "Pot_1"), (0.85, "Vase_2"), (1.3, "Pot_1"), (1.5, "Bottle_1")):
         PROPS.put(b, kind, (hx + u, wall_y - 0.25, f + 2.9 + 0.11 * 1.4 + 0.01), rnd.uniform(0, 6), 1.0, 0.4)
     # A cart wheel, leaning on the south wall.
     wc = (hx + 3.6, y0 + 0.3, f + 0.7)
