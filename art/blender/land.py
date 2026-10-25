@@ -6160,8 +6160,12 @@ def courtyard():
                   [(0, 1, 2)], [c.linear(court_rng.choice(("#d8b862", "#c9a24e", "#e6cc7a")))] * 3)
 
     # Outside it: a cart, barrels and crates, and a water trough.
-    VILLAGE.put(court, "Prop_Wagon", (BARN_W - 5.0, BARN_N + 1.8, g), facing_yaw(-0.5, 1), 1.15, 0.5)
-    solid_circle(BARN_W - 5.0 - 0.5 * 1.15, BARN_N + 1.8 + 1.0 * 1.15, 1.7)
+    # (In full: made simpler, its wheels lose their round. Solid all along it,
+    # from its shafts to its tail: its bed is 2 m across, 4 long, in the kit.)
+    cart = ((BARN_W - 5.0, BARN_N + 1.8, g), facing_yaw(-0.5, 1), 1.15)
+    VILLAGE.put(court, "Prop_Wagon", *cart)
+    for along in (-0.5, 0.4, 1.3, 2.2, 3.0):
+        solid_circle(*VILLAGE.placing(*cart)((0, along, 0))[:2], 1.15)
     for dx, dy, kind in ((-0.6, -1.0, "Barrel"), (-1.35, -1.5, "Barrel_Apples"), (-0.6, -1.85, "Barrel")):
         PROPS.put(court, kind, (BARN_W + dx, BARN_S - dy, g), court_rng.uniform(0, 6), 1.1, 0.5)
     for dx, dy, z, turn in ((-2.3, 1.2, 0, 0.2), (-2.4, 1.15, 0.88, 0.5)):
@@ -6198,18 +6202,30 @@ def coach(b, x, y, f):
     faces += [(k, (k + 1) % n, n + (k + 1) % n, n + k)[::-1] for k in range(n)]
     b.add(verts, faces, [c.vary(RED_COACH, 0.08, Vector(v) * 4) for v in verts])
     # (Which way round those go: the first face is its side facing -y.)
+    # On each side: its windows (in gilt frames, curtained), its door (edged in
+    # gilt, its crest on it) and gilt bands along it: each layer standing a
+    # little further out from the body than what it's on, or they'd flicker.
     for side in (-1, 1):
-        yy = y + side * (half + 0.012)
+
+        def layer(u0, u1, z0, z1, out, colour, vary=0.05, side=side):
+            """A layer on its side, from the body out to `out`."""
+            y0, y1 = (half + 0.002, half + out) if side > 0 else (-half - out, -half - 0.002)
+            oriented(b, (x, y, f), (1, 0), u0, u1, y0, y1, z0, z1, colour, vary)
+
         for u0, u1 in ((-0.62, -0.18), (-0.06, 0.38), (0.5, 0.92)):
-            oriented(b, (x, yy, f), (1, 0), u0 - 0.05, u1 + 0.05, -0.006 * side, 0.006 * side, 1.38, 2.0, GILT, 0.05)
-            oriented(b, (x, yy, f), (1, 0), u0, u1, -0.012 * side, 0.012 * side, 1.43, 1.95, c.linear("#3a1420"), 0.04)
-            oriented(b, (x, yy, f), (1, 0), u0, u0 + 0.1, -0.016 * side, 0.016 * side, 1.43, 1.95, c.linear("#c83a52"))
-            oriented(b, (x, yy, f), (1, 0), u1 - 0.1, u1, -0.016 * side, 0.016 * side, 1.43, 1.95, c.linear("#c83a52"))
-        oriented(b, (x, yy, f), (1, 0), -0.1, 0.42, -0.008 * side, 0.008 * side, 0.85, 1.34, GILT, 0.05)  # (the door)
-        oriented(b, (x, yy, f), (1, 0), -0.06, 0.38, -0.011 * side, 0.011 * side, 0.89, 1.3, RED_COACH, 0.05)
-        b.cylinder((x + 0.16, yy, f + 1.1), (x + 0.16, yy + side * 0.03, f + 1.1), 0.12, 0.1, GILT, sides=10)
+            layer(u0 - 0.05, u1 + 0.05, 1.38, 2.0, 0.008, GILT)
+            layer(u0, u1, 1.43, 1.95, 0.014, c.linear("#3a1420"), 0.04)
+            layer(u0, u0 + 0.1, 1.43, 1.95, 0.02, c.linear("#c83a52"))
+            layer(u1 - 0.1, u1, 1.43, 1.95, 0.02, c.linear("#c83a52"))
+        layer(-0.1, 0.42, 0.85, 1.34, 0.008, GILT)  # (the door)
+        layer(-0.06, 0.38, 0.89, 1.3, 0.014, RED_COACH)
         for z in (2.08, 1.36):
-            oriented(b, (x, yy, f), (1, 0), -0.84, 1.1, -0.014 * side, 0.014 * side, z - 0.025, z + 0.025, GILT, 0.05)
+            layer(-0.84, 1.1, z - 0.025, z + 0.025, 0.026, GILT)
+        # (Its crest: a round of gilt on the door, facing out.)
+        crest_y = y + side * (half + 0.02)
+        crest = [(x + 0.16 + math.cos(2 * math.pi * k / 12) * 0.11, crest_y, f + 1.09 + math.sin(2 * math.pi * k / 12) * 0.13)
+                 for k in range(12)]
+        facing(b, crest, [GILT] * 12, (0, side, 0))
     block(b, x - 0.92, y - half - 0.08, f + 2.1, x + 1.15, y + half + 0.08, f + 2.18, c.linear("#3a1a14"), solid=False)
     for u in (-0.9, -0.3, 0.3, 0.9):
         for side in (-1, 1):
