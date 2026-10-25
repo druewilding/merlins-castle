@@ -359,3 +359,28 @@ const rise = (t, from, to) => Math.min(1, Math.max(0, (t - from) / (to - from)))
   sparkle(track, 0.2, 1, 8, 0.25);
   save("spell", track, 0.4);
 }
+
+// The giant eating his cake: a big, soft, crumbly munch, a chomp and a
+// chew or two, deep (he's huge).
+{
+  const track = new Track(0.75);
+  [
+    [0, 0.22, 1],
+    [0.26, 0.16, 0.6],
+    [0.46, 0.14, 0.45],
+  ].forEach(([at, long, amp]) => {
+    const envelope = (t) => amp * rise(t, 0, 0.012) * Math.exp(-t / (long * 0.35));
+    track.add(at, rush(long, 0.08, envelope), -0.1);
+    // (And the crumbs in it: little crackles.)
+    const crumbs = new Float32Array(Math.round(long * RATE));
+    for (let i = 0; i < crumbs.length; i++) {
+      if (random() < 0.004) {
+        const size = (0.15 + random() * 0.2) * envelope(i / RATE);
+        for (let j = 0; j < 90 && i + j < crumbs.length; j++)
+          crumbs[i + j] += (random() * 2 - 1) * size * Math.exp(-j / 18);
+      }
+    }
+    track.add(at, release(crumbs), 0.1);
+  });
+  save("munch", track, 0.15);
+}

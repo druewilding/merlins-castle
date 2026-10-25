@@ -59,6 +59,7 @@ import { Dragon, type DragonCave, type DragonSpot } from "./dragon";
 import { Drawbridge, type DrawbridgeSpot, wantedDown } from "./drawbridge";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
+import { Giant, type GiantPlace } from "./giant";
 import { Golden } from "./golden";
 import { Guards } from "./guards";
 import { haze } from "./haze";
@@ -71,6 +72,7 @@ import { Leaves } from "./leaves";
 import { dressMaze } from "./maze";
 import { Merlin } from "./merlin";
 import dragonModel from "./models/dragon.glb?url";
+import giantModel from "./models/giant.glb?url";
 import guardModel from "./models/guards.glb?url";
 import itemModels from "./models/items.glb?url";
 import landHeights from "./models/land.bin?url";
@@ -196,7 +198,7 @@ root.append(overlay, corner);
 
 // The land you see, and the heights of the ground you walk on.
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-const [model, file, things, snaky, wizard, hags, bunnies, sentries, dragony, trolly] = await Promise.all([
+const [model, file, things, snaky, wizard, hags, bunnies, sentries, dragony, trolly, gianty] = await Promise.all([
   loader.loadAsync(landModel),
   fetch(landHeights).then(async (response) => response.arrayBuffer()),
   loader.loadAsync(itemModels),
@@ -207,6 +209,7 @@ const [model, file, things, snaky, wizard, hags, bunnies, sentries, dragony, tro
   loader.loadAsync(guardModel),
   loader.loadAsync(dragonModel),
   loader.loadAsync(trollModel),
+  loader.loadAsync(giantModel),
 ]);
 const heights = new Float32Array(file, 0, land.ground.nx * land.ground.ny);
 // The tower's inside, its own material: dark seen from outside, as it is
@@ -578,6 +581,18 @@ const dragon = new Dragon(
 // one on the harp, they dance (trolls.ts).
 const pleased = shapeOf.get("trolls north");
 const trolls = new Trolls(scene, trolly.scene, trolly.animations, land.trolls as TrollsPlace, reducedMotion);
+// The giant in front of the way west from his cave, hungry; given a cake, he
+// eats it, and goes and sits down (giant.ts).
+const hungry = shapeOf.get("giant west");
+const giant = new Giant(
+  scene,
+  gianty.scene,
+  gianty.animations,
+  things.scene.getObjectByName("cake")!,
+  land.giant as GiantPlace,
+  reducedMotion,
+  () => ownSounds.play("munch", { rate: 0.9 + Math.random() * 0.2 })
+);
 let allOpen = false; // (the debug panel's "open every obstacle")
 let opened = new Set<Shape>(); // by an object in use
 // A way that kills you even with the object (the balcony) has no far side
@@ -778,6 +793,7 @@ player.onBump = (exit) => {
   say(way?.obstacle?.blocked ?? way?.message ?? messages(world).cantGo);
   sounds.play("blocked");
   if (fiery?.names.includes(exit)) dragon.blaze();
+  if (hungry?.names.includes(exit)) giant.refuse();
   if (pleased?.names.includes(exit)) {
     trolls.spell(player.camera);
     ownSounds.play("spell");
@@ -859,7 +875,7 @@ function inUse() {
   const { room: here, itemLocations } = items.state;
   const using = effects(world, items.state);
   // (Only the ways the 3D world can open so far: walls to climb, gates, doors, the dense trees, the snake, the river,
-  // the leaves, the witches, the moat, the dragon, the dark.)
+  // the leaves, the witches, the moat, the dragon, the trolls, the giant, the dark.)
   const exits = EXIT_ORDER.flatMap((direction) => {
     const needs = world.rooms[here].exits[direction]?.obstacle?.needs;
     const shape = shapeOf.get(`${here} ${direction}`);
@@ -879,6 +895,7 @@ function inUse() {
         shape === tolled ||
         shape === fiery ||
         shape === pleased ||
+        shape === hungry ||
         unlit.has(shape))
       ? [`${here} ${direction}`]
       : [];
@@ -914,6 +931,13 @@ function inUse() {
   if (fiery && opened.has(fiery)) {
     dragon.douse(instantly ? undefined : player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
   } else dragon.relight();
+  // The cake thrown to the giant, from your hand: he eats it, and goes and
+  // sits down (or, loading, he's sitting there); and once you've gone, he's
+  // back in the way.
+  if (hungry && opened.has(hungry)) {
+    if (instantly) giant.away();
+    else giant.feed(player.camera.localToWorld(new Vector3(0.15, -0.25, -0.4)));
+  } else if (here !== "giant") giant.back();
   // The harp played to the trolls: up they get and dance, to its tune (or,
   // loading, they're dancing); and once you've gone, they sit down again.
   if (pleased && opened.has(pleased)) {
@@ -1139,6 +1163,7 @@ if (debugMode) {
       snake,
       dragon,
       trolls,
+      giant,
       merlin,
       guards,
       witches,
@@ -1477,6 +1502,7 @@ renderer.setAnimationLoop((time) => {
   rabbits.update(dt, player.position);
   dragon.update(dt, player.camera.position, room === "dragon-cave");
   trolls.update(dt, player.camera.position, room === "trolls");
+  giant.update(dt, player.camera.position, room === "giant");
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)

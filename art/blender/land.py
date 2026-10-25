@@ -529,6 +529,31 @@ def troll_spots():
     return spots
 
 
+# The giant (giant.py), crouching in front of the way west out of his cave,
+# facing in across it, as in its picture; and the boulder north of the way,
+# where he goes and sits, given a cake.
+GIANT_SIZE = 3.2  # times the model's size
+GIANT_IN = 3.6  # metres in from the cave's wall, crouching (clear of its doorway's arch, standing up)
+GIANT_SEAT = (0.62, 2.6)  # where he sits: radians round from the way west (north of it), and metres in from the wall
+GIANT_BODY = 0.6  # his radius sitting, at the model's size: for bumping into, and keeping the rocks clear
+
+
+def giant_spots():
+    """Where the giant crouches [x, y], and where he sits [x, y] and which way
+    he faces there [x, y] (to the cave's middle); and the way he walks between
+    them (points every metre or so)."""
+    hall = HALLS["giant"]
+    crouch = (hall.x - hall.r + GIANT_IN, hall.y)
+    a = math.pi - GIANT_SEAT[0]
+    out = hall.r - GIANT_SEAT[1]
+    seat = (hall.x + math.cos(a) * out, hall.y + math.sin(a) * out)
+    facing = Vector((hall.x - seat[0], hall.y - seat[1])).normalized()
+    steps = max(2, round(math.hypot(seat[0] - crouch[0], seat[1] - crouch[1])))
+    walk = [(crouch[0] + (seat[0] - crouch[0]) * k / steps, crouch[1] + (seat[1] - crouch[1]) * k / steps)
+            for k in range(steps + 1)]
+    return crouch, seat, (facing.x, facing.y), walk
+
+
 T, O, G, DM = P["trolls"], P["oak-door"], P["giant"], P["damp-tunnels"]
 TR, MZ, DK, BC = P["treasure-room"], P["maze"], P["dark-tunnels"], P["beautiful-chamber"]
 GH, WK, DU = P["grand-hall"], P["wizards-kitchen"], P["dungeon"]
@@ -3975,6 +4000,10 @@ for hall in HALLS.values():
                 if hall.place == "trolls" and any(math.hypot(x - tx, y - ty) < TROLL_BODY * size + 1.5
                                                   for (tx, ty), _, size in troll_spots()):
                     continue
+                # (And of the giant, where he crouches, walks, and sits.)
+                if hall.place == "giant" and any(math.hypot(x - gx_, y - gy_) < GIANT_BODY * GIANT_SIZE + 1.5
+                                                 for gx_, gy_ in giant_spots()[3]):
+                    continue
                 spike(caves, x, y, f - 0.1, tall, r, rock)
                 under_circle(x, y, r * 0.8)
         for _ in range(int(R * 2)):
@@ -3987,6 +4016,9 @@ for hall in HALLS.values():
             if hall.place == "trolls" and any(math.hypot(x - tx, y - ty) < TROLL_BODY * size + 1.2
                                               for (tx, ty), _, size in troll_spots()):
                 continue
+            if hall.place == "giant" and any(math.hypot(x - gx_, y - gy_) < GIANT_BODY * GIANT_SIZE + 1.5
+                                             for gx_, gy_ in giant_spots()[3]):
+                continue
             spike(caves, x, y, ceiling(x, y) + 0.3, -long, r, rock)
     if hall.place == "trolls":
         # The trolls' seats: a boulder behind each, its top as high as they
@@ -3997,6 +4029,14 @@ for hall in HALLS.values():
             caves.blob((sx, sy, f + TROLL_SEAT[0] * size - r * 0.85), r, c.mix(hall.wall, ROCK, 0.5), squash=0.85,
                        lumpy=0.1, seed=round(x))
             under_circle(x, y, TROLL_BODY * size)
+    if hall.place == "giant":
+        # The giant's seat: a boulder, its top as high as he sits.
+        _, (x, y), (fx, fy), _ = giant_spots()
+        r = 0.42 * GIANT_SIZE
+        sx, sy = x - fx * TROLL_SEAT[1] * GIANT_SIZE, y - fy * TROLL_SEAT[1] * GIANT_SIZE
+        caves.blob((sx, sy, f + TROLL_SEAT[0] * GIANT_SIZE - r * 0.85), r, c.mix(hall.wall, ROCK, 0.5), squash=0.85,
+                   lumpy=0.1, seed=3)
+        under_circle(x, y, GIANT_BODY * GIANT_SIZE)
     if hall.light == TORCH:
         # Torches on the walls.
         for _ in range(4 if R < 10 else 6):
@@ -4856,7 +4896,8 @@ for y, face in ((THICK, 1), (0, -1)):
 oak_leaf.build("oak-door-leaf", smooth=False).location = (ox0 + DOOR_IN, oy - THICK / 2, CAVE)
 obstacle(["oak-door south"], "box", O[0], -oy, TUNNEL_HALF + 0.3, 0.5, under=True)  # the oak door, locked
 gx = G[0] - HALLS["giant"].r - 1.5
-obstacle(["giant west"], "box", gx, -G[1], 1.0, TUNNEL_HALF + 0.3, under=True)  # the giant, in the way
+obstacle(["giant west"], "box", gx, -G[1], 1.0, TUNNEL_HALF + 0.3, under=True,
+         reach=GIANT_IN + 3.6)  # the giant, in the way (far enough off to see his face, he's so big)
 # The giant's iron gate: bars and rails, between iron posts at the walls, with
 # more bars fixed over it, up into the roof; padlocked, on the hall's side, to
 # a staple on the west post, its hinges on the east one (the padlock, brass, stays there, its shackle its
@@ -5165,6 +5206,11 @@ if out:
                                 "facing": [round(fx, 3), round(-fy, 3)], "size": size}
                                for (x, y), (fx, fy), size in troll_spots()],
                    "drum": TROLL_DRUM},
+        # The giant: where he crouches [x, z] and his floor, where he sits [x, z] and which way he faces there
+        # [x, z], and how big he is.
+        "giant": {"crouching": [round(giant_spots()[0][0], 2), round(-giant_spots()[0][1], 2), HALLS["giant"].floor],
+                  "sitting": [round(giant_spots()[1][0], 2), round(-giant_spots()[1][1], 2)],
+                  "facing": [round(giant_spots()[2][0], 3), round(-giant_spots()[2][1], 3)], "size": GIANT_SIZE},
         "dragon": {"at": [round(DRAGON_AT[0], 2), round(-DRAGON_AT[1], 2), HALLS["dragon-cave"].floor],
                    "facing": [round(math.sin(DRAGON_YAW), 3), round(math.cos(DRAGON_YAW), 3)],
                    "fire": [DC[0], HALLS["dragon-cave"].floor, round(-(DC[1] - HALLS["dragon-cave"].r + 1), 2)]},
