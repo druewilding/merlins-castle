@@ -6201,7 +6201,7 @@ def courtyard():
     VILLAGE.put(court, "Prop_Wagon", *cart)
     for along in (-0.5, 0.4, 1.3, 2.2, 3.0):
         solid_circle(*VILLAGE.placing(*cart)((0, along, 0))[:2], 1.15)
-    for dx, dy, kind in ((-0.6, -1.0, "Barrel"), (-1.35, -1.5, "Barrel_Apples"), (-0.6, -1.85, "Barrel")):
+    for dx, dy, kind in ((-0.6, -1.0, "Barrel"), (-1.35, -1.5, "Barrel"), (-0.6, -1.85, "Barrel")):
         PROPS.put(court, kind, (BARN_W + dx, BARN_S - dy, g), court_rng.uniform(0, 6), 1.1, 0.5)
     for dx, dy, z, turn in ((-2.3, 1.2, 0, 0.2), (-2.4, 1.15, 0.88, 0.5)):
         PROPS.put(court, "Crate_Wooden", (BARN_W + dx, BARN_S + dy, g + z), turn, 1.0, 0.3)
@@ -6327,7 +6327,7 @@ def coach_house(b, hall):
     """Inside the coach house, as in its picture: its walls boards between oak
     posts and beams, and open up to its roof, tie beams across under it;
     the red coach on the straw, hay stacked in the corner, barrels, crates
-    and sacks, tack and a horse's collar on pegs, a shelf of pots, a cart
+    and sacks, satchels and a bucket on pegs, a horse's collar, a shelf of pots, a cart
     wheel against the wall, a lantern hung from a beam, and Merlin's
     cloak, blue with silver stars (a button missing), hanging on the back wall."""
     hx, hy, f, W, D = hall.x, hall.y, hall.floor, hall.w, hall.d
@@ -6395,23 +6395,26 @@ def coach_house(b, hall):
         b.blob((hx + u, hy + v, f + 0.25), r, c.linear("#d6b25a"), squash=0.45, lumpy=0.35, seed=30 + k)
         under_circle(hx + u, hy + v, r * 0.85)
     # Barrels, crates and sacks in the south-west corner, by the doors.
-    for u, v, kind in ((-7.4, -5.5, "Barrel"), (-6.6, -5.6, "Barrel"), (-7.3, -4.7, "Barrel_Apples")):
+    for u, v, kind in ((-7.4, -5.5, "Barrel"), (-6.6, -5.6, "Barrel"), (-7.3, -4.7, "Barrel")):
         PROPS.put(b, kind, (hx + u, hy + v, f), rnd.uniform(0, 6), 1.1, 0.5)
         under_circle(hx + u, hy + v, 0.42)
     for u, v, z in ((7.5, -2.8, 0.0), (7.5, -2.8, 0.88), (7.4, -1.9, 0.0)):
         PROPS.put(b, "Crate_Wooden", (hx + u, hy + v, f + z), rnd.uniform(-0.2, 0.2), 1.0, 0.5)
     under_box(hx + 7.45, hy - 2.35, 0.5, 0.95, top=f + 1.8)
-    PROPS.put(b, "Rope_1", (hx + 7.5, hy - 2.8, f + 1.76), 0.3, 1.2, 0.4)
     for u, v in ((-5.8, -5.9), (-5.3, -5.7)):
         PROPS.put(b, "Bag", (hx + u, hy + v, f), rnd.uniform(0, 6), 1.2, 0.5)
-    # Tack on pegs, and a horse's collar, on the north wall; a shelf of pots.
-    # (Facing into the room, between the wall's posts: at hx -2.8 and +2.8.)
+    # Satchels and a bucket on pegs, and a horse's collar, on the north wall;
+    # a shelf of pots. (Facing into the room, between the wall's posts: at hx
+    # -2.8 and +2.8. Nothing like the objects you carry: no rope, no apples.)
     wall_y = y1 - 0.04
-    PROPS.put(b, "Peg_Rack", (hx - 5.0, wall_y, f + 2.2), 0.0, 1.4, 0.6)
-    for k, u in enumerate((-5.65, -5.2, -4.75, -4.3)):
-        for d in (-0.06, 0.06):
-            timber(b, (hx + u + d, wall_y - 0.12, f + 2.15), (hx + u + d * 3, wall_y - 0.1, f + 1.2 - 0.15 * (k % 2)), 0.03,
-                   c.linear("#4a2c18"), 0.012)
+    RACK = 1.4  # times the kit's size
+    rack = (hx - 5.0, wall_y, f + 2.2)
+    PROPS.put(b, "Peg_Rack", rack, 0.0, RACK, 0.6)
+    pegs = [rack[0] + x * RACK for x in (-0.47, -0.28, -0.09, 0.1, 0.29, 0.485)]  # (as the kit has them)
+    SATCHEL = 1.8  # times the kit's pouch
+    for peg in (pegs[0], pegs[5]):
+        PROPS.put(b, "Pouch_Large", (peg, wall_y - 0.2, rack[2] + 0.02 - 0.16 * SATCHEL), 0.0, SATCHEL, 0.6)
+    PROPS.put(b, "Bucket_Metal", (pegs[3], wall_y - 0.27, rack[2] + 0.02 - 0.36), 0.0, 1.0, 0.6)  # (by its handle)
     collar = (hx - 0.9, wall_y - 0.12, f + 1.75)
     for k in range(14):
         a0, a1 = 2 * math.pi * k / 14, 2 * math.pi * (k + 1) / 14
