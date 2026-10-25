@@ -1,8 +1,8 @@
 // The giant in his cave (his model: art/blender/giant.py), sitting on his
 // boulder beside the way west (land.py), hungry, watching you as you go
 // about. Walking into the way, he shakes his head at you.
-// Given a cake (thrown from your hand), he catches it, eats it in three big
-// bites, and nods, smiling broadly (and lets you by); and once you've gone,
+// Given a cake (thrown from your hand), he catches it, eats it in one big
+// gulp, and nods, smiling broadly (and lets you by); and once you've gone,
 // he's hungry again.
 // Walking into the way with no cake, he turns you into a mouse (mouse.ts):
 // he points at you, poof, and then leans down to peer at you, beaming
@@ -37,8 +37,8 @@ const FAR = 45; // metres: further off than this, he isn't drawn
 // the little kinks at each, three times bigger on him, shook his hands.
 const STEADY = 6;
 const FLIGHT = [0.6, 1.2]; // seconds the cake takes to reach his hand, at least and at most
-const BITES = 3; // he eats it in this many bites...
-const BITE = [0.5, 0.35, 0.55]; // ...each: seconds lifting it to his mouth, at it (a bite, halfway), and lowering it
+const BITES = 1; // he eats it in this many bites (one gulp)...
+const BITE = [0.6, 0.3, 0.5]; // ...each: seconds lifting it to his mouth, at it (a bite, halfway), and lowering it
 const MOUTH = [0.12, -0.03]; // where his mouth is from his head's bone: forward, and up (at the model's size)
 const TURN = 0.9; // radians his head turns, at most, either way
 const SHAKE = [1.4, 13, 0.35]; // seconds he shakes his head (no), how fast (radians a second), and how far (radians)
@@ -265,9 +265,12 @@ export class Giant {
     if (this.doing === "eating") this.reach(this.lifted());
     if (this.doing === "enchanting") this.enchanting(eye);
     this.watch(eye, here && far < WATCH && this.doing !== "eating", dt);
-    // Fed, he smiles broadly (as the last bite goes down); and turning you
+    // Fed, he smiles broadly (as soon as it's gone down); and turning you
     // into a mouse, pleased with himself.
-    const beaming = this.doing === "fed" || (this.doing === "enchanting" && this.time > POINT[1]);
+    const beaming =
+      this.doing === "fed" ||
+      (this.doing === "eating" && this.bitten >= BITES) ||
+      (this.doing === "enchanting" && this.time > POINT[1]);
     this.smiling += ((beaming ? 1 : 0) - this.smiling) * Math.min(1, dt * 3);
     this.beam(this.smiling);
     this.blink(dt);
