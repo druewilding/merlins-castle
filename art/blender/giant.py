@@ -42,6 +42,8 @@ BELLY = (0.085, 1.1, 0.2, 0.14)  # metres his belly sticks out, at its middle (i
 NOSE = (1.6, 0.036, 0.006)  # how much bigger his nose is grown, the radius of the round bulb it's made, and how far it's lifted
 EARS = 1.3  # how much bigger his ears are
 SMILE = (0.012, 0.008)  # metres the corners of his mouth are lifted, and his cheeks pushed up and out
+BEAM = (0.02, 0.014, 0.32, 0.4)  # or, smiling broadly (the shape key "smile"): those, how much wider his mouth is, and
+# how far his lower lids come up (his eyes creased, smiling)
 
 SKIN_DARK = np.array(c.linear("#5c463e")[:3], dtype=np.float32)
 SKIN = np.array(c.linear("#ae968a")[:3], dtype=np.float32)
@@ -139,7 +141,8 @@ for _ in range(SMOOTHED):
     rest = [p.lerp(sum((rest[j] for j in around[i]), Vector()) / len(around[i]), 0.5 * smoothing[i]) if around[i] else p
             for i, p in enumerate(rest)]
     rest = welded(rest)
-face = {i for i, w in enumerate(weights) if w.get("Head", 0) > 0.9}
+# (His face: all of it moved by his head, his mouth and chin too, which his neck moves a little.)
+face = {i for i, w in enumerate(weights) if w.get("Head", 0) > 0.6}
 tip = min((rest[i] for i in face if abs(rest[i].x) < 0.01 and 1.6 < rest[i].z < 1.72), key=lambda p: p.y)
 EAR = Vector((0.072, 0.025, 1.695))  # where his ears join his head (on his left; his right's the mirror)
 NOSE_AT = tip + Vector((0, 0.027, -0.002))  # the middle of his nose, behind its tip
@@ -151,10 +154,10 @@ EYE = (Vector((0.0338, -0.066, 1.6986)), 0.0148)  # the middle of his eye (his l
 LIDS = (0.204, -0.49, -0.28)
 
 
-def blinked(p):
+def blinked(p, upper=1.0, lower=1.0):
     """A point of his face, his eyes shut: each lid turned round his eye's
     middle over it (so it never goes into it), most at its edge, less going
-    away from it."""
+    away from it. (Or each only so far shut: upper, lower.)"""
     eye = Vector((math.copysign(EYE[0].x, p.x), EYE[0].y, EYE[0].z))
     d = p - eye
     if d.y > 0.003 or d.length > EYE[1] + 0.012:
@@ -162,9 +165,9 @@ def blinked(p):
     across = c.smooth(1 - (abs(d.x) - 0.85 * EYE[1]) / (0.6 * EYE[1]))
     up = math.atan2(d.z, -d.y)
     if up > 0.1:
-        turn = (LIDS[2] - LIDS[0]) * c.smooth(1 - (up - LIDS[0]) / 0.9)  # (down)
+        turn = (LIDS[2] - LIDS[0]) * c.smooth(1 - (up - LIDS[0]) / 0.9) * upper  # (down)
     elif up < -0.2:
-        turn = (LIDS[2] - LIDS[1]) * c.smooth(1 - (LIDS[1] - up) / 0.6)  # (up)
+        turn = (LIDS[2] - LIDS[1]) * c.smooth(1 - (LIDS[1] - up) / 0.6) * lower  # (up)
     else:
         return p
     turn *= across * c.smooth(1 - (d.length - EYE[1] - 0.004) / 0.008)
@@ -172,10 +175,12 @@ def blinked(p):
     return Vector((p.x, eye.y - out * math.cos(up + turn), eye.z + out * math.sin(up + turn)))
 
 
-def faced(p, blink=False):
-    """A point of his face, made a giant's, and grinning (or blinking)."""
+def faced(p, blink=False, beam=False):
+    """A point of his face, made a giant's, and grinning (or blinking, or beaming)."""
     if blink:
         p = blinked(p)
+    elif beam:
+        p = blinked(p, upper=0.0, lower=BEAM[3])
     # The nose: grown round and heavy, all of it, from its middle.
     d = Vector(((p.x - NOSE_AT.x) / 0.035, (p.y - NOSE_AT.y) / 0.045, (p.z - NOSE_AT.z) / 0.035)).length
     if d < 1 and p.y < NOSE_AT.y + 0.01:
@@ -190,15 +195,19 @@ def faced(p, blink=False):
         root = Vector((math.copysign(EAR.x, p.x), EAR.y, EAR.z))
         p = root + (p - root) * (1 + (EARS - 1) * c.smooth((abs(p.x) - EAR.x) / 0.01))
     # A grin: the corners of his mouth lifted, and wider (most at the corners,
-    # none in the middle)...
-    if abs(p.z - MOUTH) < 0.02 and abs(p.x) < 0.045 and p.y < -0.04:
-        corner = c.smooth((abs(p.x) - 0.006) / 0.022) * c.smooth(1 - abs(p.z - MOUTH) / 0.02)
-        p = Vector((p.x * (1 + 0.2 * corner), p.y + 0.005 * corner, p.z + SMILE[0] * corner))
+    # none in the middle; beaming, more of them, and further, curving round his cheeks)...
+    # (Over more of his face, beaming, so nothing lifted passes what's over it.)
+    up, out, wide, tall, broad = (*BEAM[:3], 0.036, 0.056) if beam else (*SMILE, 0.2, 0.02, 0.045)
+    if abs(p.z - MOUTH) < tall and abs(p.x) < broad and p.y < -0.04:
+        corner = c.smooth((abs(p.x) - 0.006) / 0.022) * c.smooth(1 - abs(p.z - MOUTH) / tall)
+        back = 0.012 if beam else 0.005
+        p = Vector((p.x * (1 + wide * corner), p.y + back * corner, p.z + up * corner * (c.smooth(abs(p.x) / 0.03) if beam else 1)))
     # ...and his cheeks pushed up round and out by it.
     cheek = Vector((abs(p.x) - CHEEK.x, p.y - CHEEK.y, p.z - CHEEK.z)).length
-    if cheek < 0.026 and p.y < -0.04:
-        lift = c.smooth(1 - cheek / 0.026)
-        p = p + Vector((math.copysign(0.002, p.x), -SMILE[1], SMILE[1] * 0.6)) * lift
+    reach = 0.032 if beam else 0.026
+    if cheek < reach and p.y < -0.04:
+        lift = c.smooth(1 - cheek / reach)
+        p = p + Vector((math.copysign(0.002, p.x), -out, out * 0.6)) * lift
     return p
 
 
@@ -228,13 +237,17 @@ def giant(i, **face_):
 
 everyone = range(len(rest))
 points = welded(giant(i) for i in everyone)
-# His eyes shut, for the game to blink them.
+# His eyes shut, for the game to blink them; and smiling broadly, fed.
 blinking = welded(giant(i, blink=True) if i in face else points[i] for i in everyone)
+beaming = welded(giant(i, beam=True) if i in face else points[i] for i in everyone)
 for v, p in zip(body.data.vertices, points):
     v.co = to_mesh @ p
 body.shape_key_add(name="Basis")
 key = body.shape_key_add(name="blink", from_mix=False)
 for k, p in zip(key.data, blinking):
+    k.co = to_mesh @ p
+key = body.shape_key_add(name="smile", from_mix=False)
+for k, p in zip(key.data, beaming):
     k.co = to_mesh @ p
 BROWS = (0.004, 0.008)  # metres his eyebrows are lifted, and arched over each eye (friendly: they come frowning)
 for obj in faces_on:
@@ -265,8 +278,8 @@ def scalp(i):
 
 
 def hairy(i):
-    """His hair: shaggy, hanging down round the sides and back, and wild in front;
-    his beard, bushy, from his cheeks round his chin, and over his lip."""
+    """His hair: shaggy, swept back; his beard, bushy, from his cheeks round
+    his chin."""
     p, w = rest[i], weights[i]
     if scalp(i):
         # (Not on his forehead: it's swept back off it.)
@@ -274,10 +287,12 @@ def hairy(i):
             return 0, 0
         return (1.0, 0.4) if p.y < 0.0 else (1.0, 0.75)
     if w.get("Head", 0) > 0.5 and p.y < -0.02 and 1.53 < p.z < 1.665 and abs(p.x) < 0.075:
-        if abs(p.z - MOUTH) < 0.008 and abs(p.x) < 0.03:
-            return 0, 0  # (his mouth, clear)
-        if p.z > MOUTH and (abs(p.x) > 0.032 or p.z > MOUTH + 0.02):
-            return (0.7, 0.6) if abs(p.x) > 0.05 and p.z < 1.65 else (0, 0)  # (his cheeks, the sides of them)
+        # (Clear round his mouth, so you can see him smile: his beard starts
+        # below his lower lip, and his whiskers only out on his cheeks.)
+        if p.z > MOUTH - 0.014 and abs(p.x) < 0.052:
+            return 0, 0
+        if p.z > MOUTH - 0.014:
+            return (0.7, 0.6) if p.z < 1.65 else (0, 0)  # (his cheeks, the sides of them)
         return 1.0, 0.85
     return 0, 0
 

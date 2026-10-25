@@ -2,7 +2,8 @@
 // boulder beside the way west (land.py), hungry, watching you as you go
 // about. Walking into the way, he shakes his head at you.
 // Given a cake (thrown from your hand), he catches it, eats it in three big
-// bites, and nods (and lets you by); and once you've gone, he's hungry again.
+// bites, and nods, smiling broadly (and lets you by); and once you've gone,
+// he's hungry again.
 //
 // His clip is the Universal Animation Libraries', named as it is there. It
 // doesn't eat: his hand's lifted to his mouth here, on top of it (reach).
@@ -77,6 +78,9 @@ export class Giant {
   private shaking = SHAKE[0];
   private nodding = NOD[0];
   private shut: (amount: number) => void = () => {};
+  /** His broad smile (his body's shape key "smile", 0 to 1), fed; and how far into it he is. */
+  private beam: (amount: number) => void = () => {};
+  private smiling = 0;
   private lids = { wait: BLINK[0], at: -1 };
   private cake = new Group();
   private from = new Vector3();
@@ -113,6 +117,8 @@ export class Giant {
       const blink = o.morphTargetDictionary?.blink;
       const influences = o.morphTargetInfluences;
       if (blink !== undefined && influences) this.shut = (amount) => (influences[blink] = amount);
+      const smile = o.morphTargetDictionary?.smile;
+      if (smile !== undefined && influences) this.beam = (amount) => (influences[smile] = amount);
     });
     this.yaw = Math.atan2(fx, fz);
     this.model.position.set(x, floor, z);
@@ -160,12 +166,14 @@ export class Giant {
   hungry() {
     this.doing = "hungry";
     this.cake.visible = false;
+    this.beam((this.smiling = 0));
   }
 
   /** Fed (a game loaded with the cake in use here). */
   fed() {
     this.doing = "fed";
     this.cake.visible = false;
+    this.beam((this.smiling = 1));
   }
 
   /** You've used the cake here: you throw it to him, from your hand. */
@@ -208,6 +216,9 @@ export class Giant {
     });
     if (this.doing === "eating") this.reach(this.lifted());
     this.watch(eye, here && far < WATCH && this.doing !== "eating", dt);
+    // Fed, he smiles broadly (as the last bite goes down).
+    this.smiling += ((this.doing === "fed" ? 1 : 0) - this.smiling) * Math.min(1, dt * 3);
+    this.beam(this.smiling);
     this.blink(dt);
     this.hold();
   }
