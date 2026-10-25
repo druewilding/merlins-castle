@@ -20,8 +20,8 @@ The seven built so far each live in their own file:
 
 `tripped.ts` is the simplest to copy. `trap.ts` shows a prop of its own that
 goes on moving behind the curtain. `mouse.ts` is the newest, and shows a
-creature taking part: the scene starts it (`giant.enchant()`), cues it at its
-beats (`giant.chuckle()`), and looks at it (`giant.faceAt()`); the creature
+creature taking part: the scene starts it (`giant.enchant()`) and looks at it
+(`giant.faceAt()`); the creature
 poses itself on top of its clip, and puts itself right in `restart()`
 (`giant.reset()`).
 
@@ -160,10 +160,11 @@ button` (Continue) and look behind the score card too. Combine them with
 ## What the first looks caught (check these first)
 
 - **Too long getting there:** a slow lead-in dulls it. Get to the moment.
-- **Too far to matter:** shrunk to a mouse where you bumped into the way, the
-  giant was small and far off. Move the camera to where the moment is (the
-  mouse scurries to his feet), and bend a creature further than seems right
-  (his lean, 0.55 rad, barely showed from in front: 0.95 did).
+- **Moving you about:** a mouse scurrying across to the giant's feet was one
+  move too many. Keep to where you are, and turn to look.
+- **Turning a head bent far over:** turned round about the upright and then
+  nodded down, the giant's head, bent right over, twisted onto one side. Turn
+  it straight to what it looks at (`setFromUnitVectors`).
 - **Aimed where you were:** with reduced motion, a creature posed once looks
   at where you stood, not where the scene takes you. Pose it every frame.
 - **Black in the dark:** underground, falling away from your glow, you saw

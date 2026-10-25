@@ -5,8 +5,8 @@
 // bites, and nods, smiling broadly (and lets you by); and once you've gone,
 // he's hungry again.
 // Walking into the way with no cake, he turns you into a mouse (mouse.ts):
-// he points at you, poof, and then leans down to peer at you, beaming,
-// chuckling (enchant, chuckle).
+// he points at you, poof, and then leans down to peer at you, beaming
+// (enchant).
 //
 // His clip is the Universal Animation Libraries', named as it is there. It
 // doesn't eat: his hand's lifted to his mouth here, on top of it (reach).
@@ -52,9 +52,8 @@ const CAKE = 2.0; // the cake in his hand, times the one you carry (growing as i
 const CAKE_SIZE = [0.23, 0.1]; // the one you carry: its radius, and half its height (metres)
 const PALM = 0.025; // how far over his palm's middle its top is (at the model's size): the cake sits on it
 // Turning you into a mouse, in seconds from walking into the way:
-const POINT = [0.3, 0.75, 1.5, 2.1]; // his hand lifted to point at you, pointing, held there till, and put down again
-const LEAN = [1.7, 3.1, 0.75]; // leaning down to peer at you, from, till, and how far (radians, his back bent)
-const CHUCKLE = [0.9, 0.28, 0.06]; // and a chuckle: seconds, each "ho" in it, and how far his shoulders shake with each (radians)
+const POINT = [0, 0.3, 0.6, 1.2]; // his hand lifted to point at you, pointing, held there till, and put down again
+const LEAN = [0.9, 2.3, 0.75]; // leaning down to peer at you, from, till, and how far (radians, his back bent)
 const UP = new Vector3(0, 1, 0);
 
 type Doing = "hungry" | "catching" | "eating" | "fed" | "enchanting";
@@ -99,7 +98,6 @@ export class Giant {
   private cake = new Group();
   private from = new Vector3();
   private bitten = 0;
-  private chuckled = CHUCKLE[0]; // seconds since he began to chuckle
   /** Peering at you, turning you into a mouse (0 to 1): his face turned straight to you, the shortest way (no twist, bent over). */
   private peering = 0;
 
@@ -222,7 +220,6 @@ export class Giant {
     this.head?.quaternion.copy(this.posed);
     this.arms.forEach((bone, k) => bone.quaternion.copy(this.armsPosed[k]));
     this.peering = 0;
-    this.chuckled = CHUCKLE[0];
     this.hungry();
   }
 
@@ -231,11 +228,6 @@ export class Giant {
     this.doing = "enchanting";
     this.time = 0;
     this.cake.visible = false;
-  }
-
-  /** And chuckles (ho, ho, ho), his shoulders shaking. */
-  chuckle() {
-    this.chuckled = 0;
   }
 
   /** Where his face is (between his eyes, about). */
@@ -271,7 +263,7 @@ export class Giant {
       bone.quaternion.copy(this.armsSteady[k].slerp(this.armsPosed[k], steady));
     });
     if (this.doing === "eating") this.reach(this.lifted());
-    if (this.doing === "enchanting") this.enchanting(eye, dt);
+    if (this.doing === "enchanting") this.enchanting(eye);
     this.watch(eye, here && far < WATCH && this.doing !== "eating", dt);
     // Fed, he smiles broadly (as the last bite goes down); and turning you
     // into a mouse, pleased with himself.
@@ -313,8 +305,8 @@ export class Giant {
     }
   }
 
-  /** Turning you into a mouse: pointing at you, and leaning down to peer at you, chuckling. */
-  private enchanting(eye: Vector3, dt: number) {
+  /** Turning you into a mouse: pointing at you, and leaning down to peer at you. */
+  private enchanting(eye: Vector3) {
     const ease = (u: number) => {
       const v = Math.min(1, Math.max(0, u));
       return v * v * (3 - 2 * v);
@@ -322,13 +314,8 @@ export class Giant {
     const t = this.time;
     const [lift, pointed, held, down] = POINT;
     const pointing = t < held ? ease((t - lift) / (pointed - lift)) : ease(1 - (t - held) / (down - held));
-    // (Each "ho", his shoulders up and down once, the last ones smaller.)
-    this.chuckled += dt;
-    const c = this.chuckled;
-    const shake =
-      c < CHUCKLE[0] ? CHUCKLE[2] * Math.abs(Math.sin((Math.PI * c) / CHUCKLE[1])) * (1 - c / CHUCKLE[0]) : 0;
     const leaned = ease((t - LEAN[0]) / (LEAN[1] - LEAN[0]));
-    this.lean(LEAN[2] * leaned - shake, eye);
+    this.lean(LEAN[2] * leaned, eye);
     this.peering = leaned;
     if (pointing > 0) {
       const [upper] = this.right.bones;

@@ -1064,9 +1064,7 @@ const scenes: Record<string, () => Scene3d | undefined> = {
   [GIANT_WAY]: () =>
     effects(world, items.state).includes("cake")
       ? undefined
-      : new Shrunk(player.camera, giant, land.giant as GiantPlace, poof, reducedMotion, (sound) =>
-          ownSounds.play(sound)
-        ),
+      : new Shrunk(player.camera, giant, poof, reducedMotion, (sound) => ownSounds.play(sound)),
   // (Not with the rope across it.)
   ...Object.fromEntries(
     ["maze north", "treasure-room south"].map((exit) => [

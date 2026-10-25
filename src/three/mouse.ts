@@ -1,10 +1,9 @@
 // Going on west past the giant without giving him a cake: "The giant turns
-// you into a mouse." You turn to look up at him; he lifts his hand and points
-// at you, and poof: a puff of glittering smoke, and the world shoots up round
-// you as you shrink to the floor. Squeak! You scurry across the floor to his
-// feet; and up there, huge, the giant leans down to peer at you, beaming,
-// and chuckles (giant.ts). The curtain comes down over the end of it (from a
-// little before `ends`), and he goes on peering at you behind it.
+// you into a mouse." He points at you, and poof: a puff of glittering smoke,
+// and you drop to the floor where you stand. Squeak! You turn to look up at
+// him, and up there, huge, the giant leans down to peer at you, beaming
+// (giant.ts). The curtain comes down over the end of it (from a little before
+// `ends`), and he goes on peering at you behind it.
 
 import {
   AdditiveBlending,
@@ -21,21 +20,18 @@ import {
   Vector3,
 } from "three";
 
-import type { Giant, GiantPlace } from "./giant";
+import type { Giant } from "./giant";
 import { puff } from "./smoke";
 
 // The scene's beats, in seconds from walking into it.
-const POOF = 1.15; // as he points at you: a puff of smoke
-const SHRUNK = 1.6; // and you're a mouse
-const SQUEAK = 1.8;
-const SCURRY = [2, 3]; // scurrying to his feet, from and till
-const CHUCKLES = [3.1, 5]; // and he chuckles, leaning down to peer at you
-const ENDS = 7.5;
+const POOF = 0.4; // as he points at you: a puff of smoke
+const SHRUNK = 0.5; // and you're a mouse, on the floor
+const SQUEAK = 0.6;
+const TURN = [0.7, 1.6]; // turning to look up at him, from and till
+const ENDS = 6;
 
 const EYE = 1.65; // your eye above the floor (as in player.ts)
 const MOUSE = 0.12; // and a mouse's
-const NEAR = 2.4; // metres from the middle of his seat you scurry to (at his size: before his feet)
-const SCAMPERS = 9; // little steps a second, scurrying
 const FOLLOW = 1.5; // how quickly you look round as his face moves (each second, of the way to it)
 
 export class Shrunk {
@@ -44,7 +40,6 @@ export class Shrunk {
   private readonly from: Vector3; // your eye, where you were when you came to it
   private readonly facing: Quaternion;
   private readonly floor: number;
-  private readonly to: Vector3; // where you scurry to, at his feet
   private readonly seen = new Vector3(); // where you're looking: his face, a little behind it
   private readonly eye = new Vector3();
   private readonly look = new Quaternion();
@@ -53,18 +48,14 @@ export class Shrunk {
   constructor(
     private camera: PerspectiveCamera,
     private giant: Giant,
-    place: GiantPlace,
     private poof: Poof,
     private reducedMotion: boolean,
-    private play: (sound: "poof" | "squeak" | "chuckle") => void
+    private play: (sound: "poof" | "squeak") => void
   ) {
     this.from = camera.position.clone();
     this.facing = camera.quaternion.clone();
     this.floor = this.from.y - EYE;
     this.seen.copy(giant.faceAt());
-    const [x, z] = place.at;
-    const off = new Vector3(this.from.x - x, 0, this.from.z - z);
-    this.to = new Vector3(x, 0, z).addScaledVector(off, (NEAR * place.size) / 3.2 / off.length());
     giant.enchant();
   }
 
@@ -80,31 +71,20 @@ export class Shrunk {
       this.poof.start(this.from.clone().setY(this.floor));
     }
     if (crossed(SQUEAK)) this.play("squeak");
-    for (const beat of CHUCKLES) {
-      if (crossed(beat)) {
-        this.play("chuckle");
-        this.giant.chuckle();
-      }
-    }
     this.poof.update(dt, still);
 
-    // Shrinking: slowly at first, then all at once, down to the floor (with
-    // a wobble on the way); and then scurrying across to his feet, pitter
-    // patter.
-    const s = Math.min(1, Math.max(0, (t - POOF) / (SHRUNK - POOF)));
-    const scurried = Math.min(1, Math.max(0, (t - SCURRY[0]) / (SCURRY[1] - SCURRY[0])));
-    this.eye.lerpVectors(this.from, this.to, ease(scurried));
-    this.eye.y = this.floor + EYE - (EYE - MOUSE) * s * s * (3 - 2 * s);
-    if (!still && scurried > 0 && scurried < 1) this.eye.y += 0.015 * Math.abs(Math.sin(t * SCAMPERS * Math.PI));
+    // Shrinking: straight down to the floor, where you stand.
+    const s = ease((t - POOF) / (SHRUNK - POOF));
+    this.eye.copy(this.from);
+    this.eye.y = this.floor + EYE - (EYE - MOUSE) * s;
 
-    // Looking up at his face (wherever it goes, following it smoothly).
+    // Then looking up at his face (wherever it goes, following it smoothly),
+    // from however you were looking.
     this.seen.lerp(this.giant.faceAt(), Math.min(1, dt * FOLLOW));
     const to = this.seen.clone().sub(this.eye);
-    const wobble = still ? 0 : 0.25 * Math.sin(Math.PI * s) * Math.sin(t * 18);
-    this.look.setFromEuler(this.euler.set(Math.atan2(to.y, Math.hypot(to.x, to.z)), Math.atan2(-to.x, -to.z), wobble));
+    this.look.setFromEuler(this.euler.set(Math.atan2(to.y, Math.hypot(to.x, to.z)), Math.atan2(-to.x, -to.z), 0));
     this.camera.position.copy(this.eye);
-    // (Turning to him, at first, from however you were looking.)
-    this.camera.quaternion.slerpQuaternions(this.facing, this.look, ease(t / 0.5));
+    this.camera.quaternion.slerpQuaternions(this.facing, this.look, ease((t - TURN[0]) / (TURN[1] - TURN[0])));
   }
 }
 
