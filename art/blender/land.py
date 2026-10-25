@@ -6290,15 +6290,28 @@ def coach(b, x, y, f):
     for wx_, r in ((-1.2, 0.6), (1.1, 0.78)):
         for side in (-1, 1):
             cx_, cy_, cz = x + wx_, y + side * 0.98, f + r
-            rim = [(cx_ + math.cos(2 * math.pi * k / 20) * r, cy_, cz + math.sin(2 * math.pi * k / 20) * r) for k in range(20)]
+            # (Its wooden rim, its iron tyre round the outside of it, down to
+            # the floor, and its spokes from inside its hub to inside its rim:
+            # their ends buried, not a shade from another face, where they'd
+            # flicker.)
+            wood = r - 0.06
+
+            def ring(radius, cx_=cx_, cy_=cy_, cz=cz):
+                return [(cx_ + math.cos(2 * math.pi * k / 20) * radius, cy_, cz + math.sin(2 * math.pi * k / 20) * radius)
+                        for k in range(20)]
+
+            rim, tyre = ring(wood), ring(wood + 0.045)
             for k in range(20):
                 timber(b, rim[k], rim[(k + 1) % 20], 0.07, WHEEL_WOOD, 0.07)
-                timber(b, rim[k], rim[(k + 1) % 20], 0.035, c.linear("#2a2522"), 0.09)
+                timber(b, tyre[k], tyre[(k + 1) % 20], 0.05, c.linear("#2a2522"), 0.025)
             for k in range(12):
                 a = 2 * math.pi * k / 12
-                timber(b, (cx_ + math.cos(a) * 0.1, cy_, cz + math.sin(a) * 0.1),
-                     (cx_ + math.cos(a) * (r - 0.04), cy_, cz + math.sin(a) * (r - 0.04)), 0.035, c.linear("#c08a40"))
+                timber(b, (cx_ + math.cos(a) * 0.06, cy_, cz + math.sin(a) * 0.06),
+                       (cx_ + math.cos(a) * wood, cy_, cz + math.sin(a) * wood), 0.035, c.linear("#c08a40"))
             log(b, (cx_, cy_ - 0.12, cz), (cx_, cy_ + 0.12, cz), 0.1, c.linear("#3a2416"), sides=8)
+            for end in (-1, 1):  # (its hub's ends, capped)
+                facing(b, [(cx_ + math.cos(2 * math.pi * k / 8) * 0.1, cy_ + end * 0.12, cz + math.sin(2 * math.pi * k / 8) * 0.1)
+                           for k in range(8)], [c.linear("#2a1a10")] * 8, (0, end, 0))
 
 
 def hay_bale(b, x, y, z, turn, rnd):
