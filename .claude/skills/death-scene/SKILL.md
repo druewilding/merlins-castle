@@ -154,6 +154,10 @@ button` (Continue) and look behind the score card too. Combine them with
 - The scene starts when you bump into the obstacle, which can be metres short
   of it (its reach). Check that where it happens still reads as going that
   way.
+- Come into its place by the way's free side (from the room it leads to),
+  then step back: once the title shows its place, that step is going that way
+  (`player.isIn`), and the scene plays. Before then (still in the way), you
+  can turn back. `test/obstacles.test.ts` has this for the giant.
 - Then `npx prettier --check src test`, `npx eslint src test`,
   `npx tsc --noEmit -p .` and `npx vitest run`.
 
@@ -174,3 +178,9 @@ button` (Continue) and look behind the score card too. Combine them with
   and the size generous.
 - **Frozen behind the curtain:** the stars stopped when the clock did. Let
   what should go on, go on.
+- **An effect round you, cut by the floor:** the mouse's puff, with the camera
+  dropped to the floor, showed a hard edge where the floor went through it.
+  Something all round you draws over everything (`depthTest: false`).
+- **Too much going on:** the mouse first scurried to the giant's feet, the
+  view wobbled and sniffed, and he chuckled. The user wanted less: drop where
+  you stand, turn to look, a squeak; and the curtain soon after.

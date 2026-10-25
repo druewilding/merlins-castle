@@ -5,10 +5,12 @@ description: Build a creature for Merlin's Castle 3D (a beast, a goblin, a troll
 
 # Making a magical creature
 
-How the dragon (`art/blender/dragon.py`, `src/three/dragon.ts`) and the trolls
-(`art/blender/trolls.py`, `src/three/trolls.ts`) were made, written down so the
+How the dragon (`art/blender/dragon.py`, `src/three/dragon.ts`), the trolls
+(`art/blender/trolls.py`, `src/three/trolls.ts`) and the giant
+(`art/blender/giant.py`, `src/three/giant.ts`) were made, written down so the
 next creature goes faster. The dragon is the beast route, built from scratch;
-the trolls are the human-shaped route, built on the kit and its clips. Follow
+the trolls and the giant are the human-shaped route, built on the kit and its
+clips. Follow
 the steps in order; each ends with something to look at before going on.
 
 Keep the README and PLAN-V3 spoiler-free: never write there which object gets you
@@ -126,11 +128,21 @@ The body:
 - A friendly face: lift the corners of the mouth and push the cheeks up and
   out; arch the brows over each eye (tilted ones look worried); keep the nose
   clear of the mouth.
+- **Which points are its face:** those weighted to the head bone more than
+  0.6. The mouth and chin are only about 0.76 the head's (the neck moves them
+  a little), so a 0.9 cut-off leaves them out, and a smile does nothing.
+- A broad smile (a `smile` shape key): lift mostly **above** the line between
+  the lips, and push the corners back only a few millimetres. Lifting below it
+  too, or pushing the corners in, makes the whole lower face look caved in
+  from below.
+- A wider head: widen its points side to side by their head weight, and move
+  each eye out **whole** (as far as its middle moves); stretched, they go
+  oval.
 - Its eyes: a `blink` shape key, with the lids meeting a little below the
   middle. Eye colour by tinting the iris on the kit's eye picture (find its
   middle and size in its UVs).
 
-Its own pieces (hair, moss, a beard, clothes):
+Its own pieces (hair, moss, a beard):
 
 - Skin them to the kit's skeleton with `c.skinned(...)`, each blade or piece
   weighted as the skin it grows from. Give them the body's shape keys too
@@ -141,6 +153,29 @@ Its own pieces (hair, moss, a beard, clothes):
 - Look for gaps from low down and while it sits: between the legs, under the
   arms, the back of the neck. Cover them with something that belongs (a
   fringe of moss, a beard), not by moving the body.
+- Hair combed back: points at the front of the head must never lean forward,
+  or a lock falls across the forehead.
+
+Clothes: **use the outfits kit's** (Modular Character Outfits, "Modular
+Parts": each piece is made for this skeleton, so it bends with the skin), as
+`giant.py`'s breeches are. Home-made cloth didn't work on the giant: blades
+read as spikes, flat sheets as card floating off him, and cloth weighted to
+his thigh bones sat right in Blender but sank into his thighs in the game
+(never explained). A piece from the kit:
+
+- `c.load` its part, `c.onto(piece, skeleton)`, and remove the rest of what
+  loaded.
+- **Let it out to fit the reshaped body**: move each of its points as far as
+  the nearest point of the kit's own body was moved (keep the body's points
+  as the kit made them, `kit`, before reshaping), then push any point less
+  than a little way outside the skin out to it (`SNUG`: 1.5 cm left skin
+  showing, 3 cm swallowed the hands resting on it; 2 cm was right).
+- Clear its colour masks, as on the body, and take out its normal and ORM
+  maps **and cut their links** into Metallic and Roughness: left linked, it
+  exports fully metallic, and comes out black in the caves.
+- Recolour its base picture by its brightness, keeping its folds and patches.
+  Pick the colour in the caves' light: warm browns turn the colour of the
+  skin under the orange torches; a greyer one reads as cloth.
 
 **The clips are made for the kit's slim hero.** Anything bigger (hands,
 thighs, a belly) ends up inside the skin where the clip puts a hand. Fix it in
@@ -155,6 +190,15 @@ Many of them:
   Size their seats, solid circles and the clearing round them to match (3).
 
 ## 3. In its place (`art/blender/land.py`)
+
+- Something it sits on (a boulder): its own seat height, from where its hips
+  are in its clip. The giant's legs are longer than a troll's, and on the
+  trolls' boulder height he hovered (`GIANT_ROCK`). Look from the side.
+- Big and in a cave: out from the wall enough to be seen as soon as you come
+  in. Its obstacle's `reach` sets where you bump: far enough that its face is
+  still in view (the giant's is 7.5 m; at the usual 5 you were at his knees).
+  The tests (in view when you bump, the ways past clear) leave a narrow
+  window: work it out rather than guess.
 
 - Choose its spot, which way it faces, and where its action goes. Export them
   to `land.json` (as `"dragon"` and `"trolls"` are).
@@ -206,6 +250,15 @@ On top of clips (the kit route):
   More for the fatter ones. **Blend the adjustments through every change of
   clip**: standing up, they push off their knees, and if the lap lift drops
   before the spread comes in, the wrist goes through the thigh.
+- **Steady sparse clips.** A clip with few keys and straight turns between
+  them shakes at a giant's size (the kinks at each key, many times bigger).
+  Each frame, put back the clip's pose, run the mixer, keep its new pose, then
+  ease each bone towards it (`slerp` by `min(1, dt * STEADY)`) from where it
+  was: spine, neck and arms, not only the hands.
+- **A clip that doesn't do it:** the kit's `Consume` only raises a fist beside
+  the head. To lift something to the mouth, turn the arm in code (`reach` and
+  `bend` in `giant.ts`: two bones, each turned the least way that gets the
+  palm to its target, the elbow down and out).
 - **Aim the head from where its face points now**, not from the body's angle
   to you: the clip already turns the head (the trolls all looked a little to
   your right). Measure its face's direction each frame and turn the rest of the
@@ -234,6 +287,14 @@ Behaviour:
 - **Keep it gentle** (storybook): fire across the way, never at you; a spell is
   a swirl of twinkles round your head.
 - Reduced motion: posed once, still, with its effect hanging in the air.
+- **In a death scene** (`death-scene` skill), the scene starts it (the
+  giant's `enchant()`), looks at it (`faceAt()`), and the creature poses
+  itself on top of its clip. Guard what `inUse()` calls each change (`hungry()`)
+  so it doesn't cut the scene short, and give it a `reset()` for `restart()`.
+  A head bent far over: turn it straight to what it looks at
+  (`setFromUnitVectors`), or turning round then up twists it onto one side.
+- Eating: one big gulp, then a broad smile, suited the game better than three
+  bites.
 
 Effects (sprites):
 
@@ -282,6 +343,15 @@ and run `npm run art:build`.
   its state over time.
 - Watch the console for warnings (a NaN mesh names no one: find it by its
   point count).
+- **Don't trust `getVertexPosition` for skinned meshes** to check what's
+  drawn: on the giant it put his legs well away from where they were drawn.
+  Look instead: colour the piece red (`vertexColors = false`), hide the body,
+  draw the body as a wireframe or the piece with `depthTest = false`.
+- In Blender scripts, `out` is the output path from `c.args()`: a loop
+  variable called `out` overwrites it, and the export fails ("expected a
+  string type, not float").
+- Its previews in Blender render the kit's skin black: the game's look is the
+  one to judge it by.
 - Then `npx prettier --check src test`, `npx eslint src test`,
   `npx tsc --noEmit -p .` and `npx vitest run`.
 
@@ -320,3 +390,17 @@ and run `npm run art:build`.
   every change of clip.
 - A gap to see into between the legs: a fringe of moss, hung from the hips.
 - Too small for their big cave: size them up, and their boulders with them.
+
+## What the review caught on the giant (human-shaped, sitting)
+
+- He blocked the way: sitting beside it on a boulder, as a warning, is enough.
+- His hands shook, his leg too: steady the clip's bones (the trolls' as well).
+- His hand went through the cake: sit it on the palm (`held()`), lifted to the
+  mouth by code.
+- The smile did nothing, then caved his face in: the face cut-off, then lift
+  above the lips.
+- A lock of hair through his forehead: comb the front back.
+- Too far off to matter when you bump: a longer `reach`.
+- Hovering over his boulder: a seat height of his own.
+- Home-made cloth: spikes, then card, then sinking into his thighs: the
+  outfits kit's breeches, let out to fit him, matt, recoloured.
