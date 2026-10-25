@@ -266,6 +266,19 @@ if (bullion instanceof Mesh) {
     emissiveIntensity: 0.4,
   });
 }
+// The silver, the same: cool and bright.
+const silver = things.scene.getObjectByName("silver");
+if (silver instanceof Mesh) {
+  silver.material = new MeshStandardMaterial({
+    vertexColors: true,
+    metalness: 0.95,
+    roughness: 0.26,
+    envMap: shine,
+    envMapIntensity: 0.9,
+    emissive: new Color("#2a2b30"),
+    emissiveIntensity: 0.3,
+  });
+}
 // The lamp: its glass see-through, and its flame (lit, lantern.ts) bright.
 dressLamp(things.scene.getObjectByName("lamp")!);
 // The water: its flask's glass clear and shining, and the water in it a

@@ -3,7 +3,7 @@
 # origin and its underside at z = 0, along y (the game turns it as it lands).
 #
 # The ladder, the plank, the key, the axe, the apple, the emerald, the
-# broom, the lamp, the rope, the penny, the water, the harp, the cake and the gold so far; the rest are to come (PLAN-V3.md).
+# broom, the lamp, the rope, the penny, the water, the harp, the cake, the gold and the silver so far; the rest are to come (PLAN-V3.md).
 
 import math
 import random
@@ -1606,13 +1606,13 @@ outward(cake_object)
 # one on top, across the gap between them, all lying the same way. Each is
 # wider at its foot than its top, its edges worn round, its faces hammered
 # and dented, with a few fine cracks; deep gold, lighter where it's rubbed.
-# Built 24 cm long, then made two and a half times that (GOLD_SIZE), so it shines out from
-# across the treasure room.
+# Built 24 cm long, then made two and a half times that (GOLD_SIZE), so it
+# shines out from across the treasure room.
 GOLD_SIZE = 2.5
-BAR_LONG, BAR_WIDE, BAR_TALL = 0.24, 0.092, 0.066
-BAR_TAPER = 0.014  # how much narrower its top is, on each side
-BAR_ROUND = 0.012  # its top edges, worn round
-BAR_FOOT = 0.004  # and its bottom edges, a little
+# (A bar's length, width and height; how much narrower its top is, on each
+# side; and how round its top edges are worn.)
+GOLD_BAR = (0.24, 0.092, 0.066, 0.014, 0.012)
+BAR_FOOT = 0.004  # its bottom edges, a little round
 BAR_GAP = 0.008  # between the two side by side
 BULLION = c.linear("#b87810")
 BULLION_LIGHT = c.linear("#e9ae35")
@@ -1658,23 +1658,24 @@ def bullion(p, seed):
     return c.vary(c.mix(colour, BULLION_DARK, min(0.8, 0.6 * pit + crack)), 0.06, v * 3)
 
 
-def gold_bar(x, y, z, yaw, seed):
-    """One bar, lying along y, its foot at height z."""
-    hx, hy = BAR_WIDE / 2, BAR_LONG / 2
+def metal_bar(builder, shape, colour, x, y, z, yaw, seed):
+    """One bar (gold or silver), lying along y, its foot at height z."""
+    long_, wide, tall, taper, worn = shape
+    hx, hy = wide / 2, long_ / 2
     # Its outline from the bottom up, as (how far in, how high): in from its
     # middle underneath, round its foot, up its sloping sides, round over its
     # top edges, and in across its top.
     profile = [(min(hx, hy) - 0.002, 0.0), (BAR_FOOT * 3, 0.0)]
     profile += [(BAR_FOOT * (1 - math.sin(a)), BAR_FOOT * (1 - math.cos(a)))
                 for a in (math.pi / 2 * k / 3 for k in range(4))]
-    side_top = BAR_TALL - BAR_ROUND
-    profile += [(BAR_TAPER * zz / BAR_TALL, zz) for zz in (side_top * k / 8 for k in range(1, 9))]
-    d0 = BAR_TAPER * side_top / BAR_TALL
-    profile += [(d0 + BAR_ROUND * (1 - math.cos(a)), side_top + BAR_ROUND * math.sin(a))
+    side_top = tall - worn
+    profile += [(taper * zz / tall, zz) for zz in (side_top * k / 8 for k in range(1, 9))]
+    d0 = taper * side_top / tall
+    profile += [(d0 + worn * (1 - math.cos(a)), side_top + worn * math.sin(a))
                 for a in (math.pi / 2 * k / 6 for k in range(1, 7))]
-    inner = hx - (d0 + BAR_ROUND)
-    profile += [(d0 + BAR_ROUND + inner * k / 7, BAR_TALL) for k in range(1, 7)]
-    profile += [(hx - 0.0008, BAR_TALL)]
+    inner = hx - (d0 + worn)
+    profile += [(d0 + worn + inner * k / 7, tall) for k in range(1, 7)]
+    profile += [(hx - 0.0008, tall)]
     turn = Matrix.Rotation(yaw, 4, "Z")
     verts, colours, rings = [], [], []
     for d, zz in profile:
@@ -1686,7 +1687,7 @@ def gold_bar(x, y, z, yaw, seed):
             q = Vector(p) * (1 + dent / max(0.03, Vector(p).length))
             q = turn @ q + Vector((x, y, z))
             verts.append(tuple(q))
-            colours.append(bullion(p, seed))
+            colours.append(colour(p, seed))
     n = len(verts) // len(profile)
     faces = []
     for r in range(len(profile) - 1):
@@ -1696,21 +1697,54 @@ def gold_bar(x, y, z, yaw, seed):
     for r, up in ((0, False), (len(profile) - 1, True)):
         mid = len(verts)
         verts.append(tuple(turn @ Vector((0, 0, profile[r][1])) + Vector((x, y, z))))
-        colours.append(bullion((0, 0, profile[r][1]), seed))
+        colours.append(colour((0, 0, profile[r][1]), seed))
         a = rings[r]
         faces += [(a + k, a + (k + 1) % n, mid) if not up else (a + (k + 1) % n, a + k, mid) for k in range(n)]
-    gold_bars.add(verts, faces, colours)
+    builder.add(verts, faces, colours)
 
 
 # Two side by side, and one on top, resting on both (a little back, and
 # turned a touch, as if put down by hand).
-side = BAR_WIDE / 2 + BAR_GAP / 2
-gold_bar(-side, 0.006, 0.0, 0.02, 1)
-gold_bar(side, -0.008, 0.0, -0.015, 2)
-gold_bar(0.0, 0.018, BAR_TALL - 0.0015, 0.035, 3)
+side = GOLD_BAR[1] / 2 + BAR_GAP / 2
+metal_bar(gold_bars, GOLD_BAR, bullion, -side, 0.006, 0.0, 0.02, 1)
+metal_bar(gold_bars, GOLD_BAR, bullion, side, -0.008, 0.0, -0.015, 2)
+metal_bar(gold_bars, GOLD_BAR, bullion, 0.0, 0.018, GOLD_BAR[2] - 0.0015, 0.035, 3)
 gold_object = gold_bars.build("gold", smooth=True)
 gold_object.data.transform(Matrix.Scale(GOLD_SIZE, 4))
 outward(gold_object)
+
+# The silver: as in its picture, one big bar of silver, chunkier than the
+# gold's, its sides sloping more steeply in to its top, its edges worn
+# round; cool grey, warm and creamy where it catches the light, scratched
+# bright across its top and pocked with little dents. Built 26 cm long, then
+# made a little over twice that (SILVER_SIZE), so you can spot it.
+SILVER_SIZE = 2.3
+SILVER_BAR = (0.26, 0.11, 0.08, 0.02, 0.011)
+SILVER = c.linear("#80848e")
+SILVER_LIGHT = c.linear("#d9d2c0")
+SILVER_DARK = c.linear("#3e3f46")
+SILVER_WARM = c.linear("#b9a47c")
+
+
+def silvery(p, seed):
+    """Silver: cool grey, warm and light in streaks, bright in its scratches,
+    dark in its dents."""
+    v = Vector(p) * 40 + Vector((seed * 5.3, seed * 2.9, 0))
+    colour = c.mix(SILVER, SILVER_LIGHT, 0.2 + noise.noise(v * 0.5) * 0.6)
+    colour = c.mix(colour, SILVER_WARM, max(0.0, noise.noise(v * 0.35 + Vector((4, 4, 1)))) * 0.6)
+    pit = max(0.0, noise.noise(v * 1.6) - 0.5) * 1.4
+    # (Scratches: thin bright lines where a noise crosses zero, mostly on top.)
+    line = abs(noise.noise(Vector((p[0] * 30, p[1] * 70, p[2] * 30)) + Vector((7, 1, 3))))
+    scratch = (1 - line / 0.04) if line < 0.04 and p[2] > SILVER_BAR[2] * 0.8 else 0.0
+    colour = c.mix(c.mix(colour, SILVER_DARK, min(0.8, pit)), SILVER_LIGHT, scratch * 0.8)
+    return c.vary(colour, 0.05, v * 3)
+
+
+silver_bar = c.Builder()
+metal_bar(silver_bar, SILVER_BAR, silvery, 0.0, 0.0, 0.0, 0.0, 4)
+silver_object = silver_bar.build("silver", smooth=True)
+silver_object.data.transform(Matrix.Scale(SILVER_SIZE, 4))
+outward(silver_object)
 
 if out:
     c.export(out)
