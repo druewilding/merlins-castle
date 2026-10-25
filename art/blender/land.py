@@ -6299,7 +6299,6 @@ def coach(b, x, y, f):
                 timber(b, (cx_ + math.cos(a) * 0.1, cy_, cz + math.sin(a) * 0.1),
                      (cx_ + math.cos(a) * (r - 0.04), cy_, cz + math.sin(a) * (r - 0.04)), 0.035, c.linear("#c08a40"))
             log(b, (cx_, cy_ - 0.12, cz), (cx_, cy_ + 0.12, cz), 0.1, c.linear("#3a2416"), sides=8)
-    under_box(x - 0.7, y, 1.95, 1.1, top=f + 2.4)
 
 
 def hay_bale(b, x, y, z, turn, rnd):
@@ -6316,7 +6315,7 @@ def coach_house(b, hall):
     posts and beams, and open up to its roof, tie beams across under it;
     the red coach on the straw, hay stacked in the corner, barrels, crates
     and sacks, tack and a horse's collar on pegs, a shelf of pots, a cart
-    wheel against the wall, a lantern hung over the coach, and Merlin's
+    wheel against the wall, a lantern hung from a beam, and Merlin's
     cloak, blue with silver stars (a button missing), hanging on the back wall."""
     hx, hy, f, W, D = hall.x, hall.y, hall.floor, hall.w, hall.d
     rnd = random.Random("coach house inside")
@@ -6358,9 +6357,18 @@ def coach_house(b, hall):
         z = f - 0.05 + rnd.uniform(0.0, 0.03)
         b.add([(x - lx, y - ly, z), (x + ly * 0.2, y - lx * 0.2, z), (x + lx, y + ly, z)], [(0, 1, 2)],
               [c.linear(rnd.choice(("#e0c06a", "#c9a24e", "#ecd488", "#b8923c")))] * 3)
-    # The coach.
-    coach(b, hx + 1.0, hy - 0.2, f)
-    # A lantern hung from the timber over it, lit.
+    # The coach, half as big again as it's made (as grand as in its picture),
+    # by the south wall (room to walk round it: 1.4 m clear of the wall's
+    # posts), its pole towards the doors; solid from its front wheels to its
+    # back ones (its pole, lying low, you can step over).
+    COACH_SIZE = 1.5
+    made = c.Builder()
+    coach(made, 0, 0, 0)
+    cx_, cy_ = hx + 0.6, y0 + 0.3 + 1.4 + 1.1 * COACH_SIZE
+    b.add([(cx_ + px * COACH_SIZE, cy_ + py * COACH_SIZE, f + pz * COACH_SIZE) for px, py, pz in made.verts], made.faces,
+          made.colours)
+    under_box(cx_ - 0.03 * COACH_SIZE, cy_, 1.98 * COACH_SIZE, 1.1 * COACH_SIZE, top=f + 2.4 * COACH_SIZE)
+    # A lantern hung from a beam, lit.
     ly = y0 + 0.2 + (y1 - y0 - 0.4) / 3
     log(b, (hx + 1.0, ly, BARN_EAVE - 0.32), (hx + 1.0, ly, BARN_EAVE - 1.3), 0.012, IRON, sides=4)
     block(b, hx + 0.88, ly - 0.12, BARN_EAVE - 1.65, hx + 1.12, ly + 0.12, BARN_EAVE - 1.3, c.linear("#3a3532"), solid=False)
@@ -6400,8 +6408,8 @@ def coach_house(b, hall):
     PROPS.put(b, "Shelf_Simple", (hx + 0.9, wall_y, f + 2.9), 0.0, 1.4, 0.6)
     for u, kind in ((0.4, "Pot_1"), (0.85, "Vase_2"), (1.3, "Pot_1"), (1.5, "Bottle_1")):
         PROPS.put(b, kind, (hx + u, wall_y - 0.25, f + 2.9 + 0.11 * 1.4 + 0.01), rnd.uniform(0, 6), 1.0, 0.4)
-    # A cart wheel, leaning on the south wall.
-    wc = (hx + 3.6, y0 + 0.3, f + 0.7)
+    # A cart wheel, leaning on the south wall (past the coach).
+    wc = (hx + 5.0, y0 + 0.3, f + 0.7)
     lean = 0.2
     rim = [(wc[0] + math.cos(2 * math.pi * k / 18) * 0.7, wc[1] + math.sin(2 * math.pi * k / 18) * 0.7 * math.sin(lean) + 0.0,
             wc[2] + math.sin(2 * math.pi * k / 18) * 0.7 * math.cos(lean)) for k in range(18)]
