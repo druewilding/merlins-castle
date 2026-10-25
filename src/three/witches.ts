@@ -121,6 +121,10 @@ class Witch {
       if (!(o instanceof Mesh)) return;
       const own = (m: Material) => {
         const copy = m.clone();
+        // (See-through from the start, at no cost while she's all there:
+        // turning it on as she fades would remake her shaders then, and the
+        // scene would jolt.)
+        copy.transparent = true;
         this.materials.push(copy);
         return copy;
       };
@@ -142,11 +146,7 @@ class Witch {
     for (const m of this.materials) m.opacity = opacity;
     if (fading === this.fading) return;
     this.fading = fading;
-    for (const m of this.materials) {
-      m.transparent = fading;
-      m.depthWrite = !fading;
-      m.needsUpdate = true;
-    }
+    for (const m of this.materials) m.depthWrite = !fading;
     // (No shadow, fading: a shadow doesn't fade.)
     this.model.traverse((o) => {
       if (o instanceof Mesh) o.castShadow = !fading;
