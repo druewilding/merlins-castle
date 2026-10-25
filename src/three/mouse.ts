@@ -127,7 +127,16 @@ export class Poof {
 
   private sprite(map: Texture, colour: string) {
     const sprite = new Sprite(
-      new SpriteMaterial({ map, color: new Color(colour), transparent: true, depthWrite: false, fog: false })
+      // (Drawn over everything: it's all round you, and the floor, as you
+      // drop to it, would cut through it.)
+      new SpriteMaterial({
+        map,
+        color: new Color(colour),
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        fog: false,
+      })
     );
     sprite.renderOrder = 10;
     sprite.visible = false;
