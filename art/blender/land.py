@@ -535,6 +535,7 @@ def troll_spots():
 GIANT_SIZE = 4.0  # times the model's size
 GIANT_SEAT = (0.5, 3.1)  # where he sits: radians round from the way west (north of it), and metres in from the wall
 GIANT_BODY = 0.6  # his radius sitting, at the model's size: for bumping into, and keeping the rocks clear
+GIANT_ROCK = (0.55, 0.33)  # his boulder's top: how high, and how far behind him (at the model's size: his legs are longer than a troll's)
 
 
 def giant_spot():
@@ -4024,8 +4025,8 @@ for hall in HALLS.values():
         # The giant's seat: a boulder, its top as high as he sits.
         (x, y), (fx, fy) = giant_spot()
         r = 0.42 * GIANT_SIZE
-        sx, sy = x - fx * TROLL_SEAT[1] * GIANT_SIZE, y - fy * TROLL_SEAT[1] * GIANT_SIZE
-        caves.blob((sx, sy, f + TROLL_SEAT[0] * GIANT_SIZE - r * 0.85), r, c.mix(hall.wall, ROCK, 0.5), squash=0.85,
+        sx, sy = x - fx * GIANT_ROCK[1] * GIANT_SIZE, y - fy * GIANT_ROCK[1] * GIANT_SIZE
+        caves.blob((sx, sy, f + GIANT_ROCK[0] * GIANT_SIZE - r * 0.85), r, c.mix(hall.wall, ROCK, 0.5), squash=0.85,
                    lumpy=0.1, seed=3)
         under_circle(x, y, GIANT_BODY * GIANT_SIZE)
     if hall.light == TORCH:
