@@ -128,10 +128,18 @@ function reverb(track, wet) {
   }
 }
 
-function save(name, track, wet = 0.25) {
+// (A loop, `loop` seconds long, is played twice, and only the second time
+// round kept: its start has the echoes of its end in it, so it goes round
+// without a seam.)
+function save(name, track, wet = 0.25, loop = 0) {
   reverb(track, wet);
-  // Fade out the very end, and bring the loudest moment up to just below full.
-  const fade = Math.round(0.05 * RATE);
+  if (loop) {
+    const from = track.left.length - Math.round(loop * RATE);
+    track.left = track.left.slice(from);
+    track.right = track.right.slice(from);
+  }
+  // Fade out the very end (not a loop's), and bring the loudest moment up to just below full.
+  const fade = loop ? 0 : Math.round(0.05 * RATE);
   let peak = 0;
   for (const channel of [track.left, track.right]) {
     for (let i = 0; i < fade; i++) channel[channel.length - 1 - i] *= i / fade;
@@ -419,4 +427,74 @@ const rise = (t, from, to) => Math.min(1, Math.max(0, (t - from) / (to - from)))
     track.add(at, release(out), 0.1);
   });
   save("squeak", track, 0.2);
+}
+
+// The lonely flute in the beautiful chamber: a slow air in three-four, in E
+// minor (written in A minor, played a fourth lower, as the rest), each note
+// breathy, swelling a little, with a vibrato that comes in as it's held, one
+// note slurred into the next. Round and round: it ends on a breath, and
+// starts again.
+function flute(freq, seconds, amp = 1, soft = 0.06) {
+  const out = new Float32Array(Math.ceil(seconds * RATE));
+  const w = (2 * Math.PI * freq) / RATE;
+  const r = 0.997; // (its breath, ringing at the note)
+  let phase = 0;
+  let y1 = 0;
+  let y2 = 0;
+  let low = 0;
+  for (let i = 0; i < out.length; i++) {
+    const t = i / RATE;
+    const wobble = 0.004 * rise(t, 0.25, 0.7) * Math.sin(2 * Math.PI * 5.2 * t);
+    phase += w * (1 + wobble);
+    const tone = Math.sin(phase) + 0.22 * Math.sin(2 * phase) + 0.08 * Math.sin(3 * phase) + 0.03 * Math.sin(4 * phase);
+    const noise = random() * 2 - 1;
+    const y = (1 - r * r) * Math.sin(w) * noise + 2 * r * Math.cos(w) * y1 - r * r * y2;
+    y2 = y1;
+    y1 = y;
+    low += (noise - low) * 0.3;
+    const chiff = Math.exp(-t / 0.035);
+    const swell = 0.88 + 0.12 * Math.sin(Math.PI * Math.min(1, t / seconds));
+    const v = tone * (1 + 7 * wobble) + 2.5 * y + (0.015 + 0.12 * chiff) * low;
+    out[i] = v * Math.min(1, t / soft) * swell * amp * 0.4;
+  }
+  // (Breathing out over its last 80ms, under the next one coming in.)
+  const fade = Math.min(out.length, Math.round(0.08 * RATE));
+  for (let i = 0; i < fade; i++) out[out.length - 1 - i] *= i / fade;
+  return out;
+}
+
+{
+  const BEAT = 60 / 66;
+  // Each note and how many beats it's held ("-": a breath).
+  const tune = [
+    "E5:1 A5:1.5 B5:0.5",
+    "C6:1 B5:1 A5:1",
+    "G5:1.5 E5:0.5 D5:1",
+    "E5:2.5 -:0.5",
+    "E5:1 A5:1.5 B5:0.5",
+    "C6:1 D6:1 E6:1",
+    "D6:1.5 C6:0.5 B5:1",
+    "A5:2.5 -:0.5",
+    "E6:1.5 D6:0.5 C6:1",
+    "D6:1 C6:1 A5:1",
+    "G5:1.5 A5:0.5 C6:1",
+    "B5:2 G5:1",
+    "E6:1.5 D6:0.5 C6:1",
+    "B5:1 A5:1 G5:1",
+    "E5:1.5 G5:0.5 B5:1",
+    "A5:2 -:1",
+  ].flatMap((bar) => bar.split(" ").map((n) => n.split(":")));
+  const loop = tune.reduce((sum, [, beats]) => sum + Number(beats), 0) * BEAT;
+  const track = new Track(loop * 2);
+  for (const round of [0, loop]) {
+    let at = round;
+    let after = true; // (after a breath: a softer start, not slurred)
+    for (const [n, beats] of tune) {
+      const long = Number(beats) * BEAT;
+      if (n !== "-") track.add(at, flute(note(n), long + 0.08, 0.85 + 0.15 * random(), after ? 0.09 : 0.03), 0.1);
+      after = n === "-";
+      at += long;
+    }
+  }
+  save("flute", track, 0.45, loop);
 }

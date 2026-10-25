@@ -76,6 +76,12 @@ export class Sounds<Name extends string = Shared> {
       source.start(context.currentTime + delay / 1000);
     });
   }
+
+  /** A sound's audio (its first take), to play some other way: round and round, say. */
+  async audio(name: Name) {
+    this.load();
+    return (await this.buffers.get(name))?.[0] ?? null;
+  }
 }
 
 /** The MP3s a sound is made into: <name>.mp3, or <name>-0.mp3, <name>-1.mp3… for one with takes. */

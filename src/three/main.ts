@@ -60,6 +60,7 @@ import { Dragon, type DragonCave, type DragonSpot } from "./dragon";
 import { Drawbridge, type DrawbridgeSpot, wantedDown } from "./drawbridge";
 import { Fall } from "./fall";
 import { Felling } from "./felling";
+import { Flute } from "./flute";
 import { Giant, type GiantPlace } from "./giant";
 import { Golden } from "./golden";
 import { Guards } from "./guards";
@@ -340,7 +341,8 @@ dressTreasure(model.scene, renderer);
 const embers = model.scene.getObjectByName("embers");
 const emberLook = new MeshBasicMaterial({ vertexColors: true });
 if (embers instanceof Mesh) embers.material = emberLook;
-// The treasure room's braziers: their fire glowing, added to what's behind it.
+// The treasure room's braziers (and the beautiful chamber's candles): their
+// fire glowing, added to what's behind it.
 const braziers = model.scene.getObjectByName("brazier-flames");
 if (braziers instanceof Mesh) {
   braziers.material = new MeshBasicMaterial({
@@ -351,6 +353,8 @@ if (braziers instanceof Mesh) {
     toneMapped: false,
   });
 }
+// The beautiful chamber's flute, floating, playing (flute.ts).
+const flute = new Flute(scene, model.scene.getObjectByName("flute")!, shine, reducedMotion);
 const smoke = new Smoke(scene, land.hut, reducedMotion);
 scene.add(model.scene);
 const spots = land.trees as TreeSpots;
@@ -1215,6 +1219,7 @@ if (debugMode) {
       dragon,
       trolls,
       giant,
+      flute,
       merlin,
       guards,
       witches,
@@ -1393,6 +1398,7 @@ function resume() {
   // (A click: the browser lets sound start now.)
   sounds.load();
   ownSounds.load();
+  flute.play(ownSounds.audio("flute"), OWN_SOUNDS.flute.volume);
   // Once you've walked (or loaded), the way back in carries on the game.
   overlay.querySelector(".play")!.textContent = T.continue;
   // (If the browser won't take the mouse after all, the menu's back, to click.)
@@ -1404,6 +1410,7 @@ overlay.addEventListener("click", resume);
 overlay.addEventListener("touchend", () => {
   sounds.load();
   ownSounds.load();
+  flute.play(ownSounds.audio("flute"), OWN_SOUNDS.flute.volume);
   overlay.querySelector(".play")!.textContent = T.continue;
   overlay.hidden = true;
 });
@@ -1556,6 +1563,7 @@ renderer.setAnimationLoop((time) => {
   dragon.update(dt, player.camera.position, room === "dragon-cave");
   trolls.update(dt, player.camera.position, room === "trolls");
   giant.update(dt, player.camera.position, room === "giant");
+  flute.update(dt, player.camera, player.under !== undefined);
   // Along a way underground, you're still where you set off from (PLAN-V3.md),
   // until you come into a hall.
   // (Climbing over a wall, you're where you were until you're over.)
