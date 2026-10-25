@@ -5604,6 +5604,8 @@ def rose_climber(variant, wide, tall):
                 z += math.cos(heading) * step
                 length += step
                 heading += rnd.uniform(-0.25, 0.25)
+                if abs(x) > wide / 2 + 0.15:
+                    break  # (no further: past its own part of the wall, it'd sprawl over a door or a window)
                 if abs(x) > wide / 2 - 0.2:
                     heading -= 0.3 * math.copysign(1, x)
                 if z > top:
@@ -6176,10 +6178,12 @@ def courtyard():
     # Little windows up in its gables, facing out (their glass 15 cm out from its boards' wall).
     for y, yaw in ((BARN_N + 0.15, facing_yaw(0, 1)), (BARN_S - 0.15, facing_yaw(0, -1))):
         kit_window("Window_Thin_Round1", (BARN.x, y, BARN_EAVE + 0.2), yaw, 1.1, 0.09 / 1.1)
-    # Roses up its corners by the doors, and on its north wall, facing the gate.
-    for x, y, face in ((BARN_W - 0.03, BARN_N - 1.0, (-1, 0)), (BARN_W - 0.03, BARN_S + 1.2, (-1, 0)), (BARN.x - 3.5, BARN_N + 0.03, (0, 1)),
-                       (BARN.x + 4.5, BARN_N + 0.03, (0, 1))):
-        roses_at(court_rng.choice(("rose-climber-2", "rose-climber-3")), x, y, g, facing_yaw(*face))
+    # Roses up its corners by the doors (narrow ones, clear of them), and on
+    # its north wall, facing the gate.
+    for x, y, face in ((BARN_W - 0.03, BARN_N - 0.8, (-1, 0)), (BARN_W - 0.03, BARN_S + 0.8, (-1, 0)),
+                       (BARN.x - 3.5, BARN_N + 0.03, (0, 1)), (BARN.x + 4.5, BARN_N + 0.03, (0, 1))):
+        kind = court_rng.choice(("rose-climber-2", "rose-climber-3"))
+        roses_at("rose-climber-3" if face[0] else kind, x, y, g, facing_yaw(*face))
         solid_box(x + face[0] * 0.3, y + face[1] * 0.3, 0.3 if face[0] else 1.6, 1.6 if face[0] else 0.3)
     # Straw blown out of its doors, over the cobbles.
     for _ in range(500):
