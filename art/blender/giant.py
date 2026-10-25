@@ -9,9 +9,8 @@
 # and beard (giant-hair), his hide (giant-hide) and his wraps (giant-wraps)
 # are made here, each moved by the bones that move the skin it's on. All of
 # it shares the kits' one skeleton, so the Universal Animation Libraries'
-# clips play on him (ANIMS): sitting, and sitting asking for something to
-# eat. (Neither eats: the game lifts his hand to his mouth.) The game makes
-# him giant-sized.
+# clips play on him (ANIMS): sitting. (It doesn't eat: the game lifts his
+# hand to his mouth.) The game makes him giant-sized.
 #
 # He stands in a T-pose, his feet at z = 0, facing -y (the way the kits face).
 
@@ -33,7 +32,7 @@ c.clear()
 
 BODY = c.BODIES / "Superhero_Male_FullBody.gltf"
 
-ANIMS = ["Sitting_Idle_Loop", "Sitting_Talking_Loop"]
+ANIMS = ["Sitting_Idle_Loop"]
 TEXTURE = 1024  # the size every texture is shrunk to (the kit's are 2048)
 
 HEAD_SIZE = 1.15  # times bigger, his head...

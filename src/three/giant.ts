@@ -1,16 +1,13 @@
 // The giant in his cave (his model: art/blender/giant.py), sitting on his
 // boulder beside the way west (land.py), hungry, watching you as you go
-// about; come near, and he holds out his hands, asking for something to eat.
-// Walking into the way, he shakes his head at you.
+// about. Walking into the way, he shakes his head at you.
 // Given a cake (thrown from your hand), he catches it, eats it in three big
 // bites, and nods (and lets you by); and once you've gone, he's hungry again.
 //
-// His clips are the Universal Animation Libraries', named as they are there.
-// Neither eats: his hand's lifted to his mouth here, on top of his sitting
-// clip (reach).
+// His clip is the Universal Animation Libraries', named as it is there. It
+// doesn't eat: his hand's lifted to his mouth here, on top of it (reach).
 
 import {
-  type AnimationAction,
   type AnimationClip,
   AnimationMixer,
   Group,
@@ -29,10 +26,12 @@ export interface GiantPlace {
   size: number;
 }
 
-const WATCH = 16; // metres: this near, he watches you...
-const ASK = 9; // ...and this near, hungry, he asks you for something to eat
+const WATCH = 16; // metres: this near, he watches you
 const FAR = 45; // metres: further off than this, he isn't drawn
-const BLEND = 0.5; // seconds from one clip to the next
+// How quickly his body and arms follow his clip (each second, of the way to
+// where it has them): its keys are few, with straight turns between them, and
+// the little kinks at each, three times bigger on him, shook his hands.
+const STEADY = 6;
 const FLIGHT = [0.6, 1.2]; // seconds the cake takes to reach his hand, at least and at most
 const BITES = 3; // he eats it in this many bites...
 const BITE = [0.5, 0.35, 0.55]; // ...each: seconds lifting it to his mouth, at it (a bite, halfway), and lowering it
@@ -55,14 +54,15 @@ export class Giant {
   private head: Object3D | undefined;
   private hand: Object3D | undefined;
   private knuckle: Object3D | undefined;
-  /** His left arm (upper, fore, hand), which eats; and as his clip has it (before it's lifted). */
+  /** His left arm (upper, fore, hand), which eats. */
   private arm: Object3D[];
-  private armPosed: Quaternion[] = [new Quaternion(), new Quaternion()];
+  /** His back's, neck's and arms' bones; as his clip has them (put back before the next frame of it); and as they are, steadied. */
+  private arms: Object3D[];
+  private armsPosed: Quaternion[];
+  private armsSteady: Quaternion[];
   private hands: Object3D[];
   private fingers: [Object3D, Vector3][];
   private mixer: AnimationMixer;
-  private clips: Map<string, AnimationAction>;
-  private playing: AnimationAction | undefined;
   private doing: Doing = "hungry";
   private time = 0; // seconds into what he's doing
   private yaw: number;
@@ -121,6 +121,13 @@ export class Giant {
     this.hand = this.model.getObjectByName("hand_l");
     this.knuckle = this.model.getObjectByName("middle_01_l");
     this.arm = ["upperarm_l", "lowerarm_l", "hand_l"].flatMap((name) => this.model.getObjectByName(name) ?? []);
+    this.arms = [
+      "spine_01",
+      "spine_02",
+      "spine_03",
+      "neck_01",
+      ...["l", "r"].flatMap((side) => ["clavicle", "upperarm", "lowerarm", "hand"].map((bone) => `${bone}_${side}`)),
+    ].flatMap((name) => this.model.getObjectByName(name) ?? []);
     this.hands = ["hand_l", "hand_r"].flatMap((name) => this.model.getObjectByName(name) ?? []);
     this.fingers = ["thumb", "index", "middle", "ring", "pinky"].flatMap((finger) =>
       ["02", "03", "04_leaf"].flatMap((joint) =>
@@ -131,7 +138,8 @@ export class Giant {
       )
     );
     this.mixer = new AnimationMixer(this.model);
-    this.clips = new Map(clips.map((clip) => [clip.name, this.mixer.clipAction(clip)]));
+    const sitting = clips.find((clip) => clip.name === "Sitting_Idle_Loop");
+    if (sitting) this.mixer.clipAction(sitting).play();
     // The cake he's given: a copy of the one you carry, its middle at its middle.
     const copy = cakeModel.clone();
     copy.position.set(0, -0.1, 0);
@@ -139,19 +147,11 @@ export class Giant {
     this.cake.add(copy);
     this.cake.visible = false;
     scene.add(this.cake);
-    this.play("Sitting_Idle_Loop", true);
     this.mixer.update(0);
     this.shape();
     this.posed.copy(this.head?.quaternion ?? this.posed);
-  }
-
-  private play(name: string, now = false) {
-    const next = this.clips.get(name);
-    if (!next || next === this.playing) return;
-    next.reset().play();
-    if (this.playing && !now) next.crossFadeFrom(this.playing, BLEND, false);
-    else this.playing?.stop();
-    this.playing = next;
+    this.armsPosed = this.arms.map((bone) => bone.quaternion.clone());
+    this.armsSteady = this.arms.map((bone) => bone.quaternion.clone());
   }
 
   /** Hungry again (a game loaded without the cake in use here, or you've gone). */
@@ -191,16 +191,19 @@ export class Giant {
     if (!this.model.visible || this.reducedMotion) return;
     this.time += dt;
     this.act();
-    // Hungry, he asks you for something to eat when you're near: his hands out.
-    this.play(this.doing === "hungry" && here && far < ASK ? "Sitting_Talking_Loop" : "Sitting_Idle_Loop");
     // (The mixer only sets a bone when its clip moves it: held still, his head
-    // and arm would keep the turn they were given last frame, and turn again.)
+    // and arms would keep the turn they were given last frame, and turn again.)
     this.head?.quaternion.copy(this.posed);
-    this.arm.slice(0, 2).forEach((bone, k) => bone.quaternion.copy(this.armPosed[k]));
+    this.arms.forEach((bone, k) => bone.quaternion.copy(this.armsPosed[k]));
     this.mixer.update(dt);
     this.shape();
     this.posed.copy(this.head?.quaternion ?? this.posed);
-    this.arm.slice(0, 2).forEach((bone, k) => this.armPosed[k].copy(bone.quaternion));
+    // His back and arms steadied: following his clip, but smoothly.
+    const steady = Math.min(1, dt * STEADY);
+    this.arms.forEach((bone, k) => {
+      this.armsPosed[k].copy(bone.quaternion);
+      bone.quaternion.copy(this.armsSteady[k].slerp(this.armsPosed[k], steady));
+    });
     if (this.doing === "eating") this.reach(this.lifted());
     this.watch(eye, here && far < WATCH && this.doing !== "eating", dt);
     this.blink(dt);
