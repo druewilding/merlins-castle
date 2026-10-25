@@ -5710,7 +5710,7 @@ BARN_EAVE = BARN.floor + 5.6
 BARN_RIDGE = BARN_EAVE + 4.6
 BARN_FOOTING = YARD_FLOOR + 0.85
 BARN_DOOR = 2.4 - 0.05  # (a shade narrower than the way in, as at the keep's door)
-BARN_DOOR_TOP = TUNNEL_TALL + 0.4 - LINTEL_DROP
+BARN_DOOR_TOP = BARN.floor + 4.5  # (tall enough for the coach, and its lintel still under the eaves)
 
 
 def roof_line(x):
