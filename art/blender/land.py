@@ -4441,8 +4441,8 @@ for hall in HALLS.values():
         gilding.add([(hx + math.cos(2 * math.pi * n / 20) * 0.55, hy + math.sin(2 * math.pi * n / 20) * 0.55, f + 1.04)
                      for n in range(20)], [tuple(range(20))], [GILT] * 20)
         under_circle(hx, hy, 1.3)
-        # The flute: a silver tube, its crown at its head, its lip plate
-        # (the hole to blow across), its joints, and its keys along it on
+        # The flute: a silver tube, its crown at its head, the hole to blow
+        # across, its joints, and its keys along it on
         # their rod. (Made standing, its head at the top, its keys towards
         # -x: then laid down, keys up.)
         half = FLUTE_LONG / 2
@@ -4454,8 +4454,7 @@ for hall in HALLS.values():
                 ends_ = [(math.cos(2 * math.pi * n / 14) * r_, math.sin(2 * math.pi * n / 14) * r_, z_) for n in range(14)]
                 flute_model.add(ends_ if z_ == z1_ else ends_[::-1], [tuple(range(14))], [SILVER] * 14)
         flute_model.blob((0, 0, half + 0.04), FLUTE_R * 1.1, SILVER, squash=0.6, lumpy=0.0, subdivisions=1)
-        flute_model.blob((-FLUTE_R * 0.9, 0, half - 0.12), 0.034, SILVER, squash=1.0, lumpy=0.0, subdivisions=2)
-        flute_model.blob((-FLUTE_R * 1.55, 0, half - 0.12), 0.011, c.linear("#1a1a1e"), squash=1.4, lumpy=0.0, subdivisions=1)
+        flute_model.blob((-FLUTE_R * 0.85, 0, half - 0.12), 0.0085, c.linear("#1a1a1e"), squash=1.3, lumpy=0.0, subdivisions=1)
         for n in range(12):
             z_ = half - 0.3 - n * 0.048 - (0.02 if n > 5 else 0.0)
             flute_model.blob((-FLUTE_R + 0.004, 0, z_), 0.015, SILVER if n % 3 else SILVER_DARK, lumpy=0.0, subdivisions=1)
