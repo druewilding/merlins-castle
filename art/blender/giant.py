@@ -1,13 +1,14 @@
 # The giant in his cave, as in its picture: huge and hungry, with a big
 # round belly, a bulbous nose and a grin; shaggy brown hair and a bushy
-# beard; a ragged hide round his hips; strips of cloth
-# wound round his shins; and big bare feet.
+# beard; a ragged hide round his hips; strips of cloth wound round his shins;
+# and big bare feet.
 #
 # Made from Quaternius's kits (CC0, art/models/): a Universal Base
 # Character's whole body (his head, hands and feet made bigger, his body and
 # limbs bulked out, a belly, his nose grown), his skin recoloured. His hair
-# and beard (giant-hair), his hide (giant-hide) and his wraps (giant-wraps)
-# are made here, each moved by the bones that move the skin it's on. All of
+# and beard (giant-hair, giant-beard), his hide (giant-hide) and his wraps
+# (giant-wraps) are made here, each moved by the bones that move the skin
+# it's on. All of
 # it shares the kits' one skeleton, so the Universal Animation Libraries'
 # clips play on him (ANIMS): sitting. (It doesn't eat: the game lifts his
 # hand to his mouth.) The game makes him giant-sized.
@@ -42,7 +43,7 @@ BELLY = (0.085, 1.1, 0.2, 0.14)  # metres his belly sticks out, at its middle (i
 NOSE = (1.6, 0.036, 0.006)  # how much bigger his nose is grown, the radius of the round bulb it's made, and how far it's lifted
 EARS = 1.3  # how much bigger his ears are
 SMILE = (0.012, 0.008)  # metres the corners of his mouth are lifted, and his cheeks pushed up and out
-BEAM = (0.02, 0.014, 0.32, 0.4)  # or, smiling broadly (the shape key "smile"): those, how much wider his mouth is, and
+BEAM = (0.016, 0.012, 0.16, 0.3)  # or, smiling broadly (the shape key "smile"): those, how much wider his mouth is, and
 # how far his lower lids come up (his eyes creased, smiling)
 
 SKIN_DARK = np.array(c.linear("#5c463e")[:3], dtype=np.float32)
@@ -198,16 +199,20 @@ def faced(p, blink=False, beam=False):
     # none in the middle; beaming, more of them, and further, curving round his cheeks)...
     # (Over more of his face, beaming, so nothing lifted passes what's over it.)
     up, out, wide, tall, broad = (*BEAM[:3], 0.036, 0.056) if beam else (*SMILE, 0.2, 0.02, 0.045)
-    if abs(p.z - MOUTH) < tall and abs(p.x) < broad and p.y < -0.04:
-        corner = c.smooth((abs(p.x) - 0.006) / 0.022) * c.smooth(1 - abs(p.z - MOUTH) / tall)
-        back = 0.012 if beam else 0.005
+    # (Beaming, lifted mostly above the line between his lips: below it, only
+    # just, or his chin and lower lip go up and in, and his face looks sunken.)
+    below = 0.014 if beam else tall
+    if -below < p.z - MOUTH < tall and abs(p.x) < broad and p.y < -0.04:
+        dz = p.z - MOUTH
+        corner = c.smooth((abs(p.x) - 0.006) / 0.022) * c.smooth(1 - (dz / tall if dz > 0 else -dz / below))
+        back = 0.004 if beam else 0.005
         p = Vector((p.x * (1 + wide * corner), p.y + back * corner, p.z + up * corner * (c.smooth(abs(p.x) / 0.03) if beam else 1)))
     # ...and his cheeks pushed up round and out by it.
     cheek = Vector((abs(p.x) - CHEEK.x, p.y - CHEEK.y, p.z - CHEEK.z)).length
     reach = 0.032 if beam else 0.026
     if cheek < reach and p.y < -0.04:
         lift = c.smooth(1 - cheek / reach)
-        p = p + Vector((math.copysign(0.002, p.x), -out, out * 0.6)) * lift
+        p = p + Vector((math.copysign(0.002, p.x), -out * (1.4 if beam else 1), out * 0.6)) * lift  # (round, out)
     return p
 
 
@@ -259,7 +264,7 @@ for obj in faces_on:
         v.co = m.inverted() @ grown(m @ v.co, w or {"Head": 1.0})
 body.data.update()
 
-# ---- His hair and beard (giant-hair), his hide (giant-hide), and the wraps
+# ---- His hair and beard (giant-hair, giant-beard), his hide (giant-hide), and the wraps
 # round his shins (giant-wraps) ---------------------------------------------------
 
 rng = random.Random(9)
@@ -278,23 +283,24 @@ def scalp(i):
 
 
 def hairy(i):
-    """His hair: shaggy, swept back; his beard, bushy, from his cheeks round
-    his chin."""
+    """His hair: shaggy, swept back."""
+    p = rest[i]
+    if not scalp(i) or (p.y < -0.03 and p.z < crown - 0.035):
+        return 0, 0  # (not on his forehead: it's swept back off it)
+    return (1.0, 0.4) if p.y < 0.0 else (1.0, 0.75)
+
+
+def bearded(i):
+    """His beard: bushy, from just under his lower lip round his chin and jaw,
+    and up his cheeks beside his mouth (clear of it, so you can see him smile)."""
     p, w = rest[i], weights[i]
-    if scalp(i):
-        # (Not on his forehead: it's swept back off it.)
-        if p.y < -0.03 and p.z < crown - 0.035:
-            return 0, 0
-        return (1.0, 0.4) if p.y < 0.0 else (1.0, 0.75)
-    if w.get("Head", 0) > 0.5 and p.y < -0.02 and 1.53 < p.z < 1.665 and abs(p.x) < 0.075:
-        # (Clear round his mouth, so you can see him smile: his beard starts
-        # below his lower lip, and his whiskers only out on his cheeks.)
-        if p.z > MOUTH - 0.014 and abs(p.x) < 0.052:
-            return 0, 0
-        if p.z > MOUTH - 0.014:
-            return (0.7, 0.6) if p.z < 1.65 else (0, 0)  # (his cheeks, the sides of them)
-        return 1.0, 0.85
-    return 0, 0
+    if w.get("Head", 0) <= 0.35 or p.y > -0.01 or abs(p.x) > 0.085 or p.z < 1.5:
+        return 0, 0  # (on his face, and under his jaw)
+    if p.z < MOUTH - 0.02:
+        return 1.0, 0.5  # (out from his chin, and then down: a bushy beard you see from in front)
+    if p.z < MOUTH - 0.007 and abs(p.x) < 0.05:
+        return 1.0, 0.95  # (and from just under his lower lip, falling straight down over his chin)
+    return (0.9, 0.6) if abs(p.x) > 0.055 and p.z < 1.66 else (0, 0)
 
 
 def hairs(p):
@@ -305,7 +311,7 @@ def hairs(p):
 
 
 def grow(name, where, blades, length, width, colours, tip, bed_colour, hung=None, bed=True, stray=0.4, comb=None,
-         droop=None):
+         droop=None, smiles=False, spread=0.0):
     """Something growing from his skin (moved as his skin is), as a lumpy bed
     just over it with a ragged edge, wherever where(i) says (how thick, 0 to 1,
     and how far it hangs, 0 sticking out to 1 straight down), and blades out
@@ -313,9 +319,11 @@ def grow(name, where, blades, length, width, colours, tip, bed_colour, hung=None
     wide as those (low, high), longer where it hangs. Its blades moved by his
     bone hung, if it's given, not by his skin under them; each straying
     from its way by up to stray, and combed (comb(i): which way, as well, if it's given). (Or, droop,
-    its blades' ends moved halfway by that bone: so they hang, when he bends his legs.)"""
+    its blades' ends moved halfway by that bone: so they hang, when he bends his legs.) With his
+    body's shape key "smile" too, if smiles (round his mouth: moved as the skin it grows from). (And its
+    blades' roots scattered as far as spread over his skin round each point, where its points are few.)"""
     growing = [where(i) for i in everyone]
-    verts, faces, colours_, weights_ = [], [], [], []
+    verts, faces, colours_, weights_, grows_from = [], [], [], [], []
     SHELL = (0.012, 0.01)  # metres it stands off his skin, and how lumpy
     if bed:
         on = {}
@@ -327,6 +335,7 @@ def grow(name, where, blades, length, width, colours, tip, bed_colour, hung=None
             verts.append(tuple(q))
             colours_.append(bed_colour(q))
             weights_.append(weights[i])
+            grows_from.append(i)
         faces += [tuple(on[v] for v in poly.vertices) for poly in body.data.polygons if all(v in on for v in poly.vertices)]
     for i, (thick, hang) in enumerate(growing):
         if thick <= 0 or rng.random() > blades * thick:
@@ -335,12 +344,18 @@ def grow(name, where, blades, length, width, colours, tip, bed_colour, hung=None
         for _ in range(max(3, round(3 * blades * thick))):  # (thicker, more of them)
             off = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * stray
             way = (n * (1 - hang) + DOWN * hang * 1.2 + off + (comb(i) if comb else Vector())).normalized()
+            if comb and rest[i].y < 0:
+                way.y = max(way.y, 0.2)  # (combed back: never forward, down over his face)
+                way.normalize()
             long = rng.uniform(*length) * (1 + 1.5 * hang**4)  # (hanging, longer)
             across = way.cross(n)
             if across.length < 1e-3:
                 across = way.cross(Vector((1, 0, 0)))
             across = across.normalized() * rng.uniform(*width) * (1 + 0.6 * hang)
             root = p + n * 0.006 + across * rng.uniform(-1.5, 1.5)
+            if spread:
+                scatter = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))) * spread
+                root += scatter - n * scatter.dot(n)
             colour = rng.choice(colours)
             first = len(verts)
             # (Two pieces, bending further as it goes: a lock, pointed.)
@@ -349,6 +364,7 @@ def grow(name, where, blades, length, width, colours, tip, bed_colour, hung=None
             for q, half in ((root, 1.0), (mid, 0.6)):
                 verts += [tuple(q - across * half), tuple(q + across * half)]
             verts.append(tuple(end))
+            grows_from += [i] * 5
             dark = c.mix(colour, (0, 0, 0, 1), 0.35)
             colours_ += [dark, dark, colour, colour, c.mix(colour, tip, 0.6)]
             faces += [(first, first + 1, first + 3, first + 2), (first + 2, first + 3, first + 4)]
@@ -359,12 +375,19 @@ def grow(name, where, blades, length, width, colours, tip, bed_colour, hung=None
             else:
                 weights_ += [{hung: 1.0} if hung else weights[i]] * 5
     obj = c.skinned(name, verts, faces, colours_, weights_, skeleton)
+    if smiles:
+        obj.shape_key_add(name="Basis")
+        key = obj.shape_key_add(name="smile", from_mix=False)
+        for k, v, i in zip(key.data, verts, grows_from):
+            k.co = Vector(v) + beaming[i] - points[i]
     print(f"{name}: {len(verts)} points")
     return obj
 
 
 grow("giant-hair", hairy, 2.2, (0.07, 0.13), (0.004, 0.007), HAIR, HAIR_TIP, hairs, stray=0.35,
-     comb=lambda i: Vector((0, 0.5, 0.15)) if scalp(i) else Vector())  # (his hair swept back, off his face)
+     comb=lambda i: Vector((0, 0.5, 0.15)))  # (his hair swept back, off his face)
+grow("giant-beard", bearded, 4.0, (0.07, 0.12), (0.004, 0.008), HAIR, HAIR_TIP, hairs, stray=0.3, smiles=True,
+     spread=0.012, bed=False)  # (all locks: under them, a bed of it, on his small chin, looked flat)
 
 
 # His hide: round his hips, ragged, hanging to his knees (and in front, hung

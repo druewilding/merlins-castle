@@ -78,8 +78,8 @@ export class Giant {
   private shaking = SHAKE[0];
   private nodding = NOD[0];
   private shut: (amount: number) => void = () => {};
-  /** His broad smile (his body's shape key "smile", 0 to 1), fed; and how far into it he is. */
-  private beam: (amount: number) => void = () => {};
+  /** His broad smile (the shape key "smile", 0 to 1, on his body and beard), fed; and how far into it he is. */
+  private beams: ((amount: number) => void)[] = [];
   private smiling = 0;
   private lids = { wait: BLINK[0], at: -1 };
   private cake = new Group();
@@ -118,7 +118,7 @@ export class Giant {
       const influences = o.morphTargetInfluences;
       if (blink !== undefined && influences) this.shut = (amount) => (influences[blink] = amount);
       const smile = o.morphTargetDictionary?.smile;
-      if (smile !== undefined && influences) this.beam = (amount) => (influences[smile] = amount);
+      if (smile !== undefined && influences) this.beams.push((amount) => (influences[smile] = amount));
     });
     this.yaw = Math.atan2(fx, fz);
     this.model.position.set(x, floor, z);
@@ -160,6 +160,10 @@ export class Giant {
     this.posed.copy(this.head?.quaternion ?? this.posed);
     this.armsPosed = this.arms.map((bone) => bone.quaternion.clone());
     this.armsSteady = this.arms.map((bone) => bone.quaternion.clone());
+  }
+
+  private beam(amount: number) {
+    for (const beam of this.beams) beam(amount);
   }
 
   /** Hungry again (a game loaded without the cake in use here, or you've gone). */
