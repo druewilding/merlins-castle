@@ -4,11 +4,13 @@
 // the other side you walk right through it (all the way, past its middle),
 // and once you're past its middle you can't turn back through it. Except a
 // way that kills you: come into it the free way, you can step back and forth
-// in it; only walking into it again from its far side kills you.
+// in it; only walking into it again from its far side kills you, or, once
+// you're in the place it goes from, a step back towards it.
 
 import { Object3D, Scene } from "three";
 import { describe, expect, it } from "vitest";
 
+import land from "../src/three/models/land.json";
 import { Plank } from "../src/three/plank";
 import { type Box, type Circle, Player } from "../src/three/player";
 
@@ -295,6 +297,50 @@ describe("a way that kills you (the witches: west only)", () => {
     walk(player, EAST, 10, () => player.position.x > 0.5);
     walk(player, ROUGHLY_WEST, 1.5, () => false, "KeyA");
     expect(bumps).toContain("forest-witches west");
+  });
+});
+
+// The giant, beside the way west from his cave to the treasure room, as in
+// land.json; fed the cake, you've gone by, and he's hungry again. Coming back
+// from the treasure room, you come into it the free way.
+describe("a way that kills you, coming back into its place (the giant: west only)", () => {
+  const [x, z, halfX, halfZ] = land.obstacles["giant west"].box;
+  const giant = (): Box => ({
+    x,
+    z,
+    halfX,
+    halfZ,
+    names: ["giant west"],
+    ahead: land.obstacles["giant west"].reach,
+    fatal: true,
+  });
+  const cave = land.halls.giant;
+  const edge = cave.x - cave.r; // (his cave's west edge: east of it, you're in it, as main.ts's title says)
+
+  function fromTheTreasureRoom() {
+    const { player, bumps } = standIn({ box: giant() });
+    // (In his cave by its floor, as main.ts has it from the halls: here, east of its edge.)
+    player.isIn = (exit) => exit === "giant west" && player.position.x > edge;
+    player.place(x - 20, z, EAST);
+    return { player, bumps };
+  }
+
+  it("turns you into a mouse as soon as you step back, once you're just into his cave", () => {
+    const { player, bumps } = fromTheTreasureRoom();
+    walk(player, EAST, 10, () => player.position.x > edge + 0.5);
+    expect(bumps).toEqual([]);
+    walk(player, WEST, 3);
+    expect(bumps).toContain("giant west");
+    expect(player.position.x).toBeGreaterThan(edge);
+  });
+
+  it("lets you turn back to the treasure room, past its middle, before you're in his cave", () => {
+    const { player, bumps } = fromTheTreasureRoom();
+    walk(player, EAST, 10, () => player.position.x > x + 0.5);
+    expect(player.position.x).toBeLessThan(edge);
+    walk(player, WEST, 10, () => player.position.x < x - 15);
+    expect(player.position.x).toBeLessThan(x - 15);
+    expect(bumps).toEqual([]);
   });
 });
 
