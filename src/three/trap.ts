@@ -90,35 +90,38 @@ const LOOKING = 3; // how quickly you turn to look (the larger, the quicker)
 /**
  * The treasure, shining (in land.glb: "treasure", its gold, and "jewels"): the
  * gold metal, catching a little room's light (its own, not the scene's), and
- * the rubies and emeralds glassy, with a gleam on them.
+ * the rubies and emeralds glassy, with a gleam on them. (And the treasure
+ * room's gold, "gilding", and the jewels in its chests, "hoard-jewels", the same.)
  */
 export function dressTreasure(land: Object3D, renderer: WebGLRenderer) {
   const pmrem = new PMREMGenerator(renderer);
   const room = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   pmrem.dispose();
-  const gold = land.getObjectByName("treasure");
-  if (gold instanceof Mesh) {
-    gold.material = new MeshStandardMaterial({
-      vertexColors: true,
-      flatShading: true,
-      metalness: 1,
-      roughness: 0.42,
-      envMap: room,
-      envMapIntensity: 0.42,
-    });
+  const golden = new MeshStandardMaterial({
+    vertexColors: true,
+    flatShading: true,
+    metalness: 1,
+    roughness: 0.42,
+    envMap: room,
+    envMapIntensity: 0.42,
+  });
+  for (const name of ["treasure", "gilding"]) {
+    const gold = land.getObjectByName(name);
+    if (gold instanceof Mesh) gold.material = golden;
   }
-  const jewels = land.getObjectByName("jewels");
-  if (jewels instanceof Mesh) {
-    jewels.material = new MeshPhysicalMaterial({
-      vertexColors: true,
-      flatShading: true,
-      metalness: 0.3,
-      roughness: 0.1,
-      clearcoat: 1,
-      clearcoatRoughness: 0.05,
-      envMap: room,
-      envMapIntensity: 0.4,
-    });
+  const glassy = new MeshPhysicalMaterial({
+    vertexColors: true,
+    flatShading: true,
+    metalness: 0.3,
+    roughness: 0.1,
+    clearcoat: 1,
+    clearcoatRoughness: 0.05,
+    envMap: room,
+    envMapIntensity: 0.4,
+  });
+  for (const name of ["jewels", "hoard-jewels"]) {
+    const jewels = land.getObjectByName(name);
+    if (jewels instanceof Mesh) jewels.material = glassy;
   }
 }
 

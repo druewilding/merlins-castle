@@ -3231,6 +3231,7 @@ def in_pit(x, y):
 dug, built_ways = c.Builder(), c.Builder()
 tunnel = dug
 SMOOTH_HALLS = ("treasure-room", "beautiful-chamber")
+ARCHES = []  # each doorway into the treasure room: its frame's edges, its floor, and the way into the room
 DROPS = []  # (cave, and the two sides of where a way drops away out of it)
 # (Each doorway into a cave of rough rock: the cave, the way's two edges
 # there, its floor, and how high the cave's wall goes. The cave draws round
@@ -3585,6 +3586,8 @@ for way in WAYS.values():
             if not hall.indoor and hall.place not in SMOOTH_HALLS:
                 CAVE_DOORS.append((hall, el_, er_, f, top))
                 continue
+            if hall.place == "treasure-room":
+                ARCHES.append((el_, er_, f, (inner[0] - row[0]) / run, (inner[1] - row[1]) / run))
             for p, jut in ((er_, 1.8), (el_, -1.8)):
                 q = (p[0] + nx_ * jut, p[1] + ny_ * jut)
                 quad(framed, [(*p, f - 0.3), (*q, f - 0.3), (*q, top), (*p, top)], hall.wall)
@@ -3752,6 +3755,201 @@ oriented_box(pit, beam, PIT_BEAM, PIT_BEAM + 0.3, c.mix(TIMBER, c.linear("#00000
 # (You can go right up to its edge, and look in: only over it, you slip in.)
 obstacle(["maze north", "treasure-room south"], "box", px, -py, phx, phy - 0.3, under=True, reach=0)
 
+# The treasure room, as in its painting: walls of dressed stone and a floor of
+# flagstones; columns round it, with gold bands and capitals; and against
+# its walls, pillars carved with lions in gold (the painting's own lions).
+# Arches over its doorways, gold keystones in them; at its north end, the
+# altar up its steps, carved too, and behind it a niche with a gold sunburst
+# in it. Gold braziers burning, pedestals, the two chests (open, as in the
+# painting: empty), and rubble at the foot of its walls.
+TREASURE_STONE = c.linear("#97896f")
+TREASURE_FLOOR = c.linear("#8f8370")
+TREASURE_MORTAR = c.linear("#3a3026")
+GILT = c.linear("#e0a024")
+EMBERS = c.linear("#c8300a")
+FIRE, FIRE_HEART = c.linear("#ff6a10"), c.linear("#ffc23a")  # (the game adds them to what's behind: they glow)
+SEAM = 0.02  # the mortar between stones, either side
+gilding = c.Builder()  # (gold: the game makes it shine, as Merlin's treasure does)
+brazier_flames = c.Builder()  # (and the braziers' fire glow)
+hoard_jewels = c.Builder()  # (and the jewels in its chests, glassy, as the treasure's are)
+# Carvings, from the painting: (left, top, right, bottom) in its pixels.
+CARVED = {"lion": (297, 108, 380, 297), "lion facing left": (1166, 108, 1249, 297),
+          "griffin": (707, 237, 832, 325)}
+painting = bpy.data.images.load(str(HERE.parent / "originals/rooms/treasure-room.png"))
+import numpy as np  # noqa: E402
+
+PAINTED_W, PAINTED_H = painting.size
+painted = np.empty(PAINTED_W * PAINTED_H * 4, dtype=np.float32)
+painting.pixels.foreach_get(painted)
+painted = painted.reshape(PAINTED_H, PAINTED_W, 4)[::-1]  # (its top row first)
+
+
+def painted_at(carving, s, t):
+    """A carving's colour (linear), s across it and t up it, 0 to 1: the
+    painting's, but its gold less fiery, and lighter (the room's light warms
+    it, and it's lit by the painting's own light: darker than the stone)."""
+    x0, y0, x1, y1 = CARVED[carving]
+    px = painted[int(y0 + (1 - t) * (y1 - y0 - 1)), int(x0 + s * (x1 - x0 - 1)), :3]
+    rgb = [p / 12.92 if p <= 0.04045 else ((p + 0.055) / 1.055) ** 2.4 for p in px]
+    grey = 0.3 * rgb[0] + 0.6 * rgb[1] + 0.1 * rgb[2]
+    return (*(min(1.0, 1.45 * (0.55 * v + 0.45 * grey)) for v in rgb), 1.0)
+
+
+def face(b, pts, colour, towards, vary=0.06):
+    """A flat face, turned towards a direction (a colour, or one for each corner)."""
+    a, b_, c_ = (Vector(p) for p in pts[:3])
+    colours = colour if isinstance(colour, list) else [c.vary(colour, vary, Vector(pts[0]))] * len(pts)
+    if (b_ - a).cross(c_ - a).dot(Vector(towards)) < 0:
+        pts, colours = pts[::-1], colours[::-1]
+    b.add(list(pts), [tuple(range(len(pts)))], colours)
+
+
+def facing_out(mx, my, f, lx, ly, ix, iy):
+    """Where a point is, given how far along (u), out into the room (d) and
+    up (z) from a spot on a wall."""
+    return lambda u, d, z: (mx + lx * u + ix * d, my + ly * u + iy * d, f + z)
+
+
+def dressed(b, at, u0, u1, d0, d1, z0, z1, colour, vary=0.06):
+    """A box, along, out from and up a wall (at: facing_out)."""
+    corners = [at(u, d, z) for z in (z0, z1) for d in (d0, d1) for u in (u0, u1)]
+    middle = Vector(at((u0 + u1) / 2, (d0 + d1) / 2, (z0 + z1) / 2))
+    for side in ((0, 1, 3, 2), (4, 5, 7, 6), (0, 1, 5, 4), (2, 3, 7, 6), (0, 2, 6, 4), (1, 3, 7, 5)):
+        pts = [corners[i] for i in side]
+        face(b, pts, colour, sum((Vector(p) for p in pts), Vector()) / 4 - middle, vary)
+    return corners
+
+
+def footprint(corners):
+    """Solid underfoot: round a slab's corners."""
+    xs, ys = [p[0] for p in corners], [p[1] for p in corners]
+    under_box((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, (max(xs) - min(xs)) / 2, (max(ys) - min(ys)) / 2)
+
+
+def carving(at, carved, u0, u1, z0, z1, d, cell=0.035, deep=0.035):
+    """A carving from the painting on a face (out at d), in relief: its
+    brighter parts (the gold) stand out from it."""
+    nu, nz = max(2, round((u1 - u0) / cell)), max(2, round((z1 - z0) / cell))
+    colours = [painted_at(carved, i / nu, j / nz) for j in range(nz + 1) for i in range(nu + 1)]
+    # (How far it stands out: from how bright it is, blurred, so the
+    # painting's brushstrokes don't make it rough.)
+    bright = np.array([0.3 * r + 0.6 * g + 0.1 * b for r, g, b, _ in colours]).reshape(nz + 1, nu + 1)
+    for _ in range(2):
+        padded = np.pad(bright, 1, mode="edge")
+        bright = sum(padded[1 + dj:nz + 2 + dj, 1 + di:nu + 2 + di] for dj in (-1, 0, 1) for di in (-1, 0, 1)) / 9
+    verts = []
+    for j in range(nz + 1):
+        for i in range(nu + 1):
+            edge = 0.0 if i in (0, nu) or j in (0, nz) else 1.0
+            verts.append(at(u0 + (u1 - u0) * i / nu, d + edge * deep * min(1.0, bright[j, i] * 1.6), z0 + (z1 - z0) * j / nz))
+    faces = [(j * (nu + 1) + i, j * (nu + 1) + i + 1, (j + 1) * (nu + 1) + i + 1, (j + 1) * (nu + 1) + i)
+             for j in range(nz) for i in range(nu)]
+    # (Facing out: flipped if along and out from the wall turn the other way.)
+    a, b_, c_ = (Vector(at(0, 0, 0)), Vector(at(1, 0, 0)), Vector(at(0, 0, 1)))
+    if (b_ - a).cross(c_ - a).dot(Vector(at(0, 1, 0)) - a) < 0:
+        faces = [f_[::-1] for f_ in faces]
+    cave_made.add(verts, faces, colours)
+    gilt_frame(at, u0, u1, z0, z1, d)
+
+
+def gilt_frame(at, u0, u1, z0, z1, d, wide=0.035):
+    """A thin gold frame round something on a face."""
+    for a0, a1, b0, b1 in ((u0 - wide, u1 + wide, z0 - wide, z0), (u0 - wide, u1 + wide, z1, z1 + wide),
+                           (u0 - wide, u0, z0, z1), (u1, u1 + wide, z0, z1)):
+        dressed(gilding, at, a0, a1, d - 0.01, d + 0.03, b0, b1, GILT, 0.04)
+
+
+def plaque(at, u0, u1, z0, z1, d):
+    """A gold frame on a face, and a gold diamond in it."""
+    gilt_frame(at, u0, u1, z0, z1, d)
+    um, zm, du, dz = (u0 + u1) / 2, (z0 + z1) / 2, (u1 - u0) * 0.3, (z1 - z0) * 0.3
+    diamond = [at(um, d + 0.02, zm - dz), at(um + du, d + 0.02, zm), at(um, d + 0.02, zm + dz), at(um - du, d + 0.02, zm)]
+    face(gilding, diamond, GILT, Vector(at(0, 1, 0)) - Vector(at(0, 0, 0)), 0.04)
+
+
+def arch_front(at, a, spring, top, blind=False):
+    """An arch, built out from the wall: round over its opening (a either
+    side of its middle, from `spring` up), a ring of stones round it with a
+    gold keystone at its crown, pilasters either side, and a cornice over
+    it. Blind, a niche: a recess, with a gold sunburst in it."""
+    ring, face_d, back = a + 0.6, 0.15, -0.3 if blind else -0.6
+    p0, p1 = ring + 0.35, ring + 1.15
+    out = Vector(at(0, 1, 0)) - Vector(at(0, 0, 0))
+    here = random.Random(f"arch {at(0, 0, 0)}")
+
+    def stone(darker=0.0):
+        return c.mix(c.mix(TREASURE_STONE, GOLD_STONE, here.uniform(0, 0.3)), TREASURE_MORTAR, darker)
+
+    def rim(r, t):
+        return r * math.cos(t), spring + r * math.sin(t)
+
+    def to_edge(t):
+        """Out from the arch's middle, at t, to the edge of its front (the pilasters, and its top)."""
+        dx, dz = math.cos(t), math.sin(t)
+        s = min(p0 / abs(dx) if abs(dx) > 1e-6 else 1e9, (top - spring) / dz if dz > 1e-6 else 1e9)
+        return s * dx, spring + s * dz
+
+    stones = 11
+    corner = math.atan2(top - spring, p0)
+    for n in range(stones):
+        t0, t1 = math.pi * n / stones, math.pi * (n + 1) / stones
+        (iu0, iz0), (iu1, iz1), (ou0, oz0), (ou1, oz1) = rim(a, t0), rim(a, t1), rim(ring, t0), rim(ring, t1)
+        if n == stones // 2:
+            # The keystone: gold, standing out, and up past the ring, leaning
+            # out at its top (lit by the room, not the roof).
+            ku, kz = rim(ring + 0.15, (t0 + t1) / 2)
+            lean = lambda z: 0.17 if z > (iz0 + kz) / 2 else 0.07  # noqa: E731
+            pts = [at(iu0, face_d + 0.07, iz0), at(iu1, face_d + 0.07, iz1), at(ou1, face_d + 0.17, kz),
+                   at(ou0, face_d + 0.17, kz)]
+            face(gilding, pts, GILT, out, 0.04)
+            for (u_, z_), (v_, w_) in (((iu0, iz0), (ou0, kz)), ((iu1, iz1), (ou1, kz)), ((ou0, kz), (ou1, kz))):
+                side = [at(u_, face_d, z_), at(v_, face_d, w_), at(v_, face_d + lean(w_), w_), at(u_, face_d + lean(z_), z_)]
+                face(gilding, side, GILT, Vector(at((u_ + v_) / 2, face_d, (z_ + w_) / 2)) - Vector(at(0, face_d, spring)), 0.04)
+        else:
+            face(cave_made, [at(iu0, face_d, iz0), at(iu1, face_d, iz1), at(ou1, face_d, oz1), at(ou0, face_d, oz0)],
+                 stone(0.12 * (n % 2)), out)
+        # Round from the ring to the front's edge (with its corner, if it's in between).
+        edge = [to_edge(t0)] + [to_edge(t) for t in (corner, math.pi - corner) if t0 < t < t1] + [to_edge(t1)]
+        face(cave_made, [at(ou1, face_d, oz1), at(ou0, face_d, oz0)] + [at(u_, face_d, z_) for u_, z_ in edge],
+             stone(), out)
+        # Under the arch, back into the way.
+        towards = Vector(at(-math.cos((t0 + t1) / 2), 0, spring - math.sin((t0 + t1) / 2))) - Vector(at(0, 0, spring))
+        face(cave_made, [at(iu0, face_d, iz0), at(iu1, face_d, iz1), at(iu1, back, iz1), at(iu0, back, iz0)],
+             stone(0.15), towards)
+    # Its jambs, in courses, and under the arch, back into the way.
+    courses = 3
+    for sign in (1, -1):
+        for k in range(courses):
+            z0, z1 = spring * k / courses, spring * (k + 1) / courses
+            face(cave_made, [at(sign * a, face_d, z0), at(sign * p0, face_d, z0), at(sign * p0, face_d, z1),
+                             at(sign * a, face_d, z1)], stone(), out)
+        face(cave_made, [at(sign * a, face_d, 0), at(sign * a, back, 0), at(sign * a, back, spring),
+                         at(sign * a, face_d, spring)], stone(0.15), Vector(at(-sign, 0, 0)) - Vector(at(0, 0, 0)))
+        # The pilasters: a base, a gold frame on its face, and a capital.
+        footprint(dressed(cave_made, at, sign * p0, sign * p1, -0.6, 0.45, 0, top, stone()))
+        dressed(cave_made, at, sign * (p0 - 0.06), sign * (p1 + 0.06), -0.6, 0.51, 0, 0.32, stone(0.1))
+        dressed(cave_made, at, sign * (p0 - 0.06), sign * (p1 + 0.06), -0.6, 0.51, top - 0.32, top, stone(0.1))
+        lo, hi = sorted((sign * (p0 + 0.16), sign * (p1 - 0.16)))
+        gilt_frame(at, lo, hi, 0.65, top - 0.65, 0.46)
+    # The cornice, over it all.
+    dressed(cave_made, at, -p1 - 0.12, p1 + 0.12, -0.6, 0.6, top, top + 0.3, stone(0.05))
+    dressed(gilding, at, -p1 - 0.12, p1 + 0.12, 0.6, 0.63, top + 0.05, top + 0.1, GILT, 0.04)
+    if blind:
+        # Its recess, dark, and the sunburst in it: rays round a gold sun.
+        outline = [(a, 0.0)] + [rim(a, math.pi * k / 24) for k in range(25)] + [(-a, 0.0)]
+        face(cave_made, [at(u_, back, z_) for u_, z_ in outline], c.mix(TREASURE_STONE, TREASURE_MORTAR, 0.55), out)
+        rays = 13
+        for k in range(rays):
+            t = math.pi * (k + 0.5) / rays
+            long = a * (0.92 if k % 2 else 0.7)
+            u0_, z0_ = rim(0.3, t - 0.06)
+            u1_, z1_ = rim(0.3, t + 0.06)
+            ut, zt = rim(long, t)
+            face(gilding, [at(u0_, back + 0.02, z0_), at(u1_, back + 0.02, z1_), at(ut, back + 0.02, zt)], GILT, out, 0.04)
+        sun = [rim(0.3, math.pi * k / 12) for k in range(13)]
+        face(gilding, [at(u_, back + 0.03, z_) for u_, z_ in sun], GILT, out, 0.04)
+
+
 # The halls: a floor of squares out under the walls, a lumpy round wall with
 # openings where the ways come in, and a dome.
 caves = c.Builder()
@@ -3769,37 +3967,62 @@ for hall in HALLS.values():
     reach = R + 1.4
     n = int(reach / step) + 1
     drops = [(left, right) for cave, left, right in DROPS if cave is hall]
+
+    def cut(square):
+        """A piece of floor, cut off where a way drops away out of the
+        doorway, along the way's first row of floor, which goes on down from
+        there."""
+        x_, y_ = sum(p[0] for p in square) / len(square), sum(p[1] for p in square) / len(square)
+        for (lx_, ly_), (rx_, ry_) in drops:
+            mx, my = (lx_ + rx_) / 2, (ly_ + ry_) / 2
+            across = math.hypot(rx_ - lx_, ry_ - ly_)
+            ux, uy = (rx_ - lx_) / across, (ry_ - ly_) / across
+            tx, ty = -uy, ux  # out of the cave
+            if (hx - mx) * tx + (hy - my) * ty > 0:
+                tx, ty = -tx, -ty
+            if abs((x_ - mx) * ux + (y_ - my) * uy) < across / 2 + 1.1:
+                square = clip(square, mx, my, tx, ty)
+        return square
+
     for i in range(-n, n):
         for j in range(-n, n):
             x0, y0 = hx + i * step, hy + j * step
             nearest_x, nearest_y = max(x0, min(hx, x0 + step)), max(y0, min(hy, y0 + step))
             if math.hypot(nearest_x - hx, nearest_y - hy) > reach:
                 continue
-            # (Cut off where a way drops away out of the doorway, along the
-            # way's first row of floor, which goes on down from there.)
-            square = [(x0, y0), (x0 + step, y0), (x0 + step, y0 + step), (x0, y0 + step)]
-            for (lx_, ly_), (rx_, ry_) in drops:
-                mx, my = (lx_ + rx_) / 2, (ly_ + ry_) / 2
-                across = math.hypot(rx_ - lx_, ry_ - ly_)
-                ux, uy = (rx_ - lx_) / across, (ry_ - ly_) / across
-                tx, ty = -uy, ux  # out of the cave
-                if (hx - mx) * tx + (hy - my) * ty > 0:
-                    tx, ty = -tx, -ty
-                if abs((x0 + step / 2 - mx) * ux + (y0 + step / 2 - my) * uy) < across / 2 + 1.1:
-                    square = clip(square, mx, my, tx, ty)
+            square = cut([(x0, y0), (x0 + step, y0), (x0 + step, y0 + step), (x0, y0 + step)])
             if len(square) < 3:
                 continue
             colour, vary = hall.ground, 0.12
             if hall.place == "beautiful-chamber":
                 colour, vary = (hall.ground if (i + j) % 2 else c.linear("#1d1a1c")), 0.03
             elif hall.place == "treasure-room":
-                colour = c.mix(hall.ground, GOLD_STONE, 0.5 if (i + j) % 2 else 0.1)
+                colour, vary = TREASURE_MORTAR, 0.05  # (between its flagstones, below)
             elif hall.place == "damp-tunnels" and noise.noise(Vector((x0 / 4, y0 / 4, 9.0))) > 0.15:
                 colour = c.linear("#2f3c44")  # puddles
             # (A shade lower than the ways' floors, where they overlap.)
             fl = f - 0.06
             rock_of.add([(x, y, fl) for x, y in square], [tuple(range(len(square)))],
                       [c.vary(colour, vary, Vector((x0, y0, fl)))] * len(square))
+    if hall.place == "treasure-room":
+        # Its flagstones, in rows of all lengths, a shade over the mortar.
+        flags = random.Random("the treasure room's flagstones")
+        y0 = hy - reach
+        while y0 < hy + reach:
+            deep = flags.uniform(1.0, 1.5)
+            x0 = hx - reach - flags.uniform(0, 1.2)
+            while x0 < hx + reach:
+                wide = flags.uniform(0.9, 1.8)
+                if math.hypot(x0 + wide / 2 - hx, y0 + deep / 2 - hy) < R + 1.0:
+                    flag = cut([(x0 + SEAM, y0 + SEAM), (x0 + wide - SEAM, y0 + SEAM), (x0 + wide - SEAM, y0 + deep - SEAM),
+                                (x0 + SEAM, y0 + deep - SEAM)])
+                    if len(flag) >= 3:
+                        fl = f - 0.045
+                        colour = c.mix(TREASURE_FLOOR, GOLD_STONE, flags.uniform(0, 0.35) ** 2 * 2)
+                        rock_of.add([(x, y, fl) for x, y in flag], [tuple(range(len(flag)))],
+                                    [c.vary(colour, 0.06, Vector((x, y, fl))) for x, y in flag])
+                x0 += wide
+            y0 += deep
 
     sides = max(28, int(2 * math.pi * R / (1.1 if smooth_wall else 0.55)))
     wall_top = f + max(TUNNEL_TALL + 0.8, hall.tall * 0.5)
@@ -3876,9 +4099,57 @@ for hall in HALLS.values():
                     b0 = tuple(p + (q - p) * t for p, q in zip(b0, b1))
             pts = [a0, b0, b1, a1]
             colours = [shade(k, r0, darker), shade(k + 1, r0, darker), shade(k + 1, r1, darker), shade(k, r1, darker)]
+            if hall.place == "treasure-room" and j < wall_rings - 1:
+                colours = [TREASURE_MORTAR] * 4  # (between its stones, below)
             rock_of.add(pts, [(0, 1, 2, 3)], colours)
         last = rings[-1]
         rock_of.add([point(k, last), point(k + 1, last), (hx, hy, f + hall.tall)], [(0, 1, 2)], [hall.wall] * 3)
+    if hall.place == "treasure-room":
+        # Its wall in courses of dressed stone, each stone a shade in from
+        # the mortar, every other course along by half a stone. (Not over
+        # the doorways: their arches are there.)
+        courses = random.Random("the treasure room's walls")
+        wall_r = rings[0][0][0]
+
+        def on_wall(a, z):
+            """A point on the wall, round at a (radians), a shade in from it."""
+            k = math.floor(a / (2 * math.pi) * sides)
+            t = a / (2 * math.pi) * sides - k
+            p, q = point(k, rings[0]), point(k + 1, rings[0])
+            x, y = p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t
+            inward = 1 - 0.025 / wall_r
+            return hx + (x - hx) * inward, hy + (y - hy) * inward, z
+
+        for row in range(round((wall_top - f) / 0.5)):  # (courses half a metre tall)
+            z0, z1 = f + row * 0.5 + SEAM, f + (row + 1) * 0.5 - SEAM
+            for k in range(sides):
+                k0 = k + 0.5 * (row % 2)
+                a0, a1 = 2 * math.pi * k0 / sides + SEAM / wall_r, 2 * math.pi * (k0 + 1) / sides - SEAM / wall_r
+                am = (a0 + a1) / 2
+                if z0 < f + TUNNEL_TALL + 0.5 and opening(hall, hx + math.cos(am) * (R + 0.6), hy + math.sin(am) * (R + 0.6)):
+                    continue
+                colour = c.vary(c.mix(TREASURE_STONE, GOLD_STONE, courses.uniform(0, 0.3) ** 2 * 3), 0.05,
+                                Vector((am * 10, z0, 0)))
+                # (Bent where it's round a corner of the wall.)
+                ends = [a0] + ([2 * math.pi * (k + 1) / sides] if row % 2 else []) + [a1]
+                for b0_, b1_ in zip(ends, ends[1:]):
+                    rock_of.add([on_wall(b0_, z0), on_wall(b1_, z0), on_wall(b1_, z1), on_wall(b0_, z1)], [(0, 1, 2, 3)],
+                                [colour] * 4)
+        # And a cornice along its top, a gold line along it.
+        for k in range(sides):
+            p, q = point(k, rings[0]), point(k + 1, rings[0])
+
+            def ledge(pt, by, z):
+                inward = 1 - by / wall_r
+                return hx + (pt[0] - hx) * inward, hy + (pt[1] - hy) * inward, z
+
+            top_, out_ = wall_top, 0.28
+            for (u0_, z0_), (u1_, z1_) in (((0.0, top_ - 0.3), (out_, top_ - 0.3)), ((out_, top_ - 0.3), (out_, top_)),
+                                           ((out_, top_), (0.0, top_))):
+                face(rock_of, [ledge(p, u0_, z0_), ledge(q, u0_, z0_), ledge(q, u1_, z1_), ledge(p, u1_, z1_)],
+                     c.mix(TREASURE_STONE, TREASURE_MORTAR, 0.1), (hx - p[0], hy - p[1], 0.5 if z1_ >= top_ else -0.5))
+            face(gilding, [ledge(p, out_ + 0.01, top_ - 0.2), ledge(q, out_ + 0.01, top_ - 0.2), ledge(q, out_ + 0.01, top_ - 0.14),
+                           ledge(p, out_ + 0.01, top_ - 0.14)], GILT, (hx - p[0], hy - p[1], 0), 0.04)
 
     # Round each doorway, the rock curving in to meet the way's mouth: from
     # its edges (the way's walls and roof end there) back into the cave's
@@ -3958,27 +4229,132 @@ for hall in HALLS.values():
         rho = math.hypot(x - hx, y - hy) / (R + 0.4)
         return wall_top + (f + hall.tall - wall_top) * math.sqrt(max(0.0, 1 - rho * rho))
 
-    if hall.place in ("treasure-room", "beautiful-chamber"):
+    if hall.place == "beautiful-chamber":
         # Pillars round the room.
-        count = 8 if hall.place == "treasure-room" else 14
-        inset = 2.2 if hall.place == "treasure-room" else 0.9
-        for k in range(count):
-            a = 2 * math.pi * (k + 0.5) / count
-            x, y = hx + math.cos(a) * (R - inset), hy + math.sin(a) * (R - inset)
+        for k in range(14):
+            a = 2 * math.pi * (k + 0.5) / 14
+            x, y = hx + math.cos(a) * (R - 0.9), hy + math.sin(a) * (R - 0.9)
             if opening(hall, x, y):
                 continue
-            cave_made.cylinder((x, y, f), (x, y, ceiling(x, y) + 0.2), 0.55, 0.45, GOLD_STONE if hall.place == "beautiful-chamber"
-                           else c.linear("#b49a68"), sides=10)
+            cave_made.cylinder((x, y, f), (x, y, ceiling(x, y) + 0.2), 0.55, 0.45, GOLD_STONE, sides=10)
             under_circle(x, y, 0.55)
     if hall.place == "treasure-room":
-        # The altar on its steps, against the north wall, and chests.
-        ax, ay = hx, hy + R - 3.2
-        block(cave_made, ax - 2.6, ay - 1.6, f, ax + 2.6, ay + 1.6, f + 0.4, GOLD_STONE, solid=False)
-        block(cave_made, ax - 1.6, ay - 0.9, f + 0.4, ax + 1.6, ay + 0.9, f + 1.5, c.linear("#d8b46a"), solid=False)
-        under_box(ax, ay, 2.6, 1.6)
-        for cx_, cy_ in ((hx - 4.5, hy + 3), (hx + 4.5, hy + 3), (hx - 5, hy - 3.5), (hx + 5, hy - 3.5)):
-            block(cave_made, cx_ - 0.7, cy_ - 0.45, f, cx_ + 0.7, cy_ + 0.45, f + 0.8, c.linear("#7a4e26"), solid=False)
-            under_box(cx_, cy_, 0.7, 0.45)
+        luck = random.Random("the treasure room")
+        wall_r = R + 0.4
+        # Columns round the room: a square plinth, a round shaft between gold
+        # bands, a gold capital, and over it, square, into the roof.
+        for k in range(8):
+            a = 2 * math.pi * (k + 0.5) / 8
+            x, y = hx + math.cos(a) * (R - 2.2), hy + math.sin(a) * (R - 2.2)
+            if opening(hall, x, y):
+                continue
+            on = facing_out(x, y, f, 1, 0, 0, 1)
+            dressed(cave_made, on, -0.62, 0.62, -0.62, 0.62, 0, 0.35, TREASURE_STONE)
+            gilding.cylinder((x, y, f + 0.35), (x, y, f + 0.5), 0.56, 0.47, GILT, sides=16)
+            cave_made.cylinder((x, y, f + 0.5), (x, y, f + 5.3), 0.45, 0.4, TREASURE_STONE, sides=16)
+            for z in (1.4, 4.3):
+                gilding.cylinder((x, y, f + z), (x, y, f + z + 0.1), 0.455, 0.45, GILT, sides=16)
+            gilding.cylinder((x, y, f + 5.3), (x, y, f + 5.6), 0.41, 0.6, GILT, sides=16)
+            dressed(cave_made, on, -0.66, 0.66, -0.66, 0.66, 5.6, ceiling(x, y) + 0.3 - f, TREASURE_STONE)
+            under_circle(x, y, 0.62)
+        # Against the wall, between the doorways, pillars carved with lions,
+        # turned in to face the room.
+        for degrees, lion in ((50, "lion facing left"), (130, "lion"), (230, "lion facing left"), (310, "lion")):
+            a = math.radians(degrees)
+            front = wall_r - 0.85
+            on = facing_out(hx + math.cos(a) * front, hy + math.sin(a) * front, f,
+                            math.sin(a), -math.cos(a), -math.cos(a), -math.sin(a))
+            footprint(dressed(cave_made, on, -0.7, 0.7, -1.3, 0, 0, 4.4, TREASURE_STONE))
+            dressed(cave_made, on, -0.8, 0.8, -1.3, 0.1, 0, 0.45, c.mix(TREASURE_STONE, TREASURE_MORTAR, 0.1))
+            dressed(cave_made, on, -0.8, 0.8, -1.3, 0.12, 4.4, 4.8, c.mix(TREASURE_STONE, TREASURE_MORTAR, 0.1))
+            dressed(gilding, on, -0.8, 0.8, 0.12, 0.15, 4.5, 4.6, GILT, 0.04)
+            carving(on, lion, -0.47, 0.47, 0.95, 3.1, 0.005)
+        # Arches over the doorways.
+        for (lx_, ly_), (rx_, ry_), df, ix, iy in ARCHES:
+            half_ = math.hypot(rx_ - lx_, ry_ - ly_) / 2
+            on = facing_out((lx_ + rx_) / 2, (ly_ + ry_) / 2, df, (rx_ - lx_) / (2 * half_), (ry_ - ly_) / (2 * half_), ix, iy)
+            arch_front(on, half_ - 0.2, 1.65, 4.05)
+        # The altar, at the north end: up its steps, carved, and behind it, a
+        # niche with a gold sunburst.
+        niche = facing_out(hx, hy + R - 0.5, f, 1, 0, 0, -1)
+        arch_front(niche, 1.4, 2.5, 4.6, blind=True)
+        for hw, y0, z in ((1.95, 3.8, 0.2), (1.6, 4.3, 0.4), (1.25, 4.8, 0.6)):
+            on = facing_out(hx, hy, f, 1, 0, 0, -1)
+            dressed(cave_made, on, -hw, hw, -8.2, -y0, 0, z, c.mix(TREASURE_STONE, c.linear("#ffffff"), 0.06))
+        under_box(hx, hy + 6.0, 1.95, 2.2)
+        altar = facing_out(hx, hy + 5.35, f, 1, 0, 0, -1)
+        dressed(cave_made, altar, -1.05, 1.05, -1.55, 0.15, 0.6, 0.8, c.mix(TREASURE_STONE, TREASURE_MORTAR, 0.1))
+        dressed(cave_made, altar, -0.9, 0.9, -1.4, 0, 0.8, 1.75, TREASURE_STONE)
+        dressed(cave_made, altar, -1.05, 1.05, -1.55, 0.15, 1.75, 1.95, c.mix(TREASURE_STONE, TREASURE_MORTAR, 0.1))
+        dressed(gilding, altar, -1.06, 1.06, -1.56, 0.16, 1.8, 1.86, GILT, 0.04)
+        carving(altar, "griffin", -0.62, 0.62, 0.85, 1.7, 0.005)
+        for sign in (1, -1):
+            flank = facing_out(hx + sign * 0.9, hy + 6.05, f, 0, sign, sign, 0)
+            plaque(flank, -0.42, 0.42, 0.95, 1.6, 0.005)
+        # Gold braziers burning: a foot, a stem with a knop on it, and a
+        # bowl of embers, its fire flickering up out of it.
+        for x, y in ((hx - 1.45, hy + 3.05), (hx + 1.45, hy + 3.05), (hx - 4.0, hy + 5.9), (hx + 4.0, hy + 5.9)):
+            gilding.cylinder((x, y, f), (x, y, f + 0.12), 0.36, 0.3, GILT, sides=12)
+            gilding.cylinder((x, y, f + 0.12), (x, y, f + 0.9), 0.08, 0.06, GILT, sides=8)
+            gilding.blob((x, y, f + 0.5), 0.12, GILT, squash=0.8, lumpy=0.0, subdivisions=1)
+            gilding.cylinder((x, y, f + 0.88), (x, y, f + 1.15), 0.1, 0.42, GILT, sides=14)
+            gilding.cylinder((x, y, f + 1.15), (x, y, f + 1.2), 0.43, 0.44, GILT, sides=14)
+            brazier_flames.blob((x, y, f + 1.1), 0.4, EMBERS, squash=0.18, lumpy=0.1, seed=round(x), lit=False)
+            for k, (size, tall, colour) in enumerate(((0.24, 0.75, FIRE), (0.13, 0.5, FIRE_HEART))):
+                brazier_flames.cone((x, y, f + 1.12), tall, size, colour, sides=11, droop=0, seed=k)
+            for k in range(4):
+                t = 2 * math.pi * (k + luck.random()) / 4
+                brazier_flames.cone((x + math.cos(t) * 0.18, y + math.sin(t) * 0.18, f + 1.12), luck.uniform(0.3, 0.5), 0.08,
+                                    FIRE, sides=5, droop=0, seed=k)
+            under_circle(x, y, 0.42)
+        # Pedestals, a gold diamond on each side.
+        for x, y in ((hx - 4.4, hy - 4.4), (hx + 4.4, hy - 4.4)):
+            on = facing_out(x, y, f, 1, 0, 0, 1)
+            dressed(cave_made, on, -0.5, 0.5, -0.5, 0.5, 0, 0.22, c.mix(TREASURE_STONE, TREASURE_MORTAR, 0.1))
+            dressed(cave_made, on, -0.4, 0.4, -0.4, 0.4, 0.22, 1.15, TREASURE_STONE)
+            dressed(cave_made, on, -0.52, 0.52, -0.52, 0.52, 1.15, 1.32, c.mix(TREASURE_STONE, TREASURE_MORTAR, 0.1))
+            for ux, uy in ((1, 0), (0, 1), (-1, 0), (0, -1)):
+                flank = facing_out(x + ux * 0.4, y + uy * 0.4, f, -uy, ux, ux, uy)
+                plaque(flank, -0.26, 0.26, 0.35, 1.02, 0.005)
+            under_box(x, y, 0.5, 0.5)
+        # The chests, open, by the altar, turned to the room: full to their
+        # rims with coins, heaps of them, and rubies and emeralds among them
+        # (a goblet in one).
+        (cx0, cy0, cx1, cy1), _ = PROPS.put(c.Builder(), "Chest_Wood", (0, 0, 0), 0, 1.3)  # (its size, as it's made)
+        for n, (x, y) in enumerate(((hx - 3.9, hy + 2.4), (hx + 3.9, hy + 2.4))):
+            yaw = math.atan2(hx - x, y - hy)
+            (x0, y0, x1, y1), _ = PROPS.put(cave_made, "Chest_Wood", (x, y, f - 0.045), yaw, 1.3)
+            under_box((x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2)
+            inside = c.Kit.placing((x, y, f + 0.46), yaw)
+
+            def anywhere(margin):
+                """Somewhere inside it, its middle (from above), and how high."""
+                u = luck.uniform(cx0 + 0.14 + margin, cx1 - 0.14 - margin)
+                v = luck.uniform(cy0 + 0.12 + margin, cy1 - 0.12 - margin)
+                return inside((u, v, luck.uniform(0, 0.04)))
+
+            for spot, model in (((-0.22, 0.0), "Coin_Pile_2"), ((0.2, 0.03), "Coin_Pile"), ((0.0, -0.02), "Coin_Pile")):
+                PROPS.put(gilding, model, inside((*spot, -0.06)), luck.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
+            for k in range(36):
+                PROPS.put(gilding, "Coin", anywhere(0.0), luck.uniform(0, 2 * math.pi), 2.2, tint=GOLD)
+            if n == 1:
+                PROPS.put(gilding, "Chalice", inside((0.15, 0.0, 0.0)), 0.8, 2.2, tint=GOLD)
+            for k in range(6):
+                size = luck.uniform(0.07, 0.1)
+                sx, sy, sz = anywhere(0.05)
+                hoard_jewels.blob((sx, sy, sz + size * 0.5), size, JEWELS["ruby" if k % 2 else "emerald"],
+                                  squash=0.75, lumpy=0.0, seed=k + 10 * n, subdivisions=0)
+        # Rubble, fallen at the foot of the walls.
+        for degrees in (30, 150, 205, 335):
+            for k in range(5):
+                a = math.radians(degrees + luck.uniform(-5, 5))
+                r = wall_r - luck.uniform(0.3, 0.9)
+                size = luck.uniform(0.12, 0.32)
+                x, y = hx + math.cos(a) * r, hy + math.sin(a) * r
+                caves.blob((x, y, f - size * 0.3), size, c.mix(TREASURE_STONE, ROCK, 0.5), squash=0.7, lumpy=0.2,
+                           seed=k + degrees)
+                if size > 0.2:
+                    under_circle(x, y, size)
     elif hall.place != "beautiful-chamber":
         # Stalagmites round the edge, stalactites overhead.
         rock = c.mix(hall.wall, ROCK, 0.4)
@@ -4934,6 +5310,9 @@ ky = DK[1] - HALLS["dark-tunnels"].r - 1.5
 obstacle(["dark-tunnels south"], "box", DK[0], -ky, TUNNEL_HALF + 0.3, 1.0, under=True)  # too dark to go on
 caves.build("caves", smooth=False)
 cave_made.build("cave-made", smooth=False)
+gilding.build("gilding", smooth=False)
+brazier_flames.build("brazier-flames", smooth=False)
+hoard_jewels.build("hoard-jewels", smooth=False)
 pit.build("pit", smooth=False)
 
 # Rocks either side of the mouths. (Their buried halves reach down a long
