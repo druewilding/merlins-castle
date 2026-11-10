@@ -25,16 +25,16 @@
     "world": "cd original && python3 convert.py"
   },
   "dependencies": {
-    "three": "^0.186.1"
+    "three": "^0.187.0"
   },
   "devDependencies": {
-    "@types/three": "^0.186.0",
+    "@types/three": "^0.187.0",
     "eslint-config-plus-prettier": "4.3.3",
-    "playwright": "^1.64.0",
+    "playwright": "^1.65.0",
     "sharp": "0.35.5",
     "typescript": "6.0.3",
-    "vite": "8.3.4",
-    "vitest": "5.0.3"
+    "vite": "8.3.7",
+    "vitest": "5.1.0"
   },
   "private": true,
   "prettier": "eslint-config-plus-prettier/prettier"
